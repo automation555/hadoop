@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.yarn.server.router.webapp;
 
-import com.sun.jersey.api.client.Client;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWSConsts;
@@ -54,16 +53,15 @@ public class NodesBlock extends HtmlBlock {
   protected void render(Block html) {
     // Get the node info from the federation
     Configuration conf = this.router.getConfig();
-    Client client = RouterWebServiceUtil.createJerseyClient(conf);
     String webAppAddress = WebAppUtils.getRouterWebAppURLWithScheme(conf);
-    NodesInfo nodes = RouterWebServiceUtil
-        .genericForward(webAppAddress, null, NodesInfo.class, HTTPMethods.GET,
-            RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.NODES, null, null, conf,
-            client);
+    NodesInfo nodes = RouterWebServiceUtil.genericForward(webAppAddress, null,
+        NodesInfo.class, HTTPMethods.GET,
+        RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.NODES, null, null);
 
     setTitle("Nodes");
 
     TBODY<TABLE<Hamlet>> tbody = html.table("#nodes").thead().tr()
+        .th(".subCluster", "SubCluster")
         .th(".nodelabels", "Node Labels")
         .th(".rack", "Rack")
         .th(".state", "Node State")
@@ -84,6 +82,7 @@ public class NodesBlock extends HtmlBlock {
       int usedMemory = (int) info.getUsedMemory();
       int availableMemory = (int) info.getAvailableMemory();
       TR<TBODY<TABLE<Hamlet>>> row = tbody.tr();
+      row.td().__(info.getClusterId());
       row.td().__(StringUtils.join(",", info.getNodeLabels())).__();
       row.td().__(info.getRack()).__();
       row.td().__(info.getState()).__();
