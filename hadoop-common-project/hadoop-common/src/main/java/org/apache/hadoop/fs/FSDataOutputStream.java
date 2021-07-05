@@ -24,18 +24,14 @@ import java.io.OutputStream;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.fs.impl.StoreImplementationUtils;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
-import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
+import org.apache.hadoop.fs.common.Abortable;
 
 /** Utility that wraps a {@link OutputStream} in a {@link DataOutputStream}.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class FSDataOutputStream extends DataOutputStream
-    implements Syncable, CanSetDropBehind, StreamCapabilities,
-      IOStatisticsSource, Abortable {
+    implements Syncable, CanSetDropBehind, Abortable, StreamCapabilities {
   private final OutputStream wrappedStream;
 
   private static class PositionCache extends FilterOutputStream {
@@ -107,11 +103,20 @@ public class FSDataOutputStream extends DataOutputStream
   }
 
   @Override
+  public void abort() throws IOException {
+    if (wrappedStream instanceof Abortable) {
+      ((Abortable) wrappedStream).abort();
+    } else {
+      wrappedStream.close();
+    }
+  }
+
+  @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(
         "FSDataOutputStream{");
-    sb.append("wrappedStream=").append(wrappedStream)
-        .append('}');
+    sb.append("wrappedStream=").append(wrappedStream);
+    sb.append('}');
     return sb.toString();
   }
 
@@ -127,7 +132,10 @@ public class FSDataOutputStream extends DataOutputStream
 
   @Override
   public boolean hasCapability(String capability) {
-    return StoreImplementationUtils.hasCapability(wrappedStream, capability);
+    if (wrappedStream instanceof StreamCapabilities) {
+      return ((StreamCapabilities) wrappedStream).hasCapability(capability);
+    }
+    return false;
   }
 
   @Override  // Syncable
@@ -155,34 +163,6 @@ public class FSDataOutputStream extends DataOutputStream
     } catch (ClassCastException e) {
       throw new UnsupportedOperationException("the wrapped stream does " +
           "not support setting the drop-behind caching setting.");
-    }
-  }
-
-  /**
-   * Get the IO Statistics of the nested stream, falling back to
-   * empty statistics if the stream does not implement the interface
-   * {@link IOStatisticsSource}.
-   * @return an IOStatistics instance.
-   */
-  @Override
-  public IOStatistics getIOStatistics() {
-    return IOStatisticsSupport.retrieveIOStatistics(wrappedStream);
-  }
-
-  /**
-   * Invoke {@code abort()} on the wrapped stream if it
-   * is Abortable, otherwise raise an
-   * {@code UnsupportedOperationException}.
-   * @throws UnsupportedOperationException if not available.
-   * @return the result.
-   */
-  @Override
-  public AbortableResult abort() {
-    if (wrappedStream instanceof Abortable) {
-      return ((Abortable) wrappedStream).abort();
-    } else {
-      throw new UnsupportedOperationException(
-          FSExceptionMessages.ABORTABLE_UNSUPPORTED);
     }
   }
 }

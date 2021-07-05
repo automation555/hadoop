@@ -24,10 +24,10 @@ import java.util.*;
 import java.rmi.server.UID;
 import java.security.MessageDigest;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.common.Abortable;
 import org.apache.hadoop.util.Options;
 import org.apache.hadoop.fs.*;
-import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Options.CreateOpts;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -80,7 +80,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_SKIP_CHECKSU
  *                                       values.
  *   </li>
  *   <li>
- *   <code>BlockCompressWriter</code> : Block-compressed files, both keys &amp;
+ *   <code>BlockCompressWriter</code> : Block-compressed files, both keys & 
  *                                      values are collected in 'blocks' 
  *                                      separately and compressed. The size of 
  *                                      the 'block' is configurable.
@@ -95,13 +95,13 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_SKIP_CHECKSU
  * <p>The {@link SequenceFile.Reader} acts as the bridge and can read any of the
  * above <code>SequenceFile</code> formats.</p>
  *
- * <h3 id="Formats">SequenceFile Formats</h3>
+ * <h4 id="Formats">SequenceFile Formats</h4>
  * 
  * <p>Essentially there are 3 different formats for <code>SequenceFile</code>s
  * depending on the <code>CompressionType</code> specified. All of them share a
  * <a href="#Header">common header</a> described below.
  * 
- * <h4 id="Header">SequenceFile Header</h4>
+ * <h5 id="Header">SequenceFile Header</h5>
  * <ul>
  *   <li>
  *   version - 3 bytes of magic header <b>SEQ</b>, followed by 1 byte of actual 
@@ -134,7 +134,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_SKIP_CHECKSU
  *   </li>
  * </ul>
  * 
- * <h5>Uncompressed SequenceFile Format</h5>
+ * <h5 id="#UncompressedFormat">Uncompressed SequenceFile Format</h5>
  * <ul>
  * <li>
  * <a href="#Header">Header</a>
@@ -153,7 +153,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_SKIP_CHECKSU
  * </li>
  * </ul>
  *
- * <h5>Record-Compressed SequenceFile Format</h5>
+ * <h5 id="#RecordCompressedFormat">Record-Compressed SequenceFile Format</h5>
  * <ul>
  * <li>
  * <a href="#Header">Header</a>
@@ -172,7 +172,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_SKIP_CHECKSU
  * </li>
  * </ul>
  * 
- * <h5>Block-Compressed SequenceFile Format</h5>
+ * <h5 id="#BlockCompressedFormat">Block-Compressed SequenceFile Format</h5>
  * <ul>
  * <li>
  * <a href="#Header">Header</a>
@@ -827,16 +827,15 @@ public class SequenceFile {
         this.theMetadata.entrySet().iterator();
       while (iter.hasNext()) {
         Map.Entry<Text, Text> en = iter.next();
-        sb.append("\t").append(en.getKey().toString()).append("\t")
-            .append(en.getValue().toString()).append("\n");
+        sb.append("\t").append(en.getKey().toString()).append("\t").append(en.getValue().toString());
+        sb.append("\n");
       }
       return sb.toString();
     }
   }
   
   /** Write key/value pairs to a sequence-format file. */
-  public static class Writer implements java.io.Closeable, Syncable,
-                  Flushable, StreamCapabilities {
+  public static class Writer implements java.io.Closeable, Syncable, Abortable {
     private Configuration conf;
     FSDataOutputStream out;
     boolean ownOutputStream = true;
@@ -874,6 +873,15 @@ public class SequenceFile {
         sync = digester.digest();
       } catch (Exception e) {
         throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public void abort() throws IOException {
+      if (out instanceof Abortable) {
+        ((Abortable) out).abort();
+      } else {
+        out.close();
       }
     }
 
@@ -1368,21 +1376,6 @@ public class SequenceFile {
       if (out != null) {
         out.hflush();
       }
-    }
-
-    @Override
-    public void flush() throws IOException {
-      if (out != null) {
-        out.flush();
-      }
-    }
-
-    @Override
-    public boolean hasCapability(String capability) {
-      if (out !=null && capability != null) {
-        return out.hasCapability(capability);
-      }
-      return false;
     }
     
     /** Returns the configuration of this file. */
@@ -1952,8 +1945,8 @@ public class SequenceFile {
      * @param fs The file system used to open the file.
      * @param file The file being read.
      * @param bufferSize The buffer size used to read the file.
-     * @param length The length being read if it is {@literal >=} 0.
-     *               Otherwise, the length is not available.
+     * @param length The length being read if it is >= 0.  Otherwise,
+     *               the length is not available.
      * @return The opened stream.
      * @throws IOException
      */
