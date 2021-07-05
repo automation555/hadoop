@@ -105,6 +105,7 @@ import org.apache.hadoop.hdfs.client.impl.LeaseRenewer;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
+import org.apache.hadoop.hdfs.protocol.BatchRenameException;
 import org.apache.hadoop.hdfs.protocol.BatchedDirectoryListing;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
@@ -186,18 +187,18 @@ import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.DataChecksum.Type;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.tracing.TraceScope;
-import org.apache.hadoop.tracing.Tracer;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.net.InetAddresses;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.net.InetAddresses;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and
@@ -505,15 +506,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       throws IOException {
     synchronized (filesBeingWritten) {
       putFileBeingWritten(inodeId, out);
-      LeaseRenewer renewer = getLeaseRenewer();
-      boolean result = renewer.put(this);
-      if (!result) {
-        // Existing LeaseRenewer cannot add another Daemon, so remove existing
-        // and add new one.
-        LeaseRenewer.remove(renewer);
-        renewer = getLeaseRenewer();
-        renewer.put(this);
-      }
+      getLeaseRenewer().put(this);
     }
   }
 
@@ -656,7 +649,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       clientRunning = false;
       // close dead node detector thread
       if (!disabledStopDeadNodeDetectorThreadForTest) {
-        clientContext.unreference();
+        clientContext.stopDeadNodeDetectorThread();
       }
 
       // close connections to the namenode
@@ -869,18 +862,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return dfsClientConf.getRefreshReadBlockLocationsMS();
   }
 
-  /**
-   * Get locations of the blocks of the specified file `src` from offset
-   * `start` within the prefetch size which is related to parameter
-   * `dfs.client.read.prefetch.size`. DataNode locations for each block are
-   * sorted by the proximity to the client. Please note that the prefetch size
-   * is not equal file length generally.
-   *
-   * @param src the file path.
-   * @param start starting offset.
-   * @return LocatedBlocks
-   * @throws IOException
-   */
   public LocatedBlocks getLocatedBlocks(String src, long start)
       throws IOException {
     return getLocatedBlocks(src, start, dfsClientConf.getPrefetchSize());
@@ -1630,6 +1611,27 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   }
 
   /**
+   * Rename a batch files or directories.
+   * @see ClientProtocol#batchRename(List<String>, List<String>,
+   * Options.Rename...)
+   */
+  public void batchRename(List<String> srcs, List<String> dsts,
+      Options.Rename... options) throws IOException {
+    checkOpen();
+    try {
+      namenode.batchRename(srcs, dsts, options);
+    } catch(RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class,
+          NSQuotaExceededException.class,
+          DSQuotaExceededException.class,
+          UnresolvedPathException.class,
+          SnapshotAccessControlException.class,
+          BatchRenameException.class);
+    }
+  }
+
+
+  /**
    * Truncate a file to an indicated size
    * See {@link ClientProtocol#truncate}.
    */
@@ -2020,17 +2022,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
    * @see ClientProtocol#getStats()
    */
   public FsStatus getDiskStatus() throws IOException {
-    try (TraceScope ignored = tracer.newScope("getStats")) {
-      long[] states = namenode.getStats();
-      return new FsStatus(getStateAtIndex(states, 0),
-          getStateAtIndex(states, 1), getStateAtIndex(states, 2));
-    } catch (RemoteException re) {
-      throw re.unwrapRemoteException();
-    }
-  }
-
-  private long getStateAtIndex(long[] states, int index) {
-    return states.length > index ? states[index] : -1;
+    return new FsStatus(getStateByIndex(0),
+        getStateByIndex(1), getStateByIndex(2));
   }
 
   /**
@@ -3178,17 +3171,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return getKeyProviderUri() != null;
   }
 
-  /**
-   * @return true if p is an encryption zone root
-   */
-  boolean isEZRoot(Path p) throws IOException {
-    EncryptionZone ez = getEZForPath(p.toUri().getPath());
-    if (ez == null) {
-      return false;
-    }
-    return ez.getPath().equals(p.toString());
-  }
-
   boolean isSnapshotTrashRootEnabled() throws IOException {
     return getServerDefaults().getSnapshotTrashRootEnabled();
   }
@@ -3208,9 +3190,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     }
     for (SnapshottableDirectoryStatus dirStatus : dirStatusList) {
       String currDir = dirStatus.getFullPath().toString();
-      if (!currDir.endsWith(Path.SEPARATOR)) {
-        currDir += Path.SEPARATOR;
-      }
       if (path.toUri().getPath().startsWith(currDir)) {
         return currDir;
       }
@@ -3460,12 +3439,5 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   private boolean isDeadNodeDetectionEnabled() {
     return clientContext.isDeadNodeDetectionEnabled();
-  }
-
-  /**
-   * Obtain DeadNodeDetector of the current client.
-   */
-  public DeadNodeDetector getDeadNodeDetector() {
-    return clientContext.getDeadNodeDetector();
   }
 }
