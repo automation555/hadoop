@@ -97,13 +97,14 @@ public class TestBlockReportLease {
       DelayAnswer delayer = new DelayAnswer(BlockManager.LOG);
       doAnswer(delayer).when(spyBlockManager).processReport(
           any(DatanodeStorageInfo.class),
-          any(BlockListAsLongs.class));
+          any(BlockListAsLongs.class),
+          any(BlockReportContext.class));
 
       ExecutorService pool = Executors.newFixedThreadPool(1);
 
       // Trigger sendBlockReport
       BlockReportContext brContext = new BlockReportContext(1, 0,
-          rand.nextLong(), hbResponse.getFullBlockReportLeaseId());
+          rand.nextLong(), hbResponse.getFullBlockReportLeaseId(), true);
       Future<DatanodeCommand> sendBRfuturea = pool.submit(() -> {
         // Build every storage with 100 blocks for sending report
         DatanodeStorage[] datanodeStorages
@@ -133,6 +134,44 @@ public class TestBlockReportLease {
       assertTrue(datanodeCommand instanceof FinalizeCommand);
       assertEquals(poolId, ((FinalizeCommand)datanodeCommand)
           .getBlockPoolId());
+    }
+  }
+
+  @Test
+  public void testCheckBlockReportLease2() throws Exception {
+    HdfsConfiguration conf = new HdfsConfiguration();
+    try (MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+            .numDataNodes(1).build()) {
+      cluster.waitActive();
+
+      FSNamesystem fsn = cluster.getNamesystem();
+      BlockManager blockManager = fsn.getBlockManager();
+      BlockManager spyBlockManager = spy(blockManager);
+      fsn.setBlockManagerForTesting(spyBlockManager);
+      String poolId = cluster.getNamesystem().getBlockPoolId();
+      NamenodeProtocols rpcServer = cluster.getNameNodeRpc();
+
+      // Test based on one DataNode report to Namenode
+      DataNode dn = cluster.getDataNodes().get(0);
+      DatanodeRegistration dnRegistration = dn.getDNRegistrationForBP(poolId);
+      StorageReport[] storages = dn.getFSDataset().getStorageReports(poolId);
+
+      HeartbeatResponse hbResponse = rpcServer.sendHeartbeat(
+              dnRegistration, storages, 0, 0, 0, 0, 0, null, true,
+              SlowPeerReports.EMPTY_REPORT, SlowDiskReports.EMPTY_REPORT);
+      assertTrue(hbResponse.getFullBlockReportLeaseId() != 0);
+
+      spyBlockManager.addFBRDatanode(dnRegistration.getDatanodeUuid());
+      hbResponse = rpcServer.sendHeartbeat(
+              dnRegistration, storages, 0, 0, 0, 0, 0, null, true,
+              SlowPeerReports.EMPTY_REPORT, SlowDiskReports.EMPTY_REPORT);
+      assertTrue(hbResponse.getFullBlockReportLeaseId() == 0);
+
+      spyBlockManager.removeFBRDatanode(dnRegistration.getDatanodeUuid());
+      hbResponse = rpcServer.sendHeartbeat(
+              dnRegistration, storages, 0, 0, 0, 0, 0, null, true,
+              SlowPeerReports.EMPTY_REPORT, SlowDiskReports.EMPTY_REPORT);
+      assertTrue(hbResponse.getFullBlockReportLeaseId() != 0);
     }
   }
 
