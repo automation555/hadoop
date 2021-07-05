@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.crypto.key.kms.server.KMSACLs.Type;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -77,7 +76,7 @@ interface KMSAuditLogger {
         this.user = null;
         this.impersonator = null;
       } else {
-        this.user = ugi.getUserName();
+        this.user = ugi.getShortUserName();
         if (ugi.getAuthenticationMethod()
             == UserGroupInformation.AuthenticationMethod.PROXY) {
           this.impersonator = ugi.getRealUser().getUserName();
