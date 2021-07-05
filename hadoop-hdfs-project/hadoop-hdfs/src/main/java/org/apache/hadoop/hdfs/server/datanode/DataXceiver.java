@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import javax.crypto.SecretKey;
 import org.apache.commons.logging.Log;
@@ -136,7 +136,7 @@ class DataXceiver extends Receiver implements Runnable {
   
   private DataXceiver(Peer peer, DataNode datanode,
       DataXceiverServer dataXceiverServer) throws IOException {
-    super(FsTracer.get(null));
+    super(FsTracer.get(null));  // TODO: Hack
     this.peer = peer;
     this.dnConf = datanode.getDnConf();
     this.socketIn = peer.getInputStream();
@@ -432,7 +432,7 @@ class DataXceiver extends Receiver implements Runnable {
             blk.getBlockId(), dnR.getDatanodeUuid(), success));
       }
       if (fis != null) {
-        IOUtils.cleanupWithLogger(null, fis);
+        IOUtils.cleanup(null, fis);
       }
     }
   }
@@ -555,7 +555,7 @@ class DataXceiver extends Receiver implements Runnable {
           LOG.warn("Failed to shut down socket in error handler", e);
         }
       }
-      IOUtils.cleanupWithLogger(null, shmInfo);
+      IOUtils.cleanup(null, shmInfo);
     }
   }
 
@@ -587,7 +587,7 @@ class DataXceiver extends Receiver implements Runnable {
     final String clientTraceFmt =
       clientName.length() > 0 && ClientTraceLog.isInfoEnabled()
         ? String.format(DN_CLIENTTRACE_FORMAT, localAddress, remoteAddress,
-            "", "%d", "HDFS_READ", clientName, "%d",
+            "%d", "HDFS_READ", clientName, "%d",
             dnR.getDatanodeUuid(), block, "%d")
         : dnR + " Served block " + block + " to " +
             remoteAddress;
@@ -878,11 +878,11 @@ class DataXceiver extends Receiver implements Runnable {
           IOUtils.closeSocket(mirrorSock);
           mirrorSock = null;
           if (isClient) {
-            LOG.error("{}:Exception transferring block {} to mirror {}",
+            LOG.error("{}:Exception transfering block {} to mirror {}",
                 datanode, block, mirrorNode, e);
             throw e;
           } else {
-            LOG.info("{}:Exception transferring {} to mirror {}- continuing " +
+            LOG.info("{}:Exception transfering {} to mirror {}- continuing " +
                 "without the mirror", datanode, block, mirrorNode, e);
             incrDatanodeNetworkErrors();
           }
@@ -929,9 +929,8 @@ class DataXceiver extends Receiver implements Runnable {
       if (isDatanode ||
           stage == BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         datanode.closeBlock(block, null, storageUuid, isOnTransientStorage);
-        LOG.info("Received {} src: {} dest: {} volume: {} of size {}",
-            block, remoteAddress, localAddress, replica.getVolume(),
-            block.getNumBytes());
+        LOG.info("Received {} src: {} dest: {} of size {}",
+            block, remoteAddress, localAddress, block.getNumBytes());
       }
 
       if(isClient) {
@@ -1251,8 +1250,6 @@ class DataXceiver extends Receiver implements Runnable {
         
         LOG.info("Moved {} from {}, delHint={}",
             block, peer.getRemoteAddressString(), delHint);
-
-        datanode.metrics.incrReplaceBlockOpToOtherHost();
       }
     } catch (IOException ioe) {
       opStatus = ERROR;

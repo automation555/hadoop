@@ -46,11 +46,12 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ShortCircuitShmR
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.SlotId;
-import org.apache.hadoop.tracing.SpanContext;
+import org.apache.hadoop.tracing.Span;
 import org.apache.hadoop.tracing.TraceScope;
 import org.apache.hadoop.tracing.Tracer;
 import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import io.opentracing.SpanContext;
 
 /** Receiver */
 @InterfaceAudience.Private
@@ -82,8 +83,7 @@ public abstract class Receiver implements DataTransferProtocol {
   private TraceScope continueTraceSpan(ByteString spanContextBytes,
                                        String description) {
     TraceScope scope = null;
-    SpanContext spanContext =
-        TraceUtils.byteStringToSpanContext(spanContextBytes);
+    SpanContext spanContext = TraceUtils.byteStringToSpanContext(spanContextBytes);
     if (spanContext != null) {
       scope = tracer.newScope(description, spanContext);
     }

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.fs;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -40,11 +40,25 @@ public final class FsTracer {
   public static synchronized Tracer get(Configuration conf) {
     if (instance == null) {
       instance = new Tracer.Builder("FSClient").
-          conf(TraceUtils.wrapHadoopConf(CommonConfigurationKeys.
+          conf(TraceUtils.wrapHadoopConfOT(CommonConfigurationKeys.
               FS_CLIENT_HTRACE_PREFIX, conf)).
           build();
     }
     return instance;
+  }
+
+  @VisibleForTesting
+  public static synchronized void clear() {
+/*
+    if (instance == null) {
+      return;
+    }
+    try {
+      instance.close();
+    } finally {
+      instance = null;
+    }
+ */
   }
 
   private FsTracer() {

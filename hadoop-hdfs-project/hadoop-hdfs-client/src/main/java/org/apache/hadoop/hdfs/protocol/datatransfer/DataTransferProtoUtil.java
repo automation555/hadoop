@@ -92,11 +92,21 @@ public abstract class DataTransferProtoUtil {
     if (span != null) {
       DataTransferTraceInfoProto.Builder traceInfoProtoBuilder =
           DataTransferTraceInfoProto.newBuilder().setSpanContext(
-              TraceUtils.spanContextToByteString(span.getContext()));
+              TraceUtils.spanContextToByteString(span.context()));
       builder.setTraceInfo(traceInfoProtoBuilder);
     }
     return builder.build();
   }
+
+  /*
+  public static SpanId fromProto(DataTransferTraceInfoProto proto) {
+    if ((proto != null) && proto.hasTraceId() &&
+          proto.hasParentId()) {
+      return new SpanId(proto.getTraceId(), proto.getParentId());
+    }
+    return null;
+  }
+  */
 
   public static void checkBlockOpStatus(
           BlockOpResponseProto response,
