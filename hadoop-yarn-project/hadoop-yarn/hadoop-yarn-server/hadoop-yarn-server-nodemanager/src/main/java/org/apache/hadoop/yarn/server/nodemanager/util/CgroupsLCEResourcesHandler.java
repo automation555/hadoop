@@ -37,12 +37,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsMountConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
@@ -75,7 +73,8 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
   private Configuration conf;
   private String cgroupPrefix;
-  private CGroupsMountConfig cGroupsMountConfig;
+  private boolean cgroupMount;
+  private String cgroupMountPath;
 
   private boolean cpuWeightEnabled = true;
   private boolean strictResourceUsageMode = false;
@@ -95,6 +94,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
   private float yarnProcessors;
   private int nodeVCores;
+  private float cappedMultiplier;
 
   public CgroupsLCEResourcesHandler() {
     this.controllerPaths = new HashMap<String, String>();
@@ -116,7 +116,11 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
     this.cgroupPrefix = conf.get(YarnConfiguration.
             NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn");
-    this.cGroupsMountConfig = new CGroupsMountConfig(conf);
+    this.cgroupMount = conf.getBoolean(YarnConfiguration.
+            NM_LINUX_CONTAINER_CGROUPS_MOUNT, false);
+    this.cgroupMountPath = conf.get(YarnConfiguration.
+            NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH, null);
+
     this.deleteCgroupTimeout = conf.getLong(
         YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT,
         YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT);
@@ -135,13 +139,16 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
                 .NM_LINUX_CONTAINER_CGROUPS_STRICT_RESOURCE_USAGE,
             YarnConfiguration
                 .DEFAULT_NM_LINUX_CONTAINER_CGROUPS_STRICT_RESOURCE_USAGE);
+    this.cappedMultiplier = conf.getFloat(
+        YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_CAPPED_MULTIPLIER,
+        YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_CAPPED_MULTIPLIER);
 
     int len = cgroupPrefix.length();
     if (cgroupPrefix.charAt(len - 1) == '/') {
       cgroupPrefix = cgroupPrefix.substring(0, len - 1);
     }
   }
-  
+
   public void init(LinuxContainerExecutor lce) throws IOException {
     this.init(lce,
         ResourceCalculatorPlugin.getResourceCalculatorPlugin(null, conf));
@@ -153,10 +160,10 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     initConfig();
 
     // mount cgroups if requested
-    if (cGroupsMountConfig.mountEnabledAndMountPathDefined()) {
+    if (cgroupMount && cgroupMountPath != null) {
       ArrayList<String> cgroupKVs = new ArrayList<String>();
-      cgroupKVs.add(CONTROLLER_CPU + "=" +
-          cGroupsMountConfig.getMountPath() + "/" + CONTROLLER_CPU);
+      cgroupKVs.add(CONTROLLER_CPU + "=" + cgroupMountPath + "/" +
+                    CONTROLLER_CPU);
       lce.mountCgroups(cgroupKVs, cgroupPrefix);
     }
 
@@ -331,8 +338,8 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
           String.valueOf(cpuShares));
       if (strictResourceUsageMode) {
         if (nodeVCores != containerVCores) {
-          float containerCPU =
-              (containerVCores * yarnProcessors) / (float) nodeVCores;
+          float containerVCoresCapped = Math.min(containerVCores * cappedMultiplier, nodeVCores);
+          float containerCPU = (containerVCoresCapped * yarnProcessors) / (float) nodeVCores;
           int[] limits = getOverallLimits(containerCPU);
           updateCgroup(CONTROLLER_CPU, containerName, CPU_PERIOD_US,
               String.valueOf(limits[0]));
@@ -453,9 +460,9 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     String controllerPath;
     Map<String, Set<String>> parsedMtab = null;
 
-    if (this.cGroupsMountConfig.mountDisabledButMountPathDefined()) {
+    if (this.cgroupMountPath != null && !this.cgroupMount) {
       parsedMtab = ResourceHandlerModule.
-          parseConfiguredCGroupPath(this.cGroupsMountConfig.getMountPath());
+          parseConfiguredCGroupPath(this.cgroupMountPath);
     }
 
     if (parsedMtab == null) {
@@ -473,7 +480,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
         controllerPaths.put(CONTROLLER_CPU, controllerPath);
       } else {
         throw new IOException("Not able to enforce cpu weights; cannot write "
-            + "to cgroup at: " + f.getPath());
+            + "to cgroup at: " + controllerPath);
       }
     } else {
       throw new IOException("Not able to enforce cpu weights; cannot find "
