@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.web;
 
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileChecksum;
@@ -36,12 +37,10 @@ import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 import java.io.IOException;
 import java.util.*;
@@ -565,6 +564,7 @@ public class JsonUtil {
   private static Object toJsonMap(
       SnapshotDiffReport.DiffReportEntry diffReportEntry) {
     final Map<String, Object> m = new TreeMap<String, Object>();
+    m.put("inodeType", diffReportEntry.getInodeType());
     m.put("type", diffReportEntry.getType());
     if (diffReportEntry.getSourcePath() != null) {
       m.put("sourcePath",

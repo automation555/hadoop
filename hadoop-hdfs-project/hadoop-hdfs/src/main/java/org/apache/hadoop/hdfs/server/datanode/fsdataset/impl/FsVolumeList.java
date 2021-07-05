@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -66,7 +65,6 @@ class FsVolumeList {
 
   private final boolean enableSameDiskTiering;
   private final MountVolumeMap mountVolumeMap;
-  private Map<URI, Double> capacityRatioMap;
 
   FsVolumeList(List<VolumeFailureInfo> initialVolumeFailureInfos,
       BlockScanner blockScanner,
@@ -84,7 +82,6 @@ class FsVolumeList {
         DFSConfigKeys.DFS_DATANODE_ALLOW_SAME_DISK_TIERING,
         DFSConfigKeys.DFS_DATANODE_ALLOW_SAME_DISK_TIERING_DEFAULT);
     mountVolumeMap = new MountVolumeMap(config);
-    initializeCapacityRatio(config);
   }
 
   MountVolumeMap getMountVolumeMap() {
@@ -136,20 +133,6 @@ class FsVolumeList {
       return volume;
     }
     return null;
-  }
-
-  private void initializeCapacityRatio(Configuration config) {
-    if (capacityRatioMap == null) {
-      String capacityRatioConfig = config.get(
-          DFSConfigKeys
-              .DFS_DATANODE_SAME_DISK_TIERING_CAPACITY_RATIO_PERCENTAGE,
-          DFSConfigKeys
-              .DFS_DATANODE_SAME_DISK_TIERING_CAPACITY_RATIO_PERCENTAGE_DEFAULT
-      );
-
-      this.capacityRatioMap = StorageLocation
-          .parseCapacityRatio(capacityRatioConfig);
-    }
   }
 
   /** 
@@ -253,7 +236,9 @@ class FsVolumeList {
             FsDatasetImpl.LOG.info("Adding replicas to map for block pool " +
                 bpid + " on volume " + v + "...");
             long startTime = Time.monotonicNow();
-            v.getVolumeMap(bpid, volumeMap, ramDiskReplicaMap);
+            VolumeReplicaMap replicaMap =
+                v.getVolumeMap(bpid, v, ramDiskReplicaMap);
+            volumeMap.addAll(v, replicaMap);
             long timeTaken = Time.monotonicNow() - startTime;
             FsDatasetImpl.LOG.info("Time to add replicas to map for block pool"
                 + " " + bpid + " on volume " + v + ": " + timeTaken + "ms");
@@ -342,22 +327,19 @@ class FsVolumeList {
    *
    * @param ref       a reference to the new FsVolumeImpl instance.
    */
-  void addVolume(FsVolumeReference ref) throws IOException {
+  void addVolume(FsVolumeReference ref) {
     FsVolumeImpl volume = (FsVolumeImpl) ref.getVolume();
     volumes.add(volume);
     if (isSameDiskTieringApplied(volume)) {
       mountVolumeMap.addVolume(volume);
-      URI uri = volume.getStorageLocation().getUri();
-      if (capacityRatioMap.containsKey(uri)) {
-        mountVolumeMap.setCapacityRatio(volume, capacityRatioMap.get(uri));
-      }
     }
-    if (blockScanner != null) {
+    if (blockScanner != null
+        && ref.getVolume().getStorageType() != StorageType.PROVIDED) {
       blockScanner.addVolumeScanner(ref);
     } else {
       // If the volume is not put into a volume scanner, it does not need to
       // hold the reference.
-      IOUtils.cleanupWithLogger(null, ref);
+      IOUtils.cleanup(null, ref);
     }
     // If the volume is used to replace a failed volume, it needs to reset the
     // volume failure info for this volume.

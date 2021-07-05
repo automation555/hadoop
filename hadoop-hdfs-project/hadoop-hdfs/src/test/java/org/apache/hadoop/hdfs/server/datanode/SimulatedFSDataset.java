@@ -40,7 +40,6 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
 
-import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.MountVolumeMap;
 import org.apache.hadoop.thirdparty.com.google.common.math.LongMath;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -415,11 +414,6 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
         }
       } while (deadLine > System.currentTimeMillis());
       throw new IOException("Minimum length was not achieved within timeout");
-    }
-
-    @Override
-    public FsVolumeSpi getVolume() {
-      return getStorage(theBlock).getVolume();
     }
   }
 
@@ -1201,6 +1195,12 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   @Override // FsDatasetSpi
   public synchronized InputStream getBlockInputStream(ExtendedBlock b,
       long seekOffset) throws IOException {
+    return getBlockInputStream(b, seekOffset, false);
+  }
+
+  @Override // FsDatasetSpi
+  public synchronized InputStream getBlockInputStream(ExtendedBlock b,
+      long seekOffset, boolean readThrough) throws IOException {
     InputStream result = getBlockInputStream(b);
     IOUtils.skipFully(result, seekOffset);
     return result;
@@ -1521,7 +1521,7 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
   }
 
   @Override
-  public List<ReplicaInfo> getFinalizedBlocks(String bpid) {
+  public List<ReplicaInfo> getSortedFinalizedBlocks(String bpid) {
     throw new UnsupportedOperationException();
   }
 
@@ -1605,11 +1605,6 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
       replicas.addAll(s.getBlockMap(bpid).values());
     }
     return Collections.unmodifiableSet(replicas);
-  }
-
-  @Override
-  public MountVolumeMap getMountVolumeMap() {
-    return null;
   }
 }
 

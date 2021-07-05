@@ -77,6 +77,18 @@ public interface FSNamesystemMBean {
   public long getProvidedCapacityTotal();
 
   /**
+   * Total space used for caching PROVIDED data.
+   * @return space used for caching PROVIDED data.
+   */
+  public long getProvidedCacheUsed();
+
+  /**
+   * Total space available for caching PROVIDED data.
+   * @return
+   */
+  public long getProvidedCacheCapacity();
+
+  /**
    * Total number of files and directories
    * @return -  num of files and directories
    */
@@ -149,12 +161,6 @@ public interface FSNamesystemMBean {
    * @return number of decommissioned dead data nodes
    */
   public int getNumDecomDeadDataNodes();
-
-  /**
-   * @return Number of in-service data nodes, where NumInServiceDataNodes =
-   * NumLiveDataNodes - NumDecomLiveDataNodes - NumInMaintenanceLiveDataNodes
-   */
-  int getNumInServiceLiveDataNodes();
 
   /**
    * Number of failed data volumes across all live data nodes.

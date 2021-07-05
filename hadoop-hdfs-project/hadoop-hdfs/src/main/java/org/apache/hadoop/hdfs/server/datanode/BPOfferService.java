@@ -19,20 +19,22 @@ package org.apache.hadoop.hdfs.server.datanode;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Sets;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
 import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdfs.server.common.ProvidedVolumeInfo;
 import org.apache.hadoop.hdfs.server.protocol.*;
 import org.apache.hadoop.hdfs.server.protocol.BlockECReconstructionCommand.BlockECReconstructionInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStatus;
-import org.apache.hadoop.util.Lists;
-import org.apache.hadoop.util.Sets;
 
 import org.slf4j.Logger;
 
@@ -81,7 +83,7 @@ class BPOfferService {
    * this can be null. If non-null, this must always refer to a member
    * of the {@link #bpServices} list.
    */
-  private volatile BPServiceActor bpServiceToActive = null;
+  private BPServiceActor bpServiceToActive = null;
   
   /**
    * The list of all actors for namenodes in this nameservice, regardless
@@ -780,6 +782,17 @@ class BPOfferService {
             ((KeyUpdateCommand) cmd).getExportedKeys());
       }
       break;
+    case DatanodeProtocol.DNA_PROVIDEDVOLADD:
+      LOG.info("DatanodeCommand action: DNA_PROVIDEDVOLADD");
+      ProvidedVolumeInfo providedVol =
+          ((ProvidedVolumeCommand) cmd).getProvidedVolume();
+      dn.getFSDataset().addProvidedVol(providedVol, getNamespaceInfo());
+      break;
+    case DatanodeProtocol.DNA_PROVIDEDVOLREMOVE:
+      LOG.info("DatanodeCommand action: DNA_PROVIDEDVOLREMOVE");
+      providedVol = ((ProvidedVolumeCommand) cmd).getProvidedVolume();
+      dn.getFSDataset().removeProvidedVol(providedVol);
+      break;
     case DatanodeProtocol.DNA_BALANCERBANDWIDTHUPDATE:
       LOG.info("DatanodeCommand action: DNA_BALANCERBANDWIDTHUPDATE");
       long bandwidth =
@@ -798,6 +811,20 @@ class BPOfferService {
       Collection<BlockECReconstructionInfo> ecTasks =
           ((BlockECReconstructionCommand) cmd).getECTasks();
       dn.getErasureCodingWorker().processErasureCodingTasks(ecTasks);
+      break;
+    case DatanodeProtocol.DNA_BACKUP:
+      LOG.info("DatanodeCommand action: DNA_BACKUP");
+      Collection<BlockSyncTask> blockSyncTasks =
+          ((SyncCommand) cmd).getSyncTasks();
+      SyncServiceSatisfierDatanodeWorker syncServiceSatisfierDatanodeWorker =
+          dn.getSyncServiceSatisfierDatanodeWorker();
+      if (syncServiceSatisfierDatanodeWorker != null) {
+        syncServiceSatisfierDatanodeWorker.processSyncTasks(blockSyncTasks);
+      } else {
+        LOG.error("SyncServiceSatisfierDatanodeWorker is not working. " +
+            "Please enable provided storage via configuring " +
+            DFSConfigKeys.DFS_DATANODE_PROVIDED_ENABLED);
+      }
       break;
     default:
       LOG.warn("Unknown DatanodeCommand action: " + cmd.getAction());
@@ -829,6 +856,9 @@ class BPOfferService {
     case DatanodeProtocol.DNA_CACHE:
     case DatanodeProtocol.DNA_UNCACHE:
     case DatanodeProtocol.DNA_ERASURE_CODING_RECONSTRUCTION:
+    case DatanodeProtocol.DNA_PROVIDEDVOLADD:
+    case DatanodeProtocol.DNA_PROVIDEDVOLREMOVE:
+    case DatanodeProtocol.DNA_BACKUP:
       LOG.warn("Got a command from standby NN - ignoring command:" + cmd.getAction());
       break;
     default:

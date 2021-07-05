@@ -23,7 +23,6 @@ import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.MountVolumeMap;
 import org.apache.hadoop.util.AutoCloseableLock;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
@@ -91,7 +90,7 @@ public class ExternalDatasetImpl implements FsDatasetSpi<ExternalVolumeImpl> {
   }
 
   @Override
-  public List<ReplicaInfo> getFinalizedBlocks(String bpid) {
+  public List<ReplicaInfo> getSortedFinalizedBlocks(String bpid) {
     return null;
   }
 
@@ -130,6 +129,12 @@ public class ExternalDatasetImpl implements FsDatasetSpi<ExternalVolumeImpl> {
   @Override
   public InputStream getBlockInputStream(ExtendedBlock b, long seekOffset)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public InputStream getBlockInputStream(ExtendedBlock b, long seekOffset,
+      boolean readThrough) throws IOException {
     return null;
   }
 
@@ -465,10 +470,5 @@ public class ExternalDatasetImpl implements FsDatasetSpi<ExternalVolumeImpl> {
   public Set<? extends Replica> deepCopyReplica(String bpid)
       throws IOException {
     return Collections.EMPTY_SET;
-  }
-
-  @Override
-  public MountVolumeMap getMountVolumeMap() {
-    return null;
   }
 }

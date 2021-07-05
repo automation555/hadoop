@@ -58,9 +58,8 @@ message BaseHeaderProto {
 }
 
 message DataTransferTraceInfoProto {
-  optional uint64 traceId = 1;
-  optional uint64 parentId = 2;
-  optional bytes spanContext = 3;
+  required uint64 traceId = 1;
+  required uint64 parentId = 2;
 }
 
 message ClientOperationHeaderProto {
@@ -71,6 +70,7 @@ message ClientOperationHeaderProto {
 message CachingStrategyProto {
   optional bool dropBehind = 1;
   optional int64 readahead = 2;
+  optional bool readThrough = 3;
 }
 
 message OpReadBlockProto {

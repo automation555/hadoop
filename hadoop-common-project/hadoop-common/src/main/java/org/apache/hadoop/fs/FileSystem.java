@@ -48,6 +48,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -81,8 +83,8 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.tracing.Tracer;
-import org.apache.hadoop.tracing.TraceScope;
+import org.apache.htrace.core.Tracer;
+import org.apache.htrace.core.TraceScope;
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
@@ -181,7 +183,7 @@ public abstract class FileSystem extends Configured
    * so must be considered something to only be changed with care.
    */
   @InterfaceAudience.Private
-  public static final Logger LOG = LoggerFactory.getLogger(FileSystem.class);
+  public static final Log LOG = LogFactory.getLog(FileSystem.class);
 
   /**
    * The SLF4J logger to use in logging within the FileSystem class itself.
@@ -3389,7 +3391,15 @@ public abstract class FileSystem extends Configured
               LOGGER.info("Full exception loading: {}", fs, e);
             }
           } catch (ServiceConfigurationError ee) {
-            LOGGER.warn("Cannot load filesystem", ee);
+            LOG.warn("Cannot load filesystem: " + ee);
+            Throwable cause = ee.getCause();
+            // print all the nested exception messages
+            while (cause != null) {
+              LOG.warn(cause.toString());
+              cause = cause.getCause();
+            }
+            // and at debug: the full stack
+            LOG.debug("Stack Trace", ee);
           }
         }
         FILE_SYSTEMS_LOADED = true;
@@ -4778,5 +4788,46 @@ public abstract class FileSystem extends Configured
       throws IOException {
     methodNotSupported();
     return null;
+  }
+
+  /**
+   * Add a PROVIDED mount point to the FSImage.
+   * 
+   * @param remote Remote location.
+   * @param mountPath Path in HDFS to mount the path in.
+   * @param mountMode Mount mode.
+   * @param remoteConfig remote config needed to connect to remote fs. For e.g.
+   *          if the desired remote connection requires a user=foo and a
+   *          token=bar configuration, then the config map should contain these
+   *          two pairs.
+   * @return true if the mount is successful.
+   * @throws IOException If there is an error adding the mount point.
+   */
+  public boolean addMount(String remote, String mountPath, MountMode mountMode,
+      Map<String, String> remoteConfig) throws IOException {
+    throw new UnsupportedOperationException("Adding mounts not supported");
+  }
+
+  /**
+   * Unmount (delete) a PROVIDED mount point.
+   * 
+   * @param mountPath mount path to remove
+   * @return true if the removeMount is unsuccessful
+   * @throws IOException
+   */
+  public boolean removeMount(String mountPath) throws IOException {
+    throw new UnsupportedOperationException("Removing mounts not supported");
+  }
+
+  /**
+   * Returns mount info, and mount metrics if requireStats is true, for all
+   * mount points. Does not guarantee to return the mount points in a specific
+   * order.
+   *
+   * @throws IOException
+   */
+  public ProvidedStorageSummary listMounts(boolean requireStats)
+      throws IOException {
+    throw new UnsupportedOperationException("Listing mounts not supported");
   }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileChecksum;
@@ -56,7 +57,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ChunkedArrayList;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
@@ -827,11 +827,15 @@ public class JsonUtilClient {
     if (json == null) {
       return null;
     }
+    SnapshotDiffReport.INodeType iNodeType =
+        SnapshotDiffReport.INodeType.parseINodeType(
+            (String) json.get("inodeType"));
     SnapshotDiffReport.DiffType type =
         SnapshotDiffReport.DiffType.parseDiffType((String) json.get("type"));
     byte[] sourcePath = toByteArray((String) json.get("sourcePath"));
     byte[] targetPath = toByteArray((String) json.get("targetPath"));
-    return new SnapshotDiffReport.DiffReportEntry(type, sourcePath, targetPath);
+    return new SnapshotDiffReport.DiffReportEntry(iNodeType, type, sourcePath,
+        targetPath);
   }
 
   private static byte[] toByteArray(String str) {

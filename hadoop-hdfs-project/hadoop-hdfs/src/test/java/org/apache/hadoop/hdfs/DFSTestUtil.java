@@ -25,6 +25,7 @@ import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.INodeType.DIRECTORY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
@@ -75,11 +76,11 @@ import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
 import java.util.function.Supplier;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdfs.tools.DFSck;
-import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -190,12 +191,12 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.VersionInfo;
+import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.apache.hadoop.util.ToolRunner;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.slf4j.event.Level;
 
 /** Utilities for HDFS tests */
 public class DFSTestUtil {
@@ -794,48 +795,41 @@ public class DFSTestUtil {
 
   /**
    * Wait for the given file to reach the given replication factor.
-   *
-   * @param fs the defined filesystem.
-   * @param fileName being written.
-   * @param replFactor desired replication
-   * @throws IOException getting block locations
-   * @throws InterruptedException during sleep
-   * @throws TimeoutException if 40 seconds passed before reaching the desired
-   *                          replication.
+   * @throws TimeoutException if we fail to sufficiently replicate the file
    */
-  public static void waitReplication(FileSystem fs, Path fileName,
-      short replFactor)
+  public static void waitReplication(FileSystem fs, Path fileName, short replFactor)
       throws IOException, InterruptedException, TimeoutException {
     boolean correctReplFactor;
-    int attempt = 0;
+    final int ATTEMPTS = 40;
+    int count = 0;
+
     do {
       correctReplFactor = true;
-      if (attempt++ > 0) {
-        Thread.sleep(1000);
-      }
       BlockLocation locs[] = fs.getFileBlockLocations(
-          fs.getFileStatus(fileName), 0, Long.MAX_VALUE);
-      for (int currLoc = 0; currLoc < locs.length; currLoc++) {
-        String[] hostnames = locs[currLoc].getNames();
+        fs.getFileStatus(fileName), 0, Long.MAX_VALUE);
+      count++;
+      for (int j = 0; j < locs.length; j++) {
+        String[] hostnames = locs[j].getNames();
         if (hostnames.length != replFactor) {
-          LOG.info(
-              "Block {} of file {} has replication factor {} "
-                  + "(desired {}); locations: {}",
-              currLoc, fileName, hostnames.length, replFactor,
-              Joiner.on(' ').join(hostnames));
           correctReplFactor = false;
+          System.out.println("Block " + j + " of file " + fileName
+              + " has replication factor " + hostnames.length
+              + " (desired " + replFactor + "); locations "
+              + Joiner.on(' ').join(hostnames));
+          Thread.sleep(1000);
           break;
         }
       }
-    } while (!correctReplFactor && attempt < 40);
+      if (correctReplFactor) {
+        System.out.println("All blocks of file " + fileName
+            + " verified to have replication factor " + replFactor);
+      }
+    } while (!correctReplFactor && count < ATTEMPTS);
 
-    if (!correctReplFactor) {
-      throw new TimeoutException("Timed out waiting for file ["
-          + fileName + "] to reach [" + replFactor + "] replicas");
+    if (count == ATTEMPTS) {
+      throw new TimeoutException("Timed out waiting for " + fileName +
+          " to reach " + replFactor + " replicas");
     }
-
-    LOG.info("All blocks of file {} verified to have replication factor {}",
-        fileName, replFactor);
   }
   
   /** delete directory and everything underneath it.*/
@@ -1999,6 +1993,15 @@ public class DFSTestUtil {
     GenericTestUtils.setLogLevel(NameNode.blockStateChangeLog, level);
   }
 
+  public static void setNameNodeLogLevel(org.slf4j.event.Level level) {
+    GenericTestUtils.setLogLevel(FSNamesystem.LOG, level);
+    GenericTestUtils.setLogLevel(BlockManager.LOG, level);
+    GenericTestUtils.setLogLevel(LeaseManager.LOG, level);
+    GenericTestUtils.setLogLevel(NameNode.LOG, level);
+    GenericTestUtils.setLogLevel(NameNode.stateChangeLog, level);
+    GenericTestUtils.setLogLevel(NameNode.blockStateChangeLog, level);
+  }
+
   /**
    * Get the NamenodeProtocol RPC proxy for the NN associated with this
    * DFSClient object
@@ -2465,17 +2468,25 @@ public class DFSTestUtil {
     assertEquals(entries.length, inverseReport.getDiffList().size());
 
     for (DiffReportEntry entry : entries) {
+      DiffReportEntry reportEntry = report.getDiffList().stream()
+          .filter(e -> e.equals(entry))
+          .findFirst()
+          .orElseThrow(() ->
+              new AssertionError("DiffReportEntry not found: " +
+                  entry.getType() + " " + entry.getSourcePath()));
       if (entry.getType() == DiffType.MODIFY) {
         assertTrue(report.getDiffList().contains(entry));
         assertTrue(inverseReport.getDiffList().contains(entry));
       } else if (entry.getType() == DiffType.DELETE) {
         assertTrue(report.getDiffList().contains(entry));
         assertTrue(inverseReport.getDiffList().contains(
-            new DiffReportEntry(DiffType.CREATE, entry.getSourcePath())));
+            new DiffReportEntry(DIRECTORY,
+                DiffType.CREATE, entry.getSourcePath())));
       } else if (entry.getType() == DiffType.CREATE) {
         assertTrue(report.getDiffList().contains(entry));
         assertTrue(inverseReport.getDiffList().contains(
-            new DiffReportEntry(DiffType.DELETE, entry.getSourcePath())));
+            new DiffReportEntry(DIRECTORY,
+                DiffType.DELETE, entry.getSourcePath())));
       }
     }
   }

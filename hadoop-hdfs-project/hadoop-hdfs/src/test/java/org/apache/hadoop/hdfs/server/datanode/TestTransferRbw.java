@@ -38,9 +38,9 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetTestUtil;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
-import org.slf4j.event.Level;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_WRITE_BANDWIDTHPERSEC_KEY;
 
@@ -50,7 +50,7 @@ public class TestTransferRbw {
       LoggerFactory.getLogger(TestTransferRbw.class);
   
   {
-    GenericTestUtils.setLogLevel(DataNode.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(DataNode.LOG, Level.ALL);
   }
 
   private static final Random RAN = new Random();
@@ -62,11 +62,12 @@ public class TestTransferRbw {
   }
   private static LocalReplicaInPipeline getReplica(final DataNode datanode,
       final String bpid, final ReplicaState expectedState) throws InterruptedException {
-    final Collection<ReplicaInfo> replicas = FsDatasetTestUtil.getReplicas(
+    Collection<ReplicaInfo> replicas = FsDatasetTestUtil.getReplicas(
         datanode.getFSDataset(), bpid);
     for(int i = 0; i < 5 && replicas.size() == 0; i++) {
       LOG.info("wait since replicas.size() == 0; i=" + i);
       Thread.sleep(1000);
+      replicas = FsDatasetTestUtil.getReplicas(datanode.getFSDataset(), bpid);
     }
     Assert.assertEquals(1, replicas.size());
     final ReplicaInfo r = replicas.iterator().next();

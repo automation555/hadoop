@@ -27,7 +27,10 @@ import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.util.EnumSet;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.Options.CreateOpts;
@@ -38,11 +41,10 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.util.Progressable;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.slf4j.Logger;
 
 public class TestFilterFileSystem {
 
-  private static final Logger LOG = FileSystem.LOG;
+  private static final Log LOG = FileSystem.LOG;
   private static final Configuration conf = new Configuration();
 
   @BeforeClass
@@ -143,6 +145,11 @@ public class TestFilterFileSystem {
     of the filter such as checksums.
      */
     MultipartUploaderBuilder createMultipartUploader(Path basePath);
+
+    public boolean addMount(String remote, String mount, MountMode mountMode,
+        Map<String, String> remoteConfig) throws IOException;
+    public boolean removeMount(String mountPath) throws IOException;
+    public List<MountInfo> listMounts(boolean requireStats) throws IOException;
   }
 
   @Test
