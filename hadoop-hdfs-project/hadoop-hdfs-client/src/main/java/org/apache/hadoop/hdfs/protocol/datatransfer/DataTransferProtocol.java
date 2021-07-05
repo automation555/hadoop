@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.BlockChecksumOptions;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.hadoop.hdfs.protocol.StripedBlockInfo;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.SlotId;
@@ -102,11 +101,6 @@ public interface DataTransferProtocol {
    *                         written to disk lazily
    * @param pinning whether to pin the block, so Balancer won't move it.
    * @param targetPinnings whether to pin the block on target datanode
-   * @param storageID optional StorageIDs designating where to write the
-   *                  block. An empty String or null indicates that this
-   *                  has not been provided.
-   * @param targetStorageIDs target StorageIDs corresponding to the target
-   *                         datanodes.
    */
   void writeBlock(final ExtendedBlock blk,
       final StorageType storageType,
@@ -124,9 +118,7 @@ public interface DataTransferProtocol {
       final CachingStrategy cachingStrategy,
       final boolean allowLazyPersist,
       final boolean pinning,
-      final boolean[] targetPinnings,
-      final String storageID,
-      final String[] targetStorageIDs) throws IOException;
+      final boolean[] targetPinnings) throws IOException;
   /**
    * Transfer a block to another datanode.
    * The block stage must be
@@ -137,15 +129,12 @@ public interface DataTransferProtocol {
    * @param blockToken security token for accessing the block.
    * @param clientName client's name.
    * @param targets target datanodes.
-   * @param targetStorageIDs StorageID designating where to write the
-   *                     block.
    */
   void transferBlock(final ExtendedBlock blk,
       final Token<BlockTokenIdentifier> blockToken,
       final String clientName,
       final DatanodeInfo[] targets,
-      final StorageType[] targetStorageTypes,
-      final String[] targetStorageIDs) throws IOException;
+      final StorageType[] targetStorageTypes) throws IOException;
 
   /**
    * Request short circuit access file descriptors from a DataNode.
@@ -190,15 +179,12 @@ public interface DataTransferProtocol {
    * @param blockToken security token for accessing the block.
    * @param delHint the hint for deleting the block in the original datanode.
    * @param source the source datanode for receiving the block.
-   * @param storageId an optional storage ID to designate where the block is
-   *                  replaced to.
    */
   void replaceBlock(final ExtendedBlock blk,
       final StorageType storageType,
       final Token<BlockTokenIdentifier> blockToken,
       final String delHint,
-      final DatanodeInfo source,
-      final String storageId) throws IOException;
+      final DatanodeInfo source) throws IOException;
 
   /**
    * Copy a block.
@@ -219,23 +205,7 @@ public interface DataTransferProtocol {
    *     computed from underlying block metadata.
    * @throws IOException
    */
-  void blockChecksum(ExtendedBlock blk,
-      Token<BlockTokenIdentifier> blockToken,
+  void blockChecksum(final ExtendedBlock blk,
+      final Token<BlockTokenIdentifier> blockToken,
       BlockChecksumOptions blockChecksumOptions) throws IOException;
-
-  /**
-   * Get striped block group checksum (MD5 of CRC32).
-   *
-   * @param stripedBlockInfo a striped block info.
-   * @param blockToken security token for accessing the block.
-   * @param requestedNumBytes requested number of bytes in the block group
-   *                          to compute the checksum.
-   * @param blockChecksumOptions determines how the block-level checksum is
-   *     computed from underlying block metadata.
-   * @throws IOException
-   */
-  void blockGroupChecksum(StripedBlockInfo stripedBlockInfo,
-          Token<BlockTokenIdentifier> blockToken,
-          long requestedNumBytes,
-          BlockChecksumOptions blockChecksumOptions) throws IOException;
 }
