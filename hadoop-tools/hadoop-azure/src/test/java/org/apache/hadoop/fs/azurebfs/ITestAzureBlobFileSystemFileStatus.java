@@ -67,7 +67,7 @@ public class ITestAzureBlobFileSystemFileStatus extends
 
     String errorInStatus = "error in " + fileStatus + " from " + fs;
 
-    if (!getIsNamespaceEnabled(fs)) {
+    if (!fs.getIsNamespaceEnabled()) {
       assertEquals(errorInStatus + ": owner",
               fs.getOwnerUser(), fileStatus.getOwner());
       assertEquals(errorInStatus + ": group",
@@ -138,6 +138,6 @@ public class ITestAzureBlobFileSystemFileStatus extends
     assertTrue("lastModifiedTime should be after minCreateStartTime",
         minCreateStartTime < lastModifiedTime);
     assertTrue("lastModifiedTime should be before createEndTime",
-        createEndTime > lastModifiedTime);
+        createEndTime >= lastModifiedTime);
   }
 }
