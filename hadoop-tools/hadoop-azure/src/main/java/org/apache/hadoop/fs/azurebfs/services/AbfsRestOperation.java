@@ -34,7 +34,6 @@ import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsRestOperationExcep
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AzureBlobFileSystemException;
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.InvalidAbfsRestOperationException;
 import org.apache.hadoop.fs.azurebfs.constants.HttpHeaderConfigurations;
-import org.apache.hadoop.fs.azurebfs.utils.TracingContext;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
 
 /**
@@ -67,6 +66,10 @@ public class AbfsRestOperation {
   private int bufferOffset;
   private int bufferLength;
   private int retryCount = 0;
+
+  private int leaseDuration = 0;
+  private boolean acquireLease = false;
+  private boolean requestHeaderUpdated = false;
 
   private AbfsHttpOperation result;
   private AbfsCounters abfsCounters;
@@ -172,15 +175,14 @@ public class AbfsRestOperation {
   /**
    * Execute a AbfsRestOperation. Track the Duration of a request if
    * abfsCounters isn't null.
-   * @param tracingContext TracingContext instance to track correlation IDs
+   *
    */
-  public void execute(TracingContext tracingContext)
-      throws AzureBlobFileSystemException {
+  public void execute() throws AzureBlobFileSystemException {
 
     try {
       IOStatisticsBinding.trackDurationOfInvocation(abfsCounters,
           AbfsStatistic.getStatNameFromHttpCall(method),
-          () -> completeExecute(tracingContext));
+          () -> completeExecute());
     } catch (AzureBlobFileSystemException aze) {
       throw aze;
     } catch (IOException e) {
@@ -192,10 +194,8 @@ public class AbfsRestOperation {
   /**
    * Executes the REST operation with retry, by issuing one or more
    * HTTP operations.
-   * @param tracingContext TracingContext instance to track correlation IDs
    */
-  private void completeExecute(TracingContext tracingContext)
-      throws AzureBlobFileSystemException {
+  private void completeExecute() throws AzureBlobFileSystemException {
     // see if we have latency reports from the previous requests
     String latencyHeader = this.client.getAbfsPerfTracker().getClientLatency();
     if (latencyHeader != null && !latencyHeader.isEmpty()) {
@@ -206,10 +206,9 @@ public class AbfsRestOperation {
 
     retryCount = 0;
     LOG.debug("First execution of REST operation - {}", operationType);
-    while (!executeHttpOperation(retryCount, tracingContext)) {
+    while (!executeHttpOperation(retryCount)) {
       try {
         ++retryCount;
-        tracingContext.setRetryCount(retryCount);
         LOG.debug("Retrying REST operation {}. RetryCount = {}",
             operationType, retryCount);
         Thread.sleep(client.getRetryPolicy().getRetryInterval(retryCount));
@@ -231,14 +230,16 @@ public class AbfsRestOperation {
    * fails, there may be a retry.  The retryCount is incremented with each
    * attempt.
    */
-  private boolean executeHttpOperation(final int retryCount,
-    TracingContext tracingContext) throws AzureBlobFileSystemException {
+  private boolean executeHttpOperation(final int retryCount) throws AzureBlobFileSystemException {
     AbfsHttpOperation httpOperation = null;
     try {
       // initialize the HTTP request and open the connection
+      if (acquireLease && !requestHeaderUpdated) {
+        updateRequestHeaders();
+      }
+
       httpOperation = new AbfsHttpOperation(url, method, requestHeaders);
       incrementCounter(AbfsStatistic.CONNECTIONS_MADE, 1);
-      tracingContext.constructHeader(httpOperation);
 
       switch(client.getAuthType()) {
         case Custom:
@@ -317,6 +318,17 @@ public class AbfsRestOperation {
       return false;
     }
 
+    if (client.getRetryPolicy().isRetriableDueToLease(retryCount, httpOperation.getStatusCode(), operationType)
+          && isBundleLeaseOperation()) {
+      // first try simple retrial of the request
+      // if that doesn't work then acquire lease
+      if (retryCount >= 2) {
+        acquireLease = true;
+      }
+
+      return false;
+    }
+
     result = httpOperation;
 
     return true;
@@ -332,5 +344,38 @@ public class AbfsRestOperation {
     if (abfsCounters != null) {
       abfsCounters.incrementCounter(statistic, value);
     }
+  }
+
+  private void updateRequestHeaders() {
+    requestHeaderUpdated = true;
+    boolean containsAutoRenew = requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION,
+        AbfsHttpConstants.AUTO_RENEW_LEASE_ACTION));
+
+    if (!containsAutoRenew
+          && !requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AbfsHttpConstants.RELEASE_LEASE_ACTION))) {
+      return;
+    }
+
+    String leaseId;
+    for (int i = 0; i < requestHeaders.size(); i++) {
+      if (requestHeaders.get(i).getName() == HttpHeaderConfigurations.X_MS_LEASE_ID) {
+        leaseId = requestHeaders.get(i).getValue();
+        requestHeaders.remove(i);
+        requestHeaders.remove(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION,
+            containsAutoRenew ? AbfsHttpConstants.AUTO_RENEW_LEASE_ACTION : AbfsHttpConstants.RELEASE_LEASE_ACTION));
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION,
+            containsAutoRenew ? AbfsHttpConstants.ACQUIRE_LEASE_ACTION : AbfsHttpConstants.ACQUIRE_RELEASE_LEASE_ACTION));
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_PROPOSED_LEASE_ID, leaseId));
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_DURATION, String.valueOf(leaseDuration)));
+        break;
+      }
+    }
+  }
+
+  private boolean isBundleLeaseOperation() {
+    return (requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AbfsHttpConstants.ACQUIRE_RELEASE_LEASE_ACTION))
+        || requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AbfsHttpConstants.ACQUIRE_LEASE_ACTION))
+        || requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AbfsHttpConstants.RELEASE_LEASE_ACTION))
+        || requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AbfsHttpConstants.AUTO_RENEW_LEASE_ACTION)));
   }
 }
