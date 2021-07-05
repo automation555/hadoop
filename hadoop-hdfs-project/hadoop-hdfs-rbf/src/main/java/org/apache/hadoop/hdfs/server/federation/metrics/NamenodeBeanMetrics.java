@@ -628,6 +628,22 @@ public class NamenodeBeanMetrics
     return getProvidedCapacity();
   }
 
+  /**
+   * Unsupported in RBF.
+   */
+  @Override
+  public long getProvidedCacheUsed() {
+    return 0;
+  }
+
+  /**
+   * Unsupported in RBF.
+   */
+  @Override
+  public long getProvidedCacheCapacity() {
+    return 0;
+  }
+
   @Override
   public long getFilesTotal() {
     try {
@@ -736,11 +752,6 @@ public class NamenodeBeanMetrics
       LOG.debug("Failed to get number of entering maintenance nodes",
           e.getMessage());
     }
-    return 0;
-  }
-
-  @Override
-  public int getNumInServiceLiveDataNodes() {
     return 0;
   }
 
@@ -855,7 +866,7 @@ public class NamenodeBeanMetrics
 
   @Override
   public String getEnteringMaintenanceNodes() {
-    return "{}";
+    return "N/A";
   }
 
   @Override

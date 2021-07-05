@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
@@ -25,20 +28,19 @@ import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -48,12 +50,15 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
+import org.apache.hadoop.hdfs.server.common.ProvidedVolumeInfo;
 import org.apache.hadoop.hdfs.server.common.Storage.FormatConfirmable;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddBlockOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddCacheDirectiveInfoOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddCachePoolOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddErasureCodingPolicyOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddMountOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AllocateBlockIdOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AllowSnapshotOp;
@@ -64,7 +69,9 @@ import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.ConcatDeleteOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.CreateSnapshotOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.DeleteOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.DeleteSnapshotOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.DisableErasureCodingPolicyOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.DisallowSnapshotOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.EnableErasureCodingPolicyOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.GetDelegationTokenOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.LogSegmentOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.MkdirOp;
@@ -74,6 +81,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.OpInstanceCache;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.ReassignLeaseOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RemoveCacheDirectiveInfoOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RemoveCachePoolOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RemoveErasureCodingPolicyOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RemoveXAttrOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RenameOldOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RenameOp;
@@ -87,20 +95,17 @@ import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetGenstampV1Op;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetGenstampV2Op;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetOwnerOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetPermissionsOp;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetQuotaOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetQuotaByStorageTypeOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetQuotaOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetReplicationOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetStoragePolicyOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SetXAttrOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.SymlinkOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.TimesOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.TruncateOp;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RemoveMountOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.UpdateBlocksOp;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.UpdateMasterKeyOp;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.AddErasureCodingPolicyOp;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.EnableErasureCodingPolicyOp;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.DisableErasureCodingPolicyOp;
-import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp.RemoveErasureCodingPolicyOp;
 import org.apache.hadoop.hdfs.server.namenode.JournalSet.JournalAndStream;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
@@ -109,10 +114,10 @@ import org.apache.hadoop.hdfs.server.protocol.RemoteEditLogManifest;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
-import org.apache.hadoop.util.Lists;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,7 +189,7 @@ public class FSEditLog implements LogsPurgeable {
   
   // these are statistics counters.
   private long numTransactions;        // number of transactions
-  private final LongAdder numTransactionsBatchedInSync = new LongAdder();
+  private final AtomicLong numTransactionsBatchedInSync = new AtomicLong();
   private long totalTimeTransactions;  // total time for all transactions
   private NameNodeMetrics metrics;
 
@@ -219,10 +224,7 @@ public class FSEditLog implements LogsPurgeable {
   private static final ThreadLocal<TransactionId> myTransactionId = new ThreadLocal<TransactionId>() {
     @Override
     protected synchronized TransactionId initialValue() {
-      // If an RPC call did not generate any transactions,
-      // logSync() should exit without syncing
-      // Therefore the initial value of myTransactionId should be 0
-      return new TransactionId(0L);
+      return new TransactionId(Long.MAX_VALUE);
     }
   };
 
@@ -347,7 +349,7 @@ public class FSEditLog implements LogsPurgeable {
    * @return true if the log is currently open in write mode, regardless
    * of whether it actually has an open segment.
    */
-  synchronized boolean isOpenForWrite() {
+  synchronized public boolean isOpenForWrite() {
     return state == State.IN_SEGMENT ||
       state == State.BETWEEN_LOG_SEGMENTS;
   }
@@ -467,7 +469,6 @@ public class FSEditLog implements LogsPurgeable {
       // wait if an automatic sync is scheduled
       waitIfAutoSyncScheduled();
 
-      beginTransaction(op);
       // check if it is time to schedule an automatic sync
       needsSync = doEditTransaction(op);
       if (needsSync) {
@@ -482,11 +483,9 @@ public class FSEditLog implements LogsPurgeable {
   }
 
   synchronized boolean doEditTransaction(final FSEditLogOp op) {
-    LOG.debug("doEditTx() op={} txid={}", op, txid);
-    assert op.hasTransactionId() :
-      "Transaction id is not set for " + op + " EditLog.txId=" + txid;
+    long start = beginTransaction();
+    op.setTransactionId(txid);
 
-    long start = monotonicNow();
     try {
       editLogStream.write(op);
     } catch (IOException ex) {
@@ -530,7 +529,7 @@ public class FSEditLog implements LogsPurgeable {
     return editLogStream.shouldForceSync();
   }
   
-  protected void beginTransaction(final FSEditLogOp op) {
+  private long beginTransaction() {
     assert Thread.holdsLock(this);
     // get a new transactionId
     txid++;
@@ -540,9 +539,7 @@ public class FSEditLog implements LogsPurgeable {
     //
     TransactionId id = myTransactionId.get();
     id.txid = txid;
-    if(op != null) {
-      op.setTransactionId(txid);
-    }
+    return monotonicNow();
   }
   
   private void endTransaction(long start) {
@@ -659,7 +656,7 @@ public class FSEditLog implements LogsPurgeable {
   }
 
   protected void logSync(long mytxid) {
-    long lastJournalledTxId = HdfsServerConstants.INVALID_TXID;
+    long syncStart = 0;
     boolean sync = false;
     long editsBatchedInSync = 0;
     try {
@@ -686,16 +683,8 @@ public class FSEditLog implements LogsPurgeable {
           // now, this thread will do the sync.  track if other edits were
           // included in the sync - ie. batched.  if this is the only edit
           // synced then the batched count is 0
-          lastJournalledTxId = editLogStream.getLastJournalledTxId();
-          LOG.debug("logSync(tx) synctxid={} lastJournalledTxId={} mytxid={}",
-              synctxid, lastJournalledTxId, mytxid);
-          assert lastJournalledTxId <= txid : "lastJournalledTxId exceeds txid";
-          // The stream has already been flushed, or there are no active streams
-          // We still try to flush up to mytxid
-          if(lastJournalledTxId <= synctxid) {
-            lastJournalledTxId = mytxid;
-          }
-          editsBatchedInSync = lastJournalledTxId - synctxid - 1;
+          editsBatchedInSync = txid - synctxid - 1;
+          syncStart = txid;
           isSyncRunning = true;
           sync = true;
 
@@ -748,14 +737,14 @@ public class FSEditLog implements LogsPurgeable {
       if (metrics != null) { // Metrics non-null only when used inside name node
         metrics.addSync(elapsed);
         metrics.incrTransactionsBatchedInSync(editsBatchedInSync);
-        numTransactionsBatchedInSync.add(editsBatchedInSync);
+        numTransactionsBatchedInSync.addAndGet(editsBatchedInSync);
       }
       
     } finally {
       // Prevent RuntimeException from blocking other log edit sync 
       synchronized (this) {
         if (sync) {
-          synctxid = lastJournalledTxId;
+          synctxid = syncStart;
           for (JournalManager jm : journalSet.getJournalManagers()) {
             /**
              * {@link FileJournalManager#lastReadableTxId} is only meaningful
@@ -763,7 +752,7 @@ public class FSEditLog implements LogsPurgeable {
              * other types of {@link JournalManager}.
              */
             if (jm instanceof FileJournalManager) {
-              ((FileJournalManager)jm).setLastReadableTxId(synctxid);
+              ((FileJournalManager)jm).setLastReadableTxId(syncStart);
             }
           }
           isSyncRunning = false;
@@ -788,7 +777,7 @@ public class FSEditLog implements LogsPurgeable {
         .append(" Total time for transactions(ms): ")
         .append(totalTimeTransactions)
         .append(" Number of transactions batched in Syncs: ")
-        .append(numTransactionsBatchedInSync.longValue())
+        .append(numTransactionsBatchedInSync.get())
         .append(" Number of syncs: ")
         .append(editLogStream.getNumSync())
         .append(" SyncTimes(ms): ")
@@ -1198,8 +1187,7 @@ public class FSEditLog implements LogsPurgeable {
 
   /**
    * Log a CacheDirectiveInfo returned from
-   * {@link CacheManager#addDirective(CacheDirectiveInfo, FSPermissionChecker,
-   * EnumSet)}
+   * {@link CacheManager#addDirective(CacheDirectiveInfo, FSPermissionChecker)}
    */
   void logAddCacheDirectiveInfo(CacheDirectiveInfo directive,
       boolean toLogRpcIds) {
@@ -1314,6 +1302,20 @@ public class FSEditLog implements LogsPurgeable {
     logRpcIds(op, toLogRpcIds);
     logEdit(op);
   }
+
+  void logAddMountOp(String mountPoint, ProvidedVolumeInfo providedVol) {
+    final AddMountOp op = AddMountOp.getInstance(cache.get());
+    op.setMountPoint(mountPoint);
+    op.setProvidedVolumeInfo(providedVol);
+    logEdit(op);
+  }
+
+  void logRemoveMountOp(String mountPath) {
+    final RemoveMountOp op = RemoveMountOp.getInstance(cache.get());
+    op.setMountPoint(mountPath);
+    logEdit(op);
+  }
+
   /**
    * Get all the journals this edit log is currently operating on.
    */
@@ -1421,7 +1423,7 @@ public class FSEditLog implements LogsPurgeable {
     
     numTransactions = 0;
     totalTimeTransactions = 0;
-    numTransactionsBatchedInSync.reset();
+    numTransactionsBatchedInSync.set(0L);
 
     // TODO no need to link this back to storage anymore!
     // See HDFS-2174.
@@ -1635,8 +1637,7 @@ public class FSEditLog implements LogsPurgeable {
    * store yet.
    */   
   synchronized void logEdit(final int length, final byte[] data) {
-    beginTransaction(null);
-    long start = monotonicNow();
+    long start = beginTransaction();
 
     try {
       editLogStream.writeRaw(data, 0, length);

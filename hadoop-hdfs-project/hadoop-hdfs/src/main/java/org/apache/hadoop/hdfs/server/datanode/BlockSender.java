@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
-import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -51,7 +50,7 @@ import org.apache.hadoop.io.ReadaheadPool.ReadaheadRequest;
 import org.apache.hadoop.net.SocketOutputStream;
 import org.apache.hadoop.util.AutoCloseableLock;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.tracing.TraceScope;
+import org.apache.htrace.core.TraceScope;
 
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_DONTNEED;
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_SEQUENTIAL;
@@ -166,7 +165,9 @@ class BlockSender implements java.io.Closeable {
   private final boolean dropCacheBehindLargeReads;
   
   private final boolean dropCacheBehindAllReads;
-  
+
+  private final boolean readThrough;
+
   private long lastCacheDropOffset;
   private final FileIoProvider fileIoProvider;
   
@@ -241,6 +242,13 @@ class BlockSender implements java.io.Closeable {
         this.alwaysReadahead = true;
         this.readaheadLength = cachingStrategy.getReadahead().longValue();
       }
+
+      if (cachingStrategy.getReadThrough() == null) {
+        this.readThrough = false;
+      } else {
+        this.readThrough = cachingStrategy.getReadThrough().booleanValue();
+      }
+
       this.datanode = datanode;
       
       if (verifyChecksum) {
@@ -428,11 +436,12 @@ class BlockSender implements java.io.Closeable {
       if (DataNode.LOG.isDebugEnabled()) {
         DataNode.LOG.debug("replica=" + replica);
       }
-      blockIn = datanode.data.getBlockInputStream(block, offset); // seek to offset
+      // seek to offset
+      blockIn = datanode.data.getBlockInputStream(block, offset, readThrough);
       ris = new ReplicaInputStreams(
           blockIn, checksumIn, volumeRef, fileIoProvider);
     } catch (IOException ioe) {
-      IOUtils.cleanupWithLogger(null, volumeRef);
+      LOG.error("Exception in creating BlockSender: {}", ioe);
       IOUtils.closeStream(this);
       org.apache.commons.io.IOUtils.closeQuietly(blockIn);
       org.apache.commons.io.IOUtils.closeQuietly(checksumIn);
@@ -752,8 +761,8 @@ class BlockSender implements java.io.Closeable {
    */
   long sendBlock(DataOutputStream out, OutputStream baseStream, 
                  DataTransferThrottler throttler) throws IOException {
-    final TraceScope scope = FsTracer.get(null)
-        .newScope("sendBlock_" + block.getBlockId());
+    final TraceScope scope = datanode.getTracer().
+        newScope("sendBlock_" + block.getBlockId());
     try {
       return doSendBlock(out, baseStream, throttler);
     } finally {

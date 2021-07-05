@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.ReconfigurationProtocol;
 import org.apache.hadoop.hdfs.qjournal.protocol.InterQJournalProtocol;
+import org.apache.hadoop.hdfs.protocolPB.AliasMapProtocolPB;
 import org.apache.hadoop.hdfs.qjournal.protocol.QJournalProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeLifelineProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
@@ -37,6 +38,7 @@ import org.apache.hadoop.security.authorize.Service;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
 import org.apache.hadoop.ipc.GenericRefreshProtocol;
+import org.apache.hadoop.tracing.TraceAdminProtocol;
 
 /**
  * {@link PolicyProvider} for HDFS protocols.
@@ -51,7 +53,9 @@ public class HDFSPolicyProvider extends PolicyProvider {
         ClientDatanodeProtocol.class),
     new Service(CommonConfigurationKeys.SECURITY_DATANODE_PROTOCOL_ACL,
         DatanodeProtocol.class),
-    new Service(CommonConfigurationKeys.SECURITY_INTER_DATANODE_PROTOCOL_ACL, 
+    new Service(CommonConfigurationKeys.SECURITY_ALIASMAP_PROTOCOL_ACL,
+        AliasMapProtocolPB.class),
+    new Service(CommonConfigurationKeys.SECURITY_INTER_DATANODE_PROTOCOL_ACL,
         InterDatanodeProtocol.class),
     new Service(CommonConfigurationKeys.SECURITY_NAMENODE_PROTOCOL_ACL,
         NamenodeProtocol.class),
@@ -79,6 +83,9 @@ public class HDFSPolicyProvider extends PolicyProvider {
     new Service(
         CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_GENERIC_REFRESH,
         GenericRefreshProtocol.class),
+    new Service(
+        CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_TRACING,
+        TraceAdminProtocol.class),
     new Service(
         CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_AUTHORIZATION_DATANODE_LIFELINE,
         DatanodeLifelineProtocol.class),

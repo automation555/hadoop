@@ -43,7 +43,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -99,11 +99,12 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.crypto.key.KeyProviderDelegationTokenExtension.DelegationTokenExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.CryptoExtension;
 import org.apache.hadoop.io.Text;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -135,6 +136,7 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_C
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
+import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.INodeType.FILE;
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -145,9 +147,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 import org.xml.sax.InputSource;
 import org.xml.sax.helpers.DefaultHandler;
 
@@ -155,7 +154,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 public class TestEncryptionZones {
-  static final Logger LOG = LoggerFactory.getLogger(TestEncryptionZones.class);
+  static final Logger LOG = Logger.getLogger(TestEncryptionZones.class);
 
   protected Configuration conf;
   private FileSystemTestHelper fsHelper;
@@ -199,8 +198,7 @@ public class TestEncryptionZones {
         2);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
-    GenericTestUtils.setLogLevel(
-        LoggerFactory.getLogger(EncryptionZoneManager.class), Level.TRACE);
+    Logger.getLogger(EncryptionZoneManager.class).setLevel(Level.TRACE);
     fs = cluster.getFileSystem();
     fsWrapper = new FileSystemTestWrapper(fs);
     fcWrapper = new FileContextTestWrapper(
@@ -1421,7 +1419,8 @@ public class TestEncryptionZones {
 
     Credentials creds = new Credentials();
     final Token<?> tokens[] = dfs.addDelegationTokens("JobTracker", creds);
-    LOG.debug("Delegation tokens: " + Arrays.asList(tokens));
+    DistributedFileSystem.LOG.debug("Delegation tokens: " +
+        Arrays.asList(tokens));
     Assert.assertEquals(2, tokens.length);
     Assert.assertEquals(tokens[1], testToken);
     Assert.assertEquals(2, creds.numberOfTokens());
@@ -1612,12 +1611,14 @@ public class TestEncryptionZones {
     fsWrapper.delete(zoneFile, true);
     fs.createSnapshot(zone, "snap2");
     verifyDiffReport(zone, "snap1", "snap2",
-        new DiffReportEntry(DiffType.MODIFY, DFSUtil.string2Bytes("")),
-        new DiffReportEntry(DiffType.DELETE, DFSUtil.string2Bytes("zoneFile")));
+        new DiffReportEntry(FILE, DiffType.MODIFY, DFSUtil.string2Bytes("")),
+        new DiffReportEntry(FILE, DiffType.DELETE,
+            DFSUtil.string2Bytes("zoneFile")));
 
     verifyDiffReport(rawZone, "snap1", "snap2",
-        new DiffReportEntry(DiffType.MODIFY, DFSUtil.string2Bytes("")),
-        new DiffReportEntry(DiffType.DELETE, DFSUtil.string2Bytes("zoneFile")));
+        new DiffReportEntry(FILE, DiffType.MODIFY, DFSUtil.string2Bytes("")),
+        new DiffReportEntry(FILE, DiffType.DELETE,
+            DFSUtil.string2Bytes("zoneFile")));
   }
 
   /**

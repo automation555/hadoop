@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
@@ -78,6 +79,15 @@ public class DataNodeMetrics {
   MutableCounterLong remoteBytesRead;
   @Metric("Bytes written by remote client")
   MutableCounterLong remoteBytesWritten;
+
+  @Metric("Number of exists() checks on PROVIDED Storage")
+  MutableCounterLong providedExistsChecks;
+  @Metric("Number of calls to open() on PROVIDED storage")
+  MutableCounterLong providedOpenCalls;
+  @Metric("AliasMap lookups for PROVIDDED storage")
+  MutableCounterLong numAliasMapLookups;
+  @Metric("AliasMap cache hit rate")
+  MutableGaugeFloat aliasMapCacheHitRate;
 
   // RamDisk metrics on read/write
   @Metric MutableCounterLong ramDiskBlocksWrite;
@@ -152,8 +162,6 @@ public class DataNodeMetrics {
   MutableCounterLong ecReconstructionTasks;
   @Metric("Count of erasure coding failed reconstruction tasks")
   MutableCounterLong ecFailedReconstructionTasks;
-  @Metric("Count of erasure coding invalidated reconstruction tasks")
-  private MutableCounterLong ecInvalidReconstructionTasks;
   @Metric("Nanoseconds spent by decoding tasks")
   MutableCounterLong ecDecodingTimeNanos;
   @Metric("Bytes read by erasure coding worker")
@@ -168,8 +176,6 @@ public class DataNodeMetrics {
   private MutableCounterLong ecReconstructionDecodingTimeMillis;
   @Metric("Milliseconds spent on write by erasure coding worker")
   private MutableCounterLong ecReconstructionWriteTimeMillis;
-  @Metric("Milliseconds spent on validating by erasure coding worker")
-  private MutableCounterLong ecReconstructionValidateTimeMillis;
   @Metric("Sum of all BPServiceActors command queue length")
   private MutableCounterLong sumOfActorCommandQueueLength;
   @Metric("Num of processed commands of all BPServiceActors")
@@ -191,15 +197,6 @@ public class DataNodeMetrics {
   @Metric MutableCounterLong packetsSlowWriteToMirror;
   @Metric MutableCounterLong packetsSlowWriteToDisk;
   @Metric MutableCounterLong packetsSlowWriteToOsCache;
-
-  @Metric("Number of replaceBlock ops between" +
-      " storage types on same host with local copy")
-  private MutableCounterLong replaceBlockOpOnSameHost;
-  @Metric("Number of replaceBlock ops between" +
-      " storage types on same disk mount with same disk tiering feature")
-  private MutableCounterLong replaceBlockOpOnSameMount;
-  @Metric("Number of replaceBlock ops to another node")
-  private MutableCounterLong replaceBlockOpToOtherHost;
 
   final MetricsRegistry registry = new MetricsRegistry("datanode");
   @Metric("Milliseconds spent on calling NN rpc")
@@ -547,14 +544,6 @@ public class DataNodeMetrics {
     ecFailedReconstructionTasks.incr();
   }
 
-  public void incrECInvalidReconstructionTasks() {
-    ecInvalidReconstructionTasks.incr();
-  }
-
-  public long getECInvalidReconstructionTasks() {
-    return ecInvalidReconstructionTasks.value();
-  }
-
   public void incrDataNodeActiveXceiversCount() {
     dataNodeActiveXceiversCount.incr();
   }
@@ -631,8 +620,20 @@ public class DataNodeMetrics {
     ecReconstructionDecodingTimeMillis.incr(millis);
   }
 
-  public void incrECReconstructionValidateTime(long millis) {
-    ecReconstructionValidateTimeMillis.incr(millis);
+  public void incrProvidedExistsChecks() {
+    providedExistsChecks.incr();
+  }
+
+  public void incrProvidedOpenCalls() {
+    providedOpenCalls.incr();
+  }
+
+  public void incrAliasMapLookUps() {
+    numAliasMapLookups.incr();
+  }
+
+  public void setAliasMapCacheHitRate(float cacheHitRate) {
+    aliasMapCacheHitRate.set(cacheHitRate);
   }
 
   public DataNodeUsageReport getDNUsageReport(long timeSinceLastReport) {
@@ -736,17 +737,4 @@ public class DataNodeMetrics {
   public void incrPacketsSlowWriteToOsCache() {
     packetsSlowWriteToOsCache.incr();
   }
-
-  public void incrReplaceBlockOpOnSameMount() {
-    replaceBlockOpOnSameMount.incr();
-  }
-
-  public void incrReplaceBlockOpOnSameHost() {
-    replaceBlockOpOnSameHost.incr();
-  }
-
-  public void incrReplaceBlockOpToOtherHost() {
-    replaceBlockOpToOtherHost.incr();
-  }
-
 }

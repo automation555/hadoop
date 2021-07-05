@@ -18,16 +18,15 @@
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
 import static org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol.DNA_ERASURE_CODING_RECONSTRUCTION;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_BLOCKPLACEMENTPOLICY_EXCLUDE_SLOW_NODES_ENABLED_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_BLOCKPLACEMENTPOLICY_EXCLUDE_SLOW_NODES_ENABLED_DEFAULT;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.net.InetAddresses;
 
 import org.apache.hadoop.fs.StorageType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -42,6 +41,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.BlockTargetPair;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.CachedBlocksList;
+import org.apache.hadoop.hdfs.server.common.ProvidedVolumeInfo;
 import org.apache.hadoop.hdfs.server.common.Util;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -54,12 +54,8 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.*;
 import org.apache.hadoop.net.NetworkTopology.InvalidTopologyException;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.Timer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -140,9 +136,6 @@ public class DatanodeManager {
   /** Whether or not to avoid using stale DataNodes for reading */
   private final boolean avoidStaleDataNodesForRead;
 
-  /** Whether or not to avoid using slow DataNodes for reading. */
-  private final boolean avoidSlowDataNodesForRead;
-
   /** Whether or not to consider lad for reading. */
   private final boolean readConsiderLoad;
 
@@ -188,6 +181,12 @@ public class DatanodeManager {
   private boolean shouldSendCachingCommands = false;
 
   /**
+   * Whether we should tell datanodes about any provided volumes using
+   * heartbeat message response.
+   */
+  private boolean shouldSendProvidedVolumeCommands = false;
+
+  /**
    * The number of datanodes for each software version. This list should change
    * during rolling upgrades.
    * Software version -> Number of datanodes with this version
@@ -209,19 +208,11 @@ public class DatanodeManager {
    */
   private final boolean useDfsNetworkTopology;
 
-  private static final String IP_PORT_SEPARATOR = ":";
-
   @Nullable
   private final SlowPeerTracker slowPeerTracker;
-  private static Set<String> slowNodesUuidSet = Sets.newConcurrentHashSet();
-  private Daemon slowPeerCollectorDaemon;
-  private final long slowPeerCollectionInterval;
-  private final int maxSlowPeerReportNodes;
-  private boolean excludeSlowNodesEnabled;
-
   @Nullable
   private final SlowDiskTracker slowDiskTracker;
-  
+
   /**
    * The minimum time between resending caching directives to Datanodes,
    * in milliseconds.
@@ -245,6 +236,7 @@ public class DatanodeManager {
     } else {
       networktopology = NetworkTopology.getInstance(conf);
     }
+
     this.heartbeatManager = new HeartbeatManager(namesystem,
         blockManager, conf);
     this.datanodeAdminManager = new DatanodeAdminManager(namesystem,
@@ -257,24 +249,14 @@ public class DatanodeManager {
         DFSConfigKeys.DFS_DATANODE_FILEIO_PROFILING_SAMPLING_PERCENTAGE_KEY,
         DFSConfigKeys.
             DFS_DATANODE_FILEIO_PROFILING_SAMPLING_PERCENTAGE_DEFAULT));
+
     final Timer timer = new Timer();
     this.slowPeerTracker = dataNodePeerStatsEnabled ?
         new SlowPeerTracker(conf, timer) : null;
-    this.excludeSlowNodesEnabled = conf.getBoolean(
-        DFS_NAMENODE_BLOCKPLACEMENTPOLICY_EXCLUDE_SLOW_NODES_ENABLED_KEY,
-        DFS_NAMENODE_BLOCKPLACEMENTPOLICY_EXCLUDE_SLOW_NODES_ENABLED_DEFAULT);
-    this.maxSlowPeerReportNodes = conf.getInt(
-        DFSConfigKeys.DFS_NAMENODE_MAX_SLOWPEER_COLLECT_NODES_KEY,
-        DFSConfigKeys.DFS_NAMENODE_MAX_SLOWPEER_COLLECT_NODES_DEFAULT);
-    this.slowPeerCollectionInterval = conf.getTimeDuration(
-        DFSConfigKeys.DFS_NAMENODE_SLOWPEER_COLLECT_INTERVAL_KEY,
-        DFSConfigKeys.DFS_NAMENODE_SLOWPEER_COLLECT_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    if (slowPeerTracker != null && excludeSlowNodesEnabled) {
-      startSlowPeerCollector();
-    }
+
     this.slowDiskTracker = dataNodeDiskStatsEnabled ?
         new SlowDiskTracker(conf, timer) : null;
+
     this.defaultXferPort = NetUtils.createSocketAddr(
           conf.getTrimmed(DFSConfigKeys.DFS_DATANODE_ADDRESS_KEY,
               DFSConfigKeys.DFS_DATANODE_ADDRESS_DEFAULT)).getPort();
@@ -295,9 +277,11 @@ public class DatanodeManager {
     } catch (IOException e) {
       LOG.error("error reading hosts files: ", e);
     }
+
     this.dnsToSwitchMapping = ReflectionUtils.newInstance(
         conf.getClass(DFSConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY, 
             ScriptBasedMapping.class, DNSToSwitchMapping.class), conf);
+    
     this.rejectUnresolvedTopologyDN = conf.getBoolean(
         DFSConfigKeys.DFS_REJECT_UNRESOLVED_DN_TOPOLOGY_MAPPING_KEY,
         DFSConfigKeys.DFS_REJECT_UNRESOLVED_DN_TOPOLOGY_MAPPING_DEFAULT);
@@ -312,6 +296,7 @@ public class DatanodeManager {
       }
       dnsToSwitchMapping.resolve(locations);
     }
+
     heartbeatIntervalSeconds = conf.getTimeDuration(
         DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY,
         DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.SECONDS);
@@ -320,6 +305,7 @@ public class DatanodeManager {
         DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_DEFAULT); // 5 minutes
     this.heartbeatExpireInterval = 2 * heartbeatRecheckInterval
         + 10 * 1000 * heartbeatIntervalSeconds;
+
     // Effected block invalidate limit is the bigger value between
     // value configured in hdfs-site.xml, and 20 * HB interval.
     final int configuredBlockInvalidateLimit = conf.getInt(
@@ -332,17 +318,16 @@ public class DatanodeManager {
         + ": configured=" + configuredBlockInvalidateLimit
         + ", counted=" + countedBlockInvalidateLimit
         + ", effected=" + blockInvalidateLimit);
+
     this.checkIpHostnameInRegistration = conf.getBoolean(
         DFSConfigKeys.DFS_NAMENODE_DATANODE_REGISTRATION_IP_HOSTNAME_CHECK_KEY,
         DFSConfigKeys.DFS_NAMENODE_DATANODE_REGISTRATION_IP_HOSTNAME_CHECK_DEFAULT);
     LOG.info(DFSConfigKeys.DFS_NAMENODE_DATANODE_REGISTRATION_IP_HOSTNAME_CHECK_KEY
         + "=" + checkIpHostnameInRegistration);
+
     this.avoidStaleDataNodesForRead = conf.getBoolean(
         DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_KEY,
         DFSConfigKeys.DFS_NAMENODE_AVOID_STALE_DATANODE_FOR_READ_DEFAULT);
-    this.avoidSlowDataNodesForRead = conf.getBoolean(
-        DFSConfigKeys.DFS_NAMENODE_AVOID_SLOW_DATANODE_FOR_READ_KEY,
-        DFSConfigKeys.DFS_NAMENODE_AVOID_SLOW_DATANODE_FOR_READ_DEFAULT);
     this.readConsiderLoad = conf.getBoolean(
         DFSConfigKeys.DFS_NAMENODE_READ_CONSIDERLOAD_KEY,
         DFSConfigKeys.DFS_NAMENODE_READ_CONSIDERLOAD_DEFAULT);
@@ -376,44 +361,6 @@ public class DatanodeManager {
     this.blocksPerPostponedMisreplicatedBlocksRescan = conf.getLong(
         DFSConfigKeys.DFS_NAMENODE_BLOCKS_PER_POSTPONEDBLOCKS_RESCAN_KEY,
         DFSConfigKeys.DFS_NAMENODE_BLOCKS_PER_POSTPONEDBLOCKS_RESCAN_KEY_DEFAULT);
-  }
-
-  private void startSlowPeerCollector() {
-    if (slowPeerCollectorDaemon != null) {
-      return;
-    }
-    slowPeerCollectorDaemon = new Daemon(new Runnable() {
-      @Override
-      public void run() {
-        while (true) {
-          try {
-            slowNodesUuidSet = getSlowPeersUuidSet();
-          } catch (Exception e) {
-            LOG.error("Failed to collect slow peers", e);
-          }
-
-          try {
-            Thread.sleep(slowPeerCollectionInterval);
-          } catch (InterruptedException e) {
-            LOG.error("Slow peers collection thread interrupted", e);
-            return;
-          }
-        }
-      }
-    });
-    slowPeerCollectorDaemon.start();
-  }
-
-  public void stopSlowPeerCollector() {
-    if (slowPeerCollectorDaemon == null) {
-      return;
-    }
-    slowPeerCollectorDaemon.interrupt();
-    try {
-      slowPeerCollectorDaemon.join();
-    } catch (InterruptedException e) {
-      LOG.error("Slow peers collection thread did not shutdown", e);
-    }
   }
 
   private static long getStaleIntervalFromConf(Configuration conf,
@@ -461,7 +408,6 @@ public class DatanodeManager {
   void close() {
     datanodeAdminManager.close();
     heartbeatManager.close();
-    stopSlowPeerCollector();
   }
 
   /** @return the network topology. */
@@ -504,19 +450,16 @@ public class DatanodeManager {
   }
 
   private boolean isInactive(DatanodeInfo datanode) {
-    return datanode.isDecommissioned() || datanode.isEnteringMaintenance() ||
+    return datanode.isDecommissioned() ||
         (avoidStaleDataNodesForRead && datanode.isStale(staleInterval));
-  }
 
-  private boolean isSlowNode(String dnUuid) {
-    return avoidSlowDataNodesForRead && slowNodesUuidSet.contains(dnUuid);
   }
   
   /**
    * Sort the non-striped located blocks by the distance to the target host.
    *
-   * For striped blocks, it will only move decommissioned/stale/slow
-   * nodes to the bottom. For example, assume we have storage list:
+   * For striped blocks, it will only move decommissioned/stale nodes to the
+   * bottom. For example, assume we have storage list:
    * d0, d1, d2, d3, d4, d5, d6, d7, d8, d9
    * mapping to block indices:
    * 0, 1, 2, 3, 4, 5, 6, 7, 8, 2
@@ -528,11 +471,8 @@ public class DatanodeManager {
    */
   public void sortLocatedBlocks(final String targetHost,
       final List<LocatedBlock> locatedBlocks) {
-    Comparator<DatanodeInfo> comparator =
-        avoidStaleDataNodesForRead || avoidSlowDataNodesForRead ?
-        new DFSUtil.StaleAndSlowComparator(
-            avoidStaleDataNodesForRead, staleInterval,
-            avoidSlowDataNodesForRead, slowNodesUuidSet) :
+    Comparator<DatanodeInfo> comparator = avoidStaleDataNodesForRead ?
+        new DFSUtil.ServiceAndStaleComparator(staleInterval) :
         new DFSUtil.ServiceComparator();
     // sort located block
     for (LocatedBlock lb : locatedBlocks) {
@@ -545,8 +485,7 @@ public class DatanodeManager {
   }
 
   /**
-   * Move decommissioned/entering_maintenance/stale/slow
-   * datanodes to the bottom. After sorting it will
+   * Move decommissioned/stale datanodes to the bottom. After sorting it will
    * update block indices and block tokens respectively.
    *
    * @param lb located striped block
@@ -577,9 +516,8 @@ public class DatanodeManager {
   }
 
   /**
-   * Move decommissioned/entering_maintenance/stale/slow
-   * datanodes to the bottom. Also, sort nodes by network
-   * distance.
+   * Move decommissioned/stale datanodes to the bottom. Also, sort nodes by
+   * network distance.
    *
    * @param lb located block
    * @param targetHost target host
@@ -609,15 +547,12 @@ public class DatanodeManager {
     }
 
     DatanodeInfoWithStorage[] di = lb.getLocations();
-    // Move decommissioned/entering_maintenance/stale/slow
-    // datanodes to the bottom
+    // Move decommissioned/stale datanodes to the bottom
     Arrays.sort(di, comparator);
 
     // Sort nodes by network distance only for located blocks
     int lastActiveIndex = di.length - 1;
-    while (lastActiveIndex > 0 && (
-        isSlowNode(di[lastActiveIndex].getDatanodeUuid()) ||
-            isInactive(di[lastActiveIndex]))) {
+    while (lastActiveIndex > 0 && isInactive(di[lastActiveIndex])) {
       --lastActiveIndex;
     }
     int activeLen = lastActiveIndex + 1;
@@ -1393,7 +1328,7 @@ public class DatanodeManager {
   public boolean shouldAvoidStaleDataNodesForWrite() {
     // If # stale exceeds maximum staleness ratio, disable stale
     // datanode avoidance on the write path
-    return avoidStaleDataNodesForWrite && numStaleNodes > 0 &&
+    return avoidStaleDataNodesForWrite &&
         (numStaleNodes <= heartbeatManager.getLiveDatanodeCount()
             * ratioUseStaleDataNodesForWrite);
   }
@@ -1667,7 +1602,7 @@ public class DatanodeManager {
       BlockUnderConstructionFeature uc = b.getUnderConstructionFeature();
       if(uc == null) {
         throw new IOException("Recovery block " + b +
-            " where it is not under construction.");
+            "where it is not under construction.");
       }
       final DatanodeStorageInfo[] storages = uc.getExpectedStorageLocations();
       // Skip stale nodes during recovery
@@ -1744,6 +1679,54 @@ public class DatanodeManager {
     }
   }
 
+  /**
+   * Enables transfer of provided volume management commands between DNs and
+   * NN. If disabled
+   * @param activate to enable
+   */
+  public void setShouldSendProvidedVolumeCommands(boolean activate) {
+    this.shouldSendProvidedVolumeCommands = activate;
+  }
+
+  private void addProvidedVolumeCommands(DatanodeDescriptor nodeDescriptor,
+      List<DatanodeCommand> cmds) {
+    if (shouldSendProvidedVolumeCommands) {
+      ProvidedVolumeInfo providedVol =
+          nodeDescriptor.pollPendingAddProvidedVolume();
+      while (providedVol != null) {
+        DatanodeCommand cmd = ProvidedVolumeCommand.buildAddCmd(providedVol);
+        cmds.add(cmd);
+        providedVol = nodeDescriptor.pollPendingAddProvidedVolume();
+      }
+
+      providedVol = nodeDescriptor.pollPendingRemoveProvidedVolume();
+      while (providedVol != null) {
+        DatanodeCommand cmd =
+            ProvidedVolumeCommand.buildRemoveCmd(providedVol);
+        cmds.add(cmd);
+        providedVol = nodeDescriptor.pollPendingRemoveProvidedVolume();
+      }
+    }
+  }
+
+  /**
+   * Enqueues the given volume to the list of volumes to be added on all
+   * datanodes.
+   * @param vol The provided volume to be added.
+   */
+  public synchronized void addProvidedVolume(ProvidedVolumeInfo vol) {
+    datanodeMap.values().forEach(dn -> dn.addProvidedVolume(vol));
+  }
+
+  /**
+   * Enqueues the given volume to the list of volumes to be removed from all
+   * DNs.
+   * @param vol The provided volume to be removed.
+   */
+  public synchronized void removeProvidedVolume(ProvidedVolumeInfo vol) {
+    datanodeMap.values().forEach(dn -> dn.removeProvidedVolume(vol));
+  }
+
   /** Handle heartbeat from datanodes. */
   public DatanodeCommand[] handleHeartbeat(DatanodeRegistration nodeReg,
       StorageReport[] reports, final String blockPoolId,
@@ -1751,7 +1734,8 @@ public class DatanodeManager {
       int maxTransfers, int failedVolumes,
       VolumeFailureSummary volumeFailureSummary,
       @Nonnull SlowPeerReports slowPeers,
-      @Nonnull SlowDiskReports slowDisks) throws IOException {
+      @Nonnull SlowDiskReports slowDisks)
+      throws IOException {
     final DatanodeDescriptor nodeinfo;
     try {
       nodeinfo = getDatanode(nodeReg);
@@ -1842,6 +1826,8 @@ public class DatanodeManager {
     addCacheCommands(blockPoolId, nodeinfo, cmds);
     // key update command
     blockManager.addKeyUpdateCommand(cmds, nodeinfo);
+    // provided volume commands
+    addProvidedVolumeCommands(nodeinfo, cmds);
 
     // check for balancer bandwidth update
     if (nodeinfo.getBalancerBandwidth() > 0) {
@@ -1874,6 +1860,14 @@ public class DatanodeManager {
       slowDiskTracker.checkAndUpdateReportIfNecessary();
     }
 
+    // add synctask commands
+    List<BlockSyncTask> syncTasksToDispatch =
+        nodeinfo.getBlockSyncTasksToDispatch();
+    if (!syncTasksToDispatch.isEmpty()) {
+      cmds.add(new SyncCommand(
+          DatanodeProtocol.DNA_BACKUP, syncTasksToDispatch));
+    }
+
     if (!cmds.isEmpty()) {
       return cmds.toArray(new DatanodeCommand[cmds.size()]);
     }
@@ -1886,16 +1880,18 @@ public class DatanodeManager {
    *
    * @param nodeReg registration info for DataNode sending the lifeline
    * @param reports storage reports from DataNode
+   * @param blockPoolId block pool ID
    * @param cacheCapacity cache capacity at DataNode
    * @param cacheUsed cache used at DataNode
    * @param xceiverCount estimated count of transfer threads running at DataNode
+   * @param maxTransfers count of transfers running at DataNode
    * @param failedVolumes count of failed volumes at DataNode
    * @param volumeFailureSummary info on failed volumes at DataNode
    * @throws IOException if there is an error
    */
   public void handleLifeline(DatanodeRegistration nodeReg,
-      StorageReport[] reports, long cacheCapacity,
-      long cacheUsed, int xceiverCount, int failedVolumes,
+      StorageReport[] reports, String blockPoolId, long cacheCapacity,
+      long cacheUsed, int xceiverCount, int maxTransfers, int failedVolumes,
       VolumeFailureSummary volumeFailureSummary) throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Received handleLifeline from nodeReg = " + nodeReg);
@@ -2090,60 +2086,12 @@ public class DatanodeManager {
   }
 
   /**
-   * Returns all tracking slow peers.
-   * @return
-   */
-  public Set<String> getSlowPeersUuidSet() {
-    Set<String> slowPeersUuidSet = Sets.newConcurrentHashSet();
-    if (slowPeerTracker == null) {
-      return slowPeersUuidSet;
-    }
-    ArrayList<String> slowNodes =
-        slowPeerTracker.getSlowNodes(maxSlowPeerReportNodes);
-    for (String slowNode : slowNodes) {
-      if (StringUtils.isBlank(slowNode)
-              || !slowNode.contains(IP_PORT_SEPARATOR)) {
-        continue;
-      }
-      String ipAddr = slowNode.split(IP_PORT_SEPARATOR)[0];
-      DatanodeDescriptor datanodeByHost =
-          host2DatanodeMap.getDatanodeByHost(ipAddr);
-      if (datanodeByHost != null) {
-        slowPeersUuidSet.add(datanodeByHost.getDatanodeUuid());
-      }
-    }
-    return slowPeersUuidSet;
-  }
-
-  /**
-   * Returns all tracking slow datanodes uuids.
-   * @return
-   */
-  public static Set<String> getSlowNodesUuidSet() {
-    return slowNodesUuidSet;
-  }
-
-  /**
-   * Use only for testing.
-   */
-  @VisibleForTesting
-  public SlowPeerTracker getSlowPeerTracker() {
-    return slowPeerTracker;
-  }
-
-  /**
    * Use only for testing.
    */
   @VisibleForTesting
   public SlowDiskTracker getSlowDiskTracker() {
     return slowDiskTracker;
   }
-
-  @VisibleForTesting
-  public void addSlowPeers(String dnUuid) {
-    slowNodesUuidSet.add(dnUuid);
-  }
-
   /**
    * Retrieve information about slow disks as a JSON.
    * Returns null if we are not tracking slow disks.

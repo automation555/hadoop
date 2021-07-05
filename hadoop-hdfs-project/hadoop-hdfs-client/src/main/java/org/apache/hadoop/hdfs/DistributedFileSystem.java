@@ -19,10 +19,10 @@
 package org.apache.hadoop.hdfs;
 
 
-import org.apache.hadoop.ipc.RpcNoSuchMethodException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.commons.collections.list.TreeList;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -54,6 +54,7 @@ import org.apache.hadoop.fs.GlobalStorageStatistics.StorageStatisticsProvider;
 import org.apache.hadoop.fs.InvalidPathHandleException;
 import org.apache.hadoop.fs.PartialListing;
 import org.apache.hadoop.fs.MultipartUploaderBuilder;
+import org.apache.hadoop.fs.MountMode;
 import org.apache.hadoop.fs.PathHandle;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options;
@@ -61,6 +62,7 @@ import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.Options.HandleOpt;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.ProvidedStorageSummary;
 import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StorageStatistics;
@@ -117,7 +119,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.util.ChunkedArrayList;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2389,16 +2390,8 @@ public class DistributedFileSystem extends FileSystem
     List<DiffReportListingEntry> deletedList = new ChunkedArrayList<>();
     SnapshotDiffReportListing report;
     do {
-      try {
-        report = dfs.getSnapshotDiffReportListing(snapshotDir, fromSnapshot,
-            toSnapshot, startPath, index);
-      } catch (RpcNoSuchMethodException e) {
-        // In case the server doesn't support getSnapshotDiffReportListing,
-        // fallback to getSnapshotDiffReport.
-        DFSClient.LOG.warn(
-            "Falling back to getSnapshotDiffReport {}", e.getMessage());
-        return dfs.getSnapshotDiffReport(snapshotDir, fromSnapshot, toSnapshot);
-      }
+      report = dfs.getSnapshotDiffReportListing(snapshotDir, fromSnapshot,
+          toSnapshot, startPath, index);
       startPath = report.getLastPath();
       index = report.getLastIndex();
       modifiedList.addAll(report.getModifyList());
@@ -3888,5 +3881,44 @@ public class DistributedFileSystem extends FileSystem
   public MultipartUploaderBuilder createMultipartUploader(final Path basePath)
       throws IOException {
     return new FileSystemMultipartUploaderBuilder(this, basePath);
+  }
+
+  /**
+   * Add a PROVIDED mount point to the FSImage.
+   * @param remote Remote location.
+   * @param mountPath Path in HDFS to mount remote path in.
+   * @param mountMode mount mode.
+   * @param remoteConfig config needed to connect to remote fs
+   * @return true if the mount is successful.
+   * @throws IOException If there is an error adding the mount point.
+   */
+  @Override
+  public boolean addMount(String remote, String mountPath, MountMode mountMode,
+      Map<String, String> remoteConfig)
+      throws IOException {
+    return dfs.addMount(remote, mountPath, mountMode, remoteConfig);
+  }
+
+  /**
+   * Unmount (delete) a PROVIDED mount point.
+   * @param mountPath mount path to remove
+   * @return true if the removeMount is unsuccessful
+   * @throws IOException
+   */
+  @Override
+  public boolean removeMount(String mountPath) throws IOException {
+    return dfs.removeMount(mountPath);
+  }
+
+  /**
+   * List provided storage mounts.
+   * @param requireStats whether stats for metrics are required.
+   * @return Mount info and metrics summary for provided storage.
+   * @throws IOException
+   */
+  @Override
+  public ProvidedStorageSummary listMounts(boolean requireStats)
+      throws IOException {
+    return dfs.listMounts(requireStats);
   }
 }

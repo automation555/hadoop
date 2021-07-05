@@ -20,6 +20,8 @@ package org.apache.hadoop.hdfs;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_READS;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_WRITES;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_READAHEAD;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_READTHROUGH;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_READTHROUGH_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CONTEXT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CONTEXT_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_LOCAL_INTERFACES;
@@ -79,12 +81,14 @@ import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.fs.HdfsBlockLocation;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
+import org.apache.hadoop.fs.MountMode;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.ChecksumCombineMode;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.ProvidedStorageSummary;
 import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StorageType;
@@ -186,17 +190,17 @@ import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.DataChecksum.Type;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.tracing.TraceScope;
-import org.apache.hadoop.tracing.Tracer;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.net.InetAddresses;
 
 /********************************************************
@@ -394,8 +398,12 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     Boolean writeDropBehind =
         (conf.get(DFS_CLIENT_CACHE_DROP_BEHIND_WRITES) == null) ?
             null : conf.getBoolean(DFS_CLIENT_CACHE_DROP_BEHIND_WRITES, false);
+    Boolean readThrough =
+        (conf.get(DFS_CLIENT_CACHE_READTHROUGH) == null)
+        ? null : conf.getBoolean(DFS_CLIENT_CACHE_READTHROUGH,
+            DFS_CLIENT_CACHE_READTHROUGH_DEFAULT);
     this.defaultReadCachingStrategy =
-        new CachingStrategy(readDropBehind, readahead);
+        new CachingStrategy(readDropBehind, readahead, readThrough);
     this.defaultWriteCachingStrategy =
         new CachingStrategy(writeDropBehind, readahead);
     this.clientContext = ClientContext.get(
@@ -505,15 +513,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       throws IOException {
     synchronized (filesBeingWritten) {
       putFileBeingWritten(inodeId, out);
-      LeaseRenewer renewer = getLeaseRenewer();
-      boolean result = renewer.put(this);
-      if (!result) {
-        // Existing LeaseRenewer cannot add another Daemon, so remove existing
-        // and add new one.
-        LeaseRenewer.remove(renewer);
-        renewer = getLeaseRenewer();
-        renewer.put(this);
-      }
+      getLeaseRenewer().put(this);
     }
   }
 
@@ -656,7 +656,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       clientRunning = false;
       // close dead node detector thread
       if (!disabledStopDeadNodeDetectorThreadForTest) {
-        clientContext.unreference();
+        clientContext.stopDeadNodeDetectorThread();
       }
 
       // close connections to the namenode
@@ -869,18 +869,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return dfsClientConf.getRefreshReadBlockLocationsMS();
   }
 
-  /**
-   * Get locations of the blocks of the specified file `src` from offset
-   * `start` within the prefetch size which is related to parameter
-   * `dfs.client.read.prefetch.size`. DataNode locations for each block are
-   * sorted by the proximity to the client. Please note that the prefetch size
-   * is not equal file length generally.
-   *
-   * @param src the file path.
-   * @param start starting offset.
-   * @return LocatedBlocks
-   * @throws IOException
-   */
   public LocatedBlocks getLocatedBlocks(String src, long start)
       throws IOException {
     return getLocatedBlocks(src, start, dfsClientConf.getPrefetchSize());
@@ -1806,6 +1794,70 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     } catch (RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class,
           UnresolvedPathException.class);
+    }
+  }
+
+  /**
+   * add mount for external storage without mount mode specified.
+   * The default READONLY mount is used then.
+   */
+  public boolean addMount(String remote, String mountPath,
+      Map<String, String> config) throws IOException {
+    return addMount(remote, mountPath, MountMode.READONLY, config);
+  }
+
+  /**
+   * Add a PROVIDED mount point to the FSImage.
+   *
+   * @param remote Remote location.
+   * @param mountPath HDFS path to mount external storage.
+   * @param mountMode Mount mode, readOnly, backup & writeBack are supported.
+   * @param config remote config needed to connect to remote fs. For e.g. if
+   *               the desired remote connection requires a user=foo and a
+   *               token=bar configuration, then the config map should
+   *               contain these two pairs.
+   * @return true if the mount is successful.
+   * @throws IOException If there is an error adding the mount point.
+   */
+  public boolean addMount(String remote, String mountPath, MountMode mountMode,
+      Map<String, String> config) throws IOException {
+    checkOpen();
+    try (TraceScope ignored = newPathTraceScope("getFileLinkInfo",
+        mountPath)) {
+      return namenode.addMount(remote, mountPath, mountMode, config);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(FileNotFoundException.class,
+          AccessControlException.class, UnresolvedPathException.class);
+    }
+  }
+
+  /**
+   * Provide a list of all the mount points, and stats summary if
+   * {@code requireStats} is true, in the cluster.
+   * @return Mount info and metrics summary for provided storage.
+   * @throws IOException
+   */
+  public ProvidedStorageSummary listMounts(boolean requireStats)
+      throws IOException {
+    return namenode.listMounts(requireStats);
+  }
+
+  /**
+   * Remove a PROVIDED mount point.
+   * @param mount Path in HDFS to mount the path in.
+   * @return true if the mount is successful.
+   * @throws IOException If there is an error adding the mount point.
+   */
+  public boolean removeMount(String mount) throws IOException {
+    checkOpen();
+    TraceScope scope = newPathTraceScope("removeMount", mount);
+    try {
+      return namenode.removeMount(mount);
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(FileNotFoundException.class,
+          AccessControlException.class, UnresolvedPathException.class);
+    } finally {
+      scope.close();
     }
   }
 
@@ -3460,12 +3512,5 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   private boolean isDeadNodeDetectionEnabled() {
     return clientContext.isDeadNodeDetectionEnabled();
-  }
-
-  /**
-   * Obtain DeadNodeDetector of the current client.
-   */
-  public DeadNodeDetector getDeadNodeDetector() {
-    return clientContext.getDeadNodeDetector();
   }
 }

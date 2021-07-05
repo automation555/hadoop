@@ -83,9 +83,6 @@ public interface HdfsClientConfigKeys {
       "dfs.namenode.kerberos.principal";
   String  DFS_CLIENT_WRITE_PACKET_SIZE_KEY = "dfs.client-write-packet-size";
   int     DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT = 64*1024;
-  String  DFS_CLIENT_PIPELINE_RECOVERY_MAX_RETRIES =
-      "dfs.client.pipeline.recovery.max-retries";
-  int     DFS_CLIENT_PIPELINE_RECOVERY_MAX_RETRIES_DEFAULT = 5;
   String  DFS_CLIENT_SOCKET_TIMEOUT_KEY = "dfs.client.socket-timeout";
   String  DFS_CLIENT_SOCKET_SEND_BUFFER_SIZE_KEY =
       "dfs.client.socket.send.buffer.size";
@@ -106,6 +103,8 @@ public interface HdfsClientConfigKeys {
   String  DFS_CLIENT_CACHE_READAHEAD = "dfs.client.cache.readahead";
   String  DFS_CLIENT_CACHED_CONN_RETRY_KEY = "dfs.client.cached.conn.retry";
   int     DFS_CLIENT_CACHED_CONN_RETRY_DEFAULT = 3;
+  String  DFS_CLIENT_CACHE_READTHROUGH = "dfs.client.cache.readthrough";
+  boolean DFS_CLIENT_CACHE_READTHROUGH_DEFAULT = false;
   String  DFS_CLIENT_CONTEXT = "dfs.client.context";
   String  DFS_CLIENT_CONTEXT_DEFAULT = "default";
   String  DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL =
@@ -164,9 +163,13 @@ public interface HdfsClientConfigKeys {
           "dfs.client.deadnode.detection.enabled";
   boolean DFS_CLIENT_DEAD_NODE_DETECTION_ENABLED_DEFAULT = false;
 
-  String DFS_CLIENT_DEAD_NODE_DETECTION_IDLE_SLEEP_MS_KEY =
-      "dfs.client.deadnode.detection.idle.sleep.ms";
-  long DFS_CLIENT_DEAD_NODE_DETECTION_IDLE_SLEEP_MS_DEFAULT = 10000;
+  String DFS_CLIENT_DEAD_NODE_DETECTION_DEAD_NODE_QUEUE_MAX_KEY =
+      "dfs.client.deadnode.detection.deadnode.queue.max";
+  int DFS_CLIENT_DEAD_NODE_DETECTION_DEAD_NODE_QUEUE_MAX_DEFAULT = 100;
+
+  String DFS_CLIENT_DEAD_NODE_DETECTION_SUSPECT_NODE_QUEUE_MAX_KEY =
+      "dfs.client.deadnode.detection.suspectnode.queue.max";
+  int DFS_CLIENT_DEAD_NODE_DETECTION_SUSPECT_NODE_QUEUE_MAX_DEFAULT = 1000;
 
   String DFS_CLIENT_DEAD_NODE_DETECTION_PROBE_CONNECTION_TIMEOUT_MS_KEY =
       "dfs.client.deadnode.detection.probe.connection.timeout.ms";
@@ -250,7 +253,7 @@ public interface HdfsClientConfigKeys {
   boolean DFS_NAMENODE_SNAPSHOT_CAPTURE_OPENFILES_DEFAULT = false;
 
   String DFS_PROVIDED_ALIASMAP_INMEMORY_RPC_ADDRESS =
-      "dfs.provided.aliasmap.inmemory.dnrpc-address";
+      "dfs.provided.aliasmap.inmemory.rpc.address";
 
   String DFS_LEASE_HARDLIMIT_KEY = "dfs.namenode.lease-hard-limit-sec";
   long DFS_LEASE_HARDLIMIT_DEFAULT = 20 * 60;

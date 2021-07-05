@@ -57,6 +57,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.hdfs.server.common.Storage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FileSystem;
@@ -87,9 +89,9 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.ExitUtil.ExitException;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.log4j.Level;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.spi.LoggingEvent;
@@ -98,14 +100,11 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.mockito.Mockito;
-import org.slf4j.event.Level;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 /**
  * This class tests the creation and validation of a checkpoint.
@@ -114,7 +113,7 @@ import org.slf4j.LoggerFactory;
 public class TestEditLog {
 
   static {
-    GenericTestUtils.setLogLevel(FSEditLog.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(FSEditLog.LOG, Level.ALL);
   }
 
   @Parameters
@@ -364,7 +363,8 @@ public class TestEditLog {
         editStreams.add(editLogFileInputStream2);
         FSImage readFsImage = new FSImage(conf);
         try {
-          readFsImage.loadEdits(editStreams, namesystem, 100, null, null);
+          readFsImage.loadEdits(editStreams, namesystem, 100, null, null,
+              false);
         } catch (Exception e){
           LOG.error("There appears to be an out-of-order edit in the edit log",
               e);
@@ -1549,8 +1549,7 @@ public class TestEditLog {
       LOG.error("edit log failover didn't work", e);
       fail("Edit log failover didn't work");
     } finally {
-      IOUtils.cleanupWithLogger(null,
-          streams.toArray(new EditLogInputStream[0]));
+      IOUtils.cleanup(null, streams.toArray(new EditLogInputStream[0]));
     }
   }
 
@@ -1600,8 +1599,7 @@ public class TestEditLog {
       LOG.error("edit log failover didn't work", e);
       fail("Edit log failover didn't work");
     } finally {
-      IOUtils.cleanupWithLogger(null,
-          streams.toArray(new EditLogInputStream[0]));
+      IOUtils.cleanup(null, streams.toArray(new EditLogInputStream[0]));
     }
   }
 
