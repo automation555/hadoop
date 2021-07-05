@@ -15,15 +15,15 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                      https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                      http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-mapreduce-client</artifactId>
     <groupId>org.apache.hadoop</groupId>
-    <version>3.4.0-SNAPSHOT</version>
+    <version>3.3.0-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
-  <version>3.4.0-SNAPSHOT</version>
+  <version>3.3.0-SNAPSHOT</version>
   <name>Apache Hadoop MapReduce JobClient</name>
 
   <properties>
@@ -117,8 +117,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-core</artifactId>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -183,7 +183,6 @@
           <excludes>
             <exclude>src/test/java/org/apache/hadoop/cli/data60bytes</exclude>
             <exclude>src/test/resources/job_1329348432655_0001-10.jhist</exclude>
-            <exclude>**/jobTokenPassword</exclude>
           </excludes>
         </configuration>
       </plugin>
