@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.snapshot;
 
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SNAPSHOT_MAX_LIMIT;
+import static org.apache.hadoop.hdfs.server.namenode.snapshot.DirectorySnapshottableFeature.SNAPSHOT_QUOTA_DEFAULT;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -61,7 +61,6 @@ public class TestNestedSnapshots {
 
   private static final short REPLICATION = 3;
   private static final long BLOCKSIZE = 1024;
-  private static final int SNAPSHOTLIMIT = 100;
   
   private static final Configuration conf = new Configuration();
   private static MiniDFSCluster cluster;
@@ -69,7 +68,6 @@ public class TestNestedSnapshots {
   
   @Before
   public void setUp() throws Exception {
-    conf.setInt(DFS_NAMENODE_SNAPSHOT_MAX_LIMIT, SNAPSHOTLIMIT);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(REPLICATION)
         .build();
     cluster.waitActive();
@@ -179,8 +177,8 @@ public class TestNestedSnapshots {
     Assert.assertTrue(se.getMessage().contains(substring));
   }
 
-  private static void print(String message) throws UnresolvedLinkException {
-    SnapshotTestHelper.dumpTree(message, cluster);
+  private static void print(String message) {
+    cluster.printTree(message);
   }
 
   private static void assertFile(Path s1, Path s2, Path file,
@@ -201,7 +199,7 @@ public class TestNestedSnapshots {
    * Test the snapshot limit of a single snapshottable directory.
    * @throws Exception
    */
-  @Test (timeout=600000)
+  @Test (timeout=300000)
   public void testSnapshotLimit() throws Exception {
     final int step = 1000;
     final String dirStr = "/testSnapshotLimit/dir";
@@ -210,8 +208,7 @@ public class TestNestedSnapshots {
     hdfs.allowSnapshot(dir);
 
     int s = 0;
-    for(; s < SNAPSHOTLIMIT; s++) {
-      SnapshotTestHelper.LOG.info("Creating snapshot number: {}", s);
+    for(; s < SNAPSHOT_QUOTA_DEFAULT; s++) {
       final String snapshotName = "s" + s;
       hdfs.createSnapshot(dir, snapshotName);
 
@@ -229,10 +226,10 @@ public class TestNestedSnapshots {
       SnapshotTestHelper.LOG.info("The exception is expected.", ioe);
     }
 
-    for(int f = 0; f < SNAPSHOTLIMIT; f += step) {
+    for(int f = 0; f < SNAPSHOT_QUOTA_DEFAULT; f += step) {
       final String file = "f" + f;
       s = RANDOM.nextInt(step);
-      for(; s < SNAPSHOTLIMIT; s += RANDOM.nextInt(step)) {
+      for(; s < SNAPSHOT_QUOTA_DEFAULT; s += RANDOM.nextInt(step)) {
         final Path p = SnapshotTestHelper.getSnapshotPath(dir, "s" + s, file);
         //the file #f exists in snapshot #s iff s > f.
         Assert.assertEquals(s > f, hdfs.exists(p));
