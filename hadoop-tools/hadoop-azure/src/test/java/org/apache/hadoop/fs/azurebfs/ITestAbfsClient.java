@@ -62,9 +62,7 @@ public final class ITestAbfsClient extends AbstractAbfsIntegrationTest {
     AbfsClient abfsClient =  fs.getAbfsClient();
 
     try {
-      AbfsRestOperation op = abfsClient
-          .listPath("/", true, LIST_MAX_RESULTS, "===========",
-              getTestTracingContext(fs, true));
+      AbfsRestOperation op = abfsClient.listPath("/", true, LIST_MAX_RESULTS, "===========");
       Assert.assertTrue(false);
     } catch (AbfsRestOperationException ex) {
       Assert.assertEquals("InvalidQueryParameterValue", ex.getErrorCode().getErrorCode());
@@ -93,7 +91,7 @@ public final class ITestAbfsClient extends AbstractAbfsIntegrationTest {
   public void testListPathWithValidListMaxResultsValues()
       throws IOException, ExecutionException, InterruptedException {
     final int fileCount = 10;
-    final String directory = "testWithValidListMaxResultsValues";
+    final String directory = getUniquePath("testWithValidListMaxResultsValues").toString();
     createDirectoryWithNFiles(directory, fileCount);
     final int[] testData = {fileCount + 100, fileCount + 1, fileCount,
         fileCount - 1, 1};
@@ -114,7 +112,7 @@ public final class ITestAbfsClient extends AbstractAbfsIntegrationTest {
   public void testListPathWithValueGreaterThanServerMaximum()
       throws IOException, ExecutionException, InterruptedException {
     setListMaxResults(LIST_MAX_RESULTS_SERVER + 100);
-    final String directory = "testWithValueGreaterThanServerMaximum";
+    final String directory = getUniquePath("testWithValueGreaterThanServerMaximum").toString();
     createDirectoryWithNFiles(directory, LIST_MAX_RESULTS_SERVER + 200);
     Assertions.assertThat(listPath(directory)).describedAs(
         "AbfsClient.listPath result will contain a maximum of %d items "
@@ -137,8 +135,7 @@ public final class ITestAbfsClient extends AbstractAbfsIntegrationTest {
   private List<ListResultEntrySchema> listPath(String directory)
       throws IOException {
     return getFileSystem().getAbfsClient()
-        .listPath(directory, false, getListMaxResults(), null,
-            getTestTracingContext(getFileSystem(), true)).getResult()
+        .listPath(directory, false, getListMaxResults(), null).getResult()
         .getListResultSchema().paths();
   }
 

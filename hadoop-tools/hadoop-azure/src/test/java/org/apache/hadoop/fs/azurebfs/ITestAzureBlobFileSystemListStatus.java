@@ -35,8 +35,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.azurebfs.constants.FSOperationType;
-import org.apache.hadoop.fs.azurebfs.utils.TracingHeaderValidator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.AZURE_LIST_MAX_RESULTS;
@@ -85,9 +83,6 @@ public class ITestAzureBlobFileSystemListStatus extends
     }
 
     es.shutdownNow();
-    fs.registerListener(
-        new TracingHeaderValidator(getConfiguration().getClientCorrelationId(),
-            fs.getFileSystemId(), FSOperationType.LISTSTATUS, true, 0));
     FileStatus[] files = fs.listStatus(new Path("/"));
     assertEquals(TEST_FILES_NUMBER, files.length /* user directory */);
   }
@@ -192,8 +187,9 @@ public class ITestAzureBlobFileSystemListStatus extends
     boolean exceptionThrown = false;
     final AzureBlobFileSystem fs = getFileSystem();
 
-    Path nontrailingPeriodDir = path("testTrailingDir/dir");
-    Path trailingPeriodDir = path("testTrailingDir/dir.");
+    Path testPath = getUniquePath("testTrailingDir");
+    Path nontrailingPeriodDir = new Path(testPath + "/dir");
+    Path trailingPeriodDir = new Path(testPath + "/dir.");
 
     assertMkdirs(fs, nontrailingPeriodDir);
 
@@ -212,8 +208,9 @@ public class ITestAzureBlobFileSystemListStatus extends
     boolean exceptionThrown = false;
     final AzureBlobFileSystem fs = getFileSystem();
 
-    Path trailingPeriodFile = path("testTrailingDir/file.");
-    Path nontrailingPeriodFile = path("testTrailingDir/file");
+    Path testPath = getUniquePath("testTrailingDir");
+    Path trailingPeriodFile = new Path(testPath + "/file.");
+    Path nontrailingPeriodFile = new Path(testPath + "/file");
 
     createFile(fs, nontrailingPeriodFile, false, new byte[0]);
     assertPathExists(fs, "Trailing period file does not exist",
@@ -234,8 +231,9 @@ public class ITestAzureBlobFileSystemListStatus extends
     boolean exceptionThrown = false;
     final AzureBlobFileSystem fs = getFileSystem();
 
-    Path nonTrailingPeriodFile = path("testTrailingDir/file");
-    Path trailingPeriodFile = path("testTrailingDir/file.");
+    Path testPath = getUniquePath("testTrailingDir");
+    Path nonTrailingPeriodFile = new Path(testPath + "/file");
+    Path trailingPeriodFile = new Path(testPath + "/file.");
 
     createFile(fs, nonTrailingPeriodFile, false, new byte[0]);
     try {

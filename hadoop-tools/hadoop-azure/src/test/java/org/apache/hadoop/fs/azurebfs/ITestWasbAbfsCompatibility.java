@@ -58,11 +58,11 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem fs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test,",
-        getIsNamespaceEnabled(fs));
+            fs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
-    Path path1 = new Path("/testfiles/~12/!008/3/abFsTestfile");
+    Path path1 = getUniquePath("/testfiles/~12/!008/3/abFsTestfile");
     try(FSDataOutputStream abfsStream = fs.create(path1, true)) {
       abfsStream.write(ABFS_TEST_CONTEXT.getBytes());
       abfsStream.flush();
@@ -70,7 +70,7 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     }
 
     // create file using wasb
-    Path path2 = new Path("/testfiles/~12/!008/3/nativeFsTestfile");
+    Path path2 = getUniquePath("/testfiles/~12/!008/3/nativeFsTestfile");
     LOG.info("{}", wasb.getUri());
     try(FSDataOutputStream nativeFsStream = wasb.create(path2, true)) {
       nativeFsStream.write(WASB_TEST_CONTEXT.getBytes());
@@ -93,12 +93,12 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem abfs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test",
-        getIsNamespaceEnabled(abfs));
+            abfs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
     for (int i = 0; i< 4; i++) {
-      Path path = new Path("/testReadFile/~12/!008/testfile" + i);
+      Path path = getUniquePath("/testReadFile/~12/!008/testfile" + i);
       final FileSystem createFs = createFileWithAbfs[i] ? abfs : wasb;
 
       // Write
@@ -133,12 +133,12 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem abfs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test",
-        getIsNamespaceEnabled(abfs));
+            abfs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
     for (int i = 0; i < 4; i++) {
-      Path path = new Path("/testDir/t" + i);
+      Path path = getUniquePath("/testDir/t" + i);
       //create
       final FileSystem createFs = createDirWithAbfs[i] ? abfs : wasb;
       assertTrue(createFs.mkdirs(path));
@@ -168,15 +168,16 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem abfs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test",
-        getIsNamespaceEnabled(abfs));
+            abfs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
-    Path d1d4 = new Path("/d1/d2/d3/d4");
+    Path testPath = getUniquePath("testpath");
+    Path d1d4 = new Path(testPath + "/d1/d2/d3/d4");
     assertMkdirs(abfs, d1d4);
 
     //set working directory to path1
-    Path path1 = new Path("/d1/d2");
+    Path path1 = new Path(testPath + "/d1/d2");
     wasb.setWorkingDirectory(path1);
     abfs.setWorkingDirectory(path1);
     assertEquals(path1, wasb.getWorkingDirectory());

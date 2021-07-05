@@ -21,17 +21,15 @@ package org.apache.hadoop.fs.azurebfs.services;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.UUID;
 
 import org.junit.Test;
 
 import org.mockito.ArgumentCaptor;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.azurebfs.AbfsConfiguration;
-import org.apache.hadoop.fs.azurebfs.constants.FSOperationType;
 import org.apache.hadoop.fs.azurebfs.contracts.services.AppendRequestParameters;
-import org.apache.hadoop.fs.azurebfs.utils.TracingContext;
-import org.apache.hadoop.fs.azurebfs.utils.TracingHeaderFormat;
+import org.apache.hadoop.conf.Configuration;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -89,17 +87,12 @@ public final class TestAbfsOutputStream {
     abfsConf = new AbfsConfiguration(conf, accountName1);
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
-    when(client.append(anyString(), any(byte[].class),
-        any(AppendRequestParameters.class), any(), any(TracingContext.class)))
-        .thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(),
-        isNull(), any(TracingContext.class))).thenReturn(op);
+    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull())).thenReturn(op);
 
-    AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
-        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false),
-        new TracingContext(abfsConf.getClientCorrelationId(), "test-fs-id",
-        FSOperationType.WRITE, abfsConf.getTracingHeaderFormat(),
-        null));
+    String testPath = PATH + UUID.randomUUID();
+    AbfsOutputStream out = new AbfsOutputStream(client, null, testPath, 0,
+        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
     final byte[] b = new byte[WRITE_SIZE];
     new Random().nextBytes(b);
     out.write(b);
@@ -119,13 +112,12 @@ public final class TestAbfsOutputStream {
         WRITE_SIZE, 0, 2 * WRITE_SIZE, APPEND_MODE, false, null);
 
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(firstReqParameters), any(),
-        any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(firstReqParameters), any());
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(secondReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(secondReqParameters), any());
     // confirm there were only 2 invocations in all
     verify(client, times(2)).append(
-        eq(PATH), any(byte[].class), any(), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), any(), any());
   }
 
   /**
@@ -141,17 +133,14 @@ public final class TestAbfsOutputStream {
     conf.set(accountKey1, accountValue1);
     abfsConf = new AbfsConfiguration(conf, accountName1);
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
-    TracingContext tracingContext = new TracingContext("test-corr-id",
-        "test-fs-id", FSOperationType.WRITE,
-        TracingHeaderFormat.ALL_ID_FORMAT, null);
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
-    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any(), any(TracingContext.class))).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull(), any(TracingContext.class))).thenReturn(op);
+    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull())).thenReturn(op);
 
-    AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
-        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false),
-        tracingContext);
+    String testPath = PATH + UUID.randomUUID();
+    AbfsOutputStream out = new AbfsOutputStream(client, null, testPath, 0,
+        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
     final byte[] b = new byte[WRITE_SIZE];
     new Random().nextBytes(b);
 
@@ -166,27 +155,22 @@ public final class TestAbfsOutputStream {
         BUFFER_SIZE, 0, 5*WRITE_SIZE-BUFFER_SIZE, APPEND_MODE, false, null);
 
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(firstReqParameters), any(),
-        any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(firstReqParameters), any());
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(secondReqParameters), any(),
-        any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(secondReqParameters), any());
     // confirm there were only 2 invocations in all
     verify(client, times(2)).append(
-        eq(PATH), any(byte[].class), any(), any(),
-        any(TracingContext.class));
+        eq(testPath), any(byte[].class), any(), any());
 
     ArgumentCaptor<String> acFlushPath = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<Long> acFlushPosition = ArgumentCaptor.forClass(Long.class);
-    ArgumentCaptor<TracingContext> acTracingContext = ArgumentCaptor
-        .forClass(TracingContext.class);
     ArgumentCaptor<Boolean> acFlushRetainUnCommittedData = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<Boolean> acFlushClose = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<String> acFlushSASToken = ArgumentCaptor.forClass(String.class);
 
     verify(client, times(1)).flush(acFlushPath.capture(), acFlushPosition.capture(), acFlushRetainUnCommittedData.capture(), acFlushClose.capture(),
-        acFlushSASToken.capture(), isNull(), acTracingContext.capture());
-    assertThat(Arrays.asList(PATH)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
+        acFlushSASToken.capture(), isNull());
+    assertThat(Arrays.asList(testPath)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
     assertThat(Arrays.asList(Long.valueOf(5*WRITE_SIZE))).describedAs("position").isEqualTo(acFlushPosition.getAllValues());
     assertThat(Arrays.asList(false)).describedAs("RetainUnCommittedData flag").isEqualTo(acFlushRetainUnCommittedData.getAllValues());
     assertThat(Arrays.asList(true)).describedAs("Close flag").isEqualTo(acFlushClose.getAllValues());
@@ -206,19 +190,16 @@ public final class TestAbfsOutputStream {
     conf.set(accountKey1, accountValue1);
     abfsConf = new AbfsConfiguration(conf, accountName1);
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
-    TracingContext tracingContext = new TracingContext(
-        abfsConf.getClientCorrelationId(), "test-fs-id",
-        FSOperationType.WRITE, abfsConf.getTracingHeaderFormat(), null);
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
-    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any(), any(TracingContext.class))).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull(), any(TracingContext.class))).thenReturn(op);
+    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull())).thenReturn(op);
     when(op.getSasToken()).thenReturn("testToken");
     when(op.getResult()).thenReturn(httpOp);
 
-    AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
-        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false),
-        tracingContext);
+    String testPath = PATH + UUID.randomUUID();
+    AbfsOutputStream out = new AbfsOutputStream(client, null, testPath, 0,
+        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
     final byte[] b = new byte[BUFFER_SIZE];
     new Random().nextBytes(b);
 
@@ -233,24 +214,22 @@ public final class TestAbfsOutputStream {
         BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false, null);
 
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(firstReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(firstReqParameters), any());
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(secondReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(secondReqParameters), any());
     // confirm there were only 2 invocations in all
     verify(client, times(2)).append(
-        eq(PATH), any(byte[].class), any(), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), any(), any());
 
     ArgumentCaptor<String> acFlushPath = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<Long> acFlushPosition = ArgumentCaptor.forClass(Long.class);
-    ArgumentCaptor<TracingContext> acTracingContext = ArgumentCaptor
-        .forClass(TracingContext.class);
     ArgumentCaptor<Boolean> acFlushRetainUnCommittedData = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<Boolean> acFlushClose = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<String> acFlushSASToken = ArgumentCaptor.forClass(String.class);
 
     verify(client, times(1)).flush(acFlushPath.capture(), acFlushPosition.capture(), acFlushRetainUnCommittedData.capture(), acFlushClose.capture(),
-        acFlushSASToken.capture(), isNull(), acTracingContext.capture());
-    assertThat(Arrays.asList(PATH)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
+        acFlushSASToken.capture(), isNull());
+    assertThat(Arrays.asList(testPath)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
     assertThat(Arrays.asList(Long.valueOf(2*BUFFER_SIZE))).describedAs("position").isEqualTo(acFlushPosition.getAllValues());
     assertThat(Arrays.asList(false)).describedAs("RetainUnCommittedData flag").isEqualTo(acFlushRetainUnCommittedData.getAllValues());
     assertThat(Arrays.asList(true)).describedAs("Close flag").isEqualTo(acFlushClose.getAllValues());
@@ -272,19 +251,14 @@ public final class TestAbfsOutputStream {
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
-    when(client.append(anyString(), any(byte[].class),
-        any(AppendRequestParameters.class), any(), any(TracingContext.class)))
-        .thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(),
-        any(), isNull(), any(TracingContext.class))).thenReturn(op);
+    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull())).thenReturn(op);
     when(op.getSasToken()).thenReturn("testToken");
     when(op.getResult()).thenReturn(httpOp);
 
-    AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
-        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false),
-        new TracingContext(abfsConf.getClientCorrelationId(), "test-fs-id",
-            FSOperationType.WRITE, abfsConf.getTracingHeaderFormat(),
-            null));
+    String testPath = PATH + UUID.randomUUID();
+    AbfsOutputStream out = new AbfsOutputStream(client, null, testPath, 0,
+        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
     final byte[] b = new byte[BUFFER_SIZE];
     new Random().nextBytes(b);
 
@@ -299,12 +273,12 @@ public final class TestAbfsOutputStream {
         BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false, null);
 
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(firstReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(firstReqParameters), any());
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(secondReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(secondReqParameters), any());
     // confirm there were only 2 invocations in all
     verify(client, times(2)).append(
-        eq(PATH), any(byte[].class), any(), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), any(), any());
   }
 
   /**
@@ -322,17 +296,12 @@ public final class TestAbfsOutputStream {
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
-    when(client.append(anyString(), any(byte[].class),
-        any(AppendRequestParameters.class), any(), any(TracingContext.class)))
-        .thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(),
-        isNull(), any(TracingContext.class))).thenReturn(op);
+    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull())).thenReturn(op);
 
-    AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
-        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, true),
-        new TracingContext(abfsConf.getClientCorrelationId(), "test-fs-id",
-            FSOperationType.OPEN, abfsConf.getTracingHeaderFormat(),
-            null));
+    String testPath = PATH + UUID.randomUUID();
+    AbfsOutputStream out = new AbfsOutputStream(client, null, testPath, 0,
+        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, true));
     final byte[] b = new byte[BUFFER_SIZE];
     new Random().nextBytes(b);
 
@@ -347,12 +316,12 @@ public final class TestAbfsOutputStream {
         BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, true, null);
 
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(firstReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(firstReqParameters), any());
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(secondReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(secondReqParameters), any());
     // confirm there were only 2 invocations in all
     verify(client, times(2)).append(
-        eq(PATH), any(byte[].class), any(), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), any(), any());
   }
 
   /**
@@ -369,21 +338,14 @@ public final class TestAbfsOutputStream {
     conf.set(accountKey1, accountValue1);
     abfsConf = new AbfsConfiguration(conf, accountName1);
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
-    TracingContext tracingContext = new TracingContext(
-        abfsConf.getClientCorrelationId(), "test-fs-id",
-        FSOperationType.WRITE, abfsConf.getTracingHeaderFormat(), null);
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
-    when(client.append(anyString(), any(byte[].class),
-        any(AppendRequestParameters.class), any(), any(TracingContext.class)))
-        .thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(),
-        isNull(), any(TracingContext.class))).thenReturn(op);
+    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull())).thenReturn(op);
 
-    AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
-        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false), new TracingContext(abfsConf.getClientCorrelationId(), "test-fs-id",
-        FSOperationType.OPEN, abfsConf.getTracingHeaderFormat(),
-        null));
+    String testPath = PATH + UUID.randomUUID();
+    AbfsOutputStream out = new AbfsOutputStream(client, null, testPath, 0,
+        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
     final byte[] b = new byte[BUFFER_SIZE];
     new Random().nextBytes(b);
 
@@ -398,24 +360,22 @@ public final class TestAbfsOutputStream {
         BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false, null);
 
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(firstReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(firstReqParameters), any());
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(secondReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(secondReqParameters), any());
     // confirm there were only 2 invocations in all
     verify(client, times(2)).append(
-        eq(PATH), any(byte[].class), any(), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), any(), any());
 
     ArgumentCaptor<String> acFlushPath = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<Long> acFlushPosition = ArgumentCaptor.forClass(Long.class);
-    ArgumentCaptor<TracingContext> acTracingContext = ArgumentCaptor
-        .forClass(TracingContext.class);
     ArgumentCaptor<Boolean> acFlushRetainUnCommittedData = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<Boolean> acFlushClose = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<String> acFlushSASToken = ArgumentCaptor.forClass(String.class);
 
     verify(client, times(1)).flush(acFlushPath.capture(), acFlushPosition.capture(), acFlushRetainUnCommittedData.capture(), acFlushClose.capture(),
-        acFlushSASToken.capture(), isNull(), acTracingContext.capture());
-    assertThat(Arrays.asList(PATH)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
+        acFlushSASToken.capture(), isNull());
+    assertThat(Arrays.asList(testPath)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
     assertThat(Arrays.asList(Long.valueOf(2*BUFFER_SIZE))).describedAs("position").isEqualTo(acFlushPosition.getAllValues());
     assertThat(Arrays.asList(false)).describedAs("RetainUnCommittedData flag").isEqualTo(acFlushRetainUnCommittedData.getAllValues());
     assertThat(Arrays.asList(false)).describedAs("Close flag").isEqualTo(acFlushClose.getAllValues());
@@ -435,17 +395,12 @@ public final class TestAbfsOutputStream {
     abfsConf = new AbfsConfiguration(conf, accountName1);
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
-    when(client.append(anyString(), any(byte[].class),
-        any(AppendRequestParameters.class), any(), any(TracingContext.class)))
-        .thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(),
-        isNull(), any(TracingContext.class))).thenReturn(op);
+    when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), isNull())).thenReturn(op);
 
-    AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
-        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false),
-        new TracingContext(abfsConf.getClientCorrelationId(), "test-fs-id",
-            FSOperationType.WRITE, abfsConf.getTracingHeaderFormat(),
-            null));
+    String testPath = PATH + UUID.randomUUID();
+    AbfsOutputStream out = new AbfsOutputStream(client, null, testPath, 0,
+        populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
     final byte[] b = new byte[BUFFER_SIZE];
     new Random().nextBytes(b);
 
@@ -462,11 +417,11 @@ public final class TestAbfsOutputStream {
         BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false, null);
 
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(firstReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(firstReqParameters), any());
     verify(client, times(1)).append(
-        eq(PATH), any(byte[].class), refEq(secondReqParameters), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), refEq(secondReqParameters), any());
     // confirm there were only 2 invocations in all
     verify(client, times(2)).append(
-        eq(PATH), any(byte[].class), any(), any(), any(TracingContext.class));
+        eq(testPath), any(byte[].class), any(), any());
   }
 }
