@@ -48,6 +48,7 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageBlock
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.StorageReceivedDeletedBlocksProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsServerProtos.VersionRequestProto;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
+import org.apache.hadoop.hdfs.server.protocol.BulkSyncTaskExecutionFeedback;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
@@ -62,16 +63,16 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtobufRpcEngine2;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.ProtocolMetaInterface;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcClientUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.protobuf.RpcController;
-import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 
 import javax.annotation.Nonnull;
 
@@ -99,7 +100,7 @@ public class DatanodeProtocolClientSideTranslatorPB implements
   public DatanodeProtocolClientSideTranslatorPB(InetSocketAddress nameNodeAddr,
       Configuration conf) throws IOException {
     RPC.setProtocolEngine(conf, DatanodeProtocolPB.class,
-        ProtobufRpcEngine2.class);
+        ProtobufRpcEngine.class);
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     rpcProxy = createNamenode(nameNodeAddr, conf, ugi);
   }
@@ -138,8 +139,8 @@ public class DatanodeProtocolClientSideTranslatorPB implements
       VolumeFailureSummary volumeFailureSummary,
       boolean requestFullBlockReportLease,
       @Nonnull SlowPeerReports slowPeers,
-      @Nonnull SlowDiskReports slowDisks)
-          throws IOException {
+      @Nonnull SlowDiskReports slowDisks,
+      BulkSyncTaskExecutionFeedback feedback) throws IOException {
     HeartbeatRequestProto.Builder builder = HeartbeatRequestProto.newBuilder()
         .setRegistration(PBHelper.convert(registration))
         .setXmitsInProgress(xmitsInProgress).setXceiverCount(xceiverCount)
@@ -161,6 +162,9 @@ public class DatanodeProtocolClientSideTranslatorPB implements
     }
     if (slowDisks.haveSlowDisks()) {
       builder.addAllSlowDisks(PBHelper.convertSlowDiskInfo(slowDisks));
+    }
+    if(feedback != null && !feedback.getFeedbacks().isEmpty()) {
+      builder.setBulkSyncTaskExecutionFeedback(PBHelper.convert(feedback));
     }
 
     HeartbeatResponseProto resp;
@@ -319,9 +323,6 @@ public class DatanodeProtocolClientSideTranslatorPB implements
         .setNewLength(newlength).setCloseFile(closeFile)
         .setDeleteBlock(deleteblock);
     for (int i = 0; i < newtargets.length; i++) {
-      if (newtargets[i] == null) {
-        continue;
-      }
       builder.addNewTaragets(PBHelperClient.convert(newtargets[i]));
       builder.addNewTargetStorages(newtargetstorages[i]);
     }

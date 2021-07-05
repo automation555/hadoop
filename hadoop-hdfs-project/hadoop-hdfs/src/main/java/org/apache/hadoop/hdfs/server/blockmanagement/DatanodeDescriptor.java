@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -43,6 +43,7 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.namenode.CachedBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlockECReconstructionCommand.BlockECReconstructionInfo;
+import org.apache.hadoop.hdfs.server.protocol.BlockSyncTask;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage.State;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
@@ -68,6 +69,9 @@ public class DatanodeDescriptor extends DatanodeInfo {
       LoggerFactory.getLogger(DatanodeDescriptor.class);
   public static final DatanodeDescriptor[] EMPTY_ARRAY = {};
   private static final int BLOCKS_SCHEDULED_ROLL_INTERVAL = 600*1000; //10min
+
+  /** A queue of files and directories commands that must be run. */
+  private final Queue<BlockSyncTask> plannedSyncTasks = new LinkedList<>();
 
   /** Block and targets pair */
   @InterfaceAudience.Private
@@ -237,8 +241,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
    */
   public DatanodeDescriptor(DatanodeID nodeID) {
     super(nodeID);
-    setLastUpdate(Time.now());
-    setLastUpdateMonotonic(Time.monotonicNow());
+    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0, null);
   }
 
   /**
@@ -249,8 +252,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
   public DatanodeDescriptor(DatanodeID nodeID, 
                             String networkLocation) {
     super(nodeID, networkLocation);
-    setLastUpdate(Time.now());
-    setLastUpdateMonotonic(Time.monotonicNow());
+    updateHeartbeatState(StorageReport.EMPTY_ARRAY, 0L, 0L, 0, 0, null);
   }
 
   public CachedBlocksList getPendingCached() {
@@ -406,7 +408,6 @@ public class DatanodeDescriptor extends DatanodeInfo {
     long totalBlockPoolUsed = 0;
     long totalDfsUsed = 0;
     long totalNonDfsUsed = 0;
-    Set<String> visitedMount = new HashSet<>();
     Set<DatanodeStorageInfo> failedStorageInfos = null;
 
     // Decide if we should check for any missing StorageReport and mark it as
@@ -475,17 +476,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
       totalRemaining += report.getRemaining();
       totalBlockPoolUsed += report.getBlockPoolUsed();
       totalDfsUsed += report.getDfsUsed();
-      String mount = report.getMount();
-      // For volumes on the same mount,
-      // ignore duplicated volumes for nonDfsUsed.
-      if (mount == null || mount.isEmpty()) {
-        totalNonDfsUsed += report.getNonDfsUsed();
-      } else {
-        if (!visitedMount.contains(mount)) {
-          totalNonDfsUsed += report.getNonDfsUsed();
-          visitedMount.add(mount);
-        }
-      }
+      totalNonDfsUsed += report.getNonDfsUsed();
     }
 
     // Update total metrics for the node.
@@ -526,6 +517,28 @@ public class DatanodeDescriptor extends DatanodeInfo {
       } else {
         assert storage == s : "found " + storage + " expected " + s;
       }
+    }
+  }
+
+  /**
+   * Add the file info that should be backed up to provided storage
+   *
+   * @param syncTask - store info of file that should be backed up to provided storage
+   */
+  public void scheduleSyncTaskOnHeartbeat(BlockSyncTask syncTask) {
+    synchronized (plannedSyncTasks) {
+      plannedSyncTasks.add(syncTask);
+    }
+  }
+
+  /**
+   * Add changes that should be backed up to provided storage
+   *
+   * @param multipartPutPartSyncTasks - store info of file that should be backed up to provided storage
+   */
+  public void scheduleSyncTaskOnHeartbeat(List<BlockSyncTask> multipartPutPartSyncTasks) {
+    synchronized (plannedSyncTasks) {
+      plannedSyncTasks.addAll(multipartPutPartSyncTasks);
     }
   }
 
@@ -652,8 +665,7 @@ public class DatanodeDescriptor extends DatanodeInfo {
     pendingReplicationWithoutTargets++;
   }
 
-  @VisibleForTesting
-  public void decrementPendingReplicationWithoutTargets() {
+  void decrementPendingReplicationWithoutTargets() {
     pendingReplicationWithoutTargets--;
   }
 

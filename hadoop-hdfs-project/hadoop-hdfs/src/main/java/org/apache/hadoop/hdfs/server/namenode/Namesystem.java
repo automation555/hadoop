@@ -22,14 +22,13 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockCollection;
 import org.apache.hadoop.hdfs.server.namenode.ha.HAContext;
+import org.apache.hadoop.hdfs.server.namenode.syncservice.MountManager;
 import org.apache.hadoop.hdfs.util.RwLock;
 
 /** Namesystem operations. */
 @InterfaceAudience.Private
 public interface Namesystem extends RwLock, SafeMode {
-  /**
-   * Is this name system running?
-   */
+  /** Is this name system running? */
   boolean isRunning();
 
   BlockCollection getBlockCollection(long id);
@@ -44,6 +43,8 @@ public interface Namesystem extends RwLock, SafeMode {
 
   HAContext getHAContext();
 
+  MountManager getMountManager();
+
   /**
    * @return Whether the namenode is transitioning to active state and is in the
    *         middle of the starting active services.
@@ -57,10 +58,4 @@ public interface Namesystem extends RwLock, SafeMode {
    * @throws IOException
    */
   void removeXattr(long id, String xattrName) throws IOException;
-
-  /**
-   * Check if snapshot roots are created for all existing snapshottable
-   * directories. Create them if not.
-   */
-  void checkAndProvisionSnapshotTrashRoots();
 }

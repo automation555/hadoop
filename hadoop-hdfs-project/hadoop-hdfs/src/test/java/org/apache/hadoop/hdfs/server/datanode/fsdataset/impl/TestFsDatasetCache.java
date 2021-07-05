@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
 import net.jcip.annotations.NotThreadSafe;
+import org.apache.hadoop.hdfs.server.protocol.BulkSyncTaskExecutionFeedback;
 import org.apache.hadoop.hdfs.server.protocol.SlowDiskReports;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.junit.Assert.assertEquals;
@@ -91,8 +92,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.event.Level;
 
-import java.util.function.Supplier;
-import org.apache.hadoop.thirdparty.com.google.common.primitives.Ints;
+import com.google.common.base.Supplier;
+import com.google.common.primitives.Ints;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_FSDATASETCACHE_MAX_THREADS_PER_VOLUME_KEY;
 
@@ -210,7 +211,8 @@ public class TestFsDatasetCache {
           (StorageReport[]) any(), anyLong(), anyLong(),
           anyInt(), anyInt(), anyInt(), (VolumeFailureSummary) any(),
           anyBoolean(), any(SlowPeerReports.class),
-          any(SlowDiskReports.class));
+          any(SlowDiskReports.class),
+          any(BulkSyncTaskExecutionFeedback.class));
     } finally {
       lock.writeLock().unlock();
     }
