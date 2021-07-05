@@ -46,7 +46,6 @@ import java.util.ArrayList;
 
 import javax.crypto.SecretKey;
 
-import org.apache.hadoop.io.ReadaheadPool;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.IFileInputStream;
@@ -93,8 +92,6 @@ public class TestFetcher {
   @SuppressWarnings("unchecked") // mocked generics
   public void setup() {
     LOG.info(">>>> " + name.getMethodName());
-    // to avoid threading issues with JUnit 4.13+
-    ReadaheadPool.resetInstance();
     job = new JobConf();
     job.setBoolean(MRJobConfig.SHUFFLE_FETCH_RETRY_ENABLED, false);
     jobWithRetry = new JobConf();
@@ -717,6 +714,26 @@ public class TestFetcher {
 
     underTest.copyFromHost(host);
     verify(immo).abort();
+  }
+
+  @Test(timeout = 10000)
+  public void testHeaderVersionCompatible() {
+    // client [1.0.0, 1.1.0, 1.1.1], server  [1.0.0, 1.1.0]
+    // compatible: 1.1.0
+    ShuffleHeader.HeaderVersionProtocol protocol =
+        ShuffleHeader.getHeaderVersionProtocol("1.0.0", "1.1.1");
+    assertTrue(protocol.isHeaderCompatible(ShuffleHeader.DEFAULT_HTTP_HEADER_NAME));
+    assertEquals(protocol.getCompatibleVersion().getVersionStr(), "1.1.0");
+    // client [1.0.0, 1.1.0], server  [1.0.0, 1.1.0]
+    // compatible: 1.1.0
+    protocol = ShuffleHeader.getHeaderVersionProtocol("1.0.0", "1.1.0");
+    assertTrue(protocol.isHeaderCompatible(ShuffleHeader.DEFAULT_HTTP_HEADER_NAME));
+    assertEquals(protocol.getCompatibleVersion().getVersionStr(), "1.1.0");
+    // client [1.0.0, 1.0.0], server  [1.0.0, 1.1.0]
+    // compatible: 1.0.0
+    protocol = ShuffleHeader.getHeaderVersionProtocol("1.0.0", "1.0.0");
+    assertTrue(protocol.isHeaderCompatible(ShuffleHeader.DEFAULT_HTTP_HEADER_NAME));
+    assertEquals(protocol.getCompatibleVersion().getVersionStr(), "1.0.0");
   }
 
   public static class FakeFetcher<K,V> extends Fetcher<K,V> {

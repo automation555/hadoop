@@ -42,7 +42,6 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
-import org.apache.hadoop.mapreduce.security.IntermediateEncryptedStream;
 import org.apache.hadoop.mapreduce.security.SecureShuffleUtils;
 import org.apache.hadoop.mapreduce.CryptoUtils;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -51,7 +50,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 class Fetcher<K,V> extends Thread {
   
@@ -103,6 +102,7 @@ class Fetcher<K,V> extends Thread {
 
   protected HttpURLConnection connection;
   private volatile boolean stopped = false;
+  private ShuffleHeader.HeaderVersionProtocol headerVersionProtocol;
   
   // Initiative value is 0, which means it hasn't retried yet.
   private long retryStartTime = 0;
@@ -453,10 +453,11 @@ class Fetcher<K,V> extends Thread {
           ": " + connection.getResponseMessage());
     }
     // get the shuffle version
-    if (!ShuffleHeader.DEFAULT_HTTP_HEADER_NAME.equals(
-        connection.getHeaderField(ShuffleHeader.HTTP_HEADER_NAME))
-        || !ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION.equals(
-            connection.getHeaderField(ShuffleHeader.HTTP_HEADER_VERSION))) {
+    headerVersionProtocol = ShuffleHeader
+            .getHeaderVersionProtocol(connection.getHeaderField(ShuffleHeader.HTTP_HEADER_VERSION));
+    boolean isCompatible = headerVersionProtocol
+            .isHeaderCompatible(connection.getHeaderField(ShuffleHeader.HTTP_HEADER_NAME));
+    if (!isCompatible) {
       throw new IOException("Incompatible shuffle response version");
     }
     // get the replyHash which is HMac of the encHash we sent to the server
@@ -481,6 +482,9 @@ class Fetcher<K,V> extends Thread {
         ShuffleHeader.DEFAULT_HTTP_HEADER_NAME);
     connection.addRequestProperty(ShuffleHeader.HTTP_HEADER_VERSION,
         ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION);
+    // set target version param to negotiate with shuffle server
+    connection.addRequestProperty(ShuffleHeader.HTTP_HEADER_TARGET_VERSION,
+            ShuffleHeader.getNewestVersion().getVersionStr());
   }
   
   private static TaskAttemptID[] EMPTY_ATTEMPT_ID_ARRAY = new TaskAttemptID[0];
@@ -499,7 +503,7 @@ class Fetcher<K,V> extends Thread {
       int forReduce = -1;
       //Read the shuffle header
       try {
-        ShuffleHeader header = new ShuffleHeader();
+        ShuffleHeader header = new ShuffleHeader(headerVersionProtocol.getCompatibleVersion());
         header.readFields(input);
         mapId = TaskAttemptID.forName(header.mapId);
         compressedLength = header.compressedLength;
@@ -513,9 +517,7 @@ class Fetcher<K,V> extends Thread {
       }
 
       InputStream is = input;
-      is =
-          IntermediateEncryptedStream.wrapIfNecessary(jobConf, is,
-              compressedLength, null);
+      is = CryptoUtils.wrapIfNecessary(jobConf, is, compressedLength);
       compressedLength -= CryptoUtils.cryptoPadding(jobConf);
       decompressedLength -= CryptoUtils.cryptoPadding(jobConf);
       
