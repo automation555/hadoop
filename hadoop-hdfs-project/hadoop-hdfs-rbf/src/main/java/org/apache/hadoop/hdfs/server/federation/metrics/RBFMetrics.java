@@ -39,8 +39,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
@@ -58,7 +58,6 @@ import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamespaceInfo
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
 import org.apache.hadoop.hdfs.server.federation.router.Router;
-import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.hdfs.server.federation.router.RouterServiceState;
 import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
 import org.apache.hadoop.hdfs.server.federation.store.MembershipStore;
@@ -102,10 +101,6 @@ public class RBFMetrics implements RouterMBean, FederationMBean {
 
   /** Format for a date. */
   private static final String DATE_FORMAT = "yyyy/MM/dd HH:mm:ss";
-
-  /** Prevent holding the page from load too long. */
-  private final long timeOut;
-
 
   /** Router interface. */
   private final Router router;
@@ -164,10 +159,7 @@ public class RBFMetrics implements RouterMBean, FederationMBean {
           RouterStore.class);
     }
 
-    // Initialize the cache for the DN reports
     Configuration conf = router.getConfig();
-    this.timeOut = conf.getTimeDuration(RBFConfigKeys.DN_REPORT_TIME_OUT,
-        RBFConfigKeys.DN_REPORT_TIME_OUT_MS_DEFAULT, TimeUnit.MILLISECONDS);
     this.topTokenRealOwners = conf.getInt(
         RBFConfigKeys.DFS_ROUTER_METRICS_TOP_NUM_TOKEN_OWNERS_KEY,
         RBFConfigKeys.DFS_ROUTER_METRICS_TOP_NUM_TOKEN_OWNERS_KEY_DEFAULT);
@@ -373,12 +365,63 @@ public class RBFMetrics implements RouterMBean, FederationMBean {
 
   @Override
   public long getTotalCapacity() {
-    return getNameserviceAggregatedLong(MembershipStats::getTotalSpace);
+    return getNameserviceAggregatedLong(
+        DatanodeReportType.LIVE, DatanodeInfo::getCapacity);
+  }
+
+  /**
+   * Get the aggregated value for a DatanodeReportType and
+   * a method for all nameservices.
+   * @param type a DatanodeReportType
+   * @param f Method reference
+   * @return Aggregated long.
+   */
+  public long getNameserviceAggregatedLong(
+      DatanodeReportType type, ToLongFunction<DatanodeInfo> f) {
+    return Arrays.stream(getDataNodeInfo(type)).mapToLong(f).sum();
+  }
+
+  /**
+   * Get the nodes information of the cluster according to DataNoderePortType.
+   *
+   * @param type a DatanodeReportType
+   * @return nodes information.
+   */
+  public DatanodeInfo[] getDataNodeInfo(DatanodeReportType type) {
+    DatanodeInfo[] datanodeInfo = DatanodeInfo.EMPTY_ARRAY;
+    try {
+      datanodeInfo = router.getRpcServer().getCachedDatanodeReport(type);
+    } catch (IOException e) {
+      LOG.error("Cannot get {} nodes {}", type, e.getMessage());
+    }
+    return datanodeInfo;
+  }
+
+  /**
+   * Get the aggregated value for a DatanodeReportType and
+   * a method for all nameservices.
+   * @param type a DatanodeReportType
+   * @param f Method reference
+   * @return Aggregated Integer.
+   */
+  public int getNameserviceAggregatedInt(
+      DatanodeReportType type, Predicate<DatanodeInfo> f) {
+    return (int) Arrays.stream(getDataNodeInfo(type)).filter(f).count();
+  }
+
+  /**
+   * Get the aggregated value for a DatanodeReportType for all nameservices.
+   * @param type a DatanodeReportType
+   * @return Aggregated Integer.
+   */
+  public int getNameserviceAggregatedLength(DatanodeReportType type){
+    return getDataNodeInfo(type).length;
   }
 
   @Override
   public long getRemainingCapacity() {
-    return getNameserviceAggregatedLong(MembershipStats::getAvailableSpace);
+    return getNameserviceAggregatedLong(
+        DatanodeReportType.LIVE, DatanodeInfo::getRemaining);
   }
 
   @Override
@@ -459,13 +502,12 @@ public class RBFMetrics implements RouterMBean, FederationMBean {
 
   @Override
   public int getNumLiveNodes() {
-    return getNameserviceAggregatedInt(
-        MembershipStats::getNumOfActiveDatanodes);
+    return getNameserviceAggregatedLength(DatanodeReportType.LIVE);
   }
 
   @Override
   public int getNumDeadNodes() {
-    return getNameserviceAggregatedInt(MembershipStats::getNumOfDeadDatanodes);
+    return getNameserviceAggregatedLength(DatanodeReportType.DEAD);
   }
 
   @Override
@@ -476,38 +518,39 @@ public class RBFMetrics implements RouterMBean, FederationMBean {
 
   @Override
   public int getNumDecommissioningNodes() {
-    return getNameserviceAggregatedInt(
-        MembershipStats::getNumOfDecommissioningDatanodes);
+    return getNameserviceAggregatedLength(DatanodeReportType.DECOMMISSIONING);
   }
 
   @Override
   public int getNumDecomLiveNodes() {
-    return getNameserviceAggregatedInt(
-        MembershipStats::getNumOfDecomActiveDatanodes);
+    return getNameserviceAggregatedInt(DatanodeReportType.LIVE,
+        DatanodeInfo::isDecommissioned);
   }
 
   @Override
   public int getNumDecomDeadNodes() {
-    return getNameserviceAggregatedInt(
-        MembershipStats::getNumOfDecomDeadDatanodes);
+    return getNameserviceAggregatedInt(DatanodeReportType.DEAD,
+        DatanodeInfo::isDecommissioned);
   }
 
   @Override
   public int getNumInMaintenanceLiveDataNodes() {
-    return getNameserviceAggregatedInt(
-        MembershipStats::getNumOfInMaintenanceLiveDataNodes);
+    return getNameserviceAggregatedInt(DatanodeReportType.LIVE,
+        DatanodeInfo::isMaintenance);
   }
 
   @Override
   public int getNumInMaintenanceDeadDataNodes() {
-    return getNameserviceAggregatedInt(
-        MembershipStats::getNumOfInMaintenanceDeadDataNodes);
+    return getNameserviceAggregatedInt(DatanodeReportType.DEAD,
+        DatanodeInfo::isMaintenance);
   }
 
   @Override
   public int getNumEnteringMaintenanceDataNodes() {
-    return getNameserviceAggregatedInt(
-        MembershipStats::getNumOfEnteringMaintenanceDataNodes);
+    return getNameserviceAggregatedInt(DatanodeReportType.LIVE,
+        DatanodeInfo::isEnteringMaintenance) +
+        getNameserviceAggregatedInt(DatanodeReportType.DEAD,
+            DatanodeInfo::isEnteringMaintenance);
   }
 
   @Override // NameNodeMXBean
@@ -518,32 +561,25 @@ public class RBFMetrics implements RouterMBean, FederationMBean {
     float dev = 0;
 
     final Map<String, Map<String, Object>> info = new HashMap<>();
-    try {
-      RouterRpcServer rpcServer = this.router.getRpcServer();
-      DatanodeInfo[] live = rpcServer.getDatanodeReport(
-          DatanodeReportType.LIVE, false, timeOut);
-
-      if (live.length > 0) {
-        float totalDfsUsed = 0;
-        float[] usages = new float[live.length];
-        int i = 0;
-        for (DatanodeInfo dn : live) {
-          usages[i++] = dn.getDfsUsedPercent();
-          totalDfsUsed += dn.getDfsUsedPercent();
-        }
-        totalDfsUsed /= live.length;
-        Arrays.sort(usages);
-        median = usages[usages.length / 2];
-        max = usages[usages.length - 1];
-        min = usages[0];
-
-        for (i = 0; i < usages.length; i++) {
-          dev += (usages[i] - totalDfsUsed) * (usages[i] - totalDfsUsed);
-        }
-        dev = (float) Math.sqrt(dev / usages.length);
+    DatanodeInfo[] live = getDataNodeInfo(DatanodeReportType.LIVE);
+    if (live.length > 0) {
+      float totalDfsUsed = 0;
+      float[] usages = new float[live.length];
+      int i = 0;
+      for (DatanodeInfo dn : live) {
+        usages[i++] = dn.getDfsUsedPercent();
+        totalDfsUsed += dn.getDfsUsedPercent();
       }
-    } catch (IOException e) {
-      LOG.error("Cannot get the live nodes: {}", e.getMessage());
+      totalDfsUsed /= live.length;
+      Arrays.sort(usages);
+      median = usages[usages.length / 2];
+      max = usages[usages.length - 1];
+      min = usages[0];
+
+      for (i = 0; i < usages.length; i++) {
+        dev += (usages[i] - totalDfsUsed) * (usages[i] - totalDfsUsed);
+      }
+      dev = (float) Math.sqrt(dev / usages.length);
     }
 
     final Map<String, Object> innerInfo = new HashMap<>();
