@@ -29,7 +29,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -215,6 +215,7 @@ public class TestDatanodeProtocolRetryPolicy {
            Mockito.anyInt(),
            Mockito.any(),
            Mockito.anyBoolean(),
+           Mockito.any(),
            Mockito.any(),
            Mockito.any());
 
