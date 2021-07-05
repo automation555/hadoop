@@ -34,8 +34,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Iterators;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.collect.Iterators;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -58,8 +58,8 @@ import org.apache.hadoop.security.SecurityUtil;
 import static org.apache.hadoop.util.Time.monotonicNow;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.util.Time;
 
 
@@ -91,6 +91,7 @@ public class EditLogTailer {
   private final FSNamesystem namesystem;
   private final Iterator<RemoteNameNodeInfo> nnLookup;
   private FSEditLog editLog;
+  private boolean isObserver;
 
   private RemoteNameNodeInfo currentNN;
 
@@ -173,10 +174,16 @@ public class EditLogTailer {
   private final long maxTxnsPerLock;
 
   public EditLogTailer(FSNamesystem namesystem, Configuration conf) {
+    this(namesystem, conf, false);
+  }
+
+  public EditLogTailer(FSNamesystem namesystem, Configuration conf,
+      boolean isObserver) {
     this.tailerThread = new EditLogTailerThread();
     this.conf = conf;
     this.namesystem = namesystem;
     this.editLog = namesystem.getEditLog();
+    this.isObserver = isObserver;
     
     lastLoadTimeMs = monotonicNow();
     lastRollTimeMs = monotonicNow();
@@ -418,6 +425,10 @@ public class EditLogTailer {
    */
   @VisibleForTesting
   void triggerActiveLogRoll() {
+    if (isObserver) {
+      LOG.info("Not triggering log roll on remote NameNode");
+      return;
+    }
     LOG.info("Triggering log roll on remote NameNode");
     Future<Void> future = null;
     try {
@@ -482,7 +493,9 @@ public class EditLogTailer {
           if (tooLongSinceLastLoad() &&
               lastRollTriggerTxId < lastLoadedTxnId) {
             triggerActiveLogRoll();
-            triggeredLogRoll = true;
+            if (!isObserver) {
+              triggeredLogRoll = true;
+            }
           }
           /**
            * Check again in case someone calls {@link EditLogTailer#stop} while
