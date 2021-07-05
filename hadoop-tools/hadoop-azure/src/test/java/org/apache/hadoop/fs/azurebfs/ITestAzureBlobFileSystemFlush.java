@@ -24,17 +24,16 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.StreamCapabilities;
-import org.apache.hadoop.fs.azurebfs.constants.FSOperationType;
-import org.apache.hadoop.fs.azurebfs.constants.TestConfigurationKeys;
 import org.apache.hadoop.fs.azurebfs.services.AbfsOutputStream;
-import org.apache.hadoop.fs.azurebfs.utils.TracingHeaderValidator;
+import org.apache.hadoop.fs.azurebfs.services.AbfsOutputStreamOld;
+import org.assertj.core.api.Assertions;
 import org.hamcrest.core.IsEqual;
 import org.hamcrest.core.IsNot;
 import org.junit.Test;
@@ -45,9 +44,8 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_APPEND_BLOB_KEY;
-import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasStreamCapabilities;
-import static org.apache.hadoop.fs.contract.ContractTestUtils.assertLacksStreamCapabilities;
+import static org.hamcrest.core.Is.is;
+import static org.hamcrest.core.IsEqual.equalTo;
 
 /**
  * Test flush operation.
@@ -57,12 +55,11 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.assertLacksStreamC
 public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
   private static final int BASE_SIZE = 1024;
   private static final int ONE_THOUSAND = 1000;
- //3000 KB to support appenblob too
-  private static final int TEST_BUFFER_SIZE = 3 * ONE_THOUSAND * BASE_SIZE;
+  private static final int TEST_BUFFER_SIZE = 5 * ONE_THOUSAND * BASE_SIZE;
   private static final int ONE_MB = 1024 * 1024;
   private static final int FLUSH_TIMES = 200;
   private static final int THREAD_SLEEP_TIME = 1000;
-
+  private static final int CONCURRENT_STREAM_OBJS_TEST_OBJ_COUNT = 25;
   private static final int TEST_FILE_LENGTH = 1024 * 1024 * 8;
   private static final int WAITING_TIME = 1000;
 
@@ -217,6 +214,92 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
   }
 
   @Test
+  public void testShouldUseOlderAbfsOutputStreamConf() throws IOException {
+    AzureBlobFileSystem fs = getFileSystem();
+    Path testPath = new Path(methodName.getMethodName() + "1");
+    getFileSystem().getAbfsStore().getAbfsConfiguration()
+        .setShouldUseOlderAbfsOutputStream(true);
+    try (FSDataOutputStream stream = fs.create(testPath)) {
+      Assertions.assertThat(stream.getWrappedStream()).describedAs("When the "
+          + "shouldUseOlderAbfsOutputStream is set the wrapped stream inside "
+          + "the FSDataOutputStream object should be of class "
+          + "AbfsOutputStreamOld.").isInstanceOf(AbfsOutputStreamOld.class);
+    }
+    testPath = new Path(methodName.getMethodName());
+    getFileSystem().getAbfsStore().getAbfsConfiguration()
+        .setShouldUseOlderAbfsOutputStream(false);
+    try (FSDataOutputStream stream = fs.create(testPath)) {
+      Assertions.assertThat(stream.getWrappedStream()).describedAs("When the "
+          + "shouldUseOlderAbfsOutputStream is set the wrapped stream inside "
+          + "the FSDataOutputStream object should be of class "
+          + "AbfsOutputStream.").isInstanceOf(AbfsOutputStream.class);
+    }
+  }
+
+  @Test
+  public void testWriteWithMultipleOutputStreamAtTheSameTime()
+      throws IOException, InterruptedException, ExecutionException {
+    AzureBlobFileSystem fs = getFileSystem();
+    String testFilePath = methodName.getMethodName();
+    Path[] testPaths = new Path[CONCURRENT_STREAM_OBJS_TEST_OBJ_COUNT];
+    createNStreamsAndWriteDifferentSizesConcurrently(fs, testFilePath,
+        CONCURRENT_STREAM_OBJS_TEST_OBJ_COUNT, testPaths);
+    assertSuccessfulWritesOnAllStreams(fs,
+        CONCURRENT_STREAM_OBJS_TEST_OBJ_COUNT, testPaths);
+  }
+
+  private void assertSuccessfulWritesOnAllStreams(final FileSystem fs,
+      final int numConcurrentObjects, final Path[] testPaths)
+      throws IOException {
+    for (int i = 0; i < numConcurrentObjects; i++) {
+      FileStatus fileStatus = fs.getFileStatus(testPaths[i]);
+      int numWritesMadeOnStream = i + 1;
+      long expectedLength = TEST_BUFFER_SIZE * numWritesMadeOnStream;
+      assertThat(fileStatus.getLen(), is(equalTo(expectedLength)));
+    }
+  }
+
+  private void createNStreamsAndWriteDifferentSizesConcurrently(
+      final FileSystem fs, final String testFilePath,
+      final int numConcurrentObjects, final Path[] testPaths)
+      throws ExecutionException, InterruptedException {
+    final byte[] b = new byte[TEST_BUFFER_SIZE];
+    new Random().nextBytes(b);
+    final ExecutorService es = Executors.newFixedThreadPool(40);
+    final List<Future<Void>> futureTasks = new ArrayList<>();
+    for (int i = 0; i < numConcurrentObjects; i++) {
+      Path testPath = new Path(testFilePath + i);
+      testPaths[i] = testPath;
+      int numWritesToBeDone = i + 1;
+      futureTasks.add(es.submit(() -> {
+        try (FSDataOutputStream stream = fs.create(testPath)) {
+          makeNWritesToStream(stream, numWritesToBeDone, b, es);
+        }
+        return null;
+      }));
+    }
+    for (Future<Void> futureTask : futureTasks) {
+      futureTask.get();
+    }
+    es.shutdownNow();
+  }
+
+  private void makeNWritesToStream(final FSDataOutputStream stream,
+      final int numWrites, final byte[] b, final ExecutorService es)
+      throws ExecutionException, InterruptedException, IOException {
+    final List<Future<Void>> futureTasks = new ArrayList<>();
+    for (int i = 0; i < numWrites; i++) {
+      futureTasks.add(es.submit(() -> {
+        stream.write(b);
+        return null;
+      }));
+    }
+    for (Future<Void> futureTask : futureTasks) {
+      futureTask.get();
+    }
+  }
+
+  @Test
   public void testFlushWithOutputStreamFlushEnabled() throws Exception {
     testFlush(false);
   }
@@ -235,31 +318,31 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
 
     final Path testFilePath = path(methodName.getMethodName());
     byte[] buffer = getRandomBytesArray();
+
     // The test case must write "fs.azure.write.request.size" bytes
     // to the stream in order for the data to be uploaded to storage.
-    assertTrue(fs.getAbfsStore().getAbfsConfiguration().getWriteBufferSize()
-        <= buffer.length);
-
-    boolean isAppendBlob = true;
-    if (!fs.getAbfsStore().isAppendBlobKey(fs.makeQualified(testFilePath).toString())) {
-      isAppendBlob = false;
-    }
+    assertEquals(fs.getAbfsStore().getAbfsConfiguration().getWriteBufferSize(),
+        buffer.length);
 
     try (FSDataOutputStream stream = fs.create(testFilePath)) {
       stream.write(buffer);
 
       // Write asynchronously uploads data, so we must wait for completion
-      AbfsOutputStream abfsStream = (AbfsOutputStream) stream
-          .getWrappedStream();
-      abfsStream.waitForPendingUploads();
-
+      if (stream.getWrappedStream() instanceof AbfsOutputStream) {
+        AbfsOutputStream abfsStream = (AbfsOutputStream) stream
+            .getWrappedStream();
+        abfsStream.waitForPendingUploads();
+      } else {
+        AbfsOutputStreamOld abfsStream = (AbfsOutputStreamOld) stream
+            .getWrappedStream();
+        abfsStream.waitForPendingUploads();
+      }
       // Flush commits the data so it can be read.
       stream.flush();
 
       // Verify that the data can be read if disableOutputStreamFlush is
       // false; and otherwise cannot be read.
-      /* For Appendlob flush is not needed to update data on server */
-      validate(fs.open(testFilePath), buffer, !disableOutputStreamFlush || isAppendBlob);
+      validate(fs.open(testFilePath), buffer, !disableOutputStreamFlush);
     }
   }
 
@@ -281,15 +364,10 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
     final AzureBlobFileSystem fs = this.getFileSystem();
     byte[] buffer = getRandomBytesArray();
     final Path testFilePath = path(methodName.getMethodName());
-    boolean isAppendBlob = false;
-    if (fs.getAbfsStore().isAppendBlobKey(fs.makeQualified(testFilePath).toString())) {
-      isAppendBlob = true;
-    }
 
     try (FSDataOutputStream stream = getStreamAfterWrite(fs, testFilePath, buffer, false)) {
       stream.hflush();
-      /* For Appendlob flush is not needed to update data on server */
-      validate(fs, testFilePath, buffer, isAppendBlob);
+      validate(fs, testFilePath, buffer, false);
     }
   }
 
@@ -307,26 +385,6 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
   }
 
   @Test
-  public void testTracingHeaderForAppendBlob() throws Exception {
-    Configuration config = new Configuration(this.getRawConfiguration());
-    config.set(FS_AZURE_APPEND_BLOB_KEY, "abfss:/");
-    config.set(TestConfigurationKeys.FS_AZURE_TEST_APPENDBLOB_ENABLED, "true");
-    AzureBlobFileSystem fs = (AzureBlobFileSystem) FileSystem
-        .newInstance(config);
-
-    byte[] buf = new byte[10];
-    new Random().nextBytes(buf);
-    FSDataOutputStream out = fs.create(new Path("/testFile"));
-    ((AbfsOutputStream) out.getWrappedStream()).registerListener(
-        new TracingHeaderValidator(
-            fs.getAbfsStore().getAbfsConfiguration().getClientCorrelationId(),
-            fs.getFileSystemId(), FSOperationType.WRITE, false, 0,
-            ((AbfsOutputStream) out.getWrappedStream()).getStreamID()));
-    out.write(buf);
-    out.hsync();
-  }
-
-  @Test
   public void testStreamCapabilitiesWithFlushDisabled() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
     byte[] buffer = getRandomBytesArray();
@@ -334,12 +392,11 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
     final Path testFilePath = path(methodName.getMethodName());
 
     try (FSDataOutputStream stream = getStreamAfterWrite(fs, testFilePath, buffer, false)) {
-      assertLacksStreamCapabilities(stream,
-          StreamCapabilities.HFLUSH,
-          StreamCapabilities.HSYNC,
-          StreamCapabilities.DROPBEHIND,
-          StreamCapabilities.READAHEAD,
-          StreamCapabilities.UNBUFFER);
+      assertFalse(stream.hasCapability(StreamCapabilities.HFLUSH));
+      assertFalse(stream.hasCapability(StreamCapabilities.HSYNC));
+      assertFalse(stream.hasCapability(StreamCapabilities.DROPBEHIND));
+      assertFalse(stream.hasCapability(StreamCapabilities.READAHEAD));
+      assertFalse(stream.hasCapability(StreamCapabilities.UNBUFFER));
     }
   }
 
@@ -349,13 +406,11 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
     byte[] buffer = getRandomBytesArray();
     final Path testFilePath = path(methodName.getMethodName());
     try (FSDataOutputStream stream = getStreamAfterWrite(fs, testFilePath, buffer, true)) {
-      assertHasStreamCapabilities(stream,
-          StreamCapabilities.HFLUSH,
-          StreamCapabilities.HSYNC);
-      assertLacksStreamCapabilities(stream,
-          StreamCapabilities.DROPBEHIND,
-          StreamCapabilities.READAHEAD,
-          StreamCapabilities.UNBUFFER);
+      assertTrue(stream.hasCapability(StreamCapabilities.HFLUSH));
+      assertTrue(stream.hasCapability(StreamCapabilities.HSYNC));
+      assertFalse(stream.hasCapability(StreamCapabilities.DROPBEHIND));
+      assertFalse(stream.hasCapability(StreamCapabilities.READAHEAD));
+      assertFalse(stream.hasCapability(StreamCapabilities.UNBUFFER));
     }
   }
 
@@ -364,14 +419,9 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
     final AzureBlobFileSystem fs = this.getFileSystem();
     byte[] buffer = getRandomBytesArray();
     final Path testFilePath = path(methodName.getMethodName());
-    boolean isAppendBlob = false;
-    if (fs.getAbfsStore().isAppendBlobKey(fs.makeQualified(testFilePath).toString())) {
-      isAppendBlob = true;
-    }
     try (FSDataOutputStream stream = getStreamAfterWrite(fs, testFilePath, buffer, false)) {
       stream.hsync();
-      /* For Appendlob flush is not needed to update data on server */
-      validate(fs, testFilePath, buffer, isAppendBlob);
+      validate(fs, testFilePath, buffer, false);
     }
   }
 
