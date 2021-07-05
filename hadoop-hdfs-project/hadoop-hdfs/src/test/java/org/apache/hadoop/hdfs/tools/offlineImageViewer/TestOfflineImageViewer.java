@@ -17,15 +17,42 @@
  */
 package org.apache.hadoop.hdfs.tools.offlineImageViewer;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
+import org.apache.hadoop.hdfs.util.MD5FileUtils;
+import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
+import static org.apache.hadoop.fs.permission.AclEntryType.GROUP;
+import static org.apache.hadoop.fs.permission.AclEntryType.OTHER;
+import static org.apache.hadoop.fs.permission.AclEntryType.USER;
+import static org.apache.hadoop.fs.permission.FsAction.ALL;
+import static org.apache.hadoop.fs.permission.FsAction.EXECUTE;
+import static org.apache.hadoop.fs.permission.FsAction.READ_EXECUTE;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
+import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyState;
+
+import static org.apache.hadoop.hdfs.MiniDFSCluster.HDFS_MINIDFS_BASEDIR;
+import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_NAME;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY_CELL_SIZE;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY_NAME;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY_STATE;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_SCHEMA;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_SCHEMA_CODEC_NAME;
+import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_SCHEMA_OPTION;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+import org.apache.hadoop.io.erasurecode.ECSchema;
+import org.apache.hadoop.io.erasurecode.ErasureCodeConstants;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -55,9 +82,20 @@ import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.NullOutputStream;
-import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -72,39 +110,27 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
 import org.apache.hadoop.hdfs.protocol.BlockType;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyState;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
-import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
-import org.apache.hadoop.hdfs.server.namenode.FSImageTestUtil;
+import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.hdfs.server.namenode.FsImageProto;
+import org.apache.hadoop.hdfs.server.namenode.FSImageTestUtil;
 import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeLayoutVersion;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.erasurecode.ECSchema;
-import org.apache.hadoop.io.erasurecode.ErasureCodeConstants;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.apache.hadoop.util.Lists;
-
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
-
+import org.slf4j.event.Level;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -114,29 +140,9 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
-import static org.apache.hadoop.fs.permission.AclEntryType.GROUP;
-import static org.apache.hadoop.fs.permission.AclEntryType.OTHER;
-import static org.apache.hadoop.fs.permission.AclEntryType.USER;
-import static org.apache.hadoop.fs.permission.FsAction.ALL;
-import static org.apache.hadoop.fs.permission.FsAction.EXECUTE;
-import static org.apache.hadoop.fs.permission.FsAction.READ_EXECUTE;
-import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_NAME;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY_CELL_SIZE;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY_NAME;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_POLICY_STATE;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_SCHEMA;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_SCHEMA_CODEC_NAME;
-import static org.apache.hadoop.hdfs.tools.offlineImageViewer.PBImageXmlWriter.ERASURE_CODING_SECTION_SCHEMA_OPTION;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
 
 public class TestOfflineImageViewer {
   private static final Logger LOG =
@@ -186,6 +192,12 @@ public class TestOfflineImageViewer {
       conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
       conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL,
           "RULE:[2:$1@$0](JobTracker@.*FOO.COM)s/@.*//" + "DEFAULT");
+      // fsimage with sub-section conf
+      conf.set(DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_KEY, "true");
+      conf.set(DFSConfigKeys.DFS_IMAGE_PARALLEL_INODE_THRESHOLD_KEY, "1");
+      conf.set(DFSConfigKeys.DFS_IMAGE_PARALLEL_TARGET_SECTIONS_KEY, "4");
+      conf.set(DFSConfigKeys.DFS_IMAGE_PARALLEL_THREADS_KEY, "4");
+
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
       cluster.waitActive();
       DistributedFileSystem hdfs = cluster.getFileSystem();
@@ -792,6 +804,13 @@ public class TestOfflineImageViewer {
   }
 
   @Test
+  public void testParallelPBDelimitedWriter() throws Exception {
+    testParallelPBDelimitedWriter("");  // Test in memory db.
+    testParallelPBDelimitedWriter(new FileSystemTestHelper().getTestRootDir()
+        + "/parallel-delimited.db");
+  }
+
+  @Test
   public void testCorruptionOutputEntryBuilder() throws IOException {
     PBImageCorruptionDetector corrDetector =
         new PBImageCorruptionDetector(null, ",", "");
@@ -882,11 +901,10 @@ public class TestOfflineImageViewer {
     final String DELIMITER = "\t";
     ByteArrayOutputStream output = new ByteArrayOutputStream();
 
-    try (PrintStream o = new PrintStream(output);
-        RandomAccessFile r = new RandomAccessFile(originalFsimage, "r")) {
+    try (PrintStream o = new PrintStream(output)) {
       PBImageDelimitedTextWriter v =
           new PBImageDelimitedTextWriter(o, DELIMITER, db);
-      v.visit(r);
+      v.visit(originalFsimage.getAbsolutePath());
     }
 
     Set<String> fileNames = new HashSet<>();
@@ -920,6 +938,37 @@ public class TestOfflineImageViewer {
     assertEquals(writtenFiles.keySet(), fileNames);
   }
 
+  private void testParallelPBDelimitedWriter(String db) throws Exception{
+    String delemiter = "\t";
+    int numThreads = 4;
+
+    File parallelDelimitedOut = new File(tempDir, "parallelDelimitedOut");
+    if (OfflineImageViewerPB.run(new String[] {"-p", "Delimited",
+        "-i", originalFsimage.getAbsolutePath(),
+        "-o", parallelDelimitedOut.getAbsolutePath(),
+        "-delimiter", delemiter,
+        "-t", db,
+        "-threads", String.valueOf(numThreads)}) != 0) {
+      throw new IOException("oiv returned failure outputting in parallel.");
+    }
+    MD5Hash parallelMd5 = MD5FileUtils.computeMd5ForFile(parallelDelimitedOut);
+
+    File serialDelimitedOut = new File(tempDir, "serialDelimitedOut");
+    if (db != "") {
+      db = db + "/../serial.db";
+    }
+    if (OfflineImageViewerPB.run(new String[] {"-p", "Delimited",
+        "-i", originalFsimage.getAbsolutePath(),
+        "-o", serialDelimitedOut.getAbsolutePath(),
+        "-t", db,
+        "-delimiter", delemiter}) != 0) {
+      throw new IOException("oiv returned failure outputting in serial.");
+    }
+    MD5Hash serialMd5 = MD5FileUtils.computeMd5ForFile(serialDelimitedOut);
+
+    assertEquals(parallelMd5, serialMd5);
+  }
+
   private void testPBCorruptionDetector(String db)
       throws IOException, InterruptedException {
     final String delimiter = "\t";
@@ -928,7 +977,7 @@ public class TestOfflineImageViewer {
     try (PrintStream o = new PrintStream(output)) {
       PBImageCorruptionDetector v =
           new PBImageCorruptionDetector(o, delimiter, db);
-      v.visit(new RandomAccessFile(originalFsimage, "r"));
+      v.visit(originalFsimage.getAbsolutePath());
     }
 
     try (
@@ -1024,7 +1073,7 @@ public class TestOfflineImageViewer {
     try (PrintStream o = new PrintStream(output)) {
       PBImageCorruptionDetector v =
           new PBImageCorruptionDetector(o, ",", db);
-      v.visit(new RandomAccessFile(corruptedImage, "r"));
+      v.visit(corruptedImage.getAbsolutePath());
     }
     return output.toString();
   }
@@ -1178,6 +1227,9 @@ public class TestOfflineImageViewer {
   public void testFileDistributionCalculatorForException() throws Exception {
     File fsimageFile = null;
     Configuration conf = new Configuration();
+    // Avoid using the same cluster dir to cause the global originalFsimage
+    // file to be cleared.
+    conf.set(HDFS_MINIDFS_BASEDIR, GenericTestUtils.getRandomizedTempPath());
     HashMap<String, FileStatus> files = Maps.newHashMap();
 
     // Create a initial fsimage file
