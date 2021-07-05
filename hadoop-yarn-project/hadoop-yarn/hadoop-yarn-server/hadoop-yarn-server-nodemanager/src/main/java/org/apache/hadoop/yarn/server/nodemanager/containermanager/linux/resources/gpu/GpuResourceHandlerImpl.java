@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.gpu;
 
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourcesExceptionUtil.throwIfNecessary;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -34,17 +32,18 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileg
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourceHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourceHandlerException;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.OCIContainerRuntime;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.DockerLinuxContainerRuntime;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.GpuDevice;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.GpuDiscoverer;
+import org.apache.hadoop.yarn.server.nodemanager.webapp.dao.gpu.PerGpuDeviceInformation;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+
+import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourcesExceptionUtil.throwIfNecessary;
 
 public class GpuResourceHandlerImpl implements ResourceHandler {
-  final static Logger LOG = LoggerFactory
-      .getLogger(GpuResourceHandlerImpl.class);
+  final static Log LOG = LogFactory
+      .getLog(GpuResourceHandlerImpl.class);
 
   // This will be used by container-executor to add necessary clis
   public static final String EXCLUDED_GPUS_CLI_OPTION = "--excluded_gpus";
@@ -80,6 +79,24 @@ public class GpuResourceHandlerImpl implements ResourceHandler {
         throwIfNecessary(new ResourceHandlerException(message),
             configuration);
       }
+      List<PerGpuDeviceInformation> hostAllGpus=gpuDiscoverer.getGpuDeviceInformation().getGpus();
+      Set<Integer> usableGpuMinorNumbers= new HashSet<Integer>();
+      for (GpuDevice gpuDevice:usableGpus){
+        usableGpuMinorNumbers.add(gpuDevice.getMinorNumber());
+      }
+
+
+      for(PerGpuDeviceInformation gpuInfo : hostAllGpus){
+        if (usableGpuMinorNumbers.contains(gpuInfo.getMinorNumber())){
+          continue;
+
+        }
+        gpuAllocator.addDeniedGpu(new GpuDevice(-1,gpuInfo.getMinorNumber()));
+      }
+
+
+
+
     } catch (YarnException e) {
       LOG.error("Exception when trying to get usable GPU device", e);
       throw new ResourceHandlerException(e);
@@ -88,6 +105,8 @@ public class GpuResourceHandlerImpl implements ResourceHandler {
     for (GpuDevice gpu : usableGpus) {
       gpuAllocator.addGpu(gpu);
     }
+
+
 
     // And initialize cgroups
     this.cGroupsHandler.initializeCGroupController(
@@ -108,7 +127,7 @@ public class GpuResourceHandlerImpl implements ResourceHandler {
     // Create device cgroups for the container
     cGroupsHandler.createCGroup(CGroupsHandler.CGroupController.DEVICES,
         containerIdStr);
-    if (!OCIContainerRuntime.isOCICompliantContainerRequested(
+    if (!DockerLinuxContainerRuntime.isDockerContainerRequested(
         nmContext.getConf(),
         container.getLaunchContext().getEnvironment())) {
       // Write to devices cgroup only for non-docker container. The reason is
