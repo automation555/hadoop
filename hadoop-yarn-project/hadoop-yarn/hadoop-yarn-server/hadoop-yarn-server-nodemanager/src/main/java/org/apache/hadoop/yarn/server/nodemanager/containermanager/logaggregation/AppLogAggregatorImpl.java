@@ -28,7 +28,8 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
@@ -38,7 +39,6 @@ import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -64,6 +64,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
+import org.apache.hadoop.yarn.server.nodemanager.SecureModeLocalUserAllocator;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.DeletionTask;
@@ -71,9 +72,10 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.Times;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 
 
 public class AppLogAggregatorImpl implements AppLogAggregator {
@@ -103,6 +105,8 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
   private final Context context;
   private final NodeId nodeId;
   private final LogAggregationFileControllerContext logControllerContext;
+  private final boolean secureModeUseLocalUser;
+  private final SecureModeLocalUserAllocator secureModeLocalUserAllocator;
 
   // These variables are only for testing
   private final AtomicBoolean waiting = new AtomicBoolean(false);
@@ -210,6 +214,16 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
             logAggregationInRolling,
             rollingMonitorInterval,
             this.appId, this.appAcls, this.nodeId, this.userUgi);
+    secureModeUseLocalUser = UserGroupInformation.isSecurityEnabled() &&
+        conf.getBoolean(YarnConfiguration.NM_SECURE_MODE_USE_POOL_USER,
+            YarnConfiguration.DEFAULT_NM_SECURE_MODE_USE_POOL_USER);
+    if (secureModeUseLocalUser) {
+      secureModeLocalUserAllocator =
+          SecureModeLocalUserAllocator.getInstance(conf);
+    }
+    else {
+      secureModeLocalUserAllocator = null;
+    }
   }
 
   private ContainerLogAggregationPolicy getLogAggPolicy(Configuration conf) {
@@ -460,6 +474,10 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
 
   @Override
   public void run() {
+    if (this.secureModeUseLocalUser) {
+      this.secureModeLocalUserAllocator.incrementLogHandlingCount(
+          this.userUgi.getShortUserName());
+    }
     try {
       doAppLogAggregation();
     } catch (LogAggregationDFSException e) {
@@ -481,6 +499,10 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
                 ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED));
       }
       this.appAggregationFinished.set(true);
+      if (this.secureModeUseLocalUser) {
+        this.secureModeLocalUserAllocator.decrementLogHandlingCount(
+            this.userUgi.getShortUserName());
+      }
     }
   }
 
@@ -646,9 +668,13 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
           + ". Current good log dirs are "
           + StringUtils.join(",", dirsHandler.getLogDirsForRead()));
       final LogKey logKey = new LogKey(containerId);
+      String user = userUgi.getShortUserName();
+      if (secureModeUseLocalUser) {
+        user = secureModeLocalUserAllocator.getRunAsLocalUser(user);
+      }
       final LogValue logValue =
           new LogValue(dirsHandler.getLogDirsForRead(), containerId,
-            userUgi.getShortUserName(), logAggregationContext,
+            user, logAggregationContext,
             this.uploadedFileMeta,  retentionContext, appFinished,
             containerFinished);
       try {
@@ -662,9 +688,16 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         .getCurrentUpLoadedFileMeta());
       // if any of the previous uploaded logs have been deleted,
       // we need to remove them from alreadyUploadedLogs
-      this.uploadedFileMeta = uploadedFileMeta.stream().filter(
-          next -> logValue.getAllExistingFilesMeta().contains(next)).collect(
-          Collectors.toSet());
+      Iterable<String> mask =
+          Iterables.filter(uploadedFileMeta, new Predicate<String>() {
+            @Override
+            public boolean apply(String next) {
+              return logValue.getAllExistingFilesMeta().contains(next);
+            }
+          });
+
+      this.uploadedFileMeta = Sets.newHashSet(mask);
+
       // need to return files uploaded or older-than-retention clean up.
       return Sets.union(logValue.getCurrentUpLoadedFilesPath(),
           logValue.getObsoleteRetentionLogFiles());

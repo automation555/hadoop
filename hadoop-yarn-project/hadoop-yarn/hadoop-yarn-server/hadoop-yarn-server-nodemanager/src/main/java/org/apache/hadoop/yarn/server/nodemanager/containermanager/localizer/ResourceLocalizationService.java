@@ -99,6 +99,7 @@ import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.DirectoryCollection.DirsChangeListener;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
+import org.apache.hadoop.yarn.server.nodemanager.SecureModeLocalUserAllocator;
 import org.apache.hadoop.yarn.server.nodemanager.api.LocalizationProtocol;
 import org.apache.hadoop.yarn.server.nodemanager.api.ResourceLocalizationSpec;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalResourceStatus;
@@ -143,10 +144,10 @@ import org.apache.hadoop.yarn.server.nodemanager.util.NodeManagerBuilderUtils;
 import org.apache.hadoop.yarn.util.FSDownload;
 import org.apache.hadoop.yarn.util.LRUCacheHashMap;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
-import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class ResourceLocalizationService extends CompositeService
     implements EventHandler<LocalizationEvent>, LocalizationProtocol {
@@ -174,6 +175,7 @@ public class ResourceLocalizationService extends CompositeService
   private NMStateStoreService stateStore;
   @VisibleForTesting
   final NodeManagerMetrics metrics;
+  private final boolean disablePrivateVis;
 
   @VisibleForTesting
   LocalResourcesTracker publicRsrc;
@@ -211,6 +213,26 @@ public class ResourceLocalizationService extends CompositeService
     this.dispatcher = dispatcher;
     this.delService = delService;
     this.dirsHandler = dirsHandler;
+
+    // If an app user application require private resources, when local user
+    // pooling is enabled, we will treat the private resources as application
+    // resources. This means for each application we will download (localize)
+    // the resources to application folder, and will delete it after the
+    // application is finished.
+    boolean secureModeUseLocalUser = UserGroupInformation.isSecurityEnabled() &&
+        context.getConf().getBoolean(
+            YarnConfiguration.NM_SECURE_MODE_USE_POOL_USER,
+            YarnConfiguration.DEFAULT_NM_SECURE_MODE_USE_POOL_USER);
+    if (secureModeUseLocalUser) {
+      this.disablePrivateVis = true;
+      LOG.info("When " + YarnConfiguration.NM_SECURE_MODE_USE_POOL_USER +
+          " is true, treat PRIVATE visibility as APPLICATION");
+      SecureModeLocalUserAllocator.getInstance(context.getConf())
+        .setDeletionService(delService);
+    }
+    else {
+      this.disablePrivateVis = false;
+    }
 
     this.cacheCleanup = new HadoopScheduledThreadPoolExecutor(1,
         new ThreadFactoryBuilder()
@@ -680,7 +702,9 @@ public class ResourceLocalizationService extends CompositeService
       case PUBLIC:
         return publicRsrc;
       case PRIVATE:
-        return privateRsrc.get(user);
+        if (!disablePrivateVis) {
+          return privateRsrc.get(user);
+        }
       case APPLICATION:
         return appRsrc.get(appId.toString());
     }
@@ -995,10 +1019,8 @@ public class ResourceLocalizationService extends CompositeService
                 getLocalResourcesTracker(LocalResourceVisibility.APPLICATION, user, applicationId);
               final String diagnostics = "Failed to download resource " +
                   assoc.getResource() + " " + e.getCause();
-              if(tracker != null) {
-                tracker.handle(new ResourceFailedLocalizationEvent(
-                    assoc.getResource().getRequest(), diagnostics));
-              }
+              tracker.handle(new ResourceFailedLocalizationEvent(
+                  assoc.getResource().getRequest(), diagnostics));
               publicRsrc.handle(new ResourceFailedLocalizationEvent(
                   assoc.getResource().getRequest(), diagnostics));
               LOG.error(diagnostics);
@@ -1235,9 +1257,11 @@ public class ResourceLocalizationService extends CompositeService
           context.getContainerId().getApplicationAttemptId().getApplicationId();
       LocalResourceVisibility vis = rsrc.getVisibility();
       String cacheDirectory = null;
-      if (vis == LocalResourceVisibility.PRIVATE) {// PRIVATE Only
+      if (!disablePrivateVis && vis == LocalResourceVisibility.PRIVATE) {
+        // PRIVATE ONLY
         cacheDirectory = getUserFileCachePath(user);
-      } else {// APPLICATION ONLY
+      } else {
+        // APPLICATION ONLY
         cacheDirectory = getAppFileCachePath(user, appId.toString());
       }
       Path dirPath =
@@ -1700,15 +1724,5 @@ public class ResourceLocalizationService extends CompositeService
     localDirPathFsPermissionsMap.put(fileDir, defaultPermission);
     localDirPathFsPermissionsMap.put(sysDir, nmPrivatePermission);
     return localDirPathFsPermissionsMap;
-  }
-
-  public LocalizedResource getLocalizedResource(LocalResourceRequest req,
-      String user, ApplicationId appId) {
-    LocalResourcesTracker tracker =
-        getLocalResourcesTracker(req.getVisibility(), user, appId);
-    if (tracker == null) {
-      return null;
-    }
-    return tracker.getLocalizedResource(req);
   }
 }
