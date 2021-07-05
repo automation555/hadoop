@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -208,6 +208,21 @@ public class InMemoryAliasMapProtocolClientSideTranslatorPB
 
     try {
       rpcProxy.write(null, request);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public void remove(@Nonnull Block block) throws IOException {
+    RemoveRequestProto request =
+        RemoveRequestProto
+            .newBuilder()
+            .setKey(PBHelperClient.convert(block))
+            .build();
+
+    try {
+      rpcProxy.remove(null, request);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
