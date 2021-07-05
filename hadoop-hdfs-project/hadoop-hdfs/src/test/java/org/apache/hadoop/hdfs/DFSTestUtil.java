@@ -25,6 +25,7 @@ import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.INodeType.DIRECTORY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
@@ -45,6 +46,8 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.PrintStream;
 import java.io.RandomAccessFile;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -70,16 +73,16 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
-import java.util.function.Supplier;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.base.Supplier;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdfs.tools.DFSck;
-import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -129,6 +132,7 @@ import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.LayoutVersion;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
@@ -144,10 +148,12 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.hdfs.server.datanode.TestTransferRbw;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
@@ -190,12 +196,12 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.VersionInfo;
+import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.apache.hadoop.util.ToolRunner;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.slf4j.event.Level;
+import com.google.common.annotations.VisibleForTesting;
 
 /** Utilities for HDFS tests */
 public class DFSTestUtil {
@@ -794,48 +800,41 @@ public class DFSTestUtil {
 
   /**
    * Wait for the given file to reach the given replication factor.
-   *
-   * @param fs the defined filesystem.
-   * @param fileName being written.
-   * @param replFactor desired replication
-   * @throws IOException getting block locations
-   * @throws InterruptedException during sleep
-   * @throws TimeoutException if 40 seconds passed before reaching the desired
-   *                          replication.
+   * @throws TimeoutException if we fail to sufficiently replicate the file
    */
-  public static void waitReplication(FileSystem fs, Path fileName,
-      short replFactor)
+  public static void waitReplication(FileSystem fs, Path fileName, short replFactor)
       throws IOException, InterruptedException, TimeoutException {
     boolean correctReplFactor;
-    int attempt = 0;
+    final int ATTEMPTS = 40;
+    int count = 0;
+
     do {
       correctReplFactor = true;
-      if (attempt++ > 0) {
-        Thread.sleep(1000);
-      }
       BlockLocation locs[] = fs.getFileBlockLocations(
-          fs.getFileStatus(fileName), 0, Long.MAX_VALUE);
-      for (int currLoc = 0; currLoc < locs.length; currLoc++) {
-        String[] hostnames = locs[currLoc].getNames();
+        fs.getFileStatus(fileName), 0, Long.MAX_VALUE);
+      count++;
+      for (int j = 0; j < locs.length; j++) {
+        String[] hostnames = locs[j].getNames();
         if (hostnames.length != replFactor) {
-          LOG.info(
-              "Block {} of file {} has replication factor {} "
-                  + "(desired {}); locations: {}",
-              currLoc, fileName, hostnames.length, replFactor,
-              Joiner.on(' ').join(hostnames));
           correctReplFactor = false;
+          System.out.println("Block " + j + " of file " + fileName
+              + " has replication factor " + hostnames.length
+              + " (desired " + replFactor + "); locations "
+              + Joiner.on(' ').join(hostnames));
+          Thread.sleep(1000);
           break;
         }
       }
-    } while (!correctReplFactor && attempt < 40);
+      if (correctReplFactor) {
+        System.out.println("All blocks of file " + fileName
+            + " verified to have replication factor " + replFactor);
+      }
+    } while (!correctReplFactor && count < ATTEMPTS);
 
-    if (!correctReplFactor) {
-      throw new TimeoutException("Timed out waiting for file ["
-          + fileName + "] to reach [" + replFactor + "] replicas");
+    if (count == ATTEMPTS) {
+      throw new TimeoutException("Timed out waiting for " + fileName +
+          " to reach " + replFactor + " replicas");
     }
-
-    LOG.info("All blocks of file {} verified to have replication factor {}",
-        fileName, replFactor);
   }
   
   /** delete directory and everything underneath it.*/
@@ -1955,6 +1954,39 @@ public class DFSTestUtil {
     FsShellRun(cmd, 0, null, conf);
   }
 
+  public static void addDataNodeLayoutVersion(final int lv, final String description)
+      throws NoSuchFieldException, IllegalAccessException {
+    Preconditions.checkState(lv < DataNodeLayoutVersion.CURRENT_LAYOUT_VERSION);
+
+    // Override {@link DataNodeLayoutVersion#CURRENT_LAYOUT_VERSION} via reflection.
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    modifiersField.setAccessible(true);
+    Field field = DataNodeLayoutVersion.class.getField("CURRENT_LAYOUT_VERSION");
+    field.setAccessible(true);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    field.setInt(null, lv);
+
+    field = HdfsServerConstants.class.getField("DATANODE_LAYOUT_VERSION");
+    field.setAccessible(true);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    field.setInt(null, lv);
+
+    // Inject the feature into the FEATURES map.
+    final LayoutVersion.FeatureInfo featureInfo =
+        new LayoutVersion.FeatureInfo(lv, lv + 1, description, false);
+    final LayoutVersion.LayoutFeature feature =
+        new LayoutVersion.LayoutFeature() {
+      @Override
+      public LayoutVersion.FeatureInfo getInfo() {
+        return featureInfo;
+      }
+    };
+
+    // Update the FEATURES map with the new layout version.
+    LayoutVersion.updateMap(DataNodeLayoutVersion.FEATURES,
+                            new LayoutVersion.LayoutFeature[] { feature });
+  }
+
   /**
    * Wait for datanode to reach alive or dead state for waitTime given in
    * milliseconds.
@@ -2281,13 +2313,16 @@ public class DFSTestUtil {
       public Boolean get() {
         try {
           final int currentValue = Integer.parseInt(jmx.getValue(metricName));
+          LOG.info("Waiting for " + metricName +
+                       " to reach value " + expectedValue +
+                       ", current value = " + currentValue);
           return currentValue == expectedValue;
         } catch (Exception e) {
           throw new RuntimeException(
               "Test failed due to unexpected exception", e);
         }
       }
-    }, 50, 60000);
+    }, 1000, 60000);
   }
 
   /**
@@ -2358,32 +2393,13 @@ public class DFSTestUtil {
     }
   }
 
-  /**
-   * Create open files under root path.
-   * @param fs the filesystem.
-   * @param filePrefix the prefix of the files.
-   * @param numFilesToCreate the number of files to create.
-   */
   public static Map<Path, FSDataOutputStream> createOpenFiles(FileSystem fs,
       String filePrefix, int numFilesToCreate) throws IOException {
-    return createOpenFiles(fs, new Path("/"), filePrefix, numFilesToCreate);
-  }
-
-  /**
-   * Create open files.
-   * @param fs the filesystem.
-   * @param baseDir the base path of the files.
-   * @param filePrefix the prefix of the files.
-   * @param numFilesToCreate the number of files to create.
-   */
-  public static Map<Path, FSDataOutputStream> createOpenFiles(FileSystem fs,
-      Path baseDir, String filePrefix, int numFilesToCreate)
-      throws IOException {
     final Map<Path, FSDataOutputStream> filesCreated = new HashMap<>();
     final byte[] buffer = new byte[(int) (1024 * 1.75)];
     final Random rand = new Random(0xFEED0BACL);
     for (int i = 0; i < numFilesToCreate; i++) {
-      Path file = new Path(baseDir, filePrefix + "-" + i);
+      Path file = new Path("/" + filePrefix + "-" + i);
       FSDataOutputStream stm = fs.create(file, true, 1024, (short) 1, 1024);
       rand.nextBytes(buffer);
       stm.write(buffer);
@@ -2465,17 +2481,25 @@ public class DFSTestUtil {
     assertEquals(entries.length, inverseReport.getDiffList().size());
 
     for (DiffReportEntry entry : entries) {
+      DiffReportEntry reportEntry = report.getDiffList().stream()
+          .filter(e -> e.equals(entry))
+          .findFirst()
+          .orElseThrow(() ->
+              new AssertionError("DiffReportEntry not found: " +
+                  entry.getType() + " " + entry.getSourcePath()));
       if (entry.getType() == DiffType.MODIFY) {
         assertTrue(report.getDiffList().contains(entry));
         assertTrue(inverseReport.getDiffList().contains(entry));
       } else if (entry.getType() == DiffType.DELETE) {
         assertTrue(report.getDiffList().contains(entry));
         assertTrue(inverseReport.getDiffList().contains(
-            new DiffReportEntry(DiffType.CREATE, entry.getSourcePath())));
+            new DiffReportEntry(DIRECTORY,
+                DiffType.CREATE, entry.getSourcePath())));
       } else if (entry.getType() == DiffType.CREATE) {
         assertTrue(report.getDiffList().contains(entry));
         assertTrue(inverseReport.getDiffList().contains(
-            new DiffReportEntry(DiffType.DELETE, entry.getSourcePath())));
+            new DiffReportEntry(DIRECTORY,
+                DiffType.DELETE, entry.getSourcePath())));
       }
     }
   }
