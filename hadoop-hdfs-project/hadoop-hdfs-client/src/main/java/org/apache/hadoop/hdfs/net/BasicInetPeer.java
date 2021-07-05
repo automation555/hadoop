@@ -21,10 +21,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.channels.ReadableByteChannel;
 
 import org.apache.hadoop.net.unix.DomainSocket;
+import org.apache.http.client.utils.URIBuilder;
 
 /**
  * Represents a peer that we communicate with by using a basic Socket
@@ -36,12 +38,18 @@ public class BasicInetPeer implements Peer {
   private final OutputStream out;
   private final InputStream in;
   private final boolean isLocal;
+  private final URI localURI;
+  private final URI remoteURI;
 
   public BasicInetPeer(Socket socket) throws IOException {
     this.socket = socket;
     this.out = socket.getOutputStream();
     this.in = socket.getInputStream();
     this.isLocal = socket.getInetAddress().equals(socket.getLocalAddress());
+    this.localURI = getURI(socket.getLocalAddress().getHostAddress(),
+        socket.getLocalPort());
+    this.remoteURI =
+        getURI(socket.getInetAddress().getHostAddress(), socket.getPort());
   }
 
   @Override
@@ -94,13 +102,22 @@ public class BasicInetPeer implements Peer {
 
   @Override
   public String getRemoteAddressString() {
-    SocketAddress address = socket.getRemoteSocketAddress();
-    return address == null ? null : address.toString();
+    return socket.getRemoteSocketAddress().toString();
   }
 
   @Override
   public String getLocalAddressString() {
     return socket.getLocalSocketAddress().toString();
+  }
+
+  @Override
+  public URI getRemoteURI() {
+    return this.remoteURI;
+  }
+
+  @Override
+  public URI getLocalURI() {
+    return this.localURI;
   }
 
   @Override
@@ -119,11 +136,6 @@ public class BasicInetPeer implements Peer {
   }
 
   @Override
-  public String toString() {
-    return "BasicInetPeer(" + socket.toString() + ")";
-  }
-
-  @Override
   public DomainSocket getDomainSocket() {
     return null;
   }
@@ -131,5 +143,30 @@ public class BasicInetPeer implements Peer {
   @Override
   public boolean hasSecureChannel() {
     return false;
+  }
+
+  @Override
+  public String toString() {
+    return "BasicInetPeer [isLocal=" + isLocal + ", localURI=" + localURI
+        + ", remoteURI=" + remoteURI + "]";
+  }
+
+  /**
+   * Given a host name and port, create a DN URI. Turn checked exception into
+   * runtime. Exception should never happen because the inputs are captures from
+   * an exiting socket and not parsed from an external source.
+   *
+   * @param host Host for URI
+   * @param port Port for URI
+   * @return A URI
+   */
+  private URI getURI(final String host, final int port) {
+    try {
+      return new URIBuilder().setScheme("hdfs+dn")
+      .setHost(host)
+      .setPort(port).build();
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException(e);
+    }
   }
 }
