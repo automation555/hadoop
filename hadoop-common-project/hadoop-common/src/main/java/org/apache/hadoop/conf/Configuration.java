@@ -24,7 +24,7 @@ import com.ctc.wstx.io.SystemId;
 import com.ctc.wstx.stax.WstxInputFactory;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 import java.io.BufferedInputStream;
 import java.io.DataInput;
@@ -40,8 +40,6 @@ import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.net.JarURLConnection;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -83,7 +81,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import com.google.common.base.Charsets;
 import org.apache.commons.collections.map.UnmodifiableMap;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -107,8 +105,8 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
+import org.apache.hadoop.util.noguava.Preconditions;
+import com.google.common.base.Strings;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -429,7 +427,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     DeprecationDelta(String key, String[] newKeys, String customMessage) {
       Preconditions.checkNotNull(key);
       Preconditions.checkNotNull(newKeys);
-      Preconditions.checkArgument(newKeys.length > 0);
+      Preconditions.checkIsTrue(newKeys.length > 0);
       this.key = key;
       this.newKeys = newKeys;
       this.customMessage = customMessage;
@@ -1027,11 +1025,11 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     properties = null;                            // trigger reload
     finalParameters.clear();                      // clear site-limits
   }
-
+  
   private synchronized void addResourceObject(Resource resource) {
     resources.add(resource);                      // add to resources
     restrictSystemProps |= resource.isParserRestricted();
-    loadProps(properties, resources.size() - 1, false);
+    reloadConfiguration();
   }
 
   private static final int MAX_SUBST = 20;
@@ -1139,37 +1137,36 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       final String var = eval.substring(varBounds[SUB_START_IDX],
           varBounds[SUB_END_IDX]);
       String val = null;
-      try {
-        // evaluate system properties or environment variables even when
-        // the configuration is restricted -the restrictions are enforced
-        // in the getenv/getProperty calls
-        if (var.startsWith("env.") && 4 < var.length()) {
-          String v = var.substring(4);
-          int i = 0;
-          for (; i < v.length(); i++) {
-            char c = v.charAt(i);
-            if (c == ':' && i < v.length() - 1 && v.charAt(i + 1) == '-') {
-              val = getenv(v.substring(0, i));
-              if (val == null || val.length() == 0) {
-                val = v.substring(i + 2);
+      if (!restrictSystemProps) {
+        try {
+          if (var.startsWith("env.") && 4 < var.length()) {
+            String v = var.substring(4);
+            int i = 0;
+            for (; i < v.length(); i++) {
+              char c = v.charAt(i);
+              if (c == ':' && i < v.length() - 1 && v.charAt(i + 1) == '-') {
+                val = getenv(v.substring(0, i));
+                if (val == null || val.length() == 0) {
+                  val = v.substring(i + 2);
+                }
+                break;
+              } else if (c == '-') {
+                val = getenv(v.substring(0, i));
+                if (val == null) {
+                  val = v.substring(i + 1);
+                }
+                break;
               }
-              break;
-            } else if (c == '-') {
-              val = getenv(v.substring(0, i));
-              if (val == null) {
-                val = v.substring(i + 1);
-              }
-              break;
             }
+            if (i == v.length()) {
+              val = getenv(v);
+            }
+          } else {
+            val = getProperty(var);
           }
-          if (i == v.length()) {
-            val = getenv(v);
-          }
-        } else {
-          val = getProperty(var);
+        } catch (SecurityException se) {
+          LOG.warn("Unexpected SecurityException in Configuration", se);
         }
-      } catch (SecurityException se) {
-        LOG.warn("Unexpected SecurityException in Configuration", se);
       }
       if (val == null) {
         val = getRaw(var);
@@ -1195,33 +1192,13 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     throw new IllegalStateException("Variable substitution depth too large: " 
                                     + MAX_SUBST + " " + expr);
   }
-
-  /**
-   * Get the environment variable value if
-   * {@link #restrictSystemProps} does not block this.
-   * @param name environment variable name.
-   * @return the value or null if either it is unset or access forbidden.
-   */
+  
   String getenv(String name) {
-    if (!restrictSystemProps) {
-      return System.getenv(name);
-    } else {
-      return null;
-    }
+    return System.getenv(name);
   }
 
-  /**
-   * Get a system property value if
-   * {@link #restrictSystemProps} does not block this.
-   * @param key property key
-   * @return the value or null if either it is unset or access forbidden.
-   */
   String getProperty(String key) {
-    if (!restrictSystemProps) {
-      return System.getProperty(key);
-    } else {
-      return null;
-    }
+    return System.getProperty(key);
   }
 
   /**
@@ -1397,10 +1374,10 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * @throws IllegalArgumentException when the value or name is null.
    */
   public void set(String name, String value, String source) {
-    Preconditions.checkArgument(
+    Preconditions.checkIsTrue(
         name != null,
         "Property name must not be null");
-    Preconditions.checkArgument(
+    Preconditions.checkIsTrue(
         value != null,
         "The value of property %s must not be null", name);
     name = name.trim();
@@ -2897,27 +2874,12 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   protected synchronized Properties getProps() {
     if (properties == null) {
       properties = new Properties();
-      loadProps(properties, 0, true);
-    }
-    return properties;
-  }
+      Map<String, String[]> backup = updatingResource != null ?
+          new ConcurrentHashMap<String, String[]>(updatingResource) : null;
+      loadResources(properties, resources, quietmode);
 
-  /**
-   * Loads the resource at a given index into the properties.
-   * @param props the object containing the loaded properties.
-   * @param startIdx the index where the new resource has been added.
-   * @param fullReload flag whether we do complete reload of the conf instead
-   *                   of just loading the new resource.
-   */
-  private synchronized void loadProps(final Properties props,
-      final int startIdx, final boolean fullReload) {
-    if (props != null) {
-      Map<String, String[]> backup =
-          updatingResource != null
-              ? new ConcurrentHashMap<>(updatingResource) : null;
-      loadResources(props, resources, startIdx, fullReload, quietmode);
       if (overlay != null) {
-        props.putAll(overlay);
+        properties.putAll(overlay);
         if (backup != null) {
           for (Map.Entry<Object, Object> item : overlay.entrySet()) {
             String key = (String) item.getKey();
@@ -2929,6 +2891,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
         }
       }
     }
+    return properties;
   }
 
   /**
@@ -3030,16 +2993,14 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
 
   private void loadResources(Properties properties,
                              ArrayList<Resource> resources,
-                             int startIdx,
-                             boolean fullReload,
                              boolean quiet) {
-    if(loadDefaults && fullReload) {
+    if(loadDefaults) {
       for (String resource : defaultResources) {
         loadResource(properties, new Resource(resource, false), quiet);
       }
     }
     
-    for (int i = startIdx; i < resources.size(); i++) {
+    for (int i = 0; i < resources.size(); i++) {
       Resource ret = loadResource(properties, resources.get(i), quiet);
       if (ret != null) {
         resources.set(i, ret);
@@ -3286,15 +3247,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
           File href = new File(confInclude);
           if (!href.isAbsolute()) {
             // Included resources are relative to the current resource
-            File baseFile;
-
-            try {
-              baseFile = new File(new URI(name));
-            } catch (IllegalArgumentException | URISyntaxException e) {
-              baseFile = new File(name);
-            }
-
-            baseFile = baseFile.getParentFile();
+            File baseFile = new File(name).getParentFile();
             href = new File(baseFile, href.getPath());
           }
           if (!href.exists()) {
@@ -3916,7 +3869,6 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     Pattern p = Pattern.compile(regex);
 
     Map<String,String> result = new HashMap<String,String>();
-    List<String> resultKeys = new ArrayList<>();
     Matcher m;
 
     for(Map.Entry<Object,Object> item: getProps().entrySet()) {
@@ -3924,12 +3876,11 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
           item.getValue() instanceof String) {
         m = p.matcher((String)item.getKey());
         if(m.find()) { // match
-          resultKeys.add((String) item.getKey());
+          result.put((String) item.getKey(),
+              substituteVars(getProps().getProperty((String) item.getKey())));
         }
       }
     }
-    resultKeys.forEach(item ->
-            result.put(item, substituteVars(getProps().getProperty(item))));
     return result;
   }
 

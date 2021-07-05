@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.fs;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.noguava.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -40,7 +40,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
@@ -76,10 +75,15 @@ public class TestLocalFileSystem {
   private LocalFileSystem fileSys;
 
   /**
+   * standard test timeout: {@value}.
+   */
+  public static final int DEFAULT_TEST_TIMEOUT = 60 * 1000;
+
+  /**
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(60, TimeUnit.SECONDS);
+  public Timeout testTimeout = new Timeout(DEFAULT_TEST_TIMEOUT);
 
   private void cleanupFile(FileSystem fs, Path name) throws IOException {
     assertTrue(fs.exists(name));
@@ -308,7 +312,7 @@ public class TestLocalFileSystem {
         .new LocalFSFileInputStream(path), 1024);
       assertNotNull(bis.getFileDescriptor());
     } finally {
-      IOUtils.cleanupWithLogger(null, bis);
+      IOUtils.cleanup(null, bis);
     }
   }
 
@@ -747,7 +751,7 @@ public class TestLocalFileSystem {
         throws IllegalArgumentException, IOException {
       Set<String> unsupported = new HashSet<>(getMandatoryKeys());
       unsupported.removeAll(supportedKeys);
-      Preconditions.checkArgument(unsupported.isEmpty(),
+      Preconditions.checkIsTrue(unsupported.isEmpty(),
           "unsupported key found: " + supportedKeys);
       return getFS().create(
           getPath(), getPermission(), getFlags(), getBufferSize(),

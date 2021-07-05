@@ -30,7 +30,7 @@ import java.util.EnumSet;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.noguava.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ByteBufferPositionedReadable;
@@ -46,12 +46,8 @@ import org.apache.hadoop.fs.ReadOption;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.StreamCapabilitiesPolicy;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.util.StringUtils;
-
-import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.retrieveIOStatistics;
 
 /**
  * CryptoInputStream decrypts data. It is not thread-safe. AES CTR mode is
@@ -70,7 +66,7 @@ public class CryptoInputStream extends FilterInputStream implements
     Seekable, PositionedReadable, ByteBufferReadable, HasFileDescriptor, 
     CanSetDropBehind, CanSetReadahead, HasEnhancedByteBufferAccess, 
     ReadableByteChannel, CanUnbuffer, StreamCapabilities,
-    ByteBufferPositionedReadable, IOStatisticsSource {
+    ByteBufferPositionedReadable {
   private final byte[] oneByteBuf = new byte[1];
   private final CryptoCodec codec;
   private final Decryptor decryptor;
@@ -317,7 +313,7 @@ public class CryptoInputStream extends FilterInputStream implements
   }
   
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
     if (closed) {
       return;
     }
@@ -548,7 +544,7 @@ public class CryptoInputStream extends FilterInputStream implements
   /** Skip n bytes */
   @Override
   public long skip(long n) throws IOException {
-    Preconditions.checkArgument(n >= 0, "Negative skip length.");
+    Preconditions.checkIsTrue(n >= 0, "Negative skip length.");
     checkStream();
     
     if (n == 0) {
@@ -692,7 +688,7 @@ public class CryptoInputStream extends FilterInputStream implements
 
   @Override
   public boolean seekToNewSource(long targetPos) throws IOException {
-    Preconditions.checkArgument(targetPos >= 0, 
+    Preconditions.checkIsTrue(targetPos >= 0,
         "Cannot seek to negative offset.");
     checkStream();
     if (!(in instanceof Seekable)) {
@@ -871,16 +867,8 @@ public class CryptoInputStream extends FilterInputStream implements
           + " does not expose its stream capabilities.");
       }
       return ((StreamCapabilities) in).hasCapability(capability);
-    case StreamCapabilities.IOSTATISTICS:
-      return (in instanceof StreamCapabilities)
-          && ((StreamCapabilities) in).hasCapability(capability);
     default:
       return false;
     }
-  }
-
-  @Override
-  public IOStatistics getIOStatistics() {
-    return retrieveIOStatistics(in);
   }
 }

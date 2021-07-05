@@ -50,8 +50,8 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.noguava.Preconditions;
 
 /**
  * A simple LoadBalancing KMSClientProvider that round-robins requests
@@ -286,7 +286,7 @@ public class LoadBalancingKMSClientProvider extends KeyProvider implements
   // This request is sent to all providers in the load-balancing group
   @Override
   public void warmUpEncryptedKeys(String... keyNames) throws IOException {
-    Preconditions.checkArgument(providers.length > 0,
+    Preconditions.checkIsTrue(providers.length > 0,
         "No providers are configured");
     boolean success = false;
     IOException e = null;
@@ -502,7 +502,6 @@ public class LoadBalancingKMSClientProvider extends KeyProvider implements
         return null;
       }
     }, nextIdx(), false);
-    invalidateCache(name);
   }
 
   @Override

@@ -28,7 +28,7 @@ import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.ha.HAServiceProtocol.RequestSource;
 import org.apache.hadoop.ipc.RPC;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.noguava.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -200,7 +200,7 @@ public class FailoverController {
                        boolean forceFence,
                        boolean forceActive)
       throws FailoverFailedException {
-    Preconditions.checkArgument(fromSvc.getFencer() != null,
+    Preconditions.checkIsTrue(fromSvc.getFencer() != null,
         "failover requires a fencer");
     preFailoverChecks(fromSvc, toSvc, forceActive);
 
@@ -213,7 +213,7 @@ public class FailoverController {
 
     // Fence fromSvc if it's required or forced by the user
     if (tryFence) {
-      if (!fromSvc.getFencer().fence(fromSvc, toSvc)) {
+      if (!fromSvc.getFencer().fence(fromSvc)) {
         throw new FailoverFailedException("Unable to fence " +
             fromSvc + ". Fencing failed.");
       }
