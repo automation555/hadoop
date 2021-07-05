@@ -241,6 +241,26 @@ Mount table permission can be set by following command:
 
 The option mode is UNIX-style permissions for the mount table. Permissions are specified in octal, e.g. 0755. By default, this is set to 0755.
 
+#### Init ViewFs To Router
+Router supports initializing the [ViewFs](../hadoop-hdfs/ViewFs.html) mount point to the Router. The mapping directory protocol of ViewFS must be HDFS, and the initializer only supports one-to-one mapping.
+
+For example, use the following [ViewFs](../hadoop-hdfs/ViewFs.html) to configure the initial mount table to the router.
+
+    <configuration>
+      <property>
+        <name>fs.viewfs.mounttable.ClusterX.link./data</name>
+        <value>hdfs://nn1-clusterx.example.com:8020/data</value>
+      </property>
+      <property>
+        <name>fs.viewfs.mounttable.ClusterY.link./project</name>
+        <value>hdfs://nn1-clustery.example.com:8020/project</value>
+      </property>
+    </configuration>
+
+The [ViewFs](../hadoop-hdfs/ViewFs.html) mount table can be initialized to the Router by using the following command:
+
+    [hdfs]$ $HADOOP_HOME/bin/hdfs dfsrouteradmin -initViewFsToMountTable [<clusterName> | allClusters]
+
 #### Quotas
 Router-based federation supports global quota at mount table level. Mount table entries may spread multiple subclusters and the global quota will be
 accounted across these subclusters.
@@ -514,10 +534,7 @@ More metrics info can see [RBF Metrics](../../hadoop-project-dist/hadoop-common/
 Router Federation Rename
 -------
 
-Enable Router to rename across namespaces. Currently it is implemented based on [HDFS Federation Balance](../../../hadoop-federation-balance/HDFSFederationBalance.md) and has some limits comparing with normal rename.
-1. It is much slower than the normal rename so need a longer RPC timeout configuration. See `ipc.client.rpc-timeout.ms` and its description for more information about RPC timeout.
-2. It doesn't support snapshot path.
-3. It doesn't support to rename path with multiple destinations.
+Enable Router to rename across namespaces. Currently the router federation rename is implemented by distcp. We must set the rpc timeout high enough so it won't timeout.
 
 | Property | Default | Description|
 |:---- |:---- |:---- |
