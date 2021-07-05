@@ -153,12 +153,12 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
       String defaultName = getServer().getName();
       String keytab = System.getProperty("user.home") + "/" + defaultName + ".keytab";
       keytab = getServiceConfig().get(KERBEROS_KEYTAB, keytab).trim();
-      if (keytab.length() == 0) {
+      if (keytab.isEmpty()) {
         throw new ServiceException(FileSystemAccessException.ERROR.H01, KERBEROS_KEYTAB);
       }
       String principal = defaultName + "/localhost@LOCALHOST";
       principal = getServiceConfig().get(KERBEROS_PRINCIPAL, principal).trim();
-      if (principal.length() == 0) {
+      if (principal.isEmpty()) {
         throw new ServiceException(FileSystemAccessException.ERROR.H01, KERBEROS_PRINCIPAL);
       }
       Configuration conf = new Configuration();
@@ -194,11 +194,9 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
       throw new ServiceException(FileSystemAccessException.ERROR.H11, ex.toString(), ex);
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("FileSystemAccess FileSystem configuration:");
-      for (Map.Entry entry : serviceHadoopConf) {
-        LOG.debug("  {} = {}", entry.getKey(), entry.getValue());
-      }
+    LOG.debug("FileSystemAccess FileSystem configuration:");
+    for (Map.Entry entry : serviceHadoopConf) {
+      LOG.debug("  {} = {}", entry.getKey(), entry.getValue());
     }
     setRequiredServiceHadoopConf(serviceHadoopConf);
 
@@ -264,7 +262,7 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
           LOG.warn("Error while purging filesystem, " + ex.toString(), ex);
         }
       }
-      LOG.debug("Purged [{}] filesystem instances", count);
+      LOG.debug("Purged [{}} filesystem instances", count);
     }
   }
 
@@ -337,7 +335,8 @@ public class FileSystemAccessService extends BaseService implements FileSystemAc
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H04);
     }
     if (conf.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) == null ||
-        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY).length() == 0) {
+        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY)
+                .isEmpty()) {
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H06,
                                           CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY);
     }

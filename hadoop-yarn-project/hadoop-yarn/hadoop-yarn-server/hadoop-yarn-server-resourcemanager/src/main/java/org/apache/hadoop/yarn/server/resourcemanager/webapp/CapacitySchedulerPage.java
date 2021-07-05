@@ -99,7 +99,7 @@ class CapacitySchedulerPage extends RmView {
     }
 
     private void renderLeafQueueInfoWithPartition(Block html) {
-      String nodeLabelDisplay = nodeLabel.length() == 0
+      String nodeLabelDisplay = nodeLabel.isEmpty()
           ? NodeLabel.DEFAULT_NODE_LABEL_PARTITION : nodeLabel;
       // first display the queue's label specific details :
       ResponseInfo ri =
@@ -159,12 +159,8 @@ class CapacitySchedulerPage extends RmView {
           __("Used Capacity:",
               appendPercent(resourceUsages.getUsed(),
                   capacities.getUsedCapacity() / 100))
-          .__(capacities.getWeight() != -1 ?
-              "Configured Weight:" :
-                  "Configured Capacity:",
-              capacities.getWeight() != -1 ?
-                  capacities.getWeight() :
-                  capacities.getConfiguredMinResource() == null ?
+          .__("Configured Capacity:",
+              capacities.getConfiguredMinResource() == null ?
                   Resources.none().toString() :
                   capacities.getConfiguredMinResource().toString())
           .__("Configured Max Capacity:",
@@ -197,21 +193,14 @@ class CapacitySchedulerPage extends RmView {
 
     private void renderCommonLeafQueueInfo(ResponseInfo ri) {
       ri.
-          __("Num Schedulable Applications:",
-              Integer.toString(lqinfo.getNumActiveApplications())).
-          __("Num Non-Schedulable Applications:",
-              Integer.toString(lqinfo.getNumPendingApplications())).
-          __("Num Containers:",
-              Integer.toString(lqinfo.getNumContainers())).
-          __("Max Applications:",
-              Integer.toString(lqinfo.getMaxApplications())).
-          __("Max Applications Per User:",
-              Integer.toString(lqinfo.getMaxApplicationsPerUser())).
-          __("Configured Minimum User Limit Percent:",
-              lqinfo.getUserLimit() + "%").
+          __("Num Schedulable Applications:", Integer.toString(lqinfo.getNumActiveApplications())).
+          __("Num Non-Schedulable Applications:", Integer.toString(lqinfo.getNumPendingApplications())).
+          __("Num Containers:", Integer.toString(lqinfo.getNumContainers())).
+          __("Max Applications:", Integer.toString(lqinfo.getMaxApplications())).
+          __("Max Applications Per User:", Integer.toString(lqinfo.getMaxApplicationsPerUser())).
+          __("Configured Minimum User Limit Percent:", Integer.toString(lqinfo.getUserLimit()) + "%").
           __("Configured User Limit Factor:", lqinfo.getUserLimitFactor()).
-          __("Accessible Node Labels:",
-              StringUtils.join(",", lqinfo.getNodeLabels())).
+          __("Accessible Node Labels:", StringUtils.join(",", lqinfo.getNodeLabels())).
           __("Ordering Policy: ", lqinfo.getOrderingPolicyDisplayName()).
           __("Preemption:",
               lqinfo.getPreemptionDisabled() ? "disabled" : "enabled").
@@ -475,7 +464,7 @@ class CapacitySchedulerPage extends RmView {
         boolean hasAnyLabelLinkedToNM = false;
         if (null != nodeLabelsInfo) {
           for (RMNodeLabel label : nodeLabelsInfo) {
-            if (label.getLabelName().length() == 0) {
+            if (label.getLabelName().isEmpty()) {
               // Skip DEFAULT_LABEL
               continue;
             }
@@ -501,7 +490,7 @@ class CapacitySchedulerPage extends RmView {
             csqinfo.qinfo = null;
             csqinfo.label = label.getLabelName();
             csqinfo.isExclusiveNodeLabel = label.getIsExclusive();
-            String nodeLabelDisplay = csqinfo.label.length() == 0
+            String nodeLabelDisplay = csqinfo.label.isEmpty()
                 ? NodeLabel.DEFAULT_NODE_LABEL_PARTITION : csqinfo.label;
             PartitionQueueCapacitiesInfo capacities = sinfo.getCapacities()
                 .getPartitionQueueCapacitiesInfo(csqinfo.label);
