@@ -58,7 +58,7 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem fs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test,",
-        getIsNamespaceEnabled(fs));
+            fs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
@@ -93,7 +93,7 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem abfs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test",
-        getIsNamespaceEnabled(abfs));
+            abfs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
@@ -133,7 +133,7 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem abfs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test",
-        getIsNamespaceEnabled(abfs));
+            abfs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
@@ -168,7 +168,7 @@ public class ITestWasbAbfsCompatibility extends AbstractAbfsIntegrationTest {
     AzureBlobFileSystem abfs = getFileSystem();
     // test only valid for non-namespace enabled account
     Assume.assumeFalse("Namespace enabled account does not support this test",
-        getIsNamespaceEnabled(abfs));
+            abfs.getIsNamespaceEnabled());
 
     NativeAzureFileSystem wasb = getWasbFileSystem();
 
