@@ -19,15 +19,7 @@ set -e               # exit on error
 
 cd "$(dirname "$0")" # connect to root
 
-DOCKER_DIR=dev-support/docker
-DOCKER_FILE="${DOCKER_DIR}/Dockerfile"
-
-CPU_ARCH=$(echo "$MACHTYPE" | cut -d- -f1)
-if [ "$CPU_ARCH" = "aarch64" ]; then
-  DOCKER_FILE="${DOCKER_DIR}/Dockerfile_aarch64"
-fi
-
-docker build -t hadoop-build -f $DOCKER_FILE $DOCKER_DIR
+docker build -t hadoop-build dev-support/docker
 
 USER_NAME=${SUDO_USER:=$USER}
 USER_ID=$(id -u "${USER_NAME}")
@@ -66,31 +58,30 @@ if [ "$(uname -s)" = "Linux" ]; then
   fi
 fi
 
-# Set the home directory in the Docker container.
-DOCKER_HOME_DIR=${DOCKER_HOME_DIR:-/home/${USER_NAME}}
-
 docker build -t "hadoop-build-${USER_ID}" - <<UserSpecificDocker
 FROM hadoop-build
-RUN rm -f /var/log/faillog /var/log/lastlog
 RUN groupadd --non-unique -g ${GROUP_ID} ${USER_NAME}
-RUN useradd -g ${GROUP_ID} -u ${USER_ID} -k /root -m ${USER_NAME} -d "${DOCKER_HOME_DIR}"
+RUN useradd -g ${GROUP_ID} -u ${USER_ID} -k /root -m ${USER_NAME}
 RUN echo "${USER_NAME} ALL=NOPASSWD: ALL" > "/etc/sudoers.d/hadoop-build-${USER_ID}"
-ENV HOME "${DOCKER_HOME_DIR}"
+ENV HOME /home/${USER_NAME}
 
 UserSpecificDocker
 
-#If this env varible is empty, docker will be started
-# in non interactive mode
-DOCKER_INTERACTIVE_RUN=${DOCKER_INTERACTIVE_RUN-"-i -t"}
+#If this env varible is true, docker will be started
+# in interactive mode
+if [ "${DOCKER_INTERACTIVE_RUN:-true}" = true ]; then
+    DOCKER_IT_FLAGS="-i -t"
+else
+    DOCKER_IT_FLAGS=""
+fi
 
 # By mapping the .m2 directory you can do an mvn install from
 # within the container and use the result on your normal
 # system.  And this also is a significant speedup in subsequent
 # builds because the dependencies are downloaded only once.
-docker run --rm=true $DOCKER_INTERACTIVE_RUN \
-  -v "${PWD}:${DOCKER_HOME_DIR}/hadoop${V_OPTS:-}" \
-  -w "${DOCKER_HOME_DIR}/hadoop" \
-  -v "${HOME}/.m2:${DOCKER_HOME_DIR}/.m2${V_OPTS:-}" \
-  -v "${HOME}/.gnupg:${DOCKER_HOME_DIR}/.gnupg${V_OPTS:-}" \
-  -u "${USER_ID}" \
+docker run --rm=true $DOCKER_IT_FLAGS \
+  -v "${PWD}:/home/${USER_NAME}/hadoop${V_OPTS:-}" \
+  -w "/home/${USER_NAME}/hadoop" \
+  -v "${HOME}/.m2:/home/${USER_NAME}/.m2${V_OPTS:-}" \
+  -u "${USER_NAME}" \
   "hadoop-build-${USER_ID}" "$@"
