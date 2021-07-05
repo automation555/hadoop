@@ -62,6 +62,7 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.protocol.ClientProtocol;
 import org.apache.hadoop.mapreduce.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.mapreduce.util.MRResourceUtil;
 import org.apache.hadoop.mapreduce.v2.LogParams;
 import org.apache.hadoop.mapreduce.v2.api.MRClientProtocol;
 import org.apache.hadoop.mapreduce.v2.api.protocolrecords.GetDelegationTokenRequest;
@@ -94,14 +95,13 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenSelector;
-import org.apache.hadoop.yarn.util.Apps;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * This class enables the current JobClient (0.22 hadoop) to run on YARN.
@@ -407,10 +407,7 @@ public class YARNRunner implements ClientProtocol {
       FileContext fccc =
           FileContext.getFileContext(jobJarPath.toUri(), jobConf);
       LocalResourceVisibility jobJarViz =
-          jobConf.getBoolean(MRJobConfig.JOBJAR_VISIBILITY,
-              MRJobConfig.JOBJAR_VISIBILITY_DEFAULT)
-                  ? LocalResourceVisibility.PUBLIC
-                  : LocalResourceVisibility.APPLICATION;
+          MRResourceUtil.getJobJarYarnLocalVisibility(conf);
       LocalResource rc = createApplicationResource(
           FileContext.getFileContext(jobJarPath.toUri(), jobConf), jobJarPath,
           MRJobConfig.JOB_JAR, LocalResourceType.PATTERN, jobJarViz,
@@ -900,7 +897,9 @@ public class YARNRunner implements ClientProtocol {
     } catch (YarnException e) {
       throw new IOException(e);
     }
-    if (Apps.isApplicationFinalState(application.getYarnApplicationState())) {
+    if (application.getYarnApplicationState() == YarnApplicationState.FINISHED
+        || application.getYarnApplicationState() == YarnApplicationState.FAILED
+        || application.getYarnApplicationState() == YarnApplicationState.KILLED) {
       return;
     }
     killApplication(appId);
