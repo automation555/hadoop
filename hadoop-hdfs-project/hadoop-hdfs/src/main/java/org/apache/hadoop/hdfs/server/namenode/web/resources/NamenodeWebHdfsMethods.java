@@ -28,6 +28,7 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.security.Principal;
 import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Base64.Encoder;
 import java.util.EnumSet;
@@ -86,7 +87,6 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
-import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
@@ -112,11 +112,11 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 import com.sun.jersey.spi.container.ResourceFilters;
 
 /** Web-hdfs NameNode implementation. */
@@ -733,6 +733,15 @@ public class NamenodeWebHdfsMethods {
         return Response.ok().type(MediaType.APPLICATION_OCTET_STREAM).build();
       }
     }
+    case BATCH_RENAME:
+    {
+      validateOpParams(op, destination);
+      final EnumSet<Options.Rename> s = renameOptions.getValue();
+      cp.batchRename(Arrays.asList(fullpath.split(":")),
+          Arrays.asList(destination.getValue().split(":")),
+          s.toArray(new Options.Rename[s.size()]));
+      return Response.ok().type(MediaType.APPLICATION_OCTET_STREAM).build();
+    }
     case SETREPLICATION:
     {
       final boolean b = cp.setReplication(fullpath, replication.getValue(conf));
@@ -1339,12 +1348,6 @@ public class NamenodeWebHdfsMethods {
       SnapshottableDirectoryStatus[] snapshottableDirectoryList =
           cp.getSnapshottableDirListing();
       final String js = JsonUtil.toJsonString(snapshottableDirectoryList);
-      return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
-    }
-    case GETSNAPSHOTLIST: {
-      SnapshotStatus[] snapshotList =
-          cp.getSnapshotListing(fullpath);
-      final String js = JsonUtil.toJsonString(snapshotList);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
     default:

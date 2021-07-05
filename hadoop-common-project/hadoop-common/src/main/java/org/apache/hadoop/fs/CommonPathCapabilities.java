@@ -139,11 +139,11 @@ public final class CommonPathCapabilities {
   public static final String FS_MULTIPART_UPLOADER =
       "fs.capability.multipart.uploader";
 
-
   /**
-   * Stream abort() capability implemented by {@link Abortable#abort()}.
+   * Does the store support batch rename?
    * Value: {@value}.
    */
-  public static final String ABORTABLE_STREAM =
-      "fs.capability.outputstream.abortable";
+  public static final String FS_BATCH_RENAME =
+      "fs.capability.batch.rename";
+
 }

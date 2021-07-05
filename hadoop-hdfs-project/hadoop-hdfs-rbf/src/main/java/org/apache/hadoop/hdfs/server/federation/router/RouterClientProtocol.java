@@ -97,7 +97,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -126,7 +126,6 @@ public class RouterClientProtocol implements ClientProtocol {
 
   private final RouterRpcServer rpcServer;
   private final RouterRpcClient rpcClient;
-  private final RouterFederationRename rbfRename;
   private final FileSubclusterResolver subclusterResolver;
   private final ActiveNamenodeResolver namenodeResolver;
 
@@ -192,7 +191,6 @@ public class RouterClientProtocol implements ClientProtocol {
     this.snapshotProto = new RouterSnapshot(rpcServer);
     this.routerCacheAdmin = new RouterCacheAdmin(rpcServer);
     this.securityManager = rpcServer.getRouterSecurityManager();
-    this.rbfRename = new RouterFederationRename(rpcServer, conf);
   }
 
   @Override
@@ -290,7 +288,7 @@ public class RouterClientProtocol implements ClientProtocol {
         rpcServer.getLocationsForPath(src, true);
     RemoteLocation createLocation = null;
     try {
-      createLocation = rpcServer.getCreateLocation(src, locations);
+      createLocation = rpcServer.getCreateLocation(src);
       return rpcClient.invokeSingle(createLocation, method,
           HdfsFileStatus.class);
     } catch (IOException ioe) {
@@ -308,7 +306,7 @@ public class RouterClientProtocol implements ClientProtocol {
    * @return If caused by an unavailable subcluster. False if the should not be
    *         retried (e.g., NSQuotaExceededException).
    */
-  protected static boolean isUnavailableSubclusterException(
+  private static boolean isUnavailableSubclusterException(
       final IOException ioe) {
     if (ioe instanceof ConnectException ||
         ioe instanceof ConnectTimeoutException ||
@@ -596,13 +594,13 @@ public class RouterClientProtocol implements ClientProtocol {
 
     final List<RemoteLocation> srcLocations =
         rpcServer.getLocationsForPath(src, true, false);
-    final List<RemoteLocation> dstLocations =
-        rpcServer.getLocationsForPath(dst, false, false);
     // srcLocations may be trimmed by getRenameDestinations()
     final List<RemoteLocation> locs = new LinkedList<>(srcLocations);
-    RemoteParam dstParam = getRenameDestinations(locs, dstLocations);
+    RemoteParam dstParam = getRenameDestinations(locs, dst);
     if (locs.isEmpty()) {
-      return rbfRename.routerFedRename(src, dst, srcLocations, dstLocations);
+      throw new IOException(
+          "Rename of " + src + " to " + dst + " is not allowed," +
+              " no eligible destination in the same namespace was found.");
     }
     RemoteMethod method = new RemoteMethod("rename",
         new Class<?>[] {String.class, String.class},
@@ -622,14 +620,13 @@ public class RouterClientProtocol implements ClientProtocol {
 
     final List<RemoteLocation> srcLocations =
         rpcServer.getLocationsForPath(src, true, false);
-    final List<RemoteLocation> dstLocations =
-        rpcServer.getLocationsForPath(dst, false, false);
     // srcLocations may be trimmed by getRenameDestinations()
     final List<RemoteLocation> locs = new LinkedList<>(srcLocations);
-    RemoteParam dstParam = getRenameDestinations(locs, dstLocations);
+    RemoteParam dstParam = getRenameDestinations(locs, dst);
     if (locs.isEmpty()) {
-      rbfRename.routerFedRename(src, dst, srcLocations, dstLocations);
-      return;
+      throw new IOException(
+          "Rename of " + src + " to " + dst + " is not allowed," +
+              " no eligible destination in the same namespace was found.");
     }
     RemoteMethod method = new RemoteMethod("rename2",
         new Class<?>[] {String.class, String.class, options.getClass()},
@@ -639,6 +636,12 @@ public class RouterClientProtocol implements ClientProtocol {
     } else {
       rpcClient.invokeSequential(locs, method, null, null);
     }
+  }
+
+  @Override
+  public void batchRename(String[] srcs, String[] dsts,
+                          Options.Rename... options) throws IOException {
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
@@ -1183,7 +1186,7 @@ public class RouterClientProtocol implements ClientProtocol {
     rpcServer.checkOperation(NameNode.OperationCategory.UNCHECKED);
 
     RemoteMethod method = new RemoteMethod("setBalancerBandwidth",
-        new Class<?>[] {long.class}, bandwidth);
+        new Class<?>[] {Long.class}, bandwidth);
     final Set<FederationNamespaceInfo> nss = namenodeResolver.getNamespaces();
     rpcClient.invokeConcurrent(nss, method, true, false);
   }
@@ -1802,11 +1805,10 @@ public class RouterClientProtocol implements ClientProtocol {
   }
 
   @Override
-  public HAServiceProtocol.HAServiceState getHAServiceState() {
-    if (rpcServer.isSafeMode()) {
-      return HAServiceProtocol.HAServiceState.STANDBY;
-    }
-    return HAServiceProtocol.HAServiceState.ACTIVE;
+  public HAServiceProtocol.HAServiceState getHAServiceState()
+      throws IOException {
+    rpcServer.checkOperation(NameNode.OperationCategory.READ, false);
+    return null;
   }
 
   /**
@@ -1824,9 +1826,11 @@ public class RouterClientProtocol implements ClientProtocol {
    * @throws IOException If the dst paths could not be determined.
    */
   private RemoteParam getRenameDestinations(
-      final List<RemoteLocation> srcLocations,
-      final List<RemoteLocation> dstLocations) throws IOException {
+      final List<RemoteLocation> srcLocations, final String dst)
+      throws IOException {
 
+    final List<RemoteLocation> dstLocations =
+        rpcServer.getLocationsForPath(dst, false, false);
     final Map<RemoteLocation, String> dstMap = new HashMap<>();
 
     Iterator<RemoteLocation> iterator = srcLocations.iterator();
@@ -1865,8 +1869,6 @@ public class RouterClientProtocol implements ClientProtocol {
 
   /**
    * Aggregate content summaries for each subcluster.
-   * If the mount point has multiple destinations
-   * add the quota set value only once.
    *
    * @param summaries Collection of individual summaries.
    * @return Aggregated content summary.
@@ -1889,9 +1891,9 @@ public class RouterClientProtocol implements ClientProtocol {
       length += summary.getLength();
       fileCount += summary.getFileCount();
       directoryCount += summary.getDirectoryCount();
-      quota = summary.getQuota();
+      quota += summary.getQuota();
       spaceConsumed += summary.getSpaceConsumed();
-      spaceQuota = summary.getSpaceQuota();
+      spaceQuota += summary.getSpaceQuota();
       // We return from the first response as we assume that the EC policy
       // of each sub-cluster is same.
       if (ecPolicy.isEmpty()) {
@@ -1985,8 +1987,7 @@ public class RouterClientProtocol implements ClientProtocol {
    * @param date Map with the dates.
    * @return New HDFS file status representing a mount point.
    */
-  @VisibleForTesting
-  HdfsFileStatus getMountPointStatus(
+  private HdfsFileStatus getMountPointStatus(
       String name, int childrenNum, long date) {
     long modTime = date;
     long accessTime = date;
@@ -2037,8 +2038,6 @@ public class RouterClientProtocol implements ClientProtocol {
       }
     }
     long inodeId = 0;
-    Path path = new Path(name);
-    String nameStr = path.getName();
     return new HdfsFileStatus.Builder()
         .isdir(true)
         .mtime(modTime)
@@ -2047,7 +2046,7 @@ public class RouterClientProtocol implements ClientProtocol {
         .owner(owner)
         .group(group)
         .symlink(new byte[0])
-        .path(DFSUtil.string2Bytes(nameStr))
+        .path(DFSUtil.string2Bytes(name))
         .fileId(inodeId)
         .children(childrenNum)
         .flags(flags)
@@ -2203,9 +2202,5 @@ public class RouterClientProtocol implements ClientProtocol {
       LOG.debug("The destination {} is a symlink.", src);
     }
     return false;
-  }
-
-  public int getRouterFederationRenameCount() {
-    return rbfRename.getRouterFederationRenameCount();
   }
 }
