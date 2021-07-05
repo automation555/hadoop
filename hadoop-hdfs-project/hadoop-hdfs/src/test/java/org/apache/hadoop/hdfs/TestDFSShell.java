@@ -34,12 +34,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
+import com.google.common.collect.Lists;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.log4j.Level;
 import org.junit.Test;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
@@ -71,7 +72,6 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Assert;
-import org.slf4j.event.Level;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
@@ -117,7 +117,7 @@ public class TestDFSShell {
         GenericTestUtils.getTestDir("TestDFSShell").getAbsolutePath());
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
-    conf.setLong(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 120000);
+    conf.setLong(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 1000);
 
     miniCluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     miniCluster.waitActive();
@@ -1468,9 +1468,6 @@ public class TestDFSShell {
 
     runCmd(shell, "-chgrp", "hadoop-core@apache.org/100", file);
     confirmOwner(null, "hadoop-core@apache.org/100", fs, path);
-
-    runCmd(shell, "-chown", "MYCOMPANY+user.name:hadoop", file);
-    confirmOwner("MYCOMPANY+user.name", "hadoop", fs, path);
   }
 
   /**
@@ -1962,7 +1959,7 @@ public class TestDFSShell {
 
   @Test (timeout = 30000)
   public void testGet() throws IOException {
-    GenericTestUtils.setLogLevel(FSInputChecker.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(FSInputChecker.LOG, Level.ALL);
 
     final String fname = "testGet.txt";
     Path root = new Path("/test/get");
@@ -2184,6 +2181,19 @@ public class TestDFSShell {
     }
     System.out.println("results:\n" + results);
     return results;
+  }
+
+  @Test
+  public void testLsInodeId() throws Exception {
+    dfs.mkdirs(new Path("/d1/d2"));
+    dfs.mkdirs(new Path("/d4/d5"));
+    final File f3 = createLocalFile(new File(TEST_ROOT_DIR, "f3"));
+    dfs.moveFromLocalFile(new Path(f3.getPath()), new Path("/d1/d2"));
+
+    FsShell shell = new FsShell(dfs.getConf());
+    // Check return value
+    assertThat(shell.run(new String[]{"-ls", "-i", "/"}), is(0));
+    assertThat(shell.run(new String[]{"-ls", "-i", "-R", "/"}), is(0));
   }
 
   /**
