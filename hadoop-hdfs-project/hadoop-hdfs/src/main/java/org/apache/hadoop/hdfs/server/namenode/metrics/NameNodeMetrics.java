@@ -87,8 +87,19 @@ public class NameNodeMetrics {
   MutableGaugeInt blockOpsQueued;
   @Metric("Number of blockReports and blockReceivedAndDeleted batch processed")
   MutableCounterLong blockOpsBatched;
-  @Metric("Number of pending edits")
-  MutableGaugeInt pendingEditsCount;
+  @Metric("Number of snapshot GC runs")
+  MutableCounterLong numSnapshotGcRun;
+  @Metric("Number of empty snapshot GC runs")
+  MutableCounterLong numSnapshotGcRunEmpty;
+  @Metric("Number of successful snapshot GC runs")
+  MutableCounterLong numSnapshotGcRunSuccess;
+  @Metric("Number of total snapshot delete operations")
+  MutableCounterLong numSnapshotTotalDeleteOp;
+  @Metric("Number of out-of-order snapshot delete operations")
+  MutableCounterLong numSnapshotOutOfOrderDeleteOp;
+  @Metric("Number of in-order snapshot delete operations")
+  MutableCounterLong numSnapshotInOrderDeleteOp;
+
 
   @Metric("Number of file system operations")
   public long totalFileOps(){
@@ -345,10 +356,6 @@ public class NameNodeMetrics {
     blockOpsBatched.incr(count);
   }
 
-  public void setPendingEditsCount(int size) {
-    pendingEditsCount.set(size);
-  }
-
   public void addTransaction(long latency) {
     transactions.add(latency);
   }
@@ -465,4 +472,23 @@ public class NameNodeMetrics {
       q.add(elapsed);
     }
   }
+  public void incrNumSnapshotDelete() {
+    numSnapshotTotalDeleteOp.incr();
+  }
+  public void incrOutOfOrderSnapshotDelete() {
+    numSnapshotOutOfOrderDeleteOp.incr();
+  }
+  public void incrInOrderSnapshotDelete() {
+    numSnapshotInOrderDeleteOp.incr();
+  }
+  public void incrNumSnapshotGcRun() {
+    numSnapshotGcRun.incr();
+  }
+  public void incrNumSnapshotSuccessGcRun() {
+    numSnapshotGcRunSuccess.incr();
+  }
+  public void incrNumSnapshoteEmptyGcRun() {
+    numSnapshotGcRunEmpty.incr();
+  }
+
 }
