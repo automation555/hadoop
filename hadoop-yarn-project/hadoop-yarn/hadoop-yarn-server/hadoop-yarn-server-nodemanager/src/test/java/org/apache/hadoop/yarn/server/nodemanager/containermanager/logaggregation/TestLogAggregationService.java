@@ -18,15 +18,9 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregation;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -58,7 +52,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -80,7 +73,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
@@ -99,7 +91,6 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.URL;
-import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.Event;
@@ -137,7 +128,6 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.Tes
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppFinishedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerAppStartedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerContainerFinishedEvent;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event.LogHandlerTokenUpdatedEvent;
 import org.apache.hadoop.yarn.server.nodemanager.executor.DeletionAsUserContext;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -148,13 +138,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.eclipse.jetty.util.MultiException;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 import org.slf4j.LoggerFactory;
 
 public class TestLogAggregationService extends BaseContainerManagerTest {
 
   private Map<ApplicationAccessType, String> acls = createAppAcls();
-  private static final String[] EMPTY_FILES = new String[] {"zero"};
   
   static {
     LOG = LoggerFactory.getLogger(TestLogAggregationService.class);
@@ -221,7 +210,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     ContainerId container11 = ContainerId.newContainerId(appAttemptId, 1);
     // Simulate log-file creation
     writeContainerLogs(app1LogDir, container11, new String[] { "stdout",
-        "stderr", "syslog" }, EMPTY_FILES);
+        "stderr", "syslog" });
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container11,
             ContainerType.APPLICATION_MASTER, 0));
@@ -234,31 +223,64 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     // ensure filesystems were closed
     verify(logAggregationService).closeFileSystems(
         any(UserGroupInformation.class));
-    List<Path> dirList = new ArrayList<>();
-    dirList.add(new Path(app1LogDir.toURI()));
-    verify(delSrvc, times(2)).delete(argThat(new FileDeletionMatcher(
-        delSrvc, user, null, dirList)));
-    
-    String containerIdStr = container11.toString();
-    File containerLogDir = new File(app1LogDir, containerIdStr);
-    int count = 0;
-    int maxAttempts = 50;
-    for (String fileType : new String[] { "stdout", "stderr", "syslog" }) {
-      File f = new File(containerLogDir, fileType);
+    boolean filesShouldBeDeleted =
+      this.conf.getBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLE_LOCAL_CLEANUP,
+        YarnConfiguration.DEFAULT_LOG_AGGREGATION_ENABLE_LOCAL_CLEANUP);
+    if (filesShouldBeDeleted) {
+      List<Path> dirList = new ArrayList<>();
+      dirList.add(new Path(app1LogDir.toURI()));
+      verify(delSrvc, times(2)).delete(argThat(new FileDeletionMatcher(
+          delSrvc, user, null, dirList)));
+
+      String containerIdStr = container11.toString();
+      File containerLogDir = new File(app1LogDir, containerIdStr);
+      int count = 0;
+      int maxAttempts = 50;
+      for (String fileType : new String[]{"stdout", "stderr", "syslog"}) {
+        File f = new File(containerLogDir, fileType);
+        count = 0;
+        while ((f.exists()) && (count < maxAttempts)) {
+          count++;
+          Thread.sleep(100);
+        }
+        Assert.assertFalse("File [" + f + "] was not deleted", f.exists());
+      }
       count = 0;
-      while ((f.exists()) && (count < maxAttempts)) {
+      while ((app1LogDir.exists()) && (count < maxAttempts)) {
         count++;
         Thread.sleep(100);
       }
-      Assert.assertFalse("File [" + f + "] was not deleted", f.exists());
+      Assert.assertFalse("Directory [" + app1LogDir + "] was not deleted",
+          app1LogDir.exists());
+    } else {
+      List<Path> dirList = new ArrayList<>();
+      dirList.add(new Path(app1LogDir.toURI()));
+      verify(delSrvc, never()).delete(argThat(new FileDeletionMatcher(
+          delSrvc, user, null, dirList)));
+
+      String containerIdStr = container11.toString();
+      File containerLogDir = new File(app1LogDir, containerIdStr);
+      int count = 0;
+      int maxAttempts = 50;
+      for (String fileType : new String[]{"stdout", "stderr", "syslog"}) {
+        File f = new File(containerLogDir, fileType);
+        count = 0;
+        while ((f.exists()) && (count < maxAttempts)) {
+          count++;
+          Thread.sleep(100);
+        }
+        Assert.assertTrue("File [" + f + "] was not deleted", f.exists());
+      }
+      count = 0;
+      while ((app1LogDir.exists()) && (count < maxAttempts)) {
+        count++;
+        Thread.sleep(100);
+      }
+      Assert.assertTrue("Directory [" + app1LogDir + "] was not deleted",
+          app1LogDir.exists());
     }
-    count = 0;
-    while ((app1LogDir.exists()) && (count < maxAttempts)) {
-      count++;
-      Thread.sleep(100);
-    }
-    Assert.assertFalse("Directory [" + app1LogDir + "] was not deleted",
-      app1LogDir.exists());
+
+    delSrvc.stop();
 
     Path logFilePath = logAggregationService
         .getLogAggregationFileController(conf)
@@ -294,6 +316,20 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     LogAggregationService logAggregationService = spy(
         new LogAggregationService(dispatcher, this.context, this.delSrvc,
                                   super.dirsHandler));
+    verifyLocalFileDeletion(logAggregationService);
+  }
+
+  @Test
+  public void testLocalFileRemainsAfterUploadOnCleanupDisable() throws Exception {
+    this.delSrvc = new DeletionService(createContainerExecutor());
+    delSrvc = spy(delSrvc);
+    this.delSrvc.init(conf);
+    this.conf.setBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLE_LOCAL_CLEANUP, false);
+    this.conf.set(YarnConfiguration.NM_LOG_DIRS, localLogDir.getAbsolutePath());
+    this.conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
+    this.remoteRootLogDir.getAbsolutePath());
+    LogAggregationService logAggregationService = spy(
+    new LogAggregationService(dispatcher, this.context, this.delSrvc, super.dirsHandler));
     verifyLocalFileDeletion(logAggregationService);
   }
 
@@ -344,7 +380,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
         BuilderUtils.newApplicationAttemptId(app, 1);
     ContainerId cont = ContainerId.newContainerId(appAttemptId, 1);
     writeContainerLogs(appLogDir, cont, new String[] { "stdout",
-        "stderr", "syslog" }, EMPTY_FILES);
+        "stderr", "syslog" });
     logAggregationService.handle(new LogHandlerContainerFinishedEvent(cont,
         ContainerType.APPLICATION_MASTER, 0));
     logAggregationService.handle(new LogHandlerAppFinishedEvent(app));
@@ -434,7 +470,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     ContainerId container11 = ContainerId.newContainerId(appAttemptId1, 1);
 
     // Simulate log-file creation
-    writeContainerLogs(app1LogDir, container11, fileNames, EMPTY_FILES);
+    writeContainerLogs(app1LogDir, container11, fileNames);
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container11,
             ContainerType.APPLICATION_MASTER, 0));
@@ -456,14 +492,14 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     ContainerId container21 = ContainerId.newContainerId(appAttemptId2, 1);
 
-    writeContainerLogs(app2LogDir, container21, fileNames, EMPTY_FILES);
+    writeContainerLogs(app2LogDir, container21, fileNames);
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container21,
             ContainerType.APPLICATION_MASTER, 0));
 
     ContainerId container12 = ContainerId.newContainerId(appAttemptId1, 2);
 
-    writeContainerLogs(app1LogDir, container12, fileNames, EMPTY_FILES);
+    writeContainerLogs(app1LogDir, container12, fileNames);
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container12,
             ContainerType.TASK, 0));
@@ -499,25 +535,25 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     reset(appEventHandler);
     
     ContainerId container31 = ContainerId.newContainerId(appAttemptId3, 1);
-    writeContainerLogs(app3LogDir, container31, fileNames, EMPTY_FILES);
+    writeContainerLogs(app3LogDir, container31, fileNames);
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container31,
             ContainerType.APPLICATION_MASTER, 0));
 
     ContainerId container32 = ContainerId.newContainerId(appAttemptId3, 2);
-    writeContainerLogs(app3LogDir, container32, fileNames, EMPTY_FILES);
+    writeContainerLogs(app3LogDir, container32, fileNames);
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container32,
             ContainerType.TASK, 1)); // Failed
 
     ContainerId container22 = ContainerId.newContainerId(appAttemptId2, 2);
-    writeContainerLogs(app2LogDir, container22, fileNames, EMPTY_FILES);
+    writeContainerLogs(app2LogDir, container22, fileNames);
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container22,
             ContainerType.TASK, 0));
 
     ContainerId container33 = ContainerId.newContainerId(appAttemptId3, 3);
-    writeContainerLogs(app3LogDir, container33, fileNames, EMPTY_FILES);
+    writeContainerLogs(app3LogDir, container33, fileNames);
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container33,
             ContainerType.TASK, 0));
@@ -533,15 +569,13 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     assertEquals(0, logAggregationService.getNumAggregators());
 
     verifyContainerLogs(logAggregationService, application1,
-        new ContainerId[] {container11, container12}, fileNames, 4, false,
-        EMPTY_FILES);
+        new ContainerId[] { container11, container12 }, fileNames, 3, false);
 
     verifyContainerLogs(logAggregationService, application2,
-        new ContainerId[] {container21}, fileNames, 4, false, EMPTY_FILES);
+        new ContainerId[] { container21 }, fileNames, 3, false);
 
     verifyContainerLogs(logAggregationService, application3,
-        new ContainerId[] {container31, container32}, fileNames, 4, false,
-        EMPTY_FILES);
+        new ContainerId[] { container31, container32 }, fileNames, 3, false);
     
     dispatcher.await();
     
@@ -697,15 +731,14 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     logAggregationService.stop();
   }
 
-
   @Test
   public void testAppLogDirCreation() throws Exception {
-    final String inputSuffix = "logs-tfile";
+    final String logSuffix = "logs";
     this.conf.set(YarnConfiguration.NM_LOG_DIRS,
         localLogDir.getAbsolutePath());
     this.conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
         this.remoteRootLogDir.getAbsolutePath());
-    this.conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, "logs");
+    this.conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, logSuffix);
 
     InlineDispatcher dispatcher = new InlineDispatcher();
     dispatcher.init(this.conf);
@@ -738,13 +771,8 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     ApplicationId appId = BuilderUtils.newApplicationId(1, 1);
     Path userDir = fs.makeQualified(new Path(
         remoteRootLogDir.getAbsolutePath(), this.user));
-    Path bucketDir = fs.makeQualified(LogAggregationUtils.getRemoteBucketDir(
-        new Path(remoteRootLogDir.getAbsolutePath()),
-            this.user, inputSuffix, appId));
-    Path suffixDir = bucketDir.getParent();
-    Path appDir = fs.makeQualified(LogAggregationUtils.getRemoteAppLogDir(
-        new Path(remoteRootLogDir.getAbsolutePath()), appId,
-            this.user, inputSuffix));
+    Path suffixDir = new Path(userDir, logSuffix);
+    Path appDir = new Path(suffixDir, appId.toString());
     LogAggregationContext contextWithAllContainers =
         Records.newRecord(LogAggregationContext.class);
     contextWithAllContainers.setLogAggregationPolicyClassName(
@@ -753,43 +781,23 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
         this.acls, contextWithAllContainers));
     verify(spyFs).mkdirs(eq(userDir), isA(FsPermission.class));
     verify(spyFs).mkdirs(eq(suffixDir), isA(FsPermission.class));
-    verify(spyFs).mkdirs(eq(bucketDir), isA(FsPermission.class));
     verify(spyFs).mkdirs(eq(appDir), isA(FsPermission.class));
 
     // start another application and verify only app dir created
     ApplicationId appId2 = BuilderUtils.newApplicationId(1, 2);
-    Path appDir2 = fs.makeQualified(LogAggregationUtils.getRemoteAppLogDir(
-        new Path(remoteRootLogDir.getAbsolutePath()),
-            appId2, this.user, inputSuffix));
+    Path appDir2 = new Path(suffixDir, appId2.toString());
     aggSvc.handle(new LogHandlerAppStartedEvent(appId2, this.user, null,
         this.acls, contextWithAllContainers));
     verify(spyFs).mkdirs(eq(appDir2), isA(FsPermission.class));
 
     // start another application with the app dir already created and verify
     // we do not try to create it again
-    ApplicationId appId3 = BuilderUtils.newApplicationId(2, 2);
-    Path appDir3 = fs.makeQualified(LogAggregationUtils.getRemoteAppLogDir(
-        new Path(remoteRootLogDir.getAbsolutePath()),
-            appId3, this.user, inputSuffix));
+    ApplicationId appId3 = BuilderUtils.newApplicationId(1, 3);
+    Path appDir3 = new Path(suffixDir, appId3.toString());
     new File(appDir3.toUri().getPath()).mkdir();
     aggSvc.handle(new LogHandlerAppStartedEvent(appId3, this.user, null,
         this.acls, contextWithAllContainers));
     verify(spyFs, never()).mkdirs(eq(appDir3), isA(FsPermission.class));
-
-
-    // Verify we do not create bucket dir again
-    ApplicationId appId4 = BuilderUtils.newApplicationId(2, 10003);
-    Path appDir4 = fs.makeQualified(LogAggregationUtils.getRemoteAppLogDir(
-            new Path(remoteRootLogDir.getAbsolutePath()),
-            appId4, this.user, inputSuffix));
-    Path bucketDir4 = appDir4.getParent();
-    new File(bucketDir4.toUri().getPath()).mkdir();
-
-    aggSvc.handle(new LogHandlerAppStartedEvent(appId4, this.user, null,
-        this.acls, contextWithAllContainers));
-    verify(spyFs, never()).mkdirs(eq(bucketDir4), isA(FsPermission.class));
-    verify(spyFs).mkdirs(eq(appDir4), isA(FsPermission.class));
-
     aggSvc.stop();
     aggSvc.close();
     dispatcher.stop();
@@ -815,7 +823,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
           (int) (Math.random() * 1000));
     doThrow(new YarnRuntimeException("KABOOM!"))
       .when(logAggregationService).initAppAggregator(
-          eq(appId), eq(user), any(),
+          eq(appId), eq(user), any(Credentials.class),
           anyMap(), any(LogAggregationContext.class), anyLong());
     LogAggregationContext contextWithAMAndFailed =
         Records.newRecord(LogAggregationContext.class);
@@ -862,8 +870,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
         .getFileControllerForWrite();
     LogAggregationFileController spyLogAggregationFileFormat =
         spy(logAggregationFileFormat);
-    Exception e =
-        new YarnRuntimeException(new SecretManager.InvalidToken("KABOOM!"));
+    Exception e = new RuntimeException("KABOOM!");
     doThrow(e).when(spyLogAggregationFileFormat)
         .createAppDir(any(String.class), any(ApplicationId.class),
             any(UserGroupInformation.class));
@@ -902,44 +909,33 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     };
     checkEvents(appEventHandler, expectedEvents, false,
         "getType", "getApplicationID", "getDiagnostic");
-    assertThat(logAggregationService.getInvalidTokenApps()).hasSize(1);
+
     // verify trying to collect logs for containers/apps we don't know about
     // doesn't blow up and tear down the NM
     logAggregationService.handle(new LogHandlerContainerFinishedEvent(
         BuilderUtils.newContainerId(4, 1, 1, 1),
         ContainerType.APPLICATION_MASTER, 0));
     dispatcher.await();
-
-    AppLogAggregator appAgg =
-        logAggregationService.getAppLogAggregators().get(appId);
-    Assert.assertFalse("Aggregation should be disabled",
-        appAgg.isAggregationEnabled());
-
-    // Enabled aggregation
-    logAggregationService.handle(new LogHandlerTokenUpdatedEvent());
-    dispatcher.await();
-
-    appAgg =
-        logAggregationService.getAppLogAggregators().get(appId);
-    Assert.assertFalse("Aggregation should be enabled",
-        appAgg.isAggregationEnabled());
-
-    // Check disabled apps are cleared
-    Assert.assertEquals(0, logAggregationService.getInvalidTokenApps().size());
-
     logAggregationService.handle(new LogHandlerAppFinishedEvent(
         BuilderUtils.newApplicationId(1, 5)));
     dispatcher.await();
 
     logAggregationService.stop();
     assertEquals(0, logAggregationService.getNumAggregators());
-    verify(spyDelSrvc).delete(any(FileDeletionTask.class));
+    // local log dir shouldn't be deleted given log aggregation cannot
+    // continue due to aggregated log dir creation failure on remoteFS.
+    FileDeletionTask deletionTask = new FileDeletionTask(spyDelSrvc, user,
+        null, null);
+    verify(spyDelSrvc, never()).delete(deletionTask);
     verify(logAggregationService).closeFileSystems(
         any(UserGroupInformation.class));
+    // make sure local log dir is not deleted in case log aggregation
+    // service cannot be initiated.
+    assertTrue(appLogDir.exists());
   }
 
   private void writeContainerLogs(File appLogDir, ContainerId containerId,
-      String[] fileName, String[] emptyFiles) throws IOException {
+      String[] fileName) throws IOException {
     // ContainerLogDir should be created
     String containerStr = containerId.toString();
     File containerLogDir = new File(appLogDir, containerStr);
@@ -951,22 +947,17 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
       writer11.write(containerStr + " Hello " + fileType + "!");
       writer11.close();
     }
-    for (String emptyFile : emptyFiles) {
-      Writer writer11 = new FileWriter(new File(containerLogDir, emptyFile));
-      writer11.write("");
-      writer11.close();
-    }
   }
 
   private LogFileStatusInLastCycle verifyContainerLogs(
       LogAggregationService logAggregationService,
       ApplicationId appId, ContainerId[] expectedContainerIds,
       String[] logFiles, int numOfLogsPerContainer,
-      boolean multiLogs, String[] zeroLengthFiles) throws IOException {
+      boolean multiLogs) throws IOException {
     return verifyContainerLogs(logAggregationService, appId,
         expectedContainerIds, expectedContainerIds.length,
         expectedContainerIds.length, logFiles, numOfLogsPerContainer,
-        multiLogs, zeroLengthFiles);
+        multiLogs);
   }
 
   // expectedContainerIds is the minimal set of containers to check.
@@ -977,8 +968,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
       LogAggregationService logAggregationService,
       ApplicationId appId, ContainerId[] expectedContainerIds,
       int minNumOfContainers, int maxNumOfContainers,
-      String[] logFiles, int numOfLogsPerContainer, boolean multiLogs,
-      String[] zeroLengthLogFiles)
+      String[] logFiles, int numOfLogsPerContainer, boolean multiLogs)
     throws IOException {
     Path appLogDir = logAggregationService.getLogAggregationFileController(
         conf).getRemoteAppLogDir(appId, this.user);
@@ -1097,11 +1087,6 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
           String foundValue = thisContainerMap.remove(fileType);
           Assert.assertNotNull(cId + " " + fileType
               + " not present in aggregated log-file!", foundValue);
-          Assert.assertEquals(expectedValue, foundValue);
-        }
-        for (String emptyFile : zeroLengthLogFiles) {
-          String foundValue = thisContainerMap.remove(emptyFile);
-          String expectedValue = "\nEnd of LogType:" + emptyFile;
           Assert.assertEquals(expectedValue, foundValue);
         }
         Assert.assertEquals(0, thisContainerMap.size());
@@ -1231,23 +1216,20 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     ExecutorService executorService = logAggregationService.threadPool;
 
-    CountDownLatch latch = new CountDownLatch(threadPoolSize);
-
     // used to block threads in the thread pool because main thread always
     // acquires the write lock first.
     final ReadWriteLock rwLock = new ReentrantReadWriteLock();
     final Lock rLock = rwLock.readLock();
     final Lock wLock = rwLock.writeLock();
 
-    wLock.lock();
     try {
+      wLock.lock();
       Runnable runnable = new Runnable() {
         @Override
         public void run() {
           try {
-            latch.countDown();
             // threads in the thread pool running this will be blocked
-            rLock.tryLock(15000, TimeUnit.MILLISECONDS);
+            rLock.tryLock(35000, TimeUnit.MILLISECONDS);
           } catch (InterruptedException e) {
             e.printStackTrace();
           } finally {
@@ -1263,7 +1245,6 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
         executorService.submit(runnable);
       }
 
-      latch.await();
       // count the number of current running LogAggregationService threads
       int runningThread = ((ThreadPoolExecutor) executorService).getActiveCount();
       assertEquals(threadPoolSize, runningThread);
@@ -1599,7 +1580,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     // Simulate log-file creation
     writeContainerLogs(appLogDir1, container1, new String[] { "stdout",
-        "stderr", "syslog" }, EMPTY_FILES);
+        "stderr", "syslog" });
     logAggregationService.handle(new LogHandlerContainerFinishedEvent(
         container1, ContainerType.APPLICATION_MASTER, 0));
 
@@ -1620,7 +1601,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     ContainerId container2 = ContainerId.newContainerId(appAttemptId2, 1);
 
     writeContainerLogs(app2LogDir, container2, new String[] { "stdout",
-        "stderr", "syslog" }, EMPTY_FILES);
+        "stderr", "syslog" });
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container2,
             ContainerType.APPLICATION_MASTER, 0));
@@ -1644,7 +1625,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
       this.user, null, this.acls, context1));
     ContainerId container3 = ContainerId.newContainerId(appAttemptId3, 1);
     writeContainerLogs(app3LogDir, container3, new String[] { "stdout",
-        "sys.log", "std.log", "out.log", "err.log", "log" }, EMPTY_FILES);
+        "sys.log", "std.log", "out.log", "err.log", "log" });
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container3,
             ContainerType.APPLICATION_MASTER, 0));
@@ -1669,7 +1650,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
       this.user, null, this.acls, context2));
     ContainerId container4 = ContainerId.newContainerId(appAttemptId4, 1);
     writeContainerLogs(app4LogDir, container4, new String[] { "stdout",
-        "sys.log", "std.log", "out.log", "err.log", "log" }, EMPTY_FILES);
+        "sys.log", "std.log", "out.log", "err.log", "log" });
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container4,
             ContainerType.APPLICATION_MASTER, 0));
@@ -1697,19 +1678,19 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     String[] logFiles = new String[] { "stdout", "syslog" };
     verifyContainerLogs(logAggregationService, application1,
-        new ContainerId[] {container1}, logFiles, 2, false, new String[] {});
+      new ContainerId[] { container1 }, logFiles, 2, false);
 
     logFiles = new String[] { "stderr" };
     verifyContainerLogs(logAggregationService, application2,
-        new ContainerId[] {container2}, logFiles, 2, false, EMPTY_FILES);
+      new ContainerId[] { container2 }, logFiles, 1, false);
 
     logFiles = new String[] { "out.log", "err.log" };
     verifyContainerLogs(logAggregationService, application3,
-        new ContainerId[] {container3}, logFiles, 2, false, new String[] {});
+      new ContainerId[] { container3 }, logFiles, 2, false);
 
     logFiles = new String[] { "sys.log" };
     verifyContainerLogs(logAggregationService, application4,
-        new ContainerId[] {container4}, logFiles, 1, false, new String[] {});
+      new ContainerId[] { container4 }, logFiles, 1, false);
 
     dispatcher.await();
 
@@ -1736,8 +1717,8 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     // When the app is running, we only aggregate the log with
     // the name stdout. After the app finishes, we only aggregate
     // the log with the name std_final.
-    logAggregationContext.setRolledLogsIncludePattern("stdout|zero");
-    logAggregationContext.setIncludePattern("std_final|empty_final");
+    logAggregationContext.setRolledLogsIncludePattern("stdout");
+    logAggregationContext.setIncludePattern("std_final");
     this.conf.set(
         YarnConfiguration.NM_LOG_DIRS, localLogDir.getAbsolutePath());
     //configure YarnConfiguration.NM_REMOTE_APP_LOG_DIR to
@@ -1782,8 +1763,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     // until the app finishes.
     String[] logFilesWithFinalLog =
         new String[] {"stdout", "std_final"};
-    String[] zeroFiles = new String[] {"zero", "empty_final"};
-    writeContainerLogs(appLogDir, container, logFilesWithFinalLog, zeroFiles);
+    writeContainerLogs(appLogDir, container, logFilesWithFinalLog);
 
     // Do log aggregation
     AppLogAggregatorImpl aggregator =
@@ -1797,7 +1777,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     String[] logFiles = new String[] { "stdout" };
     verifyContainerLogs(logAggregationService, application,
-        new ContainerId[] {container}, logFiles, 2, true, EMPTY_FILES);
+        new ContainerId[] {container}, logFiles, 1, true);
 
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container,
@@ -1816,9 +1796,8 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     // This container finishes.
     // The log "std_final" should be aggregated this time.
     String[] logFinalLog = new String[] {"std_final"};
-    String[] emptyFinalLog = new String[] {"empty_final"};
     verifyContainerLogs(logAggregationService, application,
-        new ContainerId[] {container}, logFinalLog, 2, true, emptyFinalLog);
+        new ContainerId[] {container}, logFinalLog, 1, true);
 
     logAggregationService.handle(new LogHandlerAppFinishedEvent(application));
 
@@ -1840,7 +1819,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     finishApplication(appId, logAggregationService);
 
     verifyContainerLogs(logAggregationService, appId,
-        new ContainerId[] {container1}, logFiles, 0, false, EMPTY_FILES);
+        new ContainerId[] {container1}, logFiles, 0, false);
 
     verifyLogAggFinishEvent(appId);
   }
@@ -1864,36 +1843,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     finishApplication(appId, logAggregationService);
 
     verifyContainerLogs(logAggregationService, appId,
-        new ContainerId[] {container1}, logFiles, 2, false, EMPTY_FILES);
-
-    verifyLogAggFinishEvent(appId);
-  }
-
-  @Test (timeout = 50000)
-  @SuppressWarnings("unchecked")
-  public void testLimitSizeContainerLogAggregationPolicy() throws Exception {
-    ApplicationId appId = createApplication();
-    LogAggregationService logAggregationService = createLogAggregationService(
-        appId, LimitSizeContainerLogAggregationPolicy.class, null);
-
-    String[] logFiles = new String[] {"stdout" };
-    // exitCode KILLED_FOR_EXCESS_LOGS
-    finishContainer(
-        appId, logAggregationService, ContainerType.APPLICATION_MASTER, 1,
-        ContainerExitStatus.KILLED_FOR_EXCESS_LOGS,
-        logFiles);
-    ContainerId container2 =
-        finishContainer(appId, logAggregationService, ContainerType.TASK, 2, 0,
-        logFiles);
-    ContainerId container3 =
-        finishContainer(appId, logAggregationService, ContainerType.TASK, 3,
-        ContainerExecutor.ExitCode.FORCE_KILLED.getExitCode(), logFiles);
-
-    finishApplication(appId, logAggregationService);
-
-    verifyContainerLogs(logAggregationService, appId,
-        new ContainerId[] {container2, container3},
-        logFiles, 2, false, EMPTY_FILES);
+        new ContainerId[] { container1 }, logFiles, 1, false);
 
     verifyLogAggFinishEvent(appId);
   }
@@ -1917,8 +1867,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     finishApplication(appId, logAggregationService);
 
     verifyContainerLogs(logAggregationService, appId,
-        new ContainerId[] {container1, container2}, logFiles, 2, false,
-        EMPTY_FILES);
+        new ContainerId[] { container1, container2 }, logFiles, 1, false);
 
     verifyLogAggFinishEvent(appId);
   }
@@ -1942,8 +1891,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     finishApplication(appId, logAggregationService);
 
     verifyContainerLogs(logAggregationService, appId,
-        new ContainerId[] {container2, container3}, logFiles, 2, false,
-        EMPTY_FILES);
+        new ContainerId[] { container2, container3 }, logFiles, 1, false);
 
     verifyLogAggFinishEvent(appId);
   }
@@ -1979,7 +1927,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     finishApplication(appId, logAggregationService);
 
     verifyContainerLogs(logAggregationService, appId,
-        new ContainerId[] {container1}, logFiles, 2, false, EMPTY_FILES);
+        new ContainerId[] { container1 }, logFiles, 1, false);
 
     verifyLogAggFinishEvent(appId);
   }
@@ -2128,7 +2076,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     verifyContainerLogs(logAggregationService, appId,
         new ContainerId[] { container1, container2, container3 },
-            logFiles, 2, false, EMPTY_FILES);
+            logFiles, 1, false);
 
     verifyLogAggFinishEvent(appId);
   }
@@ -2210,7 +2158,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     verifyContainerLogs(logAggregationService, appId,
         containerIds.toArray(new ContainerId[containerIds.size()]),
         minOfContainersWithLogs, maxOfContainersWithLogs,
-        logFiles, 2, false, EMPTY_FILES);
+        logFiles, 1, false);
 
     verifyLogAggFinishEvent(appId);
   }
@@ -2288,7 +2236,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     File appLogDir1 =
         new File(localLogDir, application1.toString());
     appLogDir1.mkdir();
-    writeContainerLogs(appLogDir1, containerId, logFiles, EMPTY_FILES);
+    writeContainerLogs(appLogDir1, containerId, logFiles);
 
     logAggregationService.handle(new LogHandlerContainerFinishedEvent(
         containerId, containerType, exitCode));
@@ -2409,8 +2357,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     String[] logFiles1WithFinalLog =
         new String[] { "stdout", "stderr", "syslog", "std_final" };
     String[] logFiles1 = new String[] { "stdout", "stderr", "syslog"};
-    writeContainerLogs(appLogDir, container, logFiles1WithFinalLog,
-        EMPTY_FILES);
+    writeContainerLogs(appLogDir, container, logFiles1WithFinalLog);
 
     // Do log aggregation
     AppLogAggregatorImpl aggregator =
@@ -2427,7 +2374,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     }
     // Container logs should be uploaded
     logFileStatusInLastCycle = verifyContainerLogs(logAggregationService, application,
-        new ContainerId[] {container}, logFiles1, 4, true, EMPTY_FILES);
+        new ContainerId[] { container }, logFiles1, 3, true);
     for(String logFile : logFiles1) {
       Assert.assertTrue(logFileStatusInLastCycle.getLogFileTypesInLastCycle()
         .contains(logFile));
@@ -2452,7 +2399,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     // Do log aggregation
     String[] logFiles2 = new String[] { "stdout_1", "stderr_1", "syslog_1" };
-    writeContainerLogs(appLogDir, container, logFiles2, EMPTY_FILES);
+    writeContainerLogs(appLogDir, container, logFiles2);
 
     aggregator.doLogAggregationOutOfBand();
 
@@ -2465,7 +2412,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     }
     // Container logs should be uploaded
     logFileStatusInLastCycle = verifyContainerLogs(logAggregationService, application,
-        new ContainerId[] {container}, logFiles2, 4, true, EMPTY_FILES);
+        new ContainerId[] { container }, logFiles2, 3, true);
 
     for(String logFile : logFiles2) {
       Assert.assertTrue(logFileStatusInLastCycle.getLogFileTypesInLastCycle()
@@ -2479,7 +2426,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
     // create another logs
     String[] logFiles3 = new String[] { "stdout_2", "stderr_2", "syslog_2" };
-    writeContainerLogs(appLogDir, container, logFiles3, EMPTY_FILES);
+    writeContainerLogs(appLogDir, container, logFiles3);
 
     logAggregationService.handle(
         new LogHandlerContainerFinishedEvent(container,
@@ -2499,8 +2446,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     String[] logFiles3WithFinalLog =
         new String[] { "stdout_2", "stderr_2", "syslog_2", "std_final" };
     verifyContainerLogs(logAggregationService, application,
-        new ContainerId[] {container}, logFiles3WithFinalLog, 5, true,
-        EMPTY_FILES);
+      new ContainerId[] { container }, logFiles3WithFinalLog, 4, true);
     logAggregationService.stop();
     assertEquals(0, logAggregationService.getNumAggregators());
   }
@@ -2695,44 +2641,5 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     public List<String> getLogFileTypesInLastCycle() {
       return this.logFileTypesInLastCycle;
     }
-  }
-
-  @Test
-  public void testRollingMonitorIntervalDefault() {
-    LogAggregationService logAggregationService =
-        new LogAggregationService(dispatcher, this.context, this.delSrvc,
-            super.dirsHandler);
-    logAggregationService.init(this.conf);
-
-    long interval = logAggregationService.getRollingMonitorInterval();
-    assertEquals(-1L, interval);
-  }
-
-  @Test
-  public void testRollingMonitorIntervalGreaterThanSet() {
-    this.conf.set(YarnConfiguration.MIN_LOG_ROLLING_INTERVAL_SECONDS, "1800");
-    this.conf.set(YarnConfiguration
-        .NM_LOG_AGGREGATION_ROLL_MONITORING_INTERVAL_SECONDS, "2700");
-    LogAggregationService logAggregationService =
-            new LogAggregationService(dispatcher, this.context, this.delSrvc,
-                    super.dirsHandler);
-    logAggregationService.init(this.conf);
-
-    long interval = logAggregationService.getRollingMonitorInterval();
-    assertEquals(2700L, interval);
-  }
-
-  @Test
-  public void testRollingMonitorIntervalLessThanSet() {
-    this.conf.set(YarnConfiguration.MIN_LOG_ROLLING_INTERVAL_SECONDS, "1800");
-    this.conf.set(YarnConfiguration
-        .NM_LOG_AGGREGATION_ROLL_MONITORING_INTERVAL_SECONDS, "600");
-    LogAggregationService logAggregationService =
-            new LogAggregationService(dispatcher, this.context, this.delSrvc,
-                    super.dirsHandler);
-    logAggregationService.init(this.conf);
-
-    long interval = logAggregationService.getRollingMonitorInterval();
-    assertEquals(1800L, interval);
   }
 }
