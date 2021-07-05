@@ -28,7 +28,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.PathIsDirectoryException;
 import org.apache.hadoop.io.IOUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Get a listing of all files in that match the file patterns.
@@ -94,6 +94,7 @@ class Tail extends FsCommand {
       try {
         Thread.sleep(followDelay);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         break;
       }
       offset = dumpFromOffset(item, offset);

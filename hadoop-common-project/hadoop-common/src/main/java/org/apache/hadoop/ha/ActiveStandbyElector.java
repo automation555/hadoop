@@ -43,8 +43,8 @@ import org.apache.zookeeper.AsyncCallback.*;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.KeeperException.Code;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -579,11 +579,6 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     fatalError(errorMessage);
   }
 
-  @VisibleForTesting
-  public boolean getWantToBeInElection() {
-    return wantToBeInElection;
-  }
-
   /**
    * We failed to become active. Re-join the election, but
    * sleep for a few seconds after terminating our existing
@@ -849,6 +844,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       try {
         zkClient.close();
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new IOException("Interrupted while closing ZK",
             e);
       }
@@ -875,7 +871,8 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     try {
       tempZk.close();
     } catch(InterruptedException e) {
-      LOG.warn(e.toString());
+      LOG.warn("Interrupted", e);
+      Thread.currentThread().interrupt();
     }
     zkConnectionState = ConnectionState.TERMINATED;
     wantToBeInElection = false;

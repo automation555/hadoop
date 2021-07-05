@@ -20,7 +20,6 @@ package org.apache.hadoop.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +29,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -274,6 +273,7 @@ public abstract class AbstractService implements Service {
   @Override
   public final boolean waitForServiceToStop(long timeout) {
     boolean completed = terminationNotification.get();
+    boolean interrupted = false;
     while (!completed) {
       try {
         synchronized(terminationNotification) {
@@ -285,7 +285,12 @@ public abstract class AbstractService implements Service {
       } catch (InterruptedException e) {
         // interrupted; have another look at the flag
         completed = terminationNotification.get();
+        interrupted = true;
       }
+    }
+    if (interrupted) {
+      // Restore interrupted flag
+      Thread.currentThread().interrupt();
     }
     return terminationNotification.get();
   }
@@ -427,7 +432,7 @@ public abstract class AbstractService implements Service {
 
   @Override
   public synchronized List<LifecycleEvent> getLifecycleHistory() {
-    return Collections.unmodifiableList(new ArrayList<>(lifecycleHistory));
+    return new ArrayList<LifecycleEvent>(lifecycleHistory);
   }
 
   /**
@@ -484,7 +489,8 @@ public abstract class AbstractService implements Service {
   @Override
   public Map<String, String> getBlockers() {
     synchronized (blockerMap) {
-      return Collections.unmodifiableMap(new HashMap<>(blockerMap));
+      Map<String, String> map = new HashMap<String, String>(blockerMap);
+      return map;
     }
   }
 }

@@ -22,7 +22,7 @@ import java.io.Closeable;
 import java.util.Random;
 import java.util.concurrent.*;
 
-import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.*;
+import static com.google.common.base.Preconditions.*;
 
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
@@ -214,6 +214,7 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
       sinkThread.join();
     } catch (InterruptedException e) {
       LOG.warn("Stop interrupted", e);
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -246,6 +247,7 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
         return notificationSemaphore.tryAcquire(millisecondsToWait,
             TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         return false;
       }
     }

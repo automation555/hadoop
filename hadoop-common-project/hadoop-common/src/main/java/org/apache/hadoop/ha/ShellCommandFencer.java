@@ -19,12 +19,11 @@ package org.apache.hadoop.ha;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.Arrays;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configured;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.util.Shell;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,11 +60,6 @@ public class ShellCommandFencer
   /** Prefix for target parameters added to the environment */
   private static final String TARGET_PREFIX = "target_";
 
-  /** Prefix for source parameters added to the environment */
-  private static final String SOURCE_PREFIX = "source_";
-
-  private static final String ARG_DELIMITER = ",";
-
   @VisibleForTesting
   static Logger LOG = LoggerFactory.getLogger(ShellCommandFencer.class);
 
@@ -79,9 +73,8 @@ public class ShellCommandFencer
   }
 
   @Override
-  public boolean tryFence(HAServiceTarget target, String args) {
+  public boolean tryFence(HAServiceTarget target, String cmd) {
     ProcessBuilder builder;
-    String cmd = parseArgs(target.getTransitionTargetHAStatus(), args);
 
     if (!Shell.WINDOWS) {
       builder = new ProcessBuilder("bash", "-e", "-c", cmd);
@@ -128,32 +121,11 @@ public class ShellCommandFencer
       outPumper.join();
     } catch (InterruptedException ie) {
       LOG.warn("Interrupted while waiting for fencing command: " + cmd);
+      Thread.currentThread().interrupt();
       return false;
     }
     
     return rc == 0;
-  }
-
-  private String parseArgs(HAServiceProtocol.HAServiceState state,
-      String cmd) {
-    String[] args = cmd.split(ARG_DELIMITER);
-    if (args.length == 1) {
-      // only one command is given, assuming both src and dst
-      // will execute the same command/script.
-      return args[0];
-    }
-    if (args.length > 2) {
-      throw new IllegalArgumentException("Expecting arguments size of at most "
-          + "two, getting " + Arrays.asList(args));
-    }
-    if (HAServiceProtocol.HAServiceState.ACTIVE.equals(state)) {
-      return args[0];
-    } else if (HAServiceProtocol.HAServiceState.STANDBY.equals(state)) {
-      return args[1];
-    } else {
-      throw new IllegalArgumentException(
-          "Unexpected HA service state:" + state);
-    }
   }
 
   /**
@@ -219,24 +191,9 @@ public class ShellCommandFencer
    */
   private void addTargetInfoAsEnvVars(HAServiceTarget target,
       Map<String, String> environment) {
-    String prefix;
-    HAServiceProtocol.HAServiceState targetState =
-        target.getTransitionTargetHAStatus();
-    if (targetState == null ||
-        HAServiceProtocol.HAServiceState.ACTIVE.equals(targetState)) {
-      // null is assumed to be same as ACTIVE, this is to be compatible
-      // with existing tests/use cases where target state is not specified
-      // but assuming it's active.
-      prefix = TARGET_PREFIX;
-    } else if (HAServiceProtocol.HAServiceState.STANDBY.equals(targetState)) {
-      prefix = SOURCE_PREFIX;
-    } else {
-      throw new IllegalArgumentException(
-          "Unexpected HA service state:" + targetState);
-    }
     for (Map.Entry<String, String> e :
          target.getFencingParameters().entrySet()) {
-      String key = prefix + e.getKey();
+      String key = TARGET_PREFIX + e.getKey();
       key = key.replace('.', '_');
       environment.put(key, e.getValue());
     }
