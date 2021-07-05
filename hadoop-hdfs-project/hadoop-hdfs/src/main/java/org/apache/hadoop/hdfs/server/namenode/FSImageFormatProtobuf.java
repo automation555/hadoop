@@ -75,8 +75,8 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.LimitInputStream;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.Lists;
 
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 import org.apache.hadoop.thirdparty.protobuf.CodedOutputStream;
 
@@ -484,7 +484,7 @@ public final class FSImageFormatProtobuf {
         case ERASURE_CODING:
           Step step = new Step(StepType.ERASURE_CODING_POLICIES);
           prog.beginStep(Phase.LOADING_FSIMAGE, step);
-          loadErasureCodingSection(in);
+          loadErasureCodingSection(in, prog, step);
           prog.endStep(Phase.LOADING_FSIMAGE, step);
           break;
         default:
@@ -569,7 +569,8 @@ public final class FSImageFormatProtobuf {
           new CacheManager.PersistState(s, pools, directives));
     }
 
-    private void loadErasureCodingSection(InputStream in)
+    private void loadErasureCodingSection(InputStream in,
+        StartupProgress prog, Step currentStep)
         throws IOException {
       ErasureCodingSection s = ErasureCodingSection.parseDelimitedFrom(in);
       List<ErasureCodingPolicyInfo> ecPolicies = Lists
@@ -578,7 +579,11 @@ public final class FSImageFormatProtobuf {
         ecPolicies.add(PBHelperClient.convertErasureCodingPolicyInfo(
             s.getPolicies(i)));
       }
-      fsn.getErasureCodingPolicyManager().loadPolicies(ecPolicies, conf);
+
+      prog.setTotal(Phase.LOADING_FSIMAGE, currentStep, ecPolicies.size());
+      Counter counter = prog.getCounter(Phase.LOADING_FSIMAGE, currentStep);
+      fsn.getErasureCodingPolicyManager().loadPolicies(ecPolicies, conf,
+          counter);
     }
   }
 
