@@ -28,16 +28,15 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.s3a.s3guard.MetastoreInstrumentation;
-import org.apache.hadoop.fs.s3a.statistics.BlockOutputStreamStatistics;
+import org.apache.hadoop.fs.s3a.statistics.impl.AbstractS3AStatisticsSource;
 import org.apache.hadoop.fs.s3a.statistics.ChangeTrackerStatistics;
 import org.apache.hadoop.fs.s3a.statistics.CommitterStatistics;
 import org.apache.hadoop.fs.s3a.statistics.CountersAndGauges;
+import org.apache.hadoop.fs.s3a.statistics.impl.CountingChangeTracker;
 import org.apache.hadoop.fs.s3a.statistics.DelegationTokenStatistics;
 import org.apache.hadoop.fs.s3a.statistics.S3AInputStreamStatistics;
+import org.apache.hadoop.fs.s3a.statistics.BlockOutputStreamStatistics;
 import org.apache.hadoop.fs.s3a.statistics.StatisticTypeEnum;
-import org.apache.hadoop.fs.s3a.statistics.impl.AbstractS3AStatisticsSource;
-import org.apache.hadoop.fs.s3a.statistics.impl.CountingChangeTracker;
-import org.apache.hadoop.fs.s3a.statistics.impl.ForwardingIOStatisticsStore;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatisticsLogging;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -470,14 +469,6 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
   }
 
   /**
-   * Create an IOStatistics store which updates FS metrics
-   * as well as IOStatistics.
-   */
-  public IOStatisticsStore createMetricsUpdatingStore() {
-    return new MetricsUpdatingIOStatisticsStore();
-  }
-
-  /**
    * String representation. Includes the IOStatistics
    * when logging is at DEBUG.
    * @return a string form.
@@ -556,24 +547,10 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
    * @param count increment value
    */
   public void incrementCounter(Statistic op, long count) {
-    incrementNamedCounter(op.getSymbol(), count);
-  }
-
-  /**
-   * Increments a mutable counter and the matching
-   * instance IOStatistics counter.
-   * No-op if the counter is not defined, or the count == 0.
-   * @param name counter name
-   * @param count increment value
-   * @return the updated value or, if the counter is unknown: 0
-   */
-  private long incrementNamedCounter(final String name,
-      final long count) {
+    String name = op.getSymbol();
     if (count != 0) {
       incrementMutableCounter(name, count);
-      return instanceIOStatistics.incrementCounter(name, count);
-    } else {
-      return 0;
+      instanceIOStatistics.incrementCounter(name, count);
     }
   }
 
@@ -988,7 +965,6 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
         closed.incrementAndGet();
         bytesDiscardedInClose.addAndGet(remainingInCurrentRequest);
         totalBytesRead.addAndGet(remainingInCurrentRequest);
-        filesystemStatistics.incrementBytesRead(remainingInCurrentRequest);
       }
     }
 
@@ -1145,6 +1121,7 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
         // increment the filesystem statistics for this thread.
         if (filesystemStatistics != null) {
           long t = getTotalBytesRead();
+          filesystemStatistics.incrementBytesRead(t);
           filesystemStatistics.incrementBytesReadByDistance(DISTANCE, t);
         }
       }
@@ -1369,9 +1346,7 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
               STREAM_WRITE_EXCEPTIONS_COMPLETING_UPLOADS.getSymbol(),
               STREAM_WRITE_QUEUE_DURATION.getSymbol(),
               STREAM_WRITE_TOTAL_DATA.getSymbol(),
-              STREAM_WRITE_TOTAL_TIME.getSymbol(),
-              INVOCATION_HFLUSH.getSymbol(),
-              INVOCATION_HSYNC.getSymbol())
+              STREAM_WRITE_TOTAL_TIME.getSymbol())
           .withGauges(
               STREAM_WRITE_BLOCK_UPLOADS_PENDING.getSymbol(),
               STREAM_WRITE_BLOCK_UPLOADS_BYTES_PENDING.getSymbol())
@@ -1512,16 +1487,6 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
     @Override
     public void commitUploaded(long size) {
       incrementCounter(COMMITTER_BYTES_UPLOADED, size);
-    }
-
-    @Override
-    public void hflushInvoked() {
-      incCounter(INVOCATION_HFLUSH.getSymbol(), 1);
-    }
-
-    @Override
-    public void hsyncInvoked() {
-      incCounter(INVOCATION_HSYNC.getSymbol(), 1);
     }
 
     @Override
@@ -1825,6 +1790,12 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
     }
 
     @Override
+    public MetricsRecordBuilder tag(MetricsInfo info, String value,
+                                    boolean isStringMetric) {
+      return this;
+    }
+
+    @Override
     public MetricsRecordBuilder add(MetricsTag tag) {
       return this;
     }
@@ -1889,45 +1860,6 @@ public class S3AInstrumentation implements Closeable, MetricsSource,
      */
     public Map<String, Long> getMap() {
       return map;
-    }
-  }
-
-  /**
-   * An IOStatisticsStore which updates metrics on calls to
-   * {@link #incrementCounter(String, long)}.
-   * This helps keeps FS metrics and IOStats in sync.
-   * Duration tracking methods are forwarded to
-   * the S3A Instrumentation duration tracker, which will
-   * update the instance IOStatistics.
-   */
-  private final class MetricsUpdatingIOStatisticsStore
-      extends ForwardingIOStatisticsStore {
-
-    private MetricsUpdatingIOStatisticsStore() {
-      super(S3AInstrumentation.this.getIOStatistics());
-    }
-
-    /**
-     * Incrementing the counter also implements the metric alongside
-     * the IOStatistics value.
-     * @param key counter key
-     * @param value increment value.
-     * @return the value in the wrapped IOStatistics.
-     */
-    @Override
-    public long incrementCounter(final String key, final long value) {
-      incrementMutableCounter(key, value);
-      return super.incrementCounter(key, value);
-    }
-
-    @Override
-    public DurationTracker trackDuration(final String key, final long count) {
-      return S3AInstrumentation.this.trackDuration(key, count);
-    }
-
-    @Override
-    public DurationTracker trackDuration(final String key) {
-      return S3AInstrumentation.this.trackDuration(key);
     }
   }
 }
