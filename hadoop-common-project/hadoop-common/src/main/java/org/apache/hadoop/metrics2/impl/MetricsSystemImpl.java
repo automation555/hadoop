@@ -30,6 +30,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import javax.management.ObjectName;
 
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.*;
@@ -57,7 +58,6 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MetricsSourceBuilder;
 import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -273,7 +273,7 @@ public class MetricsSystemImpl extends MetricsSystem implements MetricsSource {
   T register(final String name, final String description, final T sink) {
     LOG.debug(name +", "+ description);
     if (allSinks.containsKey(name)) {
-      if(sinks.get(name) == null) {
+      if(config != null && sinks.get(name) == null) {
         registerSink(name, description, sink);
       } else {
         LOG.warn("Sink "+ name +" already exists!");
