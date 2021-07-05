@@ -553,6 +553,10 @@ public class CopyCommitter extends FileOutputCommitter {
         conf.get(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH));
     List<Path> targets = new ArrayList<>(1);
     targets.add(targetFinalPath);
+    Path resultNonePath = Path.getPathWithoutSchemeAndAuthority(targetFinalPath)
+        .toString().startsWith(DistCpConstants.HDFS_RESERVED_RAW_DIRECTORY_NAME)
+        ? DistCpConstants.RAW_NONE_PATH
+        : DistCpConstants.NONE_PATH;
     //
     // Set up options to be the same from the CopyListing.buildListing's
     // perspective, so to collect similar listings as when doing the copy
@@ -560,15 +564,12 @@ public class CopyCommitter extends FileOutputCommitter {
     // thread count is picked up from the job
     int threads = conf.getInt(DistCpConstants.CONF_LABEL_LISTSTATUS_THREADS,
         DistCpConstants.DEFAULT_LISTSTATUS_THREADS);
-    boolean useIterator =
-        conf.getBoolean(DistCpConstants.CONF_LABEL_USE_ITERATOR, false);
     LOG.info("Scanning destination directory {} with thread count: {}",
         targetFinalPath, threads);
-    DistCpOptions options = new DistCpOptions.Builder(targets, targetFinalPath)
+    DistCpOptions options = new DistCpOptions.Builder(targets, resultNonePath)
         .withOverwrite(overwrite)
         .withSyncFolder(syncFolder)
         .withNumListstatusThreads(threads)
-        .withUseIterator(useIterator)
         .build();
     DistCpContext distCpContext = new DistCpContext(options);
     distCpContext.setTargetPathExists(targetPathExists);
@@ -624,10 +625,13 @@ public class CopyCommitter extends FileOutputCommitter {
     FileSystem srcfs = sourceFile.getFileSystem(conf);
 
     Path firstChunkFile = allChunkPaths.removeFirst();
+    FileStatus firstChunkFileFileStatus = dstfs.getFileStatus(firstChunkFile);
+    long modificationTime = firstChunkFileFileStatus.getModificationTime();
+    long accessTime = firstChunkFileFileStatus.getAccessTime();
     Path[] restChunkFiles = new Path[allChunkPaths.size()];
     allChunkPaths.toArray(restChunkFiles);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("concat: firstchunk: " + dstfs.getFileStatus(firstChunkFile));
+      LOG.debug("concat: firstchunk: " + firstChunkFileFileStatus);
       int i = 0;
       for (Path f : restChunkFiles) {
         LOG.debug("concat: other chunk: " + i + ": " + dstfs.getFileStatus(f));
@@ -638,7 +642,7 @@ public class CopyCommitter extends FileOutputCommitter {
     if (LOG.isDebugEnabled()) {
       LOG.debug("concat: result: " + dstfs.getFileStatus(firstChunkFile));
     }
-    rename(dstfs, firstChunkFile, targetFile);
+    rename(dstfs, firstChunkFile, targetFile, modificationTime, accessTime);
     DistCpUtils.compareFileLengthsAndChecksums(srcFileStatus.getLen(),
         srcfs, sourceFile, null, dstfs,
             targetFile, skipCrc, srcFileStatus.getLen());
@@ -649,18 +653,45 @@ public class CopyCommitter extends FileOutputCommitter {
    * @param destFileSys the file ssystem
    * @param tmp the source path
    * @param dst the destination path
+   * @param modificationTime
+   * @param accessTime
    * @throws IOException if renaming failed
    */
-  private static void rename(FileSystem destFileSys, Path tmp, Path dst)
+  private static void rename(FileSystem destFileSys, Path tmp, Path dst, long modificationTime, long accessTime)
       throws IOException {
+    long parentDirModificationTime = -1;
+    long parentDirAccessTime = -1;
+    Path parent = null;
+    try {
+      parent = dst.getParent();
+      FileStatus parentDirFileStatus = destFileSys.getFileStatus(parent);
+      parentDirModificationTime = parentDirFileStatus.getModificationTime();
+      parentDirAccessTime = parentDirFileStatus.getAccessTime();
+    } catch (IOException ioe) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("rename: parent stat failed. " +
+            "The access and modification times of the parent directory might change.", ioe);
+      }
+    }
+
     try {
       if (destFileSys.exists(dst)) {
         destFileSys.delete(dst, true);
       }
       destFileSys.rename(tmp, dst);
+      destFileSys.setTimes(dst, modificationTime, accessTime);
     } catch (IOException ioe) {
       throw new IOException("Fail to rename tmp file (=" + tmp
           + ") to destination file (=" + dst + ")", ioe);
+    } finally {
+      if (parent != null) {
+        try {
+          destFileSys.setTimes(parent, parentDirModificationTime, parentDirAccessTime);
+        } catch (Exception e) {
+          LOG.warn("Restoring the access/modification times of the parent directory " + parent + " has failed. "
+              + "The access and modification times of the parent directory might change.", e);
+        }
+      }
     }
   }
 
