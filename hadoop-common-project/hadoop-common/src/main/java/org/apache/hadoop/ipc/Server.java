@@ -752,9 +752,15 @@ public abstract class Server {
   public synchronized void refreshCallQueue(Configuration conf) {
     // Create the next queue
     String prefix = getQueueClassPrefix();
-    this.maxQueueSize = handlerCount * conf.getInt(
-        CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_KEY,
-        CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_DEFAULT);
+    String handlerQueueSizeStr = conf.get(prefix + "." +
+        CommonConfigurationKeys.SERVER_HANDLER_QUEUE_SIZE_KEY);
+    if (handlerQueueSizeStr == null) {
+      this.maxQueueSize = handlerCount * conf.getInt(
+          CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_KEY,
+          CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_DEFAULT);
+    } else {
+      this.maxQueueSize = Integer.parseInt(handlerQueueSizeStr);
+    }
     callQueue.swapQueue(getSchedulerClass(prefix, conf),
         getQueueClass(prefix, conf), maxQueueSize, prefix, conf);
     callQueue.setClientBackoffEnabled(getClientBackoffEnable(prefix, conf));
@@ -3087,23 +3093,48 @@ public abstract class Server {
     if (queueSizePerHandler != -1) {
       this.maxQueueSize = handlerCount * queueSizePerHandler;
     } else {
-      this.maxQueueSize = handlerCount * conf.getInt(
-          CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_KEY,
-          CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_DEFAULT);      
+      String handlerQueueSizeStr = conf.get(getQueueClassPrefix() + "." +
+          CommonConfigurationKeys.SERVER_HANDLER_QUEUE_SIZE_KEY);
+      if (handlerQueueSizeStr == null) {
+        this.maxQueueSize = handlerCount * conf.getInt(
+            CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_KEY,
+            CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_DEFAULT);
+      } else {
+        this.maxQueueSize = Integer.parseInt(handlerQueueSizeStr);
+      }
     }
-    this.maxRespSize = conf.getInt(
-        CommonConfigurationKeys.IPC_SERVER_RPC_MAX_RESPONSE_SIZE_KEY,
-        CommonConfigurationKeys.IPC_SERVER_RPC_MAX_RESPONSE_SIZE_DEFAULT);
+    String maxRespStr = conf.get(getQueueClassPrefix() + "." +
+        CommonConfigurationKeys.SERVER_RPC_MAX_RESPONSE_SIZE_KEY);
+    if (maxRespStr == null) {
+      this.maxRespSize = conf.getInt(
+          CommonConfigurationKeys.IPC_SERVER_RPC_MAX_RESPONSE_SIZE_KEY,
+          CommonConfigurationKeys.IPC_SERVER_RPC_MAX_RESPONSE_SIZE_DEFAULT);
+    } else {
+      this.maxRespSize = Integer.parseInt(maxRespStr);
+    }
     if (numReaders != -1) {
       this.readThreads = numReaders;
     } else {
-      this.readThreads = conf.getInt(
-          CommonConfigurationKeys.IPC_SERVER_RPC_READ_THREADS_KEY,
-          CommonConfigurationKeys.IPC_SERVER_RPC_READ_THREADS_DEFAULT);
+      String readThreadsStr = conf.get(getQueueClassPrefix() + "." +
+          CommonConfigurationKeys.SERVER_RPC_READ_THREADS_KEY);
+      if (readThreadsStr == null) {
+        this.readThreads = conf.getInt(
+            CommonConfigurationKeys.IPC_SERVER_RPC_READ_THREADS_KEY,
+            CommonConfigurationKeys.IPC_SERVER_RPC_READ_THREADS_DEFAULT);
+      } else {
+        this.readThreads = Integer.parseInt(readThreadsStr);
+      }
     }
-    this.readerPendingConnectionQueue = conf.getInt(
-        CommonConfigurationKeys.IPC_SERVER_RPC_READ_CONNECTION_QUEUE_SIZE_KEY,
-        CommonConfigurationKeys.IPC_SERVER_RPC_READ_CONNECTION_QUEUE_SIZE_DEFAULT);
+
+    String readerPendingConnectionQueueStr = conf.get(getQueueClassPrefix() + "." +
+        CommonConfigurationKeys.SERVER_RPC_READ_CONNECTION_QUEUE_SIZE_KEY);
+    if (readerPendingConnectionQueueStr == null) {
+      this.readerPendingConnectionQueue = conf.getInt(
+          CommonConfigurationKeys.IPC_SERVER_RPC_READ_CONNECTION_QUEUE_SIZE_KEY,
+          CommonConfigurationKeys.IPC_SERVER_RPC_READ_CONNECTION_QUEUE_SIZE_DEFAULT);
+    } else {
+      this.readerPendingConnectionQueue = Integer.parseInt(readerPendingConnectionQueueStr);
+    }
 
     // Setup appropriate callqueue
     final String prefix = getQueueClassPrefix();
@@ -3578,6 +3609,16 @@ public abstract class Server {
    */
   public int getMaxQueueSize() {
     return maxQueueSize;
+  }
+
+  @VisibleForTesting
+  public int getMaxRespSize() {
+    return maxRespSize;
+  }
+
+  @VisibleForTesting
+  public int getReaderPendingConnectionQueue() {
+    return readerPendingConnectionQueue;
   }
 
   /**
