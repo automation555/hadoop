@@ -43,7 +43,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.apache.hadoop.test.GenericTestUtils;
+import com.google.common.collect.Lists;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -99,11 +99,12 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.crypto.key.KeyProviderDelegationTokenExtension.DelegationTokenExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.CryptoExtension;
 import org.apache.hadoop.io.Text;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -145,9 +146,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 import org.xml.sax.InputSource;
 import org.xml.sax.helpers.DefaultHandler;
 
@@ -155,7 +153,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 public class TestEncryptionZones {
-  static final Logger LOG = LoggerFactory.getLogger(TestEncryptionZones.class);
+  static final Logger LOG = Logger.getLogger(TestEncryptionZones.class);
 
   protected Configuration conf;
   private FileSystemTestHelper fsHelper;
@@ -199,8 +197,7 @@ public class TestEncryptionZones {
         2);
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
-    GenericTestUtils.setLogLevel(
-        LoggerFactory.getLogger(EncryptionZoneManager.class), Level.TRACE);
+    Logger.getLogger(EncryptionZoneManager.class).setLevel(Level.TRACE);
     fs = cluster.getFileSystem();
     fsWrapper = new FileSystemTestWrapper(fs);
     fcWrapper = new FileContextTestWrapper(
@@ -465,34 +462,26 @@ public class TestEncryptionZones {
       assertExceptionContains("is already an encryption zone", e);
     }
 
-    /* create EZ on parent of an EZ should fail */
-    try {
-      dfsAdmin.createEncryptionZone(zoneParent, TEST_KEY, NO_TRASH);
-      fail("EZ over an EZ");
-    } catch (IOException e) {
-      assertExceptionContains("encryption zone for a non-empty directory", e);
-    }
+    /* create EZ on parent of an EZ should not fail */
+    dfsAdmin.createEncryptionZone(zoneParent, TEST_KEY, NO_TRASH);
+    assertNumZones(++numZones);
 
-    /* create EZ on a folder with a folder fails */
-    final Path notEmpty = new Path("/notEmpty");
-    final Path notEmptyChild = new Path(notEmpty, "child");
+    /* create EZ on a folder with a folder succeeds */
+    Path notEmpty = new Path("/notEmpty");
+    Path notEmptyChild = new Path(notEmpty, "child");
     fsWrapper.mkdir(notEmptyChild, FsPermission.getDirDefault(), true);
-    try {
-      dfsAdmin.createEncryptionZone(notEmpty, TEST_KEY, NO_TRASH);
-      fail("Created EZ on an non-empty directory with folder");
-    } catch (IOException e) {
-      assertExceptionContains("create an encryption zone", e);
-    }
-    fsWrapper.delete(notEmptyChild, false);
+    dfsAdmin.createEncryptionZone(notEmpty, TEST_KEY, NO_TRASH);
+    fsWrapper.delete(notEmpty, true);
+
+    notEmpty = new Path("/notEmpty");
+    notEmptyChild = new Path(notEmpty, "child");
 
     /* create EZ on a folder with a file fails */
     fsWrapper.createFile(notEmptyChild);
-    try {
-      dfsAdmin.createEncryptionZone(notEmpty, TEST_KEY, NO_TRASH);
-      fail("Created EZ on an non-empty directory with file");
-    } catch (IOException e) {
-      assertExceptionContains("create an encryption zone", e);
-    }
+    dfsAdmin.createEncryptionZone(notEmpty, TEST_KEY, NO_TRASH);
+    fsWrapper.delete(notEmpty, true);
+
+    fsWrapper.createFile(notEmptyChild);
 
     /* Test failure of create EZ on a file. */
     try {
@@ -527,7 +516,7 @@ public class TestEncryptionZones {
       assertExceptionContains("Must specify a key name when creating", e);
     }
 
-    assertNumZones(1);
+    assertNumZones(2);
 
     /* Test success of creating an EZ when they key exists. */
     DFSTestUtil.createKey(myKeyName, cluster, conf);
@@ -1421,7 +1410,8 @@ public class TestEncryptionZones {
 
     Credentials creds = new Credentials();
     final Token<?> tokens[] = dfs.addDelegationTokens("JobTracker", creds);
-    LOG.debug("Delegation tokens: " + Arrays.asList(tokens));
+    DistributedFileSystem.LOG.debug("Delegation tokens: " +
+        Arrays.asList(tokens));
     Assert.assertEquals(2, tokens.length);
     Assert.assertEquals(tokens[1], testToken);
     Assert.assertEquals(2, creds.numberOfTokens());
@@ -2411,5 +2401,47 @@ public class TestEncryptionZones {
       assertExceptionContains("At least one of the attributes provided was " +
           "not found.", ioe);
     }
+  }
+
+  @Test
+  public void testCreationEZOnNonEmptyDirectory() throws Exception {
+    final Path zonePath = new Path("/zone");
+    fsWrapper.mkdir(zonePath, FsPermission.getDirDefault(), false);
+    Path p1 = new Path(zonePath, "p1");
+    // Create a file in non-encrypted area.
+    String unEncryptedBytes = "hello world";
+    OutputStream unEncryptedOs = fs.create(p1, false);
+    unEncryptedOs.write(unEncryptedBytes.getBytes());
+    unEncryptedOs.close();
+    // Create an Encryption Zone.
+    dfsAdmin.createEncryptionZone(zonePath, TEST_KEY, NO_TRASH);
+
+    // Create a file in an encrpyted area.
+    Path p2 = new Path(zonePath, "p2");
+    OutputStream encryptedOs = fs.create(p2, false);
+    String encryptedBytes = "foo bar";
+    encryptedOs.write(encryptedBytes.getBytes());
+    encryptedOs.close();
+
+    InputStream unEncryptedStream = fs.open(p1);
+    verifyStreamsSame(unEncryptedBytes, unEncryptedStream);
+    // Raw bytes should be the same as original contents.
+    InputStream unEncryptedReservedStream = fs.open(
+        new Path("/.reserved/raw" + p1.toString()));
+    verifyStreamsSame(unEncryptedBytes, unEncryptedReservedStream);
+
+    InputStream encryptedStream = fs.open(p2);
+    verifyStreamsSame(encryptedBytes, encryptedStream);
+    InputStream encryptedReservedStream = fs.open(
+        new Path("/.reserved/raw" + p2.toString()));
+
+    InputStream cryptoStream =
+        fs.open(p2).getWrappedStream();
+    Assert.assertTrue("cryptoStream should be an instance of "
+        + "CryptoInputStream", (cryptoStream instanceof CryptoInputStream));
+    InputStream encryptedCryptoStream =
+        ((CryptoInputStream)cryptoStream).getWrappedStream();
+    // Raw bytes shouldn't be same as original data.
+    verifyRaw(encryptedBytes, encryptedCryptoStream, encryptedReservedStream);
   }
 }
