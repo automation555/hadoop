@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ha.HAServiceProtocol;
@@ -25,8 +27,6 @@ import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.GroupMappingServiceProvider;
-import org.apache.hadoop.util.Lists;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceInformation;
@@ -431,7 +432,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         new ApplicationPlacementContext(queueName);
 
     scheduler.addApplication(id11.getApplicationId(), queueName, "user1",
-        false, placementCtx);
+        false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(id11, false, false);
     List<ResourceRequest> ask1 = new ArrayList<ResourceRequest>();
     ResourceRequest request1 =
@@ -1074,22 +1075,22 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
     QueueManager queueManager = scheduler.getQueueManager();
     FSLeafQueue leafQueue = queueManager.getLeafQueue("parent.child", true);
-    Assert.assertEquals(1, queueManager.getLeafQueues().size());
+    Assert.assertEquals(2, queueManager.getLeafQueues().size());
     Assert.assertNotNull(leafQueue);
     Assert.assertEquals("root.parent.child", leafQueue.getName());
 
     FSLeafQueue leafQueue2 = queueManager.getLeafQueue("parent", true);
     Assert.assertNull(leafQueue2);
-    Assert.assertEquals(1, queueManager.getLeafQueues().size());
+    Assert.assertEquals(2, queueManager.getLeafQueues().size());
     
     FSLeafQueue leafQueue3 = queueManager.getLeafQueue("parent.child.grandchild", true);
     Assert.assertNull(leafQueue3);
-    Assert.assertEquals(1, queueManager.getLeafQueues().size());
+    Assert.assertEquals(2, queueManager.getLeafQueues().size());
     
     FSLeafQueue leafQueue4 = queueManager.getLeafQueue("parent.sister", true);
     Assert.assertNotNull(leafQueue4);
     Assert.assertEquals("root.parent.sister", leafQueue4.getName());
-    Assert.assertEquals(2, queueManager.getLeafQueues().size());
+    Assert.assertEquals(3, queueManager.getLeafQueues().size());
   }
 
   @Test
@@ -1384,7 +1385,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext("queue1");
     scheduler.addApplication(attemptId.getApplicationId(), "queue1", "user1",
-            false, placementCtx);
+            false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(attemptId, false, false);
     List<ResourceRequest> asks = new ArrayList<ResourceRequest>();
     asks.add(createResourceRequest(2048, node2.getRackName(), 1, 1, false));
@@ -1771,8 +1772,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.start();
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    // no queue by default
-    assertEquals(0, scheduler.getQueueManager().getLeafQueues().size());
+    // only default queue
+    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
 
     // Submit app with empty queue
     // Submit fails before we reach the placement check.
@@ -1783,7 +1784,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.handle(appAddedEvent);
 
     // submission rejected
-    assertEquals(0, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
     assertNull(scheduler.getSchedulerApp(appAttemptId));
     assertEquals(0, resourceManager.getRMContext().getRMApps().size());
   }
@@ -1794,8 +1795,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.start();
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    // no queue by default
-    assertEquals(0, scheduler.getQueueManager().getLeafQueues().size());
+    // only default queue
+    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
 
     // Submit app with queue name (.A)
     // Submit fails before we reach the placement check.
@@ -1805,7 +1806,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
             "user1");
     scheduler.handle(appAddedEvent1);
     // submission rejected
-    assertEquals(0, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
     assertNull(scheduler.getSchedulerApp(appAttemptId1));
     assertEquals(0, resourceManager.getRMContext().getRMApps().size());
 
@@ -1817,7 +1818,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
             "user1");
     scheduler.handle(appAddedEvent2);
     // submission rejected
-    assertEquals(0, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
     assertNull(scheduler.getSchedulerApp(appAttemptId2));
     assertEquals(0, resourceManager.getRMContext().getRMApps().size());
 
@@ -1829,7 +1830,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
             "user1", new ApplicationPlacementContext("A.B"));
     scheduler.handle(appAddedEvent3);
     // submission accepted
-    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(2, scheduler.getQueueManager().getLeafQueues().size());
     assertNull(scheduler.getSchedulerApp(appAttemptId3));
     assertEquals(0, resourceManager.getRMContext().getRMApps().size());
   }
@@ -1863,7 +1864,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.update();
 
     Collection<FSLeafQueue> queues = scheduler.getQueueManager().getLeafQueues();
-    assertEquals(2, queues.size());
+    assertEquals(3, queues.size());
 
     for (FSLeafQueue p : queues) {
       if (p.getName().equals("root.queueA")) {
@@ -1944,8 +1945,6 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         .fairDefaultQueueSchedulingPolicy()
         .addQueue(new AllocationFileQueue.Builder("root")
             .schedulingPolicy("drf")
-            .subQueue(new AllocationFileQueue.Builder("default")
-                .weight(1).build())
             .subQueue(new AllocationFileQueue.Builder("child1")
                 .weight(1).build())
             .subQueue(new AllocationFileQueue.Builder("child2")
@@ -1983,8 +1982,6 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         .fairDefaultQueueSchedulingPolicy()
         .addQueue(new AllocationFileQueue.Builder("root")
             .schedulingPolicy("drf")
-            .subQueue(new AllocationFileQueue.Builder("default")
-                .weight(1).build())
             .subQueue(new AllocationFileQueue.Builder("child1")
                 .weight(1).build())
             .subQueue(new AllocationFileQueue.Builder("child2")
@@ -2019,17 +2016,6 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     conf.setClass(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING,
         SimpleGroupsMapping.class, GroupMappingServiceProvider.class);
     conf.set(FairSchedulerConfiguration.USER_AS_DEFAULT_QUEUE, "true");
-    conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);
-
-    AllocationFileWriter.create()
-        .fairDefaultQueueSchedulingPolicy()
-        .addQueue(new AllocationFileQueue.Builder("root")
-            .schedulingPolicy("drf")
-            .subQueue(new AllocationFileQueue.Builder("default")
-                .weight(1).build())
-            .build())
-        .writeToFile(ALLOC_FILE);
-
     scheduler.init(conf);
     scheduler.start();
     scheduler.reinitialize(conf, resourceManager.getRMContext());
@@ -2072,7 +2058,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext("root.queue1");
     scheduler.addApplication(id11.getApplicationId(),
-        "root.queue1", "user1", false, placementCtx);
+        "root.queue1", "user1", false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(id11, false, false);
     List<ResourceRequest> ask1 = new ArrayList<ResourceRequest>();
     ResourceRequest request1 = createResourceRequest(minReqSize * 2,
@@ -2086,7 +2072,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     createMockRMApp(id21);
     placementCtx = new ApplicationPlacementContext("root.queue2");
     scheduler.addApplication(id21.getApplicationId(),
-        "root.queue2", "user1", false, placementCtx);
+        "root.queue2", "user1", false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(id21, false, false);
     List<ResourceRequest> ask2 = new ArrayList<ResourceRequest>();
     ResourceRequest request2 = createResourceRequest(2 * minReqSize,
@@ -2102,7 +2088,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationAttemptId id22 = createAppAttemptId(2, 2);
     createMockRMApp(id22);
     scheduler.addApplication(id22.getApplicationId(),
-        "root.queue2", "user1", false, placementCtx);
+        "root.queue2", "user1", false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(id22, false, false);
     List<ResourceRequest> ask3 = new ArrayList<ResourceRequest>();
     ResourceRequest request4 = createResourceRequest(minReqSize,
@@ -2144,12 +2130,13 @@ public class TestFairScheduler extends FairSchedulerTestBase {
 
     QueueManager queueManager = scheduler.getQueueManager();
     Collection<FSLeafQueue> leafQueues = queueManager.getLeafQueues();
-    Assert.assertEquals(3, leafQueues.size());
+    Assert.assertEquals(4, leafQueues.size());
     Assert.assertNotNull(queueManager.getLeafQueue("queueA", false));
     Assert.assertNotNull(queueManager.getLeafQueue("queueB.queueC", false));
     Assert.assertNotNull(queueManager.getLeafQueue("queueB.queueD", false));
+    Assert.assertNotNull(queueManager.getLeafQueue("default", false));
     // Make sure querying for queues didn't create any new ones:
-    Assert.assertEquals(3, leafQueues.size());
+    Assert.assertEquals(4, leafQueues.size());
   }
   
   @Test
@@ -2671,7 +2658,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext("queue1");
     scheduler.addApplication(attemptId.getApplicationId(), "queue1", "user1",
-        false, placementCtx);
+        false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(attemptId, false, false);
     
     // 1 request with 2 nodes on the same rack. another request with 1 node on
@@ -3008,7 +2995,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext(queue);
     scheduler.addApplication(attId.getApplicationId(), queue, user, false,
-        placementCtx);
+        placementCtx, Priority.newInstance(1));
 
     numTries = 0;
     while (application.getFinishTime() == 0 && numTries < MAX_TRIES) {
@@ -4324,7 +4311,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext("root.queue1");
     scheduler.addApplication(id11.getApplicationId(), "root.queue1", "user1",
-        false, placementCtx);
+        false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(id11, false, false);
 
     List<ResourceRequest> ask1 = new ArrayList<>();
@@ -4750,8 +4737,8 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     scheduler.start();
     scheduler.reinitialize(conf, resourceManager.getRMContext());
 
-    // no queue by default
-    assertEquals(0, scheduler.getQueueManager().getLeafQueues().size());
+    // only default queue
+    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
 
     // submit app with queue name "A"
     ApplicationAttemptId appAttemptId1 = createAppAttemptId(1, 1);
@@ -4761,7 +4748,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         appAttemptId1.getApplicationId(), "A", "user1", apc);
     scheduler.handle(appAddedEvent1);
     // submission accepted
-    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(2, scheduler.getQueueManager().getLeafQueues().size());
     assertNotNull(scheduler.getSchedulerApplications().get(appAttemptId1.
         getApplicationId()));
 
@@ -4785,7 +4772,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
       // expected ignore: rules should have filtered this out
     }
     // submission rejected
-    assertEquals(1, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(2, scheduler.getQueueManager().getLeafQueues().size());
     assertNull(scheduler.getSchedulerApplications().get(appAttemptId2.
         getApplicationId()));
     assertNull(scheduler.getSchedulerApp(appAttemptId2));
@@ -4797,7 +4784,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
         appAttemptId3.getApplicationId(), "B.C", "user1", apc);
     scheduler.handle(appAddedEvent3);
     // submission accepted
-    assertEquals(2, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(3, scheduler.getQueueManager().getLeafQueues().size());
     assertNotNull(scheduler.getSchedulerApplications().get(appAttemptId3.
         getApplicationId()));
 
@@ -4820,7 +4807,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
       // expected ignore: rules should have filtered this out
     }
     // submission rejected
-    assertEquals(2, scheduler.getQueueManager().getLeafQueues().size());
+    assertEquals(3, scheduler.getQueueManager().getLeafQueues().size());
     assertNull(scheduler.getSchedulerApplications().get(appAttemptId4.
         getApplicationId()));
     assertNull(scheduler.getSchedulerApp(appAttemptId4));
@@ -5322,7 +5309,7 @@ public class TestFairScheduler extends FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext("root.queue1");
     scheduler.addApplication(appAttemptId.getApplicationId(), "root.queue1",
-        "user1", false, placementCtx);
+        "user1", false, placementCtx, Priority.newInstance(1));
     scheduler.addApplicationAttempt(appAttemptId, false, false);
 
     // Create container request that goes to a specific node.

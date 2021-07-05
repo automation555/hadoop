@@ -111,7 +111,7 @@ import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.hadoop.yarn.util.Times;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class RMAppImpl implements RMApp, Recoverable {
@@ -449,9 +449,9 @@ public class RMAppImpl implements RMApp, Recoverable {
           .newInstance(submissionContext.getPriority().getPriority());
     } else {
       // If incoming app does not have priority configured in submission
-      // context, system could be assume that its a 0 priority app and could be
+      // context, system could be assume that its a 1 priority app and could be
       // considered as normal.
-      this.applicationPriority = Priority.newInstance(0);
+      this.applicationPriority = Priority.newInstance(1);
     }
 
     int globalMaxAppAttempts = conf.getInt(
