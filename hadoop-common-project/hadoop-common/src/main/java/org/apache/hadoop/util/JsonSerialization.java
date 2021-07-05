@@ -35,7 +35,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,9 +57,13 @@ import org.apache.hadoop.fs.Path;
  * {@code org.apache.hadoop.registry.client.binding.JsonSerDeser},
  * which is now a subclass of this class.
  * @param <T> Type to marshal.
+ * @deprecated Avoid using this class any more, as jackson has 
+ *             too many CVEs so far. Use gson and
+ *             {@link GsonSerialization} instead.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
+@Deprecated
 public class JsonSerialization<T> {
 
   private static final Logger LOG =

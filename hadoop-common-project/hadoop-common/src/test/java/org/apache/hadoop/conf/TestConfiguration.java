@@ -17,6 +17,31 @@
  */
 package org.apache.hadoop.conf;
 
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.HOURS;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.conf.StorageUnit.BYTES;
+import static org.apache.hadoop.conf.StorageUnit.GB;
+import static org.apache.hadoop.conf.StorageUnit.KB;
+import static org.apache.hadoop.conf.StorageUnit.MB;
+import static org.apache.hadoop.conf.StorageUnit.TB;
+import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import com.google.gson.Gson;
 import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
@@ -46,24 +71,9 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.regex.Pattern;
-import static java.util.concurrent.TimeUnit.*;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.assertj.core.api.Assertions;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
-import static org.apache.hadoop.conf.StorageUnit.BYTES;
-import static org.apache.hadoop.conf.StorageUnit.GB;
-import static org.apache.hadoop.conf.StorageUnit.KB;
-import static org.apache.hadoop.conf.StorageUnit.MB;
-import static org.apache.hadoop.conf.StorageUnit.TB;
-import static org.junit.Assert.*;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.NetUtils;
@@ -71,16 +81,21 @@ import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialProviderFactory;
 import org.apache.hadoop.security.alias.LocalJavaKeyStoreProvider;
 import org.apache.hadoop.test.GenericTestUtils;
-
-import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
-
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
+import org.hamcrest.CoreMatchers;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.mockito.Mockito;
 
 public class TestConfiguration {
 
+  @Rule
+  public ExpectedException thrown= ExpectedException.none();
   private static final double DOUBLE_DELTA = 0.000000001f;
   private Configuration conf;
   final static String CONFIG = new File("./test-config-TestConfiguration.xml").getAbsolutePath();
@@ -480,62 +495,6 @@ public class TestConfiguration {
       System.out.println("p=" + p.name);
       String gotVal = mock.get(p.name);
       String gotRawVal = mock.getRaw(p.name);
-      assertEq(p.val, gotRawVal);
-      assertEq(p.expectEval, gotVal);
-    }
-  }
-
-  /**
-   * Verify that when a configuration is restricted, environment
-   * variables and system properties will be unresolved.
-   * The fallback patterns for the variables are still parsed.
-   */
-  @Test
-  public void testRestrictedEnv() throws IOException {
-    // this test relies on env.PATH being set on all platforms a
-    // test run will take place on, and the java.version sysprop
-    // set in all JVMs.
-    // Restricted configurations will not get access to these values, so
-    // will either be unresolved or, for env vars with fallbacks: the fallback
-    // values.
-
-    conf.setRestrictSystemProperties(true);
-
-    out = new BufferedWriter(new FileWriter(CONFIG));
-    startConfig();
-    // a simple property to reference
-    declareProperty("d", "D", "D");
-
-    // system property evaluation stops working completely
-    declareProperty("system1", "${java.version}", "${java.version}");
-
-    // the env variable does not resolve
-    declareProperty("secret1", "${env.PATH}", "${env.PATH}");
-
-    // but all the fallback options do work
-    declareProperty("secret2", "${env.PATH-a}", "a");
-    declareProperty("secret3", "${env.PATH:-b}", "b");
-    declareProperty("secret4", "${env.PATH:-}", "");
-    declareProperty("secret5", "${env.PATH-}", "");
-    // special case
-    declareProperty("secret6", "${env.PATH:}", "${env.PATH:}");
-    // safety check
-    declareProperty("secret7", "${env.PATH:--}", "-");
-
-    // recursive eval of the fallback
-    declareProperty("secret8", "${env.PATH:-${d}}", "D");
-
-    // if the fallback doesn't resolve, the result is the whole variable raw.
-    declareProperty("secret9", "${env.PATH:-$d}}", "${env.PATH:-$d}}");
-
-    endConfig();
-    Path fileResource = new Path(CONFIG);
-    conf.addResource(fileResource);
-
-    for (Prop p : props) {
-      System.out.println("p=" + p.name);
-      String gotVal = conf.get(p.name);
-      String gotRawVal = conf.getRaw(p.name);
       assertEq(p.val, gotRawVal);
       assertEq(p.expectEval, gotVal);
     }
@@ -1114,38 +1073,6 @@ public class TestConfiguration {
   }
 
   @Test
-  public void testRelativeIncludesWithLoadingViaUri() throws Exception {
-    tearDown();
-    File configFile = new File("./tmp/test-config.xml");
-    File configFile2 = new File("./tmp/test-config2.xml");
-
-    new File(configFile.getParent()).mkdirs();
-    out = new BufferedWriter(new FileWriter(configFile2));
-    startConfig();
-    appendProperty("a", "b");
-    endConfig();
-
-    out = new BufferedWriter(new FileWriter(configFile));
-    startConfig();
-    // Add the relative path instead of the absolute one.
-    startInclude(configFile2.getName());
-    endInclude();
-    appendProperty("c", "d");
-    endConfig();
-
-    // verify that the includes file contains all properties
-    Path fileResource = new Path(configFile.toURI());
-    conf.addResource(fileResource);
-    assertEquals("b", conf.get("a"));
-    assertEquals("d", conf.get("c"));
-
-    // Cleanup
-    configFile.delete();
-    configFile2.delete();
-    new File(configFile.getParent()).delete();
-  }
-
-  @Test
   public void testIntegerRanges() {
     Configuration conf = new Configuration();
     conf.set("first", "-100");
@@ -1539,64 +1466,61 @@ public class TestConfiguration {
 
     conf.setStorageSize(key, 10, MB);
     // This call returns the value specified in the Key as a double in MBs.
-    Assertions.assertThat(conf.getStorageSize(key, "1GB", MB))
-        .isEqualTo(10.0);
+    assertThat(conf.getStorageSize(key, "1GB", MB),
+        is(10.0));
 
     // Since this key is missing, This call converts the default value of  1GB
     // to MBs are returns that value.
-    Assertions.assertThat(conf.getStorageSize(nonKey, "1GB", MB))
-        .isEqualTo(1024.0);
+    assertThat(conf.getStorageSize(nonKey, "1GB", MB),
+        is(1024.0));
 
 
     conf.setStorageSize(key, 1024, BYTES);
-    Assertions.assertThat(conf.getStorageSize(key, 100, KB)).isEqualTo(1.0);
+    assertThat(conf.getStorageSize(key, 100, KB), is(1.0));
 
-    Assertions.assertThat(conf.getStorageSize(nonKey, 100.0, KB))
-        .isEqualTo(100.0);
+    assertThat(conf.getStorageSize(nonKey, 100.0, KB), is(100.0));
 
     // We try out different kind of String formats to see if they work and
     // during read, we also try to read using a different Storage Units.
     conf.setStrings(key, "1TB");
-    Assertions.assertThat(conf.getStorageSize(key, "1PB", GB))
-        .isEqualTo(1024.0);
+    assertThat(conf.getStorageSize(key, "1PB", GB), is(1024.0));
 
     conf.setStrings(key, "1bytes");
-    Assertions.assertThat(conf.getStorageSize(key, "1PB", KB))
-        .isEqualTo(0.001);
+    assertThat(conf.getStorageSize(key, "1PB", KB), is(0.001));
 
     conf.setStrings(key, "2048b");
-    Assertions.assertThat(conf.getStorageSize(key, "1PB", KB)).isEqualTo(2.0);
+    assertThat(conf.getStorageSize(key, "1PB", KB), is(2.0));
 
     conf.setStrings(key, "64 GB");
-    Assertions.assertThat(conf.getStorageSize(key, "1PB", GB)).isEqualTo(64.0);
+    assertThat(conf.getStorageSize(key, "1PB", GB), is(64.0));
 
     // Match the parsing patterns of getLongBytes, which takes single char
     // suffix.
     conf.setStrings(key, "1T");
-    Assertions.assertThat(conf.getStorageSize(key, "1GB", TB)).isEqualTo(1.0);
+    assertThat(conf.getStorageSize(key, "1GB", TB), is(1.0));
 
     conf.setStrings(key, "1k");
-    Assertions.assertThat(conf.getStorageSize(key, "1GB", KB)).isEqualTo(1.0);
+    assertThat(conf.getStorageSize(key, "1GB", KB), is(1.0));
 
     conf.setStrings(key, "10m");
-    Assertions.assertThat(conf.getStorageSize(key, "1GB", MB)).isEqualTo(10.0);
+    assertThat(conf.getStorageSize(key, "1GB", MB), is(10.0));
 
 
 
     // Missing format specification, this should throw.
     conf.setStrings(key, "100");
-    assertThrows(IllegalArgumentException.class,
-        () -> conf.getStorageSize(key, "1PB", GB));
+    thrown.expect(IllegalArgumentException.class);
+    conf.getStorageSize(key, "1PB", GB);
 
     // illegal format specification, this should throw.
     conf.setStrings(key, "1HB");
-    assertThrows(IllegalArgumentException.class,
-        () -> conf.getStorageSize(key, "1PB", GB));
+    thrown.expect(IllegalArgumentException.class);
+    conf.getStorageSize(key, "1PB", GB);
 
     // Illegal number  specification, this should throw.
     conf.setStrings(key, "HadoopGB");
-    assertThrows(IllegalArgumentException.class,
-        () -> conf.getStorageSize(key, "1PB", GB));
+    thrown.expect(IllegalArgumentException.class);
+    conf.getStorageSize(key, "1PB", GB);
   }
 
   @Test
@@ -1916,7 +1840,7 @@ public class TestConfiguration {
   @Test
   public void testDumpProperty() throws IOException {
     StringWriter outWriter = new StringWriter();
-    ObjectMapper mapper = new ObjectMapper();
+    Gson gson = new Gson();
     String jsonStr = null;
     String xmlStr = null;
     try {
@@ -1937,9 +1861,8 @@ public class TestConfiguration {
       Configuration.dumpConfiguration(testConf, "test.key2", outWriter);
       jsonStr = outWriter.toString();
       outWriter.close();
-      mapper = new ObjectMapper();
       SingleJsonConfiguration jconf1 =
-          mapper.readValue(jsonStr, SingleJsonConfiguration.class);
+          gson.fromJson(jsonStr, SingleJsonConfiguration.class);
       JsonProperty jp1 = jconf1.getProperty();
       assertEquals("test.key2", jp1.getKey());
       assertEquals("value2", jp1.getValue());
@@ -1985,9 +1908,8 @@ public class TestConfiguration {
       outWriter = new StringWriter();
       Configuration.dumpConfiguration(testConf, null, outWriter);
       jsonStr = outWriter.toString();
-      mapper = new ObjectMapper();
       JsonConfiguration jconf3 =
-          mapper.readValue(jsonStr, JsonConfiguration.class);
+          gson.fromJson(jsonStr, JsonConfiguration.class);
       assertEquals(3, jconf3.getProperties().length);
 
       outWriter = new StringWriter();
@@ -2004,9 +1926,8 @@ public class TestConfiguration {
       outWriter = new StringWriter();
       Configuration.dumpConfiguration(testConf, "", outWriter);
       jsonStr = outWriter.toString();
-      mapper = new ObjectMapper();
       JsonConfiguration jconf4 =
-          mapper.readValue(jsonStr, JsonConfiguration.class);
+          gson.fromJson(jsonStr, JsonConfiguration.class);
       assertEquals(3, jconf4.getProperties().length);
 
       outWriter = new StringWriter();
@@ -2033,9 +1954,9 @@ public class TestConfiguration {
     StringWriter outWriter = new StringWriter();
     Configuration.dumpConfiguration(conf, outWriter);
     String jsonStr = outWriter.toString();
-    ObjectMapper mapper = new ObjectMapper();
+    Gson gson = new Gson();
     JsonConfiguration jconf =
-        mapper.readValue(jsonStr, JsonConfiguration.class);
+        gson.fromJson(jsonStr, JsonConfiguration.class);
     int defaultLength = jconf.getProperties().length;
 
     // add 3 keys to the existing configuration properties
@@ -2052,8 +1973,7 @@ public class TestConfiguration {
     outWriter = new StringWriter();
     Configuration.dumpConfiguration(conf, outWriter);
     jsonStr = outWriter.toString();
-    mapper = new ObjectMapper();
-    jconf = mapper.readValue(jsonStr, JsonConfiguration.class);
+    jconf = gson.fromJson(jsonStr, JsonConfiguration.class);
     int length = jconf.getProperties().length;
     // check for consistency in the number of properties parsed in Json format.
     assertEquals(length, defaultLength+3);
@@ -2071,8 +1991,7 @@ public class TestConfiguration {
     outWriter = new StringWriter();
     Configuration.dumpConfiguration(conf, outWriter);
     jsonStr = outWriter.toString();
-    mapper = new ObjectMapper();
-    jconf = mapper.readValue(jsonStr, JsonConfiguration.class);
+    jconf = gson.fromJson(jsonStr, JsonConfiguration.class);
 
     // put the keys and their corresponding attributes into a hashmap for their
     // efficient retrieval
@@ -2104,8 +2023,7 @@ public class TestConfiguration {
     outWriter = new StringWriter();
     Configuration.dumpConfiguration(conf, outWriter);
     jsonStr = outWriter.toString();
-    mapper = new ObjectMapper();
-    jconf = mapper.readValue(jsonStr, JsonConfiguration.class);
+    jconf = gson.fromJson(jsonStr, JsonConfiguration.class);
     confDump = new HashMap<String, JsonProperty>();
     for(JsonProperty prop : jconf.getProperties()) {
       confDump.put(prop.getKey(), prop);
@@ -2122,9 +2040,9 @@ public class TestConfiguration {
     StringWriter outWriter = new StringWriter();
     Configuration.dumpConfiguration(config, outWriter);
     String jsonStr = outWriter.toString();
-    ObjectMapper mapper = new ObjectMapper();
+    Gson gson = new Gson();
     JsonConfiguration jconf =
-        mapper.readValue(jsonStr, JsonConfiguration.class);
+        gson.fromJson(jsonStr, JsonConfiguration.class);
 
     //ensure that no properties are loaded.
     assertEquals(0, jconf.getProperties().length);
@@ -2142,8 +2060,7 @@ public class TestConfiguration {
     outWriter = new StringWriter();
     Configuration.dumpConfiguration(config, outWriter);
     jsonStr = outWriter.toString();
-    mapper = new ObjectMapper();
-    jconf = mapper.readValue(jsonStr, JsonConfiguration.class);
+    jconf = gson.fromJson(jsonStr, JsonConfiguration.class);
 
     HashMap<String, JsonProperty>confDump = new HashMap<String, JsonProperty>();
     for (JsonProperty prop : jconf.getProperties()) {
@@ -2478,10 +2395,10 @@ public class TestConfiguration {
 
     Configuration.addDeprecation(oldKey, newKey);
 
-    Assertions.assertThat(conf.getPassword(newKey))
-        .isEqualTo(password.toCharArray());
-    Assertions.assertThat(conf.getPassword(oldKey))
-        .isEqualTo(password.toCharArray());
+    assertThat(conf.getPassword(newKey),
+        CoreMatchers.is(password.toCharArray()));
+    assertThat(conf.getPassword(oldKey),
+        CoreMatchers.is(password.toCharArray()));
 
     FileUtil.fullyDelete(tmpDir);
   }
@@ -2507,10 +2424,10 @@ public class TestConfiguration {
 
     Configuration.addDeprecation(oldKey, newKey);
 
-    Assertions.assertThat(conf.getPassword(newKey))
-        .isEqualTo(password.toCharArray());
-    Assertions.assertThat(conf.getPassword(oldKey))
-        .isEqualTo(password.toCharArray());
+    assertThat(conf.getPassword(newKey),
+        CoreMatchers.is(password.toCharArray()));
+    assertThat(conf.getPassword(oldKey),
+        CoreMatchers.is(password.toCharArray()));
 
     FileUtil.fullyDelete(tmpDir);
   }
@@ -2523,7 +2440,7 @@ public class TestConfiguration {
     }
     conf.set("different.prefix" + ".name", "value");
     Map<String, String> prefixedProps = conf.getPropsWithPrefix("prefix.");
-    Assertions.assertThat(prefixedProps).hasSize(10);
+    assertEquals(prefixedProps.size(), 10);
     for (int i = 0; i < 10; i++) {
       assertEquals("value" + i, prefixedProps.get("name" + i));
     }
@@ -2534,7 +2451,7 @@ public class TestConfiguration {
       conf.set("subprefix." + "subname" + i, "value_${foo}" + i);
     }
     prefixedProps = conf.getPropsWithPrefix("subprefix.");
-    Assertions.assertThat(prefixedProps).hasSize(10);
+    assertEquals(prefixedProps.size(), 10);
     for (int i = 0; i < 10; i++) {
       assertEquals("value_bar" + i, prefixedProps.get("subname" + i));
     }
@@ -2638,42 +2555,5 @@ public class TestConfiguration {
     confClone.get("firstParse");
     // Thread 1
     config.get("secondParse");
-  }
-
-  @Test
-  public void testCDATA() throws IOException {
-    String xml = new String(
-        "<configuration>" +
-          "<property>" +
-            "<name>cdata</name>" +
-            "<value><![CDATA[>cdata]]></value>" +
-          "</property>\n" +
-          "<property>" +
-            "<name>cdata-multiple</name>" +
-            "<value><![CDATA[>cdata1]]> and <![CDATA[>cdata2]]></value>" +
-          "</property>\n" +
-          "<property>" +
-            "<name>cdata-multiline</name>" +
-            "<value><![CDATA[>cdata\nmultiline<>]]></value>" +
-          "</property>\n" +
-          "<property>" +
-            "<name>cdata-whitespace</name>" +
-            "<value>  prefix <![CDATA[>cdata]]>\nsuffix  </value>" +
-          "</property>\n" +
-        "</configuration>");
-    Configuration conf = checkCDATA(xml.getBytes());
-    ByteArrayOutputStream os = new ByteArrayOutputStream();
-    conf.writeXml(os);
-    checkCDATA(os.toByteArray());
-  }
-
-  private static Configuration checkCDATA(byte[] bytes) {
-    Configuration conf = new Configuration(false);
-    conf.addResource(new ByteArrayInputStream(bytes));
-    assertEquals(">cdata", conf.get("cdata"));
-    assertEquals(">cdata1 and >cdata2", conf.get("cdata-multiple"));
-    assertEquals(">cdata\nmultiline<>", conf.get("cdata-multiline"));
-    assertEquals("  prefix >cdata\nsuffix  ", conf.get("cdata-whitespace"));
-    return conf;
   }
 }
