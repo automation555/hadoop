@@ -20,8 +20,6 @@ package org.apache.hadoop.yarn.event;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.yarn.metrics.EventTypeMetrics;
-import org.apache.hadoop.yarn.util.Clock;
-import org.apache.hadoop.yarn.util.MonotonicClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
@@ -57,8 +55,6 @@ public class EventDispatcher<T extends Event> extends
   private static final Marker FATAL =
       MarkerFactory.getMarker("FATAL");
 
-  private Clock clock = new MonotonicClock();
-
   private final class EventProcessor implements Runnable {
     @Override
     public void run() {
@@ -75,10 +71,10 @@ public class EventDispatcher<T extends Event> extends
 
         try {
           if (metrics != null) {
-            long startTime = clock.getTime();
+            long startTime = System.nanoTime();
             handler.handle(event);
-            metrics.increment(event.getType(),
-                clock.getTime() - startTime);
+            metrics.incr(event.getType(),
+                (System.nanoTime() - startTime) / 1000);
           } else {
             handler.handle(event);
           }
@@ -152,17 +148,5 @@ public class EventDispatcher<T extends Event> extends
 
   public void setMetrics(EventTypeMetrics metrics) {
     this.metrics = metrics;
-  }
-
-  protected long getEventProcessorId() {
-    return this.eventProcessor.getId();
-  }
-
-  protected boolean isStopped() {
-    return this.stopped;
-  }
-
-  public int getEventQueueSize() {
-    return eventQueue.size();
   }
 }

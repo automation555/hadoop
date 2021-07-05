@@ -37,6 +37,6 @@ public final class GenericEventTypeMetricsManager {
             "Metrics for " + dispatcherName))
         .setEnumClass(eventTypeClass)
         .setEnums(eventTypeClass.getEnumConstants())
-        .build().registerMetrics();
+        .build();
   }
 }

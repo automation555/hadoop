@@ -20,19 +20,13 @@ package org.apache.hadoop.yarn.event;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.yarn.metrics.EventTypeMetrics;
-import org.apache.hadoop.yarn.util.Clock;
-import org.apache.hadoop.yarn.util.MonotonicClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
@@ -95,10 +89,6 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   private Map<Class<? extends Enum>,
       EventTypeMetrics> eventTypeMetricsMap;
 
-  private Clock clock = new MonotonicClock();
-
-  private ThreadPoolExecutor printEventDetailsExecutor;
-
   /**
    * The thread name for dispatcher.
    */
@@ -151,13 +141,12 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
             return;
           }
           if (event != null) {
-            if (eventTypeMetricsMap.
-                get(event.getType().getDeclaringClass()) != null) {
-              long startTime = clock.getTime();
+            if (eventTypeMetricsMap.get(event.getType().getClass()) != null) {
+              long startTime = System.nanoTime();
               dispatch(event);
-              eventTypeMetricsMap.get(event.getType().getDeclaringClass())
-                  .increment(event.getType(),
-                      clock.getTime() - startTime);
+              eventTypeMetricsMap.get(event.getType().getClass())
+                  .incr(event.getType(),
+                       (System.nanoTime() - startTime) / 1000);
             } else {
               dispatch(event);
             }
@@ -185,15 +174,6 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
                     YARN_DISPATCHER_PRINT_EVENTS_INFO_THRESHOLD,
             YarnConfiguration.
                     DEFAULT_YARN_DISPATCHER_PRINT_EVENTS_INFO_THRESHOLD);
-
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat("PrintEventDetailsThread #%d")
-        .build();
-    // Thread pool for async print event details,
-    // to prevent wasting too much time for RM.
-    printEventDetailsExecutor = new ThreadPoolExecutor(
-        1, 5, 10, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(), threadFactory);
   }
 
   @Override
@@ -237,7 +217,6 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
         LOG.warn("Interrupted Exception while stopping", ie);
       }
     }
-    printEventDetailsExecutor.shutdownNow();
 
     // stop all the components
     super.serviceStop();
@@ -303,16 +282,11 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   }
 
   class GenericEventHandler implements EventHandler<Event> {
-    private void printEventQueueDetails() {
-      Iterator<Event> iterator = eventQueue.iterator();
-      Map<Enum, Long> counterMap = new HashMap<>();
-      while (iterator.hasNext()) {
-        Enum eventType = iterator.next().getType();
-        if (!counterMap.containsKey(eventType)) {
-          counterMap.put(eventType, 0L);
-        }
-        counterMap.put(eventType, counterMap.get(eventType) + 1);
-      }
+    private void printEventQueueDetails(BlockingQueue<Event> queue) {
+      Map<Enum, Long> counterMap = eventQueue.stream().
+              collect(Collectors.
+                      groupingBy(e -> e.getType(), Collectors.counting())
+              );
       for (Map.Entry<Enum, Long> entry : counterMap.entrySet()) {
         long num = entry.getValue();
         LOG.info("Event type: " + entry.getKey()
@@ -335,7 +309,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
       if (qSize != 0 && qSize % detailsInterval == 0
               && lastEventDetailsQueueSizeLogged != qSize) {
         lastEventDetailsQueueSizeLogged = qSize;
-        printEventDetailsExecutor.submit(this::printEventQueueDetails);
+        printEventQueueDetails(eventQueue);
         printTrigger = true;
       }
       int remCapacity = eventQueue.remainingCapacity();
@@ -408,9 +382,5 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   public void addMetrics(EventTypeMetrics metrics,
       Class<? extends Enum> eventClass) {
     eventTypeMetricsMap.put(eventClass, metrics);
-  }
-
-  public int getEventQueueSize() {
-    return eventQueue.size();
   }
 }
