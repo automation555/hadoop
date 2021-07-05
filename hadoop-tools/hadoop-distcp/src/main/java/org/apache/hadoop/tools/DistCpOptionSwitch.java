@@ -46,18 +46,14 @@ public enum DistCpOptionSwitch {
    * only the corresponding file attribute is preserved.
    */
   PRESERVE_STATUS(DistCpConstants.CONF_LABEL_PRESERVE_STATUS,
-      new Option("p", true, "preserve status (rbugpcaxte)(replication, " +
+      new Option("p", true, "preserve status (rbugpcaxt)(replication, " +
           "block-size, user, group, permission, checksum-type, ACL, XATTR, " +
-          "timestamps, erasure coding policy). If -p is specified with no "
-          + "<arg>, then "
-          + "preserves " +
+          "timestamps). If -p is specified with no <arg>, then preserves " +
           "replication, block size, user, group, permission, checksum type " +
           "and timestamps. " +
           "raw.* xattrs are preserved when both the source and destination " +
           "paths are in the /.reserved/raw hierarchy (HDFS only). raw.* xattr" +
           "preservation is independent of the -p flag. " +
-          "Erasure coding policy is only preserved when both source and "
-          + "destination are of HDFS"+
           "Refer to the DistCp documentation for more details.")),
 
   /**
@@ -79,6 +75,15 @@ public enum DistCpOptionSwitch {
   DELETE_MISSING(DistCpConstants.CONF_LABEL_DELETE_MISSING,
       new Option("delete", false, "Delete from target, " +
           "files missing in source. Delete is applicable only with update or overwrite options")),
+
+  /**
+   * When -delete option on, files in target that are missing from source
+   * will be delete by default. This allows the files to be
+   * moved to the trash
+   */
+  DELETE_USETRASH(DistCpConstants.CONF_LABEL_DELETE_MISSING_USETRASH,
+      new Option("useTrash", false, "Move deleted files into " +
+          "the user's trash directory in the destination filesystem")),
 
   /**
    * Track missing files in target that are missing from source
@@ -239,12 +244,7 @@ public enum DistCpOptionSwitch {
    */
   DIRECT_WRITE(DistCpConstants.CONF_LABEL_DIRECT_WRITE,
       new Option("direct", false, "Write files directly to the"
-          + " target location, avoiding temporary file rename.")),
-
-  USE_ITERATOR(DistCpConstants.CONF_LABEL_USE_ITERATOR,
-      new Option("useiterator", false,
-          "Use single threaded list status iterator to build "
-              + "the listing to save the memory utilisation at the client"));
+          + " target location, avoiding temporary file rename."));
 
 
   public static final String PRESERVE_STATUS_DEFAULT = "-prbugpct";

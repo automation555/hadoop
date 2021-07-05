@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.tools.mapred;
 
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -53,8 +55,6 @@ import java.io.IOException;
 import java.util.*;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
-import static org.apache.hadoop.tools.DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH;
-import static org.apache.hadoop.tools.DistCpConstants.CONF_LABEL_TARGET_WORK_PATH;
 import static org.apache.hadoop.tools.util.TestDistCpUtils.*;
 
 public class TestCopyCommitter {
@@ -86,6 +86,7 @@ public class TestCopyCommitter {
     clusterConfig = getJobForClient().getConfiguration();
     clusterConfig.setLong(
         DistCpConstants.CONF_LABEL_TOTAL_BYTES_TO_BE_COPIED, 0);
+    clusterConfig.setLong(CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY, 10);
     clusterConfig.setLong(
         DFSConfigKeys.DFS_NAMENODE_MIN_BLOCK_SIZE_KEY, BLOCK_SIZE);
     clusterConfig.setLong(
@@ -136,6 +137,62 @@ public class TestCopyCommitter {
   }
 
   @Test
+  public void testDeleteUseTrash() throws IOException {
+    TaskAttemptContext taskAttemptContext = getTaskAttemptContext(config);
+    JobContext jobContext = new JobContextImpl(
+        taskAttemptContext.getConfiguration(),
+        taskAttemptContext.getTaskAttemptID().getJobID());
+    Configuration conf = jobContext.getConfiguration();
+
+    String sourceBase;
+    String targetBase;
+    FileSystem fs = null;
+    try {
+      OutputCommitter committer = new CopyCommitter(null, taskAttemptContext);
+      fs = FileSystem.get(conf);
+      sourceBase = TestDistCpUtils.createTestSetup(fs);
+      targetBase = TestDistCpUtils.createTestSetup(fs);
+      String targetBaseAdd = TestDistCpUtils.createTestSetup(fs);
+      ContractTestUtils.assertRenameOutcome(fs, new Path(targetBaseAdd),
+          new Path(targetBase), true);
+
+      DistCpOptions.Builder builder = new DistCpOptions.Builder(
+          Arrays.asList(new Path(sourceBase)), new Path("/out"));
+      builder.withSyncFolder(true);
+      builder.withDeleteMissing(true);
+      builder.withDeleteUseTrash(true);
+      builder.build().appendToConf(conf);
+      DistCpContext cpContext = new DistCpContext(builder.build());
+
+      CopyListing listing = new GlobbedCopyListing(conf, CREDENTIALS);
+      Path listingFile = new Path("/tmp1/" + String.valueOf(rand.nextLong()));
+      listing.buildListing(listingFile, cpContext);
+
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+
+      Path trashRootDir = fs.getTrashRoot(null);
+      if (fs.exists(trashRootDir)) {
+        fs.delete(trashRootDir, true);
+      }
+      committer.commitJob(jobContext);
+
+      verifyFoldersAreInSync(fs, targetBase, sourceBase);
+      verifyFoldersAreInSync(fs, sourceBase, targetBase);
+
+      Assert.assertTrue("Path delete does not use trash",
+          fs.exists(trashRootDir));
+      Path trashDir = new Path(trashRootDir, "Current" + targetBaseAdd);
+      verifyFoldersAreInSync(fs, trashDir.toString(), sourceBase);
+    } finally {
+      TestDistCpUtils.delete(fs, "/tmp1");
+      fs.close();
+      conf.set(DistCpConstants.CONF_LABEL_DELETE_MISSING, "false");
+      conf.set(DistCpConstants.CONF_LABEL_DELETE_MISSING_USETRASH, "false");
+    }
+  }
+
+  @Test
   public void testPreserveStatus() throws IOException {
     TaskAttemptContext taskAttemptContext = getTaskAttemptContext(config);
     JobContext jobContext = new JobContextImpl(taskAttemptContext.getConfiguration(),
@@ -162,10 +219,10 @@ public class TestCopyCommitter {
       context.setTargetPathExists(false);
 
       CopyListing listing = new GlobbedCopyListing(conf, CREDENTIALS);
-      Path listingFile = new Path("/tmp1/" + rand.nextLong());
+      Path listingFile = new Path("/tmp1/" + String.valueOf(rand.nextLong()));
       listing.buildListing(listingFile, context);
 
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
 
       committer.commitJob(jobContext);
       checkDirectoryPermissions(fs, targetBase, sourcePerm);
@@ -179,45 +236,6 @@ public class TestCopyCommitter {
       conf.unset(DistCpConstants.CONF_LABEL_PRESERVE_STATUS);
     }
 
-  }
-
-  @Test
-  public void testPreserveStatusWithAtomicCommit() throws IOException {
-    TaskAttemptContext taskAttemptContext = getTaskAttemptContext(config);
-    JobContext jobContext = new JobContextImpl(
-                            taskAttemptContext.getConfiguration(),
-                            taskAttemptContext.getTaskAttemptID().getJobID());
-    Configuration conf = jobContext.getConfiguration();
-    String sourceBase;
-    String workBase;
-    String targetBase;
-    FileSystem fs = null;
-    try {
-      OutputCommitter committer = new CopyCommitter(null, taskAttemptContext);
-      fs = FileSystem.get(conf);
-      FsPermission sourcePerm = new FsPermission((short) 511);
-      FsPermission initialPerm = new FsPermission((short) 448);
-      sourceBase = TestDistCpUtils.createTestSetup(fs, sourcePerm);
-      workBase = TestDistCpUtils.createTestSetup(fs, initialPerm);
-      targetBase = "/tmp1/" + rand.nextLong();
-      final DistCpOptions options = new DistCpOptions.Builder(
-              Collections.singletonList(new Path(sourceBase)), new Path("/out"))
-              .preserve(FileAttribute.PERMISSION).build();
-      options.appendToConf(conf);
-      final DistCpContext context = new DistCpContext(options);
-      context.setTargetPathExists(false);
-      CopyListing listing = new GlobbedCopyListing(conf, CREDENTIALS);
-      Path listingFile = new Path("/tmp1/" + rand.nextLong());
-      listing.buildListing(listingFile, context);
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
-      conf.set(CONF_LABEL_TARGET_WORK_PATH, workBase);
-      conf.setBoolean(DistCpConstants.CONF_LABEL_ATOMIC_COPY, true);
-      committer.commitJob(jobContext);
-      checkDirectoryPermissions(fs, targetBase, sourcePerm);
-    } finally {
-      TestDistCpUtils.delete(fs, "/tmp1");
-      conf.unset(DistCpConstants.CONF_LABEL_PRESERVE_STATUS);
-    }
   }
 
   @Test
@@ -248,51 +266,6 @@ public class TestCopyCommitter {
       Path listingFile = new Path("/tmp1/" + String.valueOf(rand.nextLong()));
       listing.buildListing(listingFile, context);
 
-      conf.set(CONF_LABEL_TARGET_WORK_PATH, targetBase);
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
-
-      committer.commitJob(jobContext);
-      verifyFoldersAreInSync(fs, targetBase, sourceBase);
-      verifyFoldersAreInSync(fs, sourceBase, targetBase);
-
-      //Test for idempotent commit
-      committer.commitJob(jobContext);
-      verifyFoldersAreInSync(fs, targetBase, sourceBase);
-      verifyFoldersAreInSync(fs, sourceBase, targetBase);
-    } finally {
-      TestDistCpUtils.delete(fs, "/tmp1");
-      conf.set(DistCpConstants.CONF_LABEL_DELETE_MISSING, "false");
-    }
-  }
-
-  @Test
-  public void testDeleteMissingWithOnlyFile() throws IOException {
-    TaskAttemptContext taskAttemptContext = getTaskAttemptContext(config);
-    JobContext jobContext = new JobContextImpl(taskAttemptContext
-        .getConfiguration(), taskAttemptContext.getTaskAttemptID().getJobID());
-    Configuration conf = jobContext.getConfiguration();
-
-    String sourceBase;
-    String targetBase;
-    FileSystem fs = null;
-    try {
-      OutputCommitter committer = new CopyCommitter(null, taskAttemptContext);
-      fs = FileSystem.get(conf);
-      sourceBase = TestDistCpUtils.createTestSetupWithOnlyFile(fs,
-          FsPermission.getDefault());
-      targetBase = TestDistCpUtils.createTestSetupWithOnlyFile(fs,
-          FsPermission.getDefault());
-
-      final DistCpOptions options = new DistCpOptions.Builder(
-          Collections.singletonList(new Path(sourceBase)), new Path(targetBase))
-          .withSyncFolder(true).withDeleteMissing(true).build();
-      options.appendToConf(conf);
-      final DistCpContext context = new DistCpContext(options);
-
-      CopyListing listing = new GlobbedCopyListing(conf, CREDENTIALS);
-      Path listingFile = new Path(sourceBase);
-      listing.buildListing(listingFile, context);
-
       conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
       conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
 
@@ -315,8 +288,8 @@ public class TestCopyCommitter {
   public void testPreserveTimeWithDeleteMiss() throws IOException {
     TaskAttemptContext taskAttemptContext = getTaskAttemptContext(config);
     JobContext jobContext = new JobContextImpl(
-            taskAttemptContext.getConfiguration(),
-            taskAttemptContext.getTaskAttemptID().getJobID());
+        taskAttemptContext.getConfiguration(),
+        taskAttemptContext.getTaskAttemptID().getJobID());
     Configuration conf = jobContext.getConfiguration();
 
     FileSystem fs = null;
@@ -324,17 +297,17 @@ public class TestCopyCommitter {
       OutputCommitter committer = new CopyCommitter(null, taskAttemptContext);
       fs = FileSystem.get(conf);
       String sourceBase = TestDistCpUtils.createTestSetup(
-              fs, FsPermission.getDefault());
+          fs, FsPermission.getDefault());
       String targetBase = TestDistCpUtils.createTestSetup(
-              fs, FsPermission.getDefault());
+          fs, FsPermission.getDefault());
       String targetBaseAdd = TestDistCpUtils.createTestSetup(
-              fs, FsPermission.getDefault());
+          fs, FsPermission.getDefault());
       fs.rename(new Path(targetBaseAdd), new Path(targetBase));
 
       final DistCpOptions options = new DistCpOptions.Builder(
-              Collections.singletonList(new Path(sourceBase)), new Path("/out"))
-              .withSyncFolder(true).withDeleteMissing(true)
-              .preserve(FileAttribute.TIMES).build();
+          Collections.singletonList(new Path(sourceBase)), new Path("/out"))
+          .withSyncFolder(true).withDeleteMissing(true)
+          .preserve(FileAttribute.TIMES).build();
       options.appendToConf(conf);
       final DistCpContext context = new DistCpContext(options);
 
@@ -342,13 +315,13 @@ public class TestCopyCommitter {
       Path listingFile = new Path("/tmp1/" + String.valueOf(rand.nextLong()));
       listing.buildListing(listingFile, context);
 
-      conf.set(CONF_LABEL_TARGET_WORK_PATH, targetBase);
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
 
       Path sourceListing = new Path(
-              conf.get(DistCpConstants.CONF_LABEL_LISTING_FILE_PATH));
+          conf.get(DistCpConstants.CONF_LABEL_LISTING_FILE_PATH));
       SequenceFile.Reader sourceReader = new SequenceFile.Reader(conf,
-              SequenceFile.Reader.file(sourceListing));
+          SequenceFile.Reader.file(sourceListing));
       Path targetRoot = new Path(targetBase);
 
       committer.commitJob(jobContext);
@@ -364,6 +337,61 @@ public class TestCopyCommitter {
     }
   }
 
+  @Test
+  public void testDeleteUseTrash() throws IOException {
+    TaskAttemptContext taskAttemptContext = getTaskAttemptContext(config);
+    JobContext jobContext = new JobContextImpl(
+        taskAttemptContext.getConfiguration(),
+        taskAttemptContext.getTaskAttemptID().getJobID());
+    Configuration conf = jobContext.getConfiguration();
+
+    String sourceBase;
+    String targetBase;
+    FileSystem fs = null;
+    try {
+      OutputCommitter committer = new CopyCommitter(null, taskAttemptContext);
+      fs = FileSystem.get(conf);
+      sourceBase = TestDistCpUtils.createTestSetup(fs);
+      targetBase = TestDistCpUtils.createTestSetup(fs);
+      String targetBaseAdd = TestDistCpUtils.createTestSetup(fs);
+      ContractTestUtils.assertRenameOutcome(fs, new Path(targetBaseAdd),
+          new Path(targetBase),true);
+
+      DistCpOptions.Builder builder = new DistCpOptions.Builder(
+          Arrays.asList(new Path(sourceBase)), new Path("/out"));
+      builder.withSyncFolder(true);
+      builder.withDeleteMissing(true);
+      builder.withDeleteUseTrash(true);
+      builder.build().appendToConf(conf);
+      DistCpContext cpContext = new DistCpContext(builder.build());
+
+      CopyListing listing = new GlobbedCopyListing(conf, CREDENTIALS);
+      Path listingFile = new Path("/tmp1/" + String.valueOf(rand.nextLong()));
+      listing.buildListing(listingFile, cpContext);
+
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+
+      Path trashRootDir = fs.getTrashRoot(null);
+      if (fs.exists(trashRootDir)) {
+        fs.delete(trashRootDir, true);
+      }
+      committer.commitJob(jobContext);
+
+      verifyFoldersAreInSync(fs, targetBase, sourceBase);
+      verifyFoldersAreInSync(fs, sourceBase, targetBase);
+
+      Assert.assertTrue("Path delete does not use trash",
+          fs.exists(trashRootDir));
+      Path trashDir = new Path(trashRootDir, "Current" + targetBaseAdd);
+      verifyFoldersAreInSync(fs, trashDir.toString(), sourceBase);
+    } finally {
+      TestDistCpUtils.delete(fs, "/tmp1");
+      fs.close();
+      conf.set(DistCpConstants.CONF_LABEL_DELETE_MISSING, "false");
+      conf.set(DistCpConstants.CONF_LABEL_DELETE_MISSING_USETRASH, "false");
+    }
+  }
 
   @Test
   public void testDeleteMissingFlatInterleavedFiles() throws IOException {
@@ -406,8 +434,8 @@ public class TestCopyCommitter {
       Path listingFile = new Path("/tmp1/" + String.valueOf(rand.nextLong()));
       listing.buildListing(listingFile, context);
 
-      conf.set(CONF_LABEL_TARGET_WORK_PATH, targetBase);
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
 
       committer.commitJob(jobContext);
       verifyFoldersAreInSync(fs, targetBase, sourceBase);
@@ -439,8 +467,8 @@ public class TestCopyCommitter {
       fs = FileSystem.get(conf);
       fs.mkdirs(new Path(workPath));
 
-      conf.set(CONF_LABEL_TARGET_WORK_PATH, workPath);
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, finalPath);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, workPath);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, finalPath);
       conf.setBoolean(DistCpConstants.CONF_LABEL_ATOMIC_COPY, true);
 
       assertPathExists(fs, "Work path", new Path(workPath));
@@ -477,8 +505,8 @@ public class TestCopyCommitter {
       fs.mkdirs(new Path(workPath));
       fs.mkdirs(new Path(finalPath));
 
-      conf.set(CONF_LABEL_TARGET_WORK_PATH, workPath);
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, finalPath);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, workPath);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, finalPath);
       conf.setBoolean(DistCpConstants.CONF_LABEL_ATOMIC_COPY, true);
 
       assertPathExists(fs, "Work path", new Path(workPath));
@@ -549,8 +577,8 @@ public class TestCopyCommitter {
           + String.valueOf(rand.nextLong()));
       listing.buildListing(listingFile, context);
 
-      conf.set(CONF_LABEL_TARGET_WORK_PATH, targetBase);
-      conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
 
       OutputCommitter committer = new CopyCommitter(
           null, taskAttemptContext);

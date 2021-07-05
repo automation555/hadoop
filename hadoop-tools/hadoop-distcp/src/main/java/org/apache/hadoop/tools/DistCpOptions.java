@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.tools;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,6 +95,8 @@ public final class DistCpOptions {
   /** Whether to run blocking or non-blocking. */
   private final boolean blocking;
 
+  private boolean deleteUseTrash;
+
   // When "-diff s1 s2 src tgt" is passed, apply forward snapshot diff (from s1
   // to s2) of source cluster to the target cluster to sync target cluster with
   // the source cluster. Referred to as "Fdiff" in the code.
@@ -158,8 +160,6 @@ public final class DistCpOptions {
   /** Whether data should be written directly to the target paths. */
   private final boolean directWrite;
 
-  private final boolean useIterator;
-
   /**
    * File attributes for preserve.
    *
@@ -174,8 +174,7 @@ public final class DistCpOptions {
     CHECKSUMTYPE,   // C
     ACL,            // A
     XATTR,          // X
-    TIMES,          // T
-    ERASURECODINGPOLICY; // E
+    TIMES;          // T
 
     public static FileAttribute getAttribute(char symbol) {
       for (FileAttribute attribute : values()) {
@@ -224,8 +223,7 @@ public final class DistCpOptions {
     this.trackPath = builder.trackPath;
 
     this.directWrite = builder.directWrite;
-
-    this.useIterator = builder.useIterator;
+    this.deleteUseTrash = builder.deleteUseTrash;
   }
 
   public Path getSourceFileListing() {
@@ -287,6 +285,10 @@ public final class DistCpOptions {
 
   public boolean shouldUseSnapshotDiff() {
     return shouldUseDiff() || shouldUseRdiff();
+  }
+
+  public boolean shouldDeleteUseTrash() {
+    return deleteUseTrash;
   }
 
   public String getFromSnapshot() {
@@ -357,10 +359,6 @@ public final class DistCpOptions {
     return directWrite;
   }
 
-  public boolean shouldUseIterator() {
-    return useIterator;
-  }
-
   /**
    * Add options to configuration. These will be used in the Mapper/committer
    *
@@ -383,6 +381,8 @@ public final class DistCpOptions {
         String.valueOf(useDiff));
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.RDIFF,
         String.valueOf(useRdiff));
+    DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.DELETE_USETRASH,
+        String.valueOf(deleteUseTrash));
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.SKIP_CRC,
         String.valueOf(skipCRC));
     if (mapBandwidth > 0) {
@@ -411,9 +411,6 @@ public final class DistCpOptions {
     }
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.DIRECT_WRITE,
             String.valueOf(directWrite));
-
-    DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.USE_ITERATOR,
-        String.valueOf(useIterator));
   }
 
   /**
@@ -427,6 +424,7 @@ public final class DistCpOptions {
         "atomicCommit=" + atomicCommit +
         ", syncFolder=" + syncFolder +
         ", deleteMissing=" + deleteMissing +
+        ", deleteUseTrash=" + deleteUseTrash +
         ", ignoreFailures=" + ignoreFailures +
         ", overwrite=" + overwrite +
         ", append=" + append +
@@ -451,7 +449,6 @@ public final class DistCpOptions {
         ", copyBufferSize=" + copyBufferSize +
         ", verboseLog=" + verboseLog +
         ", directWrite=" + directWrite +
-        ", useiterator=" + useIterator +
         '}';
   }
 
@@ -480,6 +477,8 @@ public final class DistCpOptions {
 
     private boolean useDiff = false;
     private boolean useRdiff = false;
+    private boolean deleteUseTrash = false;
+
     private String fromSnapshot;
     private String toSnapshot;
 
@@ -502,8 +501,6 @@ public final class DistCpOptions {
             DistCpConstants.COPY_BUFFER_SIZE_DEFAULT;
 
     private boolean directWrite = false;
-
-    private boolean useIterator = false;
 
     public Builder(List<Path> sourcePaths, Path targetPath) {
       Preconditions.checkArgument(sourcePaths != null && !sourcePaths.isEmpty(),
@@ -579,6 +576,11 @@ public final class DistCpOptions {
             + "only with update or overwrite options");
       }
 
+      if (deleteUseTrash && !deleteMissing) {
+        throw new IllegalArgumentException("Option -useTrash must be " +
+            "accompanied by -delete");
+      }
+
       if (overwrite && syncFolder) {
         throw new IllegalArgumentException("Overwrite and update options are "
             + "mutually exclusive");
@@ -639,6 +641,11 @@ public final class DistCpOptions {
 
     public Builder withDeleteMissing(boolean newDeleteMissing) {
       this.deleteMissing = newDeleteMissing;
+      return this;
+    }
+
+    public Builder withDeleteUseTrash(boolean newDeleteUseTrash) {
+      this.deleteUseTrash = newDeleteUseTrash;
       return this;
     }
 
@@ -760,11 +767,6 @@ public final class DistCpOptions {
 
     public Builder withDirectWrite(boolean newDirectWrite) {
       this.directWrite = newDirectWrite;
-      return this;
-    }
-
-    public Builder withUseIterator(boolean useItr) {
-      this.useIterator = useItr;
       return this;
     }
   }

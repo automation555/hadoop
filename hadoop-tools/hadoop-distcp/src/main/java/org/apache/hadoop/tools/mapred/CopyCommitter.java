@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
@@ -318,10 +319,8 @@ public class CopyCommitter extends FileOutputCommitter {
     SequenceFile.Reader sourceReader = new SequenceFile.Reader(conf,
                                       SequenceFile.Reader.file(sourceListing));
     long totalLen = clusterFS.getFileStatus(sourceListing).getLen();
-    // For Atomic Copy the Final & Work Path are different & atomic copy has
-    // already moved it to final path.
-    Path targetRoot =
-            new Path(conf.get(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH));
+
+    Path targetRoot = new Path(conf.get(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH));
 
     long preservedEntries = 0;
     try {
@@ -460,7 +459,8 @@ public class CopyCommitter extends FileOutputCommitter {
         if (tracker.shouldDelete(trgtFileStatus)) {
           showProgress = true;
           try {
-            if (targetFS.delete(targetEntry, true)) {
+            boolean result = deletePath(targetFS, targetEntry, conf);
+            if (result) {
               // the delete worked. Unless the file is actually missing, this is the
               LOG.info("Deleted " + targetEntry + " - missing at source");
               deletedEntries++;
@@ -474,7 +474,8 @@ public class CopyCommitter extends FileOutputCommitter {
               // For all the filestores which implement the FS spec properly,
               // this means "the file wasn't there".
               // so track but don't worry about it.
-              LOG.info("delete({}) returned false ({})",
+              LOG.info("delete({}) returned false ({}). Consider using " +
+                      "-useTrash option if trash is enabled.",
                   targetEntry, trgtFileStatus);
               missingDeletes++;
             }
@@ -522,6 +523,17 @@ public class CopyCommitter extends FileOutputCommitter {
         formatDuration(deletionEnd - listingStart));
   }
 
+  private boolean deletePath(FileSystem targetFS, Path targetEntry,
+                             Configuration conf) throws IOException {
+    if (conf.getBoolean(DistCpConstants.CONF_LABEL_DELETE_MISSING_USETRASH,
+        false)) {
+      return Trash.moveToAppropriateTrash(
+          targetFS, targetEntry, conf);
+    } else {
+      return targetFS.delete(targetEntry, true);
+    }
+  }
+
   /**
    * Take a duration and return a human-readable duration of
    * hours:minutes:seconds.millis.
@@ -553,6 +565,10 @@ public class CopyCommitter extends FileOutputCommitter {
         conf.get(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH));
     List<Path> targets = new ArrayList<>(1);
     targets.add(targetFinalPath);
+    Path resultNonePath = Path.getPathWithoutSchemeAndAuthority(targetFinalPath)
+        .toString().startsWith(DistCpConstants.HDFS_RESERVED_RAW_DIRECTORY_NAME)
+        ? DistCpConstants.RAW_NONE_PATH
+        : DistCpConstants.NONE_PATH;
     //
     // Set up options to be the same from the CopyListing.buildListing's
     // perspective, so to collect similar listings as when doing the copy
@@ -560,15 +576,12 @@ public class CopyCommitter extends FileOutputCommitter {
     // thread count is picked up from the job
     int threads = conf.getInt(DistCpConstants.CONF_LABEL_LISTSTATUS_THREADS,
         DistCpConstants.DEFAULT_LISTSTATUS_THREADS);
-    boolean useIterator =
-        conf.getBoolean(DistCpConstants.CONF_LABEL_USE_ITERATOR, false);
     LOG.info("Scanning destination directory {} with thread count: {}",
         targetFinalPath, threads);
-    DistCpOptions options = new DistCpOptions.Builder(targets, targetFinalPath)
+    DistCpOptions options = new DistCpOptions.Builder(targets, resultNonePath)
         .withOverwrite(overwrite)
         .withSyncFolder(syncFolder)
         .withNumListstatusThreads(threads)
-        .withUseIterator(useIterator)
         .build();
     DistCpContext distCpContext = new DistCpContext(options);
     distCpContext.setTargetPathExists(targetPathExists);

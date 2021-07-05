@@ -19,7 +19,6 @@
 package org.apache.hadoop.tools.contract;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
-import static org.apache.hadoop.tools.DistCpConstants.CONF_LABEL_DISTCP_JOB_ID;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -27,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -42,12 +42,8 @@ import org.apache.hadoop.tools.CopyListingFileStatus;
 import org.apache.hadoop.tools.DistCp;
 import org.apache.hadoop.tools.DistCpConstants;
 import org.apache.hadoop.tools.DistCpOptions;
-import org.apache.hadoop.tools.SimpleCopyListing;
 import org.apache.hadoop.tools.mapred.CopyMapper;
-import org.apache.hadoop.tools.util.DistCpTestUtils;
-import org.apache.hadoop.util.functional.RemoteIterators;
 
-import org.assertj.core.api.Assertions;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -62,7 +58,6 @@ import org.slf4j.LoggerFactory;
  * under test.  The tests in the suite cover both copying from local to remote
  * (e.g. a backup use case) and copying from remote to local (e.g. a restore use
  * case).
- * The HDFS contract test needs to be run explicitly.
  */
 public abstract class AbstractContractDistCpTest
     extends AbstractFSContractTestBase {
@@ -143,6 +138,7 @@ public abstract class AbstractContractDistCpTest
   public void setup() throws Exception {
     super.setup();
     conf = getContract().getConf();
+    conf.setLong(CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY, 10);
     localFS = FileSystem.getLocal(conf);
     remoteFS = getFileSystem();
     // Test paths are isolated by concrete subclass name and test method name.
@@ -231,6 +227,13 @@ public abstract class AbstractContractDistCpTest
   }
 
   @Test
+  public void testUpdateUseTrashDeepDirectoryStructureToRemote() throws Exception {
+    describe("update a deep directory structure from local to remote");
+    distCpDeepDirectoryStructure(localFS, localDir, remoteFS, remoteDir);
+    distCpUpdateUseTrashDeepDirectoryStructure(remoteDir);
+  }
+
+  @Test
   public void testUpdateDeepDirectoryStructureNoChange() throws Exception {
     describe("update an unchanged directory structure"
         + " from local to remote; expect no copy");
@@ -290,6 +293,10 @@ public abstract class AbstractContractDistCpTest
 
     modifySourceDirectories();
 
+    ContractTestUtils.assertPathsDoNotExist(localFS,
+        "Paths for test are wrong",
+        inputFile1, inputFile3, inputSubDir4);
+
     Job job = distCpUpdate(srcDir, destDir);
 
     Path outputFileNew1 = new Path(outputSubDir2, "newfile1");
@@ -329,6 +336,72 @@ public abstract class AbstractContractDistCpTest
   }
 
   /**
+   * Do a distcp -update -delete -useTrash.
+   * @param destDir output directory used by the initial distcp
+   * @return the distcp job
+   */
+  protected Job distCpUpdateUseTrashDeepDirectoryStructure(final Path destDir)
+      throws Exception {
+    describe("Incremental update with deletion-use-trash of missing files");
+    Path srcDir = inputDir;
+    LOG.info("Source directory = {}, dest={}", srcDir, destDir);
+
+    ContractTestUtils.assertPathsExist(localFS,
+        "Paths for test are wrong",
+        inputFile1, inputFile2, inputFile3, inputFile4, inputFile5);
+
+    modifySourceDirectories();
+    ContractTestUtils.assertPathsDoNotExist(localFS, "deleted right now",
+        inputFile1, inputFile3, inputSubDir4);
+
+    Path trashRootDir = remoteFS.getTrashRoot(null);
+    remoteFS.delete(trashRootDir, true);
+
+    Job job = distCpUpdateDeleteUseTrash(inputDir, inputDirUnderOutputDir);
+    lsR("Updated Remote", remoteFS, destDir);
+
+    ContractTestUtils.assertPathsDoNotExist(remoteFS,
+        "DistCP should have deleted",
+        outputFile1, outputFile3, outputFile4, outputSubDir4);
+    ContractTestUtils.assertPathExists(remoteFS,
+        "Path delete does not use trash", trashRootDir);
+    Path trashFile1 = new Path(trashRootDir,
+        "Current" + outputFile1.toUri().getPath());
+    Path trashFile3 = new Path(trashRootDir,
+        "Current" + outputFile3.toUri().getPath());
+    Path trashFile4 = new Path(trashRootDir,
+        "Current" + outputFile4.toUri().getPath());
+    Path trashFile5 = new Path(trashRootDir,
+        "Current" + outputFile5.toUri().getPath());
+    ContractTestUtils.assertPathsExist(remoteFS,
+        "Path delete does not use trash",
+        trashFile1, trashFile3, trashFile4, trashFile5);
+    return job;
+  }
+
+  /**
+   * Run distcp -update -delete -useTrash.
+   * @param srcDir local source directory
+   * @param destDir remote destination directory.
+   * @return the completed job
+   * @throws Exception any failure.
+   */
+  private Job distCpUpdateDeleteUseTrash(final Path srcDir, final Path destDir)
+      throws Exception {
+    describe("\nDistcp -update from " + srcDir + " to " + destDir);
+    lsR("Local to update", localFS, srcDir);
+    lsR("Remote before update", remoteFS, destDir);
+    return runDistCp(buildWithStandardOptions(
+        new DistCpOptions.Builder(
+            Collections.singletonList(srcDir), destDir)
+            .withDeleteMissing(true)
+            .withDeleteUseTrash(true)
+            .withSyncFolder(true)
+            .withCRC(true)
+            .withOverwrite(false)));
+  }
+
+  /**
    * Update the source directories as various tests expect,
    * including adding a new file.
    * @return the path to the newly created file
@@ -342,6 +415,11 @@ public abstract class AbstractContractDistCpTest
     // add one new file
     Path inputFileNew1 = new Path(inputSubDir2, "newfile1");
     ContractTestUtils.touch(localFS, inputFileNew1);
+
+    ContractTestUtils.assertPathsDoNotExist(localFS, "deleted right now",
+        inputFile1, inputFile3, inputSubDir4);
+    ContractTestUtils.assertPathsExist(localFS, "touched right now",
+        inputFileNew1);
     return inputFileNew1;
   }
 
@@ -470,17 +548,6 @@ public abstract class AbstractContractDistCpTest
     largeFiles(remoteFS, remoteDir, localFS, localDir);
   }
 
-  @Test
-  public void testSetJobId() throws Exception {
-    describe("check jobId is set in the conf");
-    remoteFS.create(new Path(remoteDir, "file1")).close();
-    DistCpTestUtils
-        .assertRunDistCp(DistCpConstants.SUCCESS, remoteDir.toString(),
-            localDir.toString(), null, conf);
-    assertNotNull("DistCp job id isn't set",
-        conf.get(CONF_LABEL_DISTCP_JOB_ID));
-  }
-
   /**
    * Executes a DistCp using a file system sub-tree with multiple nesting
    * levels.
@@ -510,6 +577,7 @@ public abstract class AbstractContractDistCpTest
     createFile(srcFS, inputFile4, true, dataset(400, 53, 63));
     createFile(srcFS, inputFile5, true, dataset(500, 53, 63));
     Path target = new Path(dstDir, "outputDir");
+
     runDistCp(inputDir, target);
     ContractTestUtils.assertIsDirectory(dstFS, target);
     lsR("Destination tree after distcp", dstFS, target);
@@ -617,48 +685,6 @@ public abstract class AbstractContractDistCpTest
     directWrite(localFS, localDir, remoteFS, remoteDir, false);
   }
 
-  @Test
-  public void testDistCpWithIterator() throws Exception {
-    describe("Build listing in distCp using the iterator option.");
-    Path source = new Path(remoteDir, "src");
-    Path dest = new Path(localDir, "dest");
-    dest = localFS.makeQualified(dest);
-    mkdirs(remoteFS, source);
-    verifyPathExists(remoteFS, "", source);
-
-    GenericTestUtils
-        .createFiles(remoteFS, source, getDepth(), getWidth(), getWidth());
-
-    GenericTestUtils.LogCapturer log =
-        GenericTestUtils.LogCapturer.captureLogs(SimpleCopyListing.LOG);
-
-    DistCpTestUtils.assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
-        dest.toString(), "-useiterator -update -delete", conf);
-
-    // Check the target listing was also done using iterator.
-    Assertions.assertThat(log.getOutput()).contains(
-        "Building listing using iterator mode for " + dest.toString());
-
-    Assertions.assertThat(RemoteIterators.toList(localFS.listFiles(dest, true)))
-        .describedAs("files").hasSize(getTotalFiles());
-  }
-
-  public int getDepth() {
-    return 3;
-  }
-
-  public int getWidth() {
-    return 10;
-  }
-
-  private int getTotalFiles() {
-    int totalFiles = 0;
-    for (int i = 1; i <= getDepth(); i++) {
-      totalFiles += Math.pow(getWidth(), i);
-    }
-    return totalFiles;
-  }
-
   /**
    * Executes a test with support for using direct write option.
    *
@@ -709,60 +735,4 @@ public abstract class AbstractContractDistCpTest
                     Collections.singletonList(srcDir), destDir)
                     .withDirectWrite(true)));
   }
-
-  @Test
-  public void testDistCpWithFile() throws Exception {
-    describe("Distcp only file");
-
-    Path source = new Path(remoteDir, "file");
-    Path dest = new Path(localDir, "file");
-    dest = localFS.makeQualified(dest);
-
-    mkdirs(remoteFS, remoteDir);
-    mkdirs(localFS, localDir);
-
-    int len = 4;
-    int base = 0x40;
-    byte[] block = dataset(len, base, base + len);
-    ContractTestUtils.createFile(remoteFS, source, true, block);
-    verifyPathExists(remoteFS, "", source);
-    verifyPathExists(localFS, "", localDir);
-
-    DistCpTestUtils.assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
-        dest.toString(), null, conf);
-
-    Assertions
-        .assertThat(RemoteIterators.toList(localFS.listFiles(dest, true)))
-        .describedAs("files").hasSize(1);
-    verifyFileContents(localFS, dest, block);
-  }
-
-  @Test
-  public void testDistCpWithUpdateExistFile() throws Exception {
-    describe("Now update an exist file.");
-
-    Path source = new Path(remoteDir, "file");
-    Path dest = new Path(localDir, "file");
-    dest = localFS.makeQualified(dest);
-
-    mkdirs(remoteFS, remoteDir);
-    mkdirs(localFS, localDir);
-
-    int len = 4;
-    int base = 0x40;
-    byte[] block = dataset(len, base, base + len);
-    byte[] destBlock = dataset(len, base, base + len + 1);
-    ContractTestUtils.createFile(remoteFS, source, true, block);
-    ContractTestUtils.createFile(localFS, dest, true, destBlock);
-
-    verifyPathExists(remoteFS, "", source);
-    verifyPathExists(localFS, "", dest);
-    DistCpTestUtils.assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
-        dest.toString(), "-delete -update", conf);
-
-    Assertions.assertThat(RemoteIterators.toList(localFS.listFiles(dest, true)))
-        .hasSize(1);
-    verifyFileContents(localFS, dest, block);
-  }
-
 }
