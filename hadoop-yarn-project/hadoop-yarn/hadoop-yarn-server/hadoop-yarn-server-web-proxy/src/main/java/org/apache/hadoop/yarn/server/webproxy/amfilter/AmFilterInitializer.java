@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.server.webproxy.amfilter;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.FilterContainer;
 import org.apache.hadoop.http.FilterInitializer;
@@ -68,7 +68,9 @@ public class AmFilterInitializer extends FilterInitializer {
       List<String> urls = new ArrayList<>();
       for (String rmId : rmIds) {
         String url = getUrlByRmId(yarnConf, rmId);
-        urls.add(url);
+        if (url != null) {
+          urls.add(url);
+        }
       }
       if (!urls.isEmpty()) {
         params.put(RM_HA_URLS, StringUtils.join(",", urls));
