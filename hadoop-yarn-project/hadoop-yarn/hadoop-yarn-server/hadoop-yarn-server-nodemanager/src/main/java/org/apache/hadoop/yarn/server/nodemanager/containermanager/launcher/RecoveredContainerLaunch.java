@@ -72,7 +72,7 @@ public class RecoveredContainerLaunch extends ContainerLaunch {
     String containerIdStr = containerId.toString();
 
     dispatcher.getEventHandler().handle(new ContainerEvent(containerId,
-        ContainerEventType.CONTAINER_LAUNCHED));
+        ContainerEventType.RECOVER_PAUSED_CONTAINER));
 
     boolean notInterrupted = true;
     try {
@@ -106,6 +106,17 @@ public class RecoveredContainerLaunch extends ContainerLaunch {
           LOG.error("Unable to set exit code for container " + containerId);
         }
       }
+    }
+
+    if (retCode == ExitCode.FORCE_KILLED.getExitCode()
+        || retCode == ExitCode.TERMINATED.getExitCode()) {
+      // If the process was killed, Send container_cleanedup_after_kill and
+      // just break out of this method.
+      this.dispatcher.getEventHandler().handle(
+        new ContainerExitEvent(containerId,
+          ContainerEventType.CONTAINER_KILLED_ON_REQUEST, retCode,
+          "Container exited with a non-zero exit code " + retCode));
+      return retCode;
     }
 
     if (retCode != 0) {
