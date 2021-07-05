@@ -27,12 +27,10 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3ATestUtils;
+import org.apache.hadoop.fs.s3a.S3ListRequest;
+import org.apache.hadoop.fs.s3a.S3ListResult;
 import org.apache.hadoop.fs.s3a.Statistic;
-import org.apache.hadoop.fs.s3a.WriteOperationHelper;
-import org.apache.hadoop.fs.s3a.api.RequestFactory;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.store.audit.AuditSpan;
-import org.apache.hadoop.util.functional.RemoteIterators;
+import org.apache.hadoop.util.DurationInfo;
 
 import org.junit.Test;
 import org.assertj.core.api.Assertions;
@@ -43,7 +41,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -51,20 +50,9 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 
-import static org.apache.hadoop.fs.s3a.Constants.DIRECTORY_MARKER_POLICY;
-import static org.apache.hadoop.fs.s3a.Constants.DIRECTORY_MARKER_POLICY_KEEP;
-import static org.apache.hadoop.fs.s3a.Constants.S3_METADATA_STORE_IMPL;
 import static org.apache.hadoop.fs.s3a.Statistic.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
-import static org.apache.hadoop.fs.s3a.impl.CallableSupplier.submit;
-import static org.apache.hadoop.fs.s3a.impl.CallableSupplier.waitForCompletion;
-import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.lookupCounterStatistic;
-import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.verifyStatisticCounterValue;
-import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToPrettyString;
-import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.retrieveIOStatistics;
-import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OBJECT_CONTINUE_LIST_REQUEST;
-import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OBJECT_LIST_REQUEST;
 
 /**
  * Test the performance of listing files/directories.
@@ -86,7 +74,7 @@ public class ITestS3ADirectoryPerformance extends S3AScaleTestBase {
     int depth = scale;
     int files = scale;
     MetricDiff metadataRequests = new MetricDiff(fs, OBJECT_METADATA_REQUESTS);
-    MetricDiff listRequests = new MetricDiff(fs, Statistic.OBJECT_LIST_REQUEST);
+    MetricDiff listRequests = new MetricDiff(fs, OBJECT_LIST_REQUESTS);
     MetricDiff listContinueRequests =
         new MetricDiff(fs, OBJECT_CONTINUE_LIST_REQUESTS);
     MetricDiff listStatusCalls = new MetricDiff(fs, INVOCATION_LIST_FILES);
@@ -173,12 +161,10 @@ public class ITestS3ADirectoryPerformance extends S3AScaleTestBase {
   }
 
   /**
-   * This is quite a big test; it PUTs up a number of
-   * files and then lists them in a filesystem set to ask for a small number
-   * of files on each listing.
-   * The standard listing API calls are all used, and then
-   * delete() is invoked to verify that paged deletion works correctly too.
+   * This test bulk creates directory entries through PUT requests so does
+   * not work with guarded stores.
    */
+  @SuppressWarnings("InfiniteLoopStatement")
   @Test
   public void testMultiPagesListingPerformanceAndCorrectness()
           throws Throwable {
@@ -189,65 +175,48 @@ public class ITestS3ADirectoryPerformance extends S3AScaleTestBase {
     final int numOfPutRequests = 1000;
     final int eachFileProcessingTime = 10;
     final int numOfPutThreads = 50;
-    Assertions.assertThat(numOfPutRequests % batchSize)
-        .describedAs("Files put %d must be a multiple of list batch size %d",
-            numOfPutRequests, batchSize)
-        .isEqualTo(0);
     final Configuration conf =
             getConfigurationWithConfiguredBatchSize(batchSize);
-
     removeBaseAndBucketOverrides(conf,
-        S3_METADATA_STORE_IMPL,
-        DIRECTORY_MARKER_POLICY);
-    // force directory markers = keep to save delete requests on every
-    // file created.
-    conf.set(DIRECTORY_MARKER_POLICY, DIRECTORY_MARKER_POLICY_KEEP);
-    S3AFileSystem fs = (S3AFileSystem) FileSystem.get(dir.toUri(), conf);
+        Constants.S3_METADATA_STORE_IMPL);
 
+    final InputStream im = new InputStream() {
+      @Override
+      public int read() throws IOException {
+        return -1;
+      }
+    };
     final List<String> originalListOfFiles = new ArrayList<>();
+    List<Callable<PutObjectResult>> putObjectRequests = new ArrayList<>();
     ExecutorService executorService = Executors
             .newFixedThreadPool(numOfPutThreads);
 
     NanoTimer uploadTimer = new NanoTimer();
-    try {
-      assume("Test is only for raw fs", !fs.hasMetadataStore());
+    try(S3AFileSystem fs = (S3AFileSystem) FileSystem.get(dir.toUri(), conf)) {
       fs.create(dir);
-
-      // create a span for the write operations
-      final AuditSpan span = fs.getAuditSpanSource()
-          .createSpan(OBJECT_PUT_REQUESTS.getSymbol(), dir.toString(), null);
-      final WriteOperationHelper writeOperationHelper
-          = fs.getWriteOperationHelper();
-      final RequestFactory requestFactory
-          = writeOperationHelper.getRequestFactory();
-      List<CompletableFuture<PutObjectResult>> futures =
-          new ArrayList<>(numOfPutRequests);
-
+      assume("Test is only for raw fs", !fs.hasMetadataStore());
       for (int i=0; i<numOfPutRequests; i++) {
         Path file = new Path(dir, String.format("file-%03d", i));
         originalListOfFiles.add(file.toString());
         ObjectMetadata om = fs.newObjectMetadata(0L);
-        PutObjectRequest put = requestFactory
-            .newPutObjectRequest(fs.pathToKey(file), om,
-                new FailingInputStream());
-        futures.add(submit(executorService, () ->
-            writeOperationHelper.putObject(put)));
+        PutObjectRequest put = new PutObjectRequest(fs.getBucket(),
+                fs.pathToKey(file),
+                im,
+                om);
+        putObjectRequests.add(() ->
+                fs.getWriteOperationHelper().putObject(put));
       }
-      LOG.info("Waiting for PUTs to complete");
-      waitForCompletion(futures);
+      executorService.invokeAll(putObjectRequests);
       uploadTimer.end("uploading %d files with a parallelism of %d",
               numOfPutRequests, numOfPutThreads);
 
       RemoteIterator<LocatedFileStatus> resIterator = fs.listFiles(dir, true);
       List<String> listUsingListFiles = new ArrayList<>();
       NanoTimer timeUsingListFiles = new NanoTimer();
-      RemoteIterators.foreach(resIterator, st -> {
-        listUsingListFiles.add(st.getPath().toString());
-        sleep(eachFileProcessingTime);
-      });
-      LOG.info("Listing Statistics: {}", ioStatisticsToPrettyString(
-          retrieveIOStatistics(resIterator)));
-
+      while(resIterator.hasNext()) {
+        listUsingListFiles.add(resIterator.next().getPath().toString());
+        Thread.sleep(eachFileProcessingTime);
+      }
       timeUsingListFiles.end("listing %d files using listFiles() api with " +
                       "batch size of %d including %dms of processing time" +
                       " for each file",
@@ -255,7 +224,7 @@ public class ITestS3ADirectoryPerformance extends S3AScaleTestBase {
 
       Assertions.assertThat(listUsingListFiles)
               .describedAs("Listing results using listFiles() must" +
-                      " match with original list of files")
+                      "  match with original list of files")
               .hasSameElementsAs(originalListOfFiles)
               .hasSize(numOfPutRequests);
       List<String> listUsingListStatus = new ArrayList<>();
@@ -263,7 +232,7 @@ public class ITestS3ADirectoryPerformance extends S3AScaleTestBase {
       FileStatus[] fileStatuses = fs.listStatus(dir);
       for(FileStatus fileStatus : fileStatuses) {
         listUsingListStatus.add(fileStatus.getPath().toString());
-        sleep(eachFileProcessingTime);
+        Thread.sleep(eachFileProcessingTime);
       }
       timeUsingListStatus.end("listing %d files using listStatus() api with " +
                       "batch size of %d including %dms of processing time" +
@@ -271,88 +240,60 @@ public class ITestS3ADirectoryPerformance extends S3AScaleTestBase {
               numOfPutRequests, batchSize, eachFileProcessingTime);
       Assertions.assertThat(listUsingListStatus)
               .describedAs("Listing results using listStatus() must" +
-                      "match with original list of files")
+                      " match with original list of files")
               .hasSameElementsAs(originalListOfFiles)
               .hasSize(numOfPutRequests);
-      // Validate listing using listStatusIterator().
-      NanoTimer timeUsingListStatusItr = new NanoTimer();
-      List<String> listUsingListStatusItr = new ArrayList<>();
-      RemoteIterator<FileStatus> lsItr = fs.listStatusIterator(dir);
-      RemoteIterators.foreach(lsItr, st -> {
-        listUsingListStatusItr.add(st.getPath().toString());
-        sleep(eachFileProcessingTime);
-      });
-      timeUsingListStatusItr.end("listing %d files using " +
-                      "listStatusIterator() api with batch size of %d " +
-                      "including %dms of processing time for each file",
-              numOfPutRequests, batchSize, eachFileProcessingTime);
-      Assertions.assertThat(listUsingListStatusItr)
-              .describedAs("Listing results using listStatusIterator() must" +
-                      "match with original list of files")
-              .hasSameElementsAs(originalListOfFiles)
-              .hasSize(numOfPutRequests);
-      // now validate the statistics returned by the listing
-      // to be non-null and containing list and continue counters.
-      IOStatistics lsStats = retrieveIOStatistics(lsItr);
-      String statsReport = ioStatisticsToPrettyString(lsStats);
-      LOG.info("Listing Statistics: {}", statsReport);
-      verifyStatisticCounterValue(lsStats, OBJECT_LIST_REQUEST, 1);
-      long continuations = lookupCounterStatistic(lsStats,
-          OBJECT_CONTINUE_LIST_REQUEST);
-      // calculate expected #of continuations
-      int expectedContinuations = numOfPutRequests / batchSize - 1;
-      Assertions.assertThat(continuations)
-          .describedAs("%s in %s", OBJECT_CONTINUE_LIST_REQUEST, statsReport)
-          .isEqualTo(expectedContinuations);
 
-      List<String> listUsingListLocatedStatus = new ArrayList<>();
+      // now iterate through listObjects in two
+      // different ways: hasNext/next and next() to failure
+      // both list sequences MUST return the same results
+      String pathKey = fs.pathToKey(dir);
+      S3ListRequest r = fs.createListObjectsRequest(pathKey, "/");
+      // first iteration does a hasNext/next sequence
+      int scan1pageCount  = 0;
+      int scan1objectCount  = 0;
+      try (DurationInfo ignored =
+               new DurationInfo(LOG, "Iterating through objects")) {
+        RemoteIterator<S3ListResult> it = fs.getListing()
+            .createObjectListingIterator(dir, r);
+        while (it.hasNext()) {
+          scan1pageCount++;
+          S3ListResult result = it.next();
+          scan1objectCount += result.getObjectSummaries().size();
+        }
+      }
 
-      RemoteIterator<LocatedFileStatus> it = fs.listLocatedStatus(dir);
-      RemoteIterators.foreach(it, st -> {
-        listUsingListLocatedStatus.add(st.getPath().toString());
-        sleep(eachFileProcessingTime);
-      });
-      final IOStatistics llsStats = retrieveIOStatistics(it);
-      LOG.info("Listing Statistics: {}", ioStatisticsToPrettyString(
-          llsStats));
-      verifyStatisticCounterValue(llsStats, OBJECT_CONTINUE_LIST_REQUEST,
-          expectedContinuations);
-      Assertions.assertThat(listUsingListLocatedStatus)
-          .describedAs("Listing results using listLocatedStatus() must" +
-              "match with original list of files")
-          .hasSameElementsAs(originalListOfFiles);
-      // delete in this FS so S3Guard is left out of it.
-      // and so that the incremental listing is tested through
-      // the delete operation.
-      fs.delete(dir, true);
+      // iteration calls next() until there is a failure.
+      int scan2pageCount = 0;
+      int scan2objectCount = 0;
+      RemoteIterator<S3ListResult> it = fs.getListing()
+          .createObjectListingIterator(dir, r);
+      try (DurationInfo ignored =
+               new DurationInfo(LOG, "Iterating through objects")) {
+        while (true) {
+          S3ListResult result = it.next();
+          scan2pageCount++;
+          scan2objectCount += result.getObjectSummaries().size();
+        }
+      } catch (NoSuchElementException expected) {
+        // end of scan
+      }
+      Assertions.assertThat(it.hasNext())
+          .describedAs("hasNext() after next() %s", it)
+          .isFalse();
+      Assertions.assertThat(scan1pageCount)
+          .describedAs("Scan page count")
+          .isEqualTo(scan2pageCount);
+      Assertions.assertThat(scan1objectCount)
+          .describedAs("Scan object count")
+          .isEqualTo(scan2objectCount);
+
+      // now do a bulk delete
+      try (DurationInfo ignored = new DurationInfo(LOG, "Deleting objects")) {
+        fs.delete(dir, true);
+      }
     } finally {
       executorService.shutdown();
-      // in case the previous delete was not reached.
-      fs.delete(dir, true);
-      LOG.info("FS statistics {}",
-          ioStatisticsToPrettyString(fs.getIOStatistics()));
-      fs.close();
-    }
-  }
-
-  /**
-   * Input stream which always returns -1.
-   */
-  private static final class FailingInputStream  extends InputStream {
-    @Override
-    public int read() throws IOException {
-      return -1;
-    }
-  }
-
-  /**
-   * Sleep briefly.
-   * @param eachFileProcessingTime time to sleep.
-   */
-  private void sleep(final int eachFileProcessingTime) {
-    try {
-      Thread.sleep(eachFileProcessingTime);
-    } catch (InterruptedException ignored) {
     }
   }
 
@@ -401,7 +342,7 @@ public class ITestS3ADirectoryPerformance extends S3AScaleTestBase {
     MetricDiff metadataRequests =
         new MetricDiff(fs, Statistic.OBJECT_METADATA_REQUESTS);
     MetricDiff listRequests =
-        new MetricDiff(fs, Statistic.OBJECT_LIST_REQUEST);
+        new MetricDiff(fs, Statistic.OBJECT_LIST_REQUESTS);
     long attempts = getOperationCount();
     NanoTimer timer = new NanoTimer();
     for (long l = 0; l < attempts; l++) {
