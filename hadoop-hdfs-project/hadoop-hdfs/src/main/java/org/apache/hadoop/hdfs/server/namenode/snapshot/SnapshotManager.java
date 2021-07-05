@@ -36,7 +36,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.management.ObjectName;
 
+import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.XAttrSetFlag;
@@ -63,10 +65,8 @@ import org.apache.hadoop.hdfs.server.namenode.INodesInPath;
 import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.apache.hadoop.hdfs.util.ReadOnlyList;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.util.Lists;
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -457,8 +457,7 @@ public class SnapshotManager implements SnapshotStatsMXBean {
       // requests.
       throw new SnapshotException(
           "Failed to create the snapshot. The FileSystem has run out of " +
-          "snapshot IDs and ID rollover is not supported " +
-              "and the max snapshot limit is: " + maxSnapshotLimit);
+          "snapshot IDs and ID rollover is not supported.");
     }
     int n = numSnapshots.get();
     checkFileSystemSnapshotLimit(n);
@@ -521,6 +520,14 @@ public class SnapshotManager implements SnapshotStatsMXBean {
         final List<XAttr> xattrs = Lists.newArrayListWithCapacity(1);
         xattrs.add(snapshotXAttr);
 
+        // Check if snapshot is already marked as deleted.
+        // If already marked deleted, metric for out of order snapshot deletion
+        // won't be incremented.
+        XAttr existingXAttr = FSDirXAttrOp.getXAttrByPrefixedName(
+            fsdir, INodesInPath.append(iip, snapshot.getRoot(),
+                DFSUtil.string2Bytes(snapshotName)),
+            HdfsServerConstants.XATTR_SNAPSHOT_DELETED);
+
         // The snapshot to be deleted is just marked for deletion in the xAttr.
         // Same snaphot delete call can happen multiple times until and unless
         // the very 1st instance of a snapshot delete hides it/remove it from
@@ -535,8 +542,10 @@ public class SnapshotManager implements SnapshotStatsMXBean {
             INodesInPath.append(iip, snapshot.getRoot(),
                 DFSUtil.string2Bytes(snapshotName)), xattrs,
             EnumSet.of(XAttrSetFlag.CREATE, XAttrSetFlag.REPLACE));
-        renameSnapshot(iip, srcRoot.getFullPathName(), snapshotName,
-            Snapshot.generateDeletedSnapshotName(snapshot), Time.now());
+        if (existingXAttr == null) {
+          NameNode.getNameNodeMetrics().incrNumSnapshotDelete();
+          NameNode.getNameNodeMetrics().incrOutOfOrderSnapshotDelete();
+        }
         return;
       }
 
@@ -545,6 +554,8 @@ public class SnapshotManager implements SnapshotStatsMXBean {
 
     srcRoot.removeSnapshot(reclaimContext, snapshotName, now, this);
     numSnapshots.getAndDecrement();
+    NameNode.getNameNodeMetrics().incrNumSnapshotDelete();
+    NameNode.getNameNodeMetrics().incrInOrderSnapshotDelete() ;
   }
 
   /**
@@ -577,6 +588,19 @@ public class SnapshotManager implements SnapshotStatsMXBean {
 
   void setNumSnapshots(int num) {
     numSnapshots.set(num);
+  }
+
+  private int getNumDeletedSnapshots() {
+    AtomicInteger numDeletedSnapshots = new AtomicInteger();
+    for (INodeDirectory d : getSnapshottableDirs()) {
+      for (Snapshot s : d.getDirectorySnapshottableFeature().getSnapshotList()) {
+        if (s.getRoot().isMarkedAsDeleted()) {
+          numDeletedSnapshots.getAndIncrement();
+        }
+
+      }
+    }
+    return numDeletedSnapshots.get();
   }
 
   int getSnapshotCounter() {
@@ -800,6 +824,16 @@ public class SnapshotManager implements SnapshotStatsMXBean {
     }
     return beans.toArray(new SnapshotInfo.Bean[beans.size()]);
   }
+
+  @Override // SnapshotStatsMXBean
+  @Metric({"ActiveSnapshots", "Number of Active Snapshots"})
+  public long getnumActiveSnapshots() {
+    return this.getNumSnapshots() - this.getNumDeletedSnapshots();
+  }
+
+  @Override // SnapshotStatsMXBean
+  @Metric({"DeletedSnapshots", "Number of Deleted Snapshots"})
+  public long getnumDeletedSnapshots() { return this.getNumDeletedSnapshots(); }
 
   public static SnapshottableDirectoryStatus.Bean toBean(INodeDirectory d) {
     return new SnapshottableDirectoryStatus.Bean(

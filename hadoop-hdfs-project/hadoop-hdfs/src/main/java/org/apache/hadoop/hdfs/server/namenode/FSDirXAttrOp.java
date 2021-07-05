@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.FileStatus;
@@ -31,10 +34,6 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ReencryptionInfoProto;
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
 import org.apache.hadoop.hdfs.server.namenode.FSDirectory.DirOp;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.util.Lists;
-
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -410,7 +409,7 @@ public class FSDirXAttrOp {
     return xAttrs;
   }
 
-  static XAttr getXAttrByPrefixedName(FSDirectory fsd, INodesInPath iip,
+  public static XAttr getXAttrByPrefixedName(FSDirectory fsd, INodesInPath iip,
       String prefixedName) throws IOException {
     fsd.readLock();
     try {
@@ -438,10 +437,7 @@ public class FSDirXAttrOp {
       if (inode != null &&
           inode.isDirectory() &&
           inode.getFsPermission().getStickyBit()) {
-        if (pc.isSuperUser()) {
-          // call external enforcer for audit
-          pc.checkSuperuserPrivilege(iip.getPath());
-        } else {
+        if (!pc.isSuperUser()) {
           fsd.checkOwner(pc, iip);
         }
       } else {
