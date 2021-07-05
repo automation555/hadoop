@@ -24,6 +24,8 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -171,6 +173,7 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MsyncR
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.OpenFilesBatchResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RecoverLeaseRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RefreshNodesRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RefreshProtectedDirectoriesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveCacheDirectiveRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RemoveCachePoolRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.Rename2RequestProto;
@@ -254,7 +257,6 @@ import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import org.apache.hadoop.thirdparty.protobuf.Message;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.concurrent.AsyncGet;
 
 /**
@@ -287,6 +289,10 @@ public class ClientNamenodeProtocolTranslatorPB implements
 
   private final static RefreshNodesRequestProto VOID_REFRESH_NODES_REQUEST =
       RefreshNodesRequestProto.newBuilder().build();
+
+  private final static RefreshProtectedDirectoriesRequestProto
+      VOID_REFRESH_PROTECTED_DIR_REQUEST =
+      RefreshProtectedDirectoriesRequestProto.newBuilder().build();
 
   private final static FinalizeUpgradeRequestProto
       VOID_FINALIZE_UPGRADE_REQUEST =
@@ -996,7 +1002,9 @@ public class ClientNamenodeProtocolTranslatorPB implements
         .setSrc(src).build();
     try {
       GetFileLinkInfoResponseProto result = rpcProxy.getFileLinkInfo(null, req);
-      return result.hasFs() ? PBHelperClient.convert(result.getFs()) : null;
+      return result.hasFs() ?
+          PBHelperClient.convert(rpcProxy.getFileLinkInfo(null, req).getFs()) :
+          null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -1177,6 +1185,16 @@ public class ClientNamenodeProtocolTranslatorPB implements
             .build();
     try {
       rpcProxy.setBalancerBandwidth(null, req);
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public void refreshProtectedDirectories() throws IOException {
+    try {
+      rpcProxy.refreshProtectedDirectories(null,
+          VOID_REFRESH_PROTECTED_DIR_REQUEST);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }

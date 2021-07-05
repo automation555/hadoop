@@ -20,6 +20,8 @@ package org.apache.hadoop.hdfs.server.namenode;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Sets;
 
 import java.util.Set;
 import org.apache.commons.logging.Log;
@@ -90,9 +92,7 @@ import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.hadoop.util.ExitUtil.ExitException;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.JvmPauseMonitor;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ServicePlugin;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.GcTimeMonitor;
@@ -171,7 +171,6 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.FS_PROTECTED_DIRECTORIES;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_SATISFIER_MODE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_MAX_STREAMS_DEFAULT;
@@ -320,7 +319,6 @@ public class NameNode extends ReconfigurableBase implements
       .newTreeSet(Lists.newArrayList(
           DFS_HEARTBEAT_INTERVAL_KEY,
           DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY,
-          FS_PROTECTED_DIRECTORIES,
           HADOOP_CALLER_CONTEXT_ENABLED_KEY,
           DFS_STORAGE_POLICY_SATISFIER_MODE_KEY,
           DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY,
@@ -1245,9 +1243,8 @@ public class NameNode extends ReconfigurableBase implements
     LOG.info("Formatting using clusterid: {}", clusterId);
     
     FSImage fsImage = new FSImage(conf, nameDirsToFormat, editDirsToFormat);
-    FSNamesystem fsn = null;
     try {
-      fsn = new FSNamesystem(conf, fsImage);
+      FSNamesystem fsn = new FSNamesystem(conf, fsImage);
       fsImage.getEditLog().initJournalsForWrite();
 
       // Abort NameNode format if reformat is disabled and if
@@ -1272,14 +1269,8 @@ public class NameNode extends ReconfigurableBase implements
       fsImage.format(fsn, clusterId, force);
     } catch (IOException ioe) {
       LOG.warn("Encountered exception during format", ioe);
+      fsImage.close();
       throw ioe;
-    } finally {
-      if (fsImage != null) {
-        fsImage.close();
-      }
-      if (fsn != null) {
-        fsn.close();
-      }
     }
     return false;
   }
@@ -1835,9 +1826,9 @@ public class NameNode extends ReconfigurableBase implements
     }
   }
 
-  synchronized void monitorHealth() throws IOException {
-    String operationName = "monitorHealth";
-    namesystem.checkSuperuserPrivilege(operationName);
+  synchronized void monitorHealth() 
+      throws HealthCheckFailedException, AccessControlException {
+    namesystem.checkSuperuserPrivilege();
     if (!haEnabled) {
       return; // no-op, if HA is not enabled
     }
@@ -1859,9 +1850,9 @@ public class NameNode extends ReconfigurableBase implements
     }
   }
   
-  synchronized void transitionToActive() throws IOException {
-    String operationName = "transitionToActive";
-    namesystem.checkSuperuserPrivilege(operationName);
+  synchronized void transitionToActive() 
+      throws ServiceFailedException, AccessControlException {
+    namesystem.checkSuperuserPrivilege();
     if (!haEnabled) {
       throw new ServiceFailedException("HA for namenode is not enabled");
     }
@@ -1876,18 +1867,18 @@ public class NameNode extends ReconfigurableBase implements
     state.setState(haContext, ACTIVE_STATE);
   }
 
-  synchronized void transitionToStandby() throws IOException {
-    String operationName = "transitionToStandby";
-    namesystem.checkSuperuserPrivilege(operationName);
+  synchronized void transitionToStandby()
+      throws ServiceFailedException, AccessControlException {
+    namesystem.checkSuperuserPrivilege();
     if (!haEnabled) {
       throw new ServiceFailedException("HA for namenode is not enabled");
     }
     state.setState(haContext, STANDBY_STATE);
   }
 
-  synchronized void transitionToObserver() throws IOException {
-    String operationName = "transitionToObserver";
-    namesystem.checkSuperuserPrivilege(operationName);
+  synchronized void transitionToObserver()
+      throws ServiceFailedException, AccessControlException {
+    namesystem.checkSuperuserPrivilege();
     if (!haEnabled) {
       throw new ServiceFailedException("HA for namenode is not enabled");
     }
@@ -2021,7 +2012,6 @@ public class NameNode extends ReconfigurableBase implements
     public void startActiveServices() throws IOException {
       try {
         namesystem.startActiveServices();
-        namesystem.checkAndProvisionSnapshotTrashRoots();
         startTrashEmptier(getConf());
       } catch (Throwable t) {
         doImmediateShutdown(t);
@@ -2178,8 +2168,6 @@ public class NameNode extends ReconfigurableBase implements
       return reconfHeartbeatInterval(datanodeManager, property, newVal);
     } else if (property.equals(DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY)) {
       return reconfHeartbeatRecheckInterval(datanodeManager, property, newVal);
-    } else if (property.equals(FS_PROTECTED_DIRECTORIES)) {
-      return reconfProtectedDirectories(newVal);
     } else if (property.equals(HADOOP_CALLER_CONTEXT_ENABLED_KEY)) {
       return reconfCallerContextEnabled(newVal);
     } else if (property.equals(ipcClientRPCBackoffEnable)) {
@@ -2304,9 +2292,6 @@ public class NameNode extends ReconfigurableBase implements
     }
   }
 
-  private String reconfProtectedDirectories(String newVal) {
-    return getNamesystem().getFSDirectory().setProtectedDirectories(newVal);
-  }
 
   private String reconfCallerContextEnabled(String newVal) {
     Boolean callerContextEnabled;

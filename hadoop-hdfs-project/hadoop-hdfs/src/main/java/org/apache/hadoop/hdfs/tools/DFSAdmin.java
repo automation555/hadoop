@@ -38,7 +38,6 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
@@ -459,10 +458,11 @@ public class DFSAdmin extends FsShell {
     "\t[-deleteBlockPool datanode_host:ipc_port blockpoolId [force]]\n"+
     "\t[-setBalancerBandwidth <bandwidth in bytes per second>]\n" +
     "\t[-getBalancerBandwidth <datanode_host:ipc_port>]\n" +
+      "\t[-refreshProtectedDirectories]\n" +
     "\t[-fetchImage <local directory>]\n" +
     "\t[-allowSnapshot <snapshotDir>]\n" +
     "\t[-disallowSnapshot <snapshotDir>]\n" +
-      "\t[-provisionSnapshotTrash <snapshotDir> [-all]]\n" +
+      "\t[-provisionSnapshotTrash <snapshotDir>]\n" +
     "\t[-shutdownDatanode <datanode_host:ipc_port> [upgrade]]\n" +
     "\t[-evictWriters <datanode_host:ipc_port>]\n" +
     "\t[-getDatanodeInfo <datanode_host:ipc_port>]\n" +
@@ -794,7 +794,14 @@ public class DFSAdmin extends FsShell {
     System.out.println("Disallowing snapshot on " + argv[1] + " succeeded");
   }
 
-  private void provisionSnapshotTrashInternal(Path p) throws IOException {
+  /**
+   * Provision trash root in a snapshottable directory.
+   * Usage: hdfs dfsadmin -provisionSnapshotTrash snapshotDir
+   * @param argv List of of command line parameters.
+   * @exception IOException
+   */
+  public void provisionSnapshotTrash(String[] argv) throws IOException {
+    Path p = new Path(argv[1]);
     final HdfsAdmin admin = new HdfsAdmin(p.toUri(), getConf());
     Path trashRoot;
     try {
@@ -803,35 +810,7 @@ public class DFSAdmin extends FsShell {
       throw new RemoteException(e.getClass().getName(), e.getMessage());
     }
     System.out.println("Successfully provisioned snapshot trash at " +
-            trashRoot);
-  }
-
-  private void provisionSnapshotTrashAll() throws IOException {
-    // Get all snapshottable directories
-    final DistributedFileSystem dfs = getDFS();
-    SnapshottableDirectoryStatus[] lst = dfs.getSnapshottableDirListing();
-    if (lst != null) {
-      for (SnapshottableDirectoryStatus dirStatus : lst) {
-        final Path p = dirStatus.getFullPath();
-        provisionSnapshotTrashInternal(p);
-      }
-    }
-  }
-
-  /**
-   * Provision trash root in a snapshottable directory.
-   * Usage: hdfs dfsadmin -provisionSnapshotTrash snapshotDir
-   *        hdfs dfsadmin -provisionSnapshotTrash -all
-   * @param argv List of of command line parameters.
-   * @exception IOException
-   */
-  public void provisionSnapshotTrash(String[] argv) throws IOException {
-    if (argv[1].equals("-all")) {
-      provisionSnapshotTrashAll();
-      return;
-    }
-    Path p = new Path(argv[1]);
-    provisionSnapshotTrashInternal(p);
+        trashRoot);
   }
   
   /**
@@ -1046,14 +1025,14 @@ public class DFSAdmin extends FsShell {
 
   private void printOpenFiles(RemoteIterator<OpenFileEntry> openFilesIterator)
       throws IOException {
-    System.out.printf("%-20s\t%-20s\t%s%n", "Client Host",
-        "Client Name", "Open File Path");
+    System.out.println(String.format("%-20s\t%-20s\t%s", "Client Host",
+          "Client Name", "Open File Path"));
     while (openFilesIterator.hasNext()) {
       OpenFileEntry openFileEntry = openFilesIterator.next();
-      System.out.printf("%-20s\t%-20s\t%20s%n",
+      System.out.println(String.format("%-20s\t%-20s\t%20s",
           openFileEntry.getClientMachine(),
           openFileEntry.getClientName(),
-          openFileEntry.getFilePath());
+          openFileEntry.getFilePath()));
     }
   }
 
@@ -1111,6 +1090,48 @@ public class DFSAdmin extends FsShell {
       throw new IOException("Datanode unreachable. " + ioe, ioe);
     }
     return 0;
+  }
+
+  /**
+   * Command to ask the namenode to set protected directories
+   * Usage: hdfs dfsadmin -refreshProtectedDirectories.
+   * @exception IOException
+   */
+  public int refreshProtectedDirectories() throws IOException {
+    int exitCode = -1;
+
+    DistributedFileSystem dfs = getDFS();
+    Configuration dfsConf = dfs.getConf();
+    URI dfsUri = dfs.getUri();
+    boolean isHaEnabled = HAUtilClient.isLogicalUri(dfsConf, dfsUri);
+
+    if (isHaEnabled) {
+      String nsId = dfsUri.getHost();
+      List<ProxyAndInfo<ClientProtocol>> proxies =
+          HAUtil.getProxiesForAllNameNodesInNameservice(dfsConf,
+              nsId, ClientProtocol.class);
+      List<IOException> exceptions = new ArrayList<>();
+      for (ProxyAndInfo<ClientProtocol> proxy: proxies) {
+        try{
+          proxy.getProxy().refreshProtectedDirectories();
+          System.out.println("Refresh protected directories successful for " +
+              proxy.getAddress());
+        }catch (IOException ioe){
+          System.out.println("Refresh protected directories failed for " +
+              proxy.getAddress());
+          exceptions.add(ioe);
+        }
+      }
+      if(!exceptions.isEmpty()){
+        throw MultipleIOException.createIOException(exceptions);
+      }
+    } else {
+      dfs.refreshProtectedDirectories();
+      System.out.println("Refresh nodes successful");
+    }
+    exitCode = 0;
+
+    return exitCode;
   }
 
   /**
@@ -1278,6 +1299,9 @@ public class DFSAdmin extends FsShell {
         "\tduring HDFS block balancing.\n\n" +
         "\t--- NOTE: This value is not persistent on the DataNode.---\n";
 
+    String refreshProtectedDirectories = "-refreshProtectedDirectories:\n" +
+        "\tRefresh protected directories form config.\n";
+
     String fetchImage = "-fetchImage <local directory>:\n" +
       "\tDownloads the most recent fsimage from the Name Node and saves it in" +
       "\tthe specified local directory.\n";
@@ -1288,10 +1312,9 @@ public class DFSAdmin extends FsShell {
     String disallowSnapshot = "-disallowSnapshot <snapshotDir>:\n" +
         "\tDo not allow snapshots to be taken on a directory any more.\n";
 
-    String provisionSnapshotTrash =
-        "-provisionSnapshotTrash <snapshotDir> [-all]:\n"
-        + "\tProvision trash root in one or all snapshottable directories."
-        + "\tTrash permission is " + HdfsAdmin.TRASH_PERMISSION + ".\n";
+    String provisionSnapshotTrash = "-provisionSnapshotTrash <snapshotDir>:\n" +
+        "\tProvision trash root in a snapshottable directory with permission"
+        + "\t" + HdfsAdmin.TRASH_PERMISSION + ".\n";
 
     String shutdownDatanode = "-shutdownDatanode <datanode_host:ipc_port> [upgrade]\n"
         + "\tSubmit a shutdown request for the given datanode. If an optional\n"
@@ -1376,6 +1399,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(setBalancerBandwidth);
     } else if ("getBalancerBandwidth".equals(cmd)) {
       System.out.println(getBalancerBandwidth);
+    } else if ("refreshProtectedDirectories".equals(cmd)) {
+      System.out.println(refreshProtectedDirectories);
     } else if ("fetchImage".equals(cmd)) {
       System.out.println(fetchImage);
     } else if ("allowSnapshot".equalsIgnoreCase(cmd)) {
@@ -1423,6 +1448,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(deleteBlockPool);
       System.out.println(setBalancerBandwidth);
       System.out.println(getBalancerBandwidth);
+      System.out.println(refreshProtectedDirectories);
       System.out.println(fetchImage);
       System.out.println(allowSnapshot);
       System.out.println(disallowSnapshot);
@@ -2138,7 +2164,7 @@ public class DFSAdmin extends FsShell {
           + " [-disallowSnapshot <snapshotDir>]");
     } else if ("-provisionSnapshotTrash".equalsIgnoreCase(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
-          + " [-provisionSnapshotTrash <snapshotDir> [-all]]");
+          + " [-provisionSnapshotTrash <snapshotDir>]");
     } else if ("-saveNamespace".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
           + " [-saveNamespace [-beforeShutdown]]");
@@ -2212,6 +2238,9 @@ public class DFSAdmin extends FsShell {
     } else if ("-getBalancerBandwidth".equalsIgnoreCase(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
           + " [-getBalancerBandwidth <datanode_host:ipc_port>]");
+    } else if ("-refreshProtectedDirectories".equalsIgnoreCase(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin"
+          + " [-refreshProtectedDirectories]");
     } else if ("-fetchImage".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
           + " [-fetchImage <local directory>]");
@@ -2372,6 +2401,11 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if ("-refreshProtectedDirectories".equalsIgnoreCase(cmd)) {
+      if (argv.length != 1) {
+        printUsage(cmd);
+        return exitCode;
+      }
     } else if ("-fetchImage".equals(cmd)) {
       if (argv.length != 2) {
         printUsage(cmd);
@@ -2461,6 +2495,8 @@ public class DFSAdmin extends FsShell {
         exitCode = setBalancerBandwidth(argv, i);
       } else if ("-getBalancerBandwidth".equals(cmd)) {
         exitCode = getBalancerBandwidth(argv, i);
+      } else if ("-refreshProtectedDirectories".equals(cmd)) {
+        exitCode = refreshProtectedDirectories();
       } else if ("-fetchImage".equals(cmd)) {
         exitCode = fetchImage(argv, i);
       } else if ("-shutdownDatanode".equals(cmd)) {
