@@ -28,6 +28,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -46,6 +48,8 @@ import org.junit.Test;
  */
 public class TestDataNodeReconfiguration {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestBlockRecovery.class);
   private static final String DATA_DIR = MiniDFSCluster.getBaseDirectory()
       + "data";
   private final static InetSocketAddress NN_ADDR = new InetSocketAddress(
@@ -211,11 +215,9 @@ public class TestDataNodeReconfiguration {
       dataNode.xserver.balanceThrottler.acquire();
       dataNode.xserver.balanceThrottler.acquire();
 
-      dataNode.xserver.setMaxReconfigureWaitTime(1);
-
       // Attempt to set new maximum to 1
       final boolean success =
-          dataNode.xserver.updateBalancerMaxConcurrentMovers(1);
+          dataNode.xserver.updateBalancerMaxConcurrentMovers(1, 1);
       Assert.assertFalse(success);
     } finally {
       dataNode.shutdown();
@@ -237,8 +239,6 @@ public class TestDataNodeReconfiguration {
       // Simulate grabbing 2 threads
       dataNode.xserver.balanceThrottler.acquire();
       dataNode.xserver.balanceThrottler.acquire();
-
-      dataNode.xserver.setMaxReconfigureWaitTime(1);
 
       // Now try reconfigure maximum downwards with threads released
       dataNode.reconfigurePropertyImpl(
