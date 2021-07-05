@@ -43,8 +43,8 @@ import org.apache.zookeeper.AsyncCallback.*;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.KeeperException.Code;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,10 +136,8 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
    * Name of the lock znode used by the library. Protected for access in test
    * classes
    */
-  @VisibleForTesting
   protected static final String LOCK_FILENAME = "ActiveStandbyElectorLock";
-  @VisibleForTesting
-  protected static final String BREADCRUMB_FILENAME = "ActiveBreadCrumb";
+  public static final String BREADCRUMB_FILENAME = "ActiveBreadCrumb";
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ActiveStandbyElector.class);
@@ -577,11 +575,6 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     }
 
     fatalError(errorMessage);
-  }
-
-  @VisibleForTesting
-  public boolean getWantToBeInElection() {
-    return wantToBeInElection;
   }
 
   /**
