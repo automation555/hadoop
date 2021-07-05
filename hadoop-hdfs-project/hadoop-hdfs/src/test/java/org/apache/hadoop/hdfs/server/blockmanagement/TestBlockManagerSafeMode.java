@@ -38,6 +38,7 @@ import java.io.InterruptedIOException;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -228,6 +229,19 @@ public class TestBlockManagerSafeMode {
     setSafeModeStatus(BMSafeModeStatus.PENDING_THRESHOLD);
     bmSafeMode.checkSafeMode();
     assertEquals(BMSafeModeStatus.OFF, getSafeModeStatus());
+  }
+
+  @Test(timeout = 20000)
+  public void testCheckSafeMode9() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    conf.setLong(DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_KEY, 3000);
+    GenericTestUtils.LogCapturer auditLog =
+        GenericTestUtils.LogCapturer.captureLogs(BlockManagerSafeMode.LOG);
+    BlockManagerSafeMode blockManagerSafeMode = new BlockManagerSafeMode(bm,
+        fsn, true, conf);
+    String auditOut = auditLog.getOutput();
+    assertTrue(auditOut.contains("Using 3000 as SafeModeMonitor Interval"));
+
   }
 
   /**
