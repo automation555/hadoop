@@ -81,6 +81,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos.QueueACLProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.QueueStateProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ReservationRequestInterpreterProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
+import org.apache.hadoop.yarn.proto.YarnProtos.StringIntMapProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.StringStringMapProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.TimedPlacementConstraintProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.YarnApplicationAttemptStateProto;
@@ -587,17 +588,29 @@ public class ProtoUtils {
     return ret;
   }
 
-  public static List<YarnProtos.StringFloatMapProto>
-      convertMapToStringFloatMapProtoList(
-      Map<String, Float> map) {
-    List<YarnProtos.StringFloatMapProto> ret = new ArrayList<>();
-    if (map != null) {
-      for (Map.Entry<String, Float> entry : map.entrySet()) {
-        YarnProtos.StringFloatMapProto.Builder tmp =
-            YarnProtos.StringFloatMapProto.newBuilder();
-        tmp.setKey(entry.getKey());
-        tmp.setValue(entry.getValue());
-        ret.add(tmp.build());
+
+  public static List<YarnProtos.StringIntMapProto>
+      convertStringIntMapToProtoList(Map<String, Integer> stringIntMap) {
+    List<YarnProtos.StringIntMapProto> pList = new ArrayList<>();
+    if (stringIntMap != null && !stringIntMap.isEmpty()) {
+      StringIntMapProto.Builder pBuilder = StringIntMapProto.newBuilder();
+      for (Map.Entry<String, Integer> entry : stringIntMap.entrySet()) {
+        pBuilder.setKey(entry.getKey());
+        pBuilder.setValue(entry.getValue());
+        pList.add(pBuilder.build());
+      }
+    }
+    return pList;
+  }
+
+  public static Map<String, Integer> convertProtoListToStringIntMap(
+      List<StringIntMapProto> pList) {
+    Map<String, Integer> ret = new HashMap<>();
+    if (pList != null) {
+      for (StringIntMapProto p : pList) {
+        if (p.hasKey()) {
+          ret.put(p.getKey(), p.getValue());
+        }
       }
     }
     return ret;
@@ -608,19 +621,6 @@ public class ProtoUtils {
     Map<String, String> ret = new HashMap<>();
     if (pList != null) {
       for (StringStringMapProto p : pList) {
-        if (p.hasKey()) {
-          ret.put(p.getKey(), p.getValue());
-        }
-      }
-    }
-    return ret;
-  }
-
-  public static Map<String, Float> convertStringFloatMapProtoListToMap(
-      List<YarnProtos.StringFloatMapProto> pList) {
-    Map<String, Float> ret = new HashMap<>();
-    if (pList != null) {
-      for (YarnProtos.StringFloatMapProto p : pList) {
         if (p.hasKey()) {
           ret.put(p.getKey(), p.getValue());
         }

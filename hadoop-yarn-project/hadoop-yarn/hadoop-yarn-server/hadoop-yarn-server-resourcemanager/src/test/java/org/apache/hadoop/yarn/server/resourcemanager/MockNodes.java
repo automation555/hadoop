@@ -25,7 +25,6 @@ import java.util.Set;
 import java.util.Map;
 
 import org.apache.hadoop.net.Node;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -39,11 +38,13 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.resourcetypes.ResourceTypesTestHelper;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.records.NodeHealthDetails;
 import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 /**
  * Test helper to generate mock nodes
@@ -127,6 +128,7 @@ public class MockNodes {
     private ResourceUtilization nodeUtilization;
     private Resource physicalResource;
     private RMContext rmContext;
+    private NodeHealthDetails nodeHealthDetails;
 
     MockRMNodeImpl(NodeId nodeId, String nodeAddr, String httpAddress,
         Resource perNode, String rackName, String healthReport,
@@ -268,6 +270,11 @@ public class MockNodes {
     @Override
     public long getLastHealthReportTime() {
       return lastHealthReportTime;
+    }
+
+    @Override
+    public NodeHealthDetails getNodeHealthDetails() {
+      return nodeHealthDetails;
     }
 
     @Override
