@@ -24,6 +24,8 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 
+import com.google.common.collect.Lists;
+
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -254,7 +256,6 @@ import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import org.apache.hadoop.thirdparty.protobuf.Message;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.concurrent.AsyncGet;
 
 /**
@@ -544,16 +545,22 @@ public class ClientNamenodeProtocolTranslatorPB implements
         .newBuilder()
         .setSrc(src)
         .setFileId(fileId)
-        .setBlk(PBHelperClient.convert(blk))
-        .addAllExistings(PBHelperClient.convert(existings))
         .addAllExistingStorageUuids(Arrays.asList(existingStorageIDs))
-        .addAllExcludes(PBHelperClient.convert(excludes))
         .setNumAdditionalNodes(numAdditionalNodes)
-        .setClientName(clientName)
-        .build();
+        .setClientName(clientName);
+
+    if (blk != null) {
+      req.setBlk(PBHelperClient.convert(blk));
+    }
+    if (existings != null) {
+      req.addAllExistings(PBHelperClient.convert(existings));
+    }
+    if (excludes != null) {
+      req.addAllExcludes(PBHelperClient.convert(excludes));
+    }
     try {
       return PBHelperClient.convertLocatedBlockProto(
-          rpcProxy.getAdditionalDatanode(null, req).getBlock());
+          rpcProxy.getAdditionalDatanode(null, req.build()).getBlock());
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
@@ -996,7 +1003,9 @@ public class ClientNamenodeProtocolTranslatorPB implements
         .setSrc(src).build();
     try {
       GetFileLinkInfoResponseProto result = rpcProxy.getFileLinkInfo(null, req);
-      return result.hasFs() ? PBHelperClient.convert(result.getFs()) : null;
+      return result.hasFs() ?
+          PBHelperClient.convert(rpcProxy.getFileLinkInfo(null, req).getFs()) :
+          null;
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }
