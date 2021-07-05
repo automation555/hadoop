@@ -18,10 +18,11 @@
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.*;
 
-import org.slf4j.event.Level;
+import org.apache.log4j.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -50,7 +51,7 @@ public class TestFuseDFS {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestFuseDFS.class);
   {
-    GenericTestUtils.setLogLevel(LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(LOG, Level.ALL);
   }
 
   /** Dump the given intput stream to stderr */
@@ -116,7 +117,8 @@ public class TestFuseDFS {
 
   /** Create and write the given file */
   private static void createFile(File f, String s) throws IOException {
-    InputStream is = new ByteArrayInputStream(s.getBytes());
+    InputStream is =
+        new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8));
     FileOutputStream fos = new FileOutputStream(f);
     IOUtils.copyBytes(is, fos, s.length(), true);
   }

@@ -28,13 +28,13 @@ import static org.junit.Assert.fail;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -46,7 +46,6 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotDirectoryException;
-import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -77,7 +76,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList;
 
 public class TestINodeFile {
   // Re-enable symlinks for tests, see HADOOP-10020 and HADOOP-10052
@@ -95,8 +94,8 @@ public class TestINodeFile {
   private long preferredBlockSize = 1024;
 
   static public INodeFile createINodeFile(long id) {
-    return new INodeFile(id, ("file" + id).getBytes(), perm, 0L, 0L, null,
-        (short)3, 1024L);
+    return new INodeFile(id, ("file" + id).getBytes(StandardCharsets.UTF_8),
+        perm, 0L, 0L, null, (short) 3, 1024L);
   }
 
   static void toCompleteFile(INodeFile file) {
@@ -1164,20 +1163,21 @@ public class TestINodeFile {
       assertTrue(dl.getPartialListing().length == 3);
 
       String f2 = new String("f2");
-      dl = cluster.getNameNodeRpc().getListing("/tmp", f2.getBytes(), false);
+      dl = cluster.getNameNodeRpc().getListing("/tmp",
+          f2.getBytes(StandardCharsets.UTF_8), false);
       assertTrue(dl.getPartialListing().length == 1);
 
       INode f2INode = fsdir.getINode("/tmp/f2");
       String f2InodePath = "/.reserved/.inodes/" + f2INode.getId();
-      dl = cluster.getNameNodeRpc().getListing("/tmp", f2InodePath.getBytes(),
-          false);
+      dl = cluster.getNameNodeRpc().getListing("/tmp",
+          f2InodePath.getBytes(StandardCharsets.UTF_8), false);
       assertTrue(dl.getPartialListing().length == 1);
 
       // Test the deleted startAfter file
       hdfs.delete(new Path("/tmp/f2"), false);
       try {
         dl = cluster.getNameNodeRpc().getListing("/tmp",
-            f2InodePath.getBytes(), false);
+            f2InodePath.getBytes(StandardCharsets.UTF_8), false);
         fail("Didn't get exception for the deleted startAfter token.");
       } catch (IOException e) {
         assertTrue(e instanceof DirectoryListingStartAfterNotFoundException);
@@ -1233,36 +1233,5 @@ public class TestINodeFile {
     assertEquals(1, toBeCleared.getBlocks().length);
     toBeCleared.clearBlocks();
     assertTrue(toBeCleared.getBlocks().length == 0);
-  }
-
-  @Test
-  public void testConcat() throws IOException {
-    Configuration conf = new Configuration();
-    try (MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build()) {
-      cluster.waitActive();
-      DistributedFileSystem dfs = cluster.getFileSystem();
-      String dir = "/testConcat";
-      dfs.mkdirs(new Path(dir), FsPermission.getDirDefault());
-      dfs.setQuota(new Path(dir), 100L, HdfsConstants.QUOTA_DONT_SET);
-
-      // Create 4 files
-      Path trg = new Path(dir + "/file");
-      DFSTestUtil.createFile(dfs, trg, 512, (short) 1, 0);
-      Path[] srcs = new Path[4];
-      for (int i = 0; i < 4; i++) {
-        srcs[i] = new Path(dir + "/file" + i);
-        DFSTestUtil.createFile(dfs, srcs[i], 512, (short) 1, 0);
-      }
-
-      // Concat file1, file2, file3 to file0
-      dfs.concat(trg, srcs);
-
-      // Check the file and directory count and consumed space
-      ContentSummary cs = dfs.getContentSummary(new Path(dir));
-      QuotaUsage qu = dfs.getQuotaUsage(new Path(dir));
-
-      Assert.assertEquals(cs.getFileCount() + cs.getDirectoryCount(),
-          qu.getFileAndDirectoryCount());
-    }
   }
 }

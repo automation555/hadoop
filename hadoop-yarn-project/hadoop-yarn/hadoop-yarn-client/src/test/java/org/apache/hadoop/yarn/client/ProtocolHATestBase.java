@@ -19,10 +19,9 @@
 package org.apache.hadoop.yarn.client;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
@@ -170,7 +169,7 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     keepRunning = true;
     conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
-    conf.setInt(YarnConfiguration.CLIENT_FAILOVER_MAX_ATTEMPTS, 10);
+    conf.setInt(YarnConfiguration.CLIENT_FAILOVER_MAX_ATTEMPTS, 5);
     conf.set(YarnConfiguration.RM_HA_IDS, RM1_NODE_ID + "," + RM2_NODE_ID);
     HATestUtil.setRpcAddressForRM(RM1_NODE_ID, RM1_PORT_BASE, conf);
     HATestUtil.setRpcAddressForRM(RM2_NODE_ID, RM2_PORT_BASE, conf);
@@ -224,24 +223,22 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     verifyClientConnection();
   }
 
-  protected void verifyClientConnection() throws InterruptedException {
-    try {
-      GenericTestUtils.waitFor(() -> {
-        Configuration yarnConf = new YarnConfiguration(conf);
-        YarnClient client = createAndStartYarnClient(yarnConf);
-        try {
-          client.getApplications();
-          return true;
-        } catch (YarnException | IOException ex) {
-          LOG.error(ex.getMessage());
-        } finally {
-          client.stop();
-        }
-        return false;
-      }, 50, 500);
-    } catch (TimeoutException e) {
-      fail("Client couldn't connect to the Active RM");
+  protected void verifyClientConnection() {
+    int numRetries = 3;
+    while(numRetries-- > 0) {
+      Configuration conf = new YarnConfiguration(this.conf);
+      YarnClient client = createAndStartYarnClient(conf);
+      try {
+        Thread.sleep(100);
+        client.getApplications();
+        return;
+      } catch (Exception e) {
+        LOG.error(e.getMessage());
+      } finally {
+        client.stop();
+      }
     }
+    fail("Client couldn't connect to the Active RM");
   }
 
   protected Thread createAndStartFailoverThread() {
@@ -331,11 +328,11 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     private boolean waittingForFailOver() {
-      int maximumWaittingTime = 200;
+      int maximumWaittingTime = 50;
       int count = 0;
       while (!failoverTriggered.get() && count <= maximumWaittingTime) {
         try {
-          Thread.sleep(25);
+          Thread.sleep(100);
         } catch (InterruptedException e) {
           // DO NOTHING
         }
@@ -668,10 +665,9 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     }
 
     public QueueInfo createFakeQueueInfo() {
-      return QueueInfo.newInstance("root", "root", 100f, 100f, 50f, null,
-          createFakeAppReports(), QueueState.RUNNING, null,
-          null, null, false, -1.0f,
-           null, false);
+      return QueueInfo.newInstance("root", 100f, 100f, 50f, null,
+          createFakeAppReports(), QueueState.RUNNING, null, null, null, false,
+          null, false);
     }
 
     public List<QueueUserACLInfo> createFakeQueueUserACLInfoList() {
@@ -715,13 +711,14 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
     public Token createFakeToken() {
       String identifier = "fake Token";
       String password = "fake token passwd";
-      Token token = Token.newInstance(
-          identifier.getBytes(), " ", password.getBytes(), " ");
+      Token token =
+          Token.newInstance(identifier.getBytes(StandardCharsets.UTF_8), " ",
+              password.getBytes(StandardCharsets.UTF_8), " ");
       return token;
     }
 
     public long createNextExpirationTime() {
-      return "fake Token".getBytes().length;
+      return "fake Token".getBytes(StandardCharsets.UTF_8).length;
     }
 
     private class CustomedResourceTrackerService extends
@@ -799,7 +796,8 @@ public abstract class ProtocolHATestBase extends ClientBaseWithFixes {
       Map<ApplicationAccessType, String> acls =
           new HashMap<ApplicationAccessType, String>();
       acls.put(ApplicationAccessType.MODIFY_APP, "*");
-      ByteBuffer key = ByteBuffer.wrap("fake_key".getBytes());
+      ByteBuffer key =
+          ByteBuffer.wrap("fake_key".getBytes(StandardCharsets.UTF_8));
       return RegisterApplicationMasterResponse.newInstance(minCapability,
           maxCapability, acls, key, new ArrayList<Container>(), "root",
           new ArrayList<NMToken>());

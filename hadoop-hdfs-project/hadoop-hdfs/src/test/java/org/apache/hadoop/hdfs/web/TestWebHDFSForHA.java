@@ -27,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -95,7 +96,7 @@ public class TestWebHDFSForHA {
       final Path dir2 = new Path("/test2");
       Assert.assertTrue(fs.mkdirs(dir2));
     } finally {
-      IOUtils.cleanupWithLogger(null, fs);
+      IOUtils.cleanup(null, fs);
       if (cluster != null) {
         cluster.shutdown();
       }
@@ -130,7 +131,7 @@ public class TestWebHDFSForHA {
       verify(fs).renewDelegationToken(token);
       verify(fs).cancelDelegationToken(token);
     } finally {
-      IOUtils.cleanupWithLogger(null, fs);
+      IOUtils.cleanup(null, fs);
       if (cluster != null) {
         cluster.shutdown();
       }
@@ -199,7 +200,7 @@ public class TestWebHDFSForHA {
       Exception unwrapped = re.unwrapRemoteException(StandbyException.class);
       Assert.assertTrue(unwrapped instanceof StandbyException);
     } finally {
-      IOUtils.cleanupWithLogger(null, fs);
+      IOUtils.cleanup(null, fs);
       if (cluster != null) {
         cluster.shutdown();
       }
@@ -214,7 +215,7 @@ public class TestWebHDFSForHA {
     MiniDFSCluster cluster = null;
     FileSystem fs = null;
     final Path p = new Path("/test");
-    final byte[] data = "Hello".getBytes();
+    final byte[] data = "Hello".getBytes(StandardCharsets.UTF_8);
 
     try {
       cluster = new MiniDFSCluster.Builder(conf).nnTopology(topo)
@@ -238,7 +239,7 @@ public class TestWebHDFSForHA {
       IOUtils.readFully(in, buf, 0, buf.length);
       Assert.assertArrayEquals(data, buf);
     } finally {
-      IOUtils.cleanupWithLogger(null, fs);
+      IOUtils.cleanup(null, fs);
       if (cluster != null) {
         cluster.shutdown();
       }
@@ -264,7 +265,7 @@ public class TestWebHDFSForHA {
       fs = (WebHdfsFileSystem)FileSystem.get(WEBHDFS_URI, conf);
       Assert.assertEquals(2, fs.getResolvedNNAddr().length);
     } finally {
-      IOUtils.cleanupWithLogger(null, fs);
+      IOUtils.cleanup(null, fs);
       if (cluster != null) {
         cluster.shutdown();
       }
@@ -304,7 +305,7 @@ public class TestWebHDFSForHA {
           } catch (IOException e) {
             result = false;
           } finally {
-            IOUtils.cleanupWithLogger(null, fs);
+            IOUtils.cleanup(null, fs);
           }
           synchronized (TestWebHDFSForHA.this) {
             resultMap.put("mkdirs", result);

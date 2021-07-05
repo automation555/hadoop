@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.security.Permission;
 import java.security.PrivilegedExceptionAction;
 import java.text.SimpleDateFormat;
@@ -34,12 +35,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
+import com.google.common.collect.Lists;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.log4j.Level;
 import org.junit.Test;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
@@ -70,8 +72,6 @@ import org.junit.rules.Timeout;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
-import org.junit.Assert;
-import org.slf4j.event.Level;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
@@ -117,7 +117,7 @@ public class TestDFSShell {
         GenericTestUtils.getTestDir("TestDFSShell").getAbsolutePath());
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY, true);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_ACLS_ENABLED_KEY, true);
-    conf.setLong(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 120000);
+    conf.setLong(DFSConfigKeys.DFS_NAMENODE_ACCESSTIME_PRECISION_KEY, 1000);
 
     miniCluster = new MiniDFSCluster.Builder(conf).numDataNodes(2).build();
     miniCluster.waitActive();
@@ -711,7 +711,7 @@ public class TestDFSShell {
           (returned.lastIndexOf("File exists") != -1));
       Path testFile = new Path("/testfile");
       OutputStream outtmp = dfs.create(testFile);
-      outtmp.write(testFile.toString().getBytes());
+      outtmp.write(testFile.toString().getBytes(StandardCharsets.UTF_8));
       outtmp.close();
       out.reset();
       argv[0] = "-mkdir";
@@ -912,7 +912,7 @@ public class TestDFSShell {
     final Path testFile = new Path("testHead", "file1");
     final String text = RandomStringUtils.randomAscii(fileLen);
     try (OutputStream pout = dfs.create(testFile)) {
-      pout.write(text.getBytes());
+      pout.write(text.getBytes(StandardCharsets.UTF_8));
     }
     final ByteArrayOutputStream out = new ByteArrayOutputStream();
     System.setOut(new PrintStream(out));
@@ -924,7 +924,8 @@ public class TestDFSShell {
             1024, out.size());
     // tailed out last 1KB of the file content
     assertArrayEquals("Head output doesn't match input",
-            text.substring(0, 1024).getBytes(), out.toByteArray());
+        text.substring(0, 1024).getBytes(StandardCharsets.UTF_8),
+        out.toByteArray());
     out.reset();
   }
 
@@ -939,7 +940,7 @@ public class TestDFSShell {
     final Path testFile = new Path("testTail", "file1");
     final String text = RandomStringUtils.randomAscii(fileLen);
     try (OutputStream pout = dfs.create(testFile)) {
-      pout.write(text.getBytes());
+      pout.write(text.getBytes(StandardCharsets.UTF_8));
     }
     final ByteArrayOutputStream out = new ByteArrayOutputStream();
     System.setOut(new PrintStream(out));
@@ -951,7 +952,8 @@ public class TestDFSShell {
         1024, out.size());
     // tailed out last 1KB of the file content
     assertArrayEquals("Tail output doesn't match input",
-        text.substring(fileLen - 1024).getBytes(), out.toByteArray());
+        text.substring(fileLen - 1024).getBytes(StandardCharsets.UTF_8),
+        out.toByteArray());
     out.reset();
   }
 
@@ -990,13 +992,14 @@ public class TestDFSShell {
 
     final String text = RandomStringUtils.randomAscii(BLOCK_SIZE / 2);
     try (OutputStream pout = dfs.create(testFile)) {
-      pout.write(text.getBytes());
+      pout.write(text.getBytes(StandardCharsets.UTF_8));
     }
     // The tailer should eventually show the file contents
     GenericTestUtils.waitFor(new Supplier<Boolean>() {
       @Override
       public Boolean get() {
-        return Arrays.equals(text.getBytes(), out.toByteArray());
+        return Arrays.equals(text.getBytes(StandardCharsets.UTF_8),
+            out.toByteArray());
       }
     }, 100, 10000);
   }
@@ -1059,13 +1062,14 @@ public class TestDFSShell {
       ret = ToolRunner.run(new FsShell(conf), argv);
       assertEquals("'-text " + argv[1] + " returned " + ret, 0, ret);
       assertTrue("Output doesn't match input",
-          Arrays.equals("Foo\tBar\n".getBytes(), out.toByteArray()));
+          Arrays.equals("Foo\tBar\n".getBytes(StandardCharsets.UTF_8),
+              out.toByteArray()));
       out.reset();
 
       // Test deflate. Extension-based detection.
       OutputStream dout = new DeflaterOutputStream(
           fs.create(new Path(root, "file.deflate")));
-      byte[] outbytes = "foo".getBytes();
+      byte[] outbytes = "foo".getBytes(StandardCharsets.UTF_8);
       dout.write(outbytes);
       dout.close();
       out = new ByteArrayOutputStream();
@@ -1086,7 +1090,7 @@ public class TestDFSShell {
       Path p = new Path(root, "file." + extension);
       OutputStream fout = new DataOutputStream(codec.createOutputStream(
           fs.create(p, true)));
-      byte[] writebytes = "foo".getBytes();
+      byte[] writebytes = "foo".getBytes(StandardCharsets.UTF_8);
       fout.write(writebytes);
       fout.close();
       out = new ByteArrayOutputStream();
@@ -1102,7 +1106,7 @@ public class TestDFSShell {
 
       // Test a plain text.
       OutputStream pout = fs.create(new Path(root, "file.txt"));
-      writebytes = "bar".getBytes();
+      writebytes = "bar".getBytes(StandardCharsets.UTF_8);
       pout.write(writebytes);
       pout.close();
       out = new ByteArrayOutputStream();
@@ -1119,31 +1123,6 @@ public class TestDFSShell {
       if (null != bak) {
         System.setOut(bak);
       }
-    }
-  }
-
-  @Test (timeout = 30000)
-  public void testChecksum() throws Exception {
-    PrintStream printStream = System.out;
-    try {
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-      System.setOut(new PrintStream(out));
-      FsShell shell = new FsShell(dfs.getConf());
-      final Path filePath = new Path("/testChecksum/file1");
-      writeFile(dfs, filePath);
-      FileStatus fileStatus = dfs.getFileStatus(filePath);
-      FileChecksum checksum = dfs.getFileChecksum(filePath);
-      String[] args = {"-checksum", "-v", filePath.toString()};
-      assertEquals(0, shell.run(args));
-      // verify block size is printed in the output
-      assertTrue(out.toString()
-          .contains(String.format("BlockSize=%s", fileStatus.getBlockSize())));
-      // verify checksum is printed in the output
-      assertTrue(out.toString().contains(StringUtils
-          .byteToHexString(checksum.getBytes(), 0, checksum.getLength())));
-    } finally {
-      Assert.assertNotNull(printStream);
-      System.setOut(printStream);
     }
   }
 
@@ -1260,11 +1239,11 @@ public class TestDFSShell {
     dfs.mkdirs(root);
     // create file under root
     FSDataOutputStream File1 = dfs.create(new Path(root, "File1"));
-    File1.write("hi".getBytes());
+    File1.write("hi".getBytes(StandardCharsets.UTF_8));
     File1.close();
     // create file under sub-folder
     FSDataOutputStream File2 = dfs.create(new Path(root, "Folder1/File2"));
-    File2.write("hi".getBytes());
+    File2.write("hi".getBytes(StandardCharsets.UTF_8));
     File2.close();
     // getUsed() should return total length of all the files in Filesystem
     assertEquals(4, dfs.getUsed(root));
@@ -1302,6 +1281,9 @@ public class TestDFSShell {
       exitCode = shell.run(args);
       LOG.info("RUN: "+args[0]+" exit=" + exitCode);
       return exitCode;
+    } catch (IOException e) {
+      LOG.error("RUN: "+args[0]+" IOException="+e.getMessage());
+      throw e;
     } catch (RuntimeException e) {
       LOG.error("RUN: "+args[0]+" RuntimeException="+e.getMessage());
       throw e;
@@ -1468,9 +1450,6 @@ public class TestDFSShell {
 
     runCmd(shell, "-chgrp", "hadoop-core@apache.org/100", file);
     confirmOwner(null, "hadoop-core@apache.org/100", fs, path);
-
-    runCmd(shell, "-chown", "MYCOMPANY+user.name:hadoop", file);
-    confirmOwner("MYCOMPANY+user.name", "hadoop", fs, path);
   }
 
   /**
@@ -1915,7 +1894,7 @@ public class TestDFSShell {
     char c = content.charAt(0);
     sb.setCharAt(0, ++c);
     for(MaterializedReplica replica : replicas) {
-      replica.corruptData(sb.toString().getBytes("UTF8"));
+      replica.corruptData(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
   }
 
@@ -1962,7 +1941,7 @@ public class TestDFSShell {
 
   @Test (timeout = 30000)
   public void testGet() throws IOException {
-    GenericTestUtils.setLogLevel(FSInputChecker.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(FSInputChecker.LOG, Level.ALL);
 
     final String fname = "testGet.txt";
     Path root = new Path("/test/get");

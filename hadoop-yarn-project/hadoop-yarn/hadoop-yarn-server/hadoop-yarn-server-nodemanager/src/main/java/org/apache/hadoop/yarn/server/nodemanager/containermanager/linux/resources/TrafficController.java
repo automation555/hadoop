@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -222,7 +223,9 @@ import java.util.regex.Pattern;
       Pattern pattern = Pattern.compile(regex, Pattern.MULTILINE);
 
       if (pattern.matcher(state).find()) {
-        LOG.debug("Matched regex: {}", regex);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Matched regex: " + regex);
+        }
       } else {
         String logLine = new StringBuffer("Failed to match regex: ")
               .append(regex).append(" Current state: ").append(state).toString();
@@ -256,7 +259,9 @@ import java.util.regex.Pattern;
       String output =
           privilegedOperationExecutor.executePrivilegedOperation(op, true);
 
-      LOG.debug("TC state: {}" + output);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("TC state: %n" + output);
+      }
 
       return output;
     } catch (PrivilegedOperationException e) {
@@ -328,11 +333,15 @@ import java.util.regex.Pattern;
       String output =
           privilegedOperationExecutor.executePrivilegedOperation(op, true);
 
-      LOG.debug("TC stats output:{}", output);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("TC stats output:" + output);
+      }
 
       Map<Integer, Integer> classIdBytesStats = parseStatsString(output);
 
-      LOG.debug("classId -> bytes sent {}", classIdBytesStats);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("classId -> bytes sent %n" + classIdBytesStats);
+      }
 
       return classIdBytesStats;
     } catch (PrivilegedOperationException e) {
@@ -459,7 +468,9 @@ import java.util.regex.Pattern;
     //e.g 4325381 -> 00420005
     String classIdStr = String.format("%08x", Integer.parseInt(input));
 
-    LOG.debug("ClassId hex string : {}", classIdStr);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("ClassId hex string : " + classIdStr);
+    }
 
     //extract and return 4 digits
     //e.g 00420005 -> 0005
@@ -620,7 +631,7 @@ import java.util.regex.Pattern;
 
         try (
             Writer writer = new OutputStreamWriter(new FileOutputStream(tcCmds),
-                "UTF-8");
+                StandardCharsets.UTF_8);
             PrintWriter printWriter = new PrintWriter(writer)) {
           for (String command : commands) {
             printWriter.println(command);

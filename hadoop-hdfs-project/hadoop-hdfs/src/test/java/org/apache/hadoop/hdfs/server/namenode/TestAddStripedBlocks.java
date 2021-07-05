@@ -45,6 +45,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaBeingWritten;
+import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo;
 import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStatus;
@@ -58,6 +59,7 @@ import org.junit.Rule;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -205,7 +207,7 @@ public class TestAddStripedBlocks {
       assertTrue(blocks[0].isStriped());
       checkStripedBlockUC((BlockInfoStriped) fileNode.getLastBlock(), false);
     } finally {
-      IOUtils.cleanupWithLogger(null, out);
+      IOUtils.cleanup(null, out);
     }
   }
 
@@ -270,7 +272,7 @@ public class TestAddStripedBlocks {
       assertArrayEquals(indices, blockIndices);
       assertArrayEquals(expectedDNs, datanodes);
     } finally {
-      IOUtils.cleanupWithLogger(null, out);
+      IOUtils.cleanup(null, out);
     }
   }
 
@@ -326,7 +328,7 @@ public class TestAddStripedBlocks {
         assertTrue(storageIDs.contains(newstorage.getStorageID()));
       }
     } finally {
-      IOUtils.cleanupWithLogger(null, out);
+      IOUtils.cleanup(null, out);
     }
 
     // 3. restart the namenode. mimic the full block reports and check the
@@ -350,7 +352,8 @@ public class TestAddStripedBlocks {
       StorageBlockReport[] reports = {new StorageBlockReport(storage,
           bll)};
       cluster.getNameNodeRpc().blockReport(dn.getDNRegistrationForBP(bpId),
-          bpId, reports, null);
+          bpId, reports,
+          new BlockReportContext(1, 0, System.nanoTime(), 0, true));
     }
 
     DatanodeStorageInfo[] locs = lastBlock.getUnderConstructionFeature()
@@ -482,7 +485,7 @@ public class TestAddStripedBlocks {
     Path replicated = new Path("/blockLocation/replicated");
     try (FSDataOutputStream out =
         dfs.createFile(replicated).replicate().recursive().build()) {
-      out.write("this is a replicated file".getBytes());
+      out.write("this is a replicated file".getBytes(StandardCharsets.UTF_8));
     }
     BlockLocation[] locations = dfs.getFileBlockLocations(replicated, 0, 100);
     assertEquals("There should be exactly one Block present",
@@ -491,7 +494,7 @@ public class TestAddStripedBlocks {
 
     Path striped = new Path("/blockLocation/striped");
     try (FSDataOutputStream out = dfs.createFile(striped).recursive().build()) {
-      out.write("this is a striped file".getBytes());
+      out.write("this is a striped file".getBytes(StandardCharsets.UTF_8));
     }
     locations = dfs.getFileBlockLocations(striped, 0, 100);
     assertEquals("There should be exactly one Block present",

@@ -26,6 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -641,7 +642,7 @@ public class TestFileAppend{
       for (int i = 0; i < 4; i++) {
         sb.append(hello);
       }
-      final byte[] content = sb.toString().getBytes();
+      final byte[] content = sb.toString().getBytes(StandardCharsets.UTF_8);
       AppendTestUtil.checkFullFile(fs, path, content.length, content,
           "Read /test");
 
@@ -667,6 +668,7 @@ public class TestFileAppend{
     Configuration conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024);
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 1);
+    conf.setInt("dfs.min.replication", 1);
     File builderBaseDir = new File(GenericTestUtils.getRandomizedTempPath());
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf, builderBaseDir)
         .numDataNodes(1).build();
@@ -692,6 +694,7 @@ public class TestFileAppend{
     Configuration conf = new HdfsConfiguration();
     conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, 1024);
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 1);
+    conf.setInt("dfs.min.replication", 1);
 
     File builderBaseDir = new File(GenericTestUtils.getRandomizedTempPath());
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf, builderBaseDir)

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.security.token.delegation.web;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
@@ -37,6 +37,7 @@ import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -295,8 +296,10 @@ public class DelegationTokenAuthenticatedURL extends AuthenticatedURL {
       // delegation token
       Credentials creds = UserGroupInformation.getCurrentUser().
           getCredentials();
-      LOG.debug("Token not set, looking for delegation token. Creds:{},"
-          + " size:{}", creds.getAllTokens(), creds.numberOfTokens());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Token not set, looking for delegation token. Creds:{},"
+                + " size:{}", creds.getAllTokens(), creds.numberOfTokens());
+      }
       if (!creds.getAllTokens().isEmpty()) {
         dToken = selectDelegationToken(url, creds);
         if (dToken != null) {
@@ -320,7 +323,8 @@ public class DelegationTokenAuthenticatedURL extends AuthenticatedURL {
 
     // proxyuser
     if (doAs != null) {
-      extraParams.put(DO_AS, URLEncoder.encode(doAs, "UTF-8"));
+      extraParams.put(DO_AS,
+          URLEncoder.encode(doAs, StandardCharsets.UTF_8.name()));
     }
 
     url = augmentURL(url, extraParams);

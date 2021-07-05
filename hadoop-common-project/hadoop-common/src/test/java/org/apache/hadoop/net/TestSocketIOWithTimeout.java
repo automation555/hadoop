@@ -23,6 +23,7 @@ import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.SocketTimeoutException;
 import java.nio.channels.Pipe;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.apache.hadoop.test.GenericTestUtils;
@@ -40,7 +41,7 @@ import org.slf4j.LoggerFactory;
 import static org.junit.Assert.*;
 
 /**
- * This tests timeout out from SocketInputStream and
+ * This tests timout out from SocketInputStream and
  * SocketOutputStream using pipes.
  * 
  * Normal read and write using these streams are tested by pretty much
@@ -96,7 +97,7 @@ public class TestSocketIOWithTimeout {
       final InputStream in = new SocketInputStream(source, TIMEOUT);
       OutputStream out = new SocketOutputStream(sink, TIMEOUT);
       
-      byte[] writeBytes = TEST_STRING.getBytes();
+      byte[] writeBytes = TEST_STRING.getBytes(StandardCharsets.UTF_8);
       byte[] readBytes = new byte[writeBytes.length];
       byte byteWithHighBit = (byte)0x80;
       
@@ -183,44 +184,6 @@ public class TestSocketIOWithTimeout {
       if (sink != null) {
         sink.close();
       }
-    }
-  }
-
-  @Test
-  public void testSocketIOWithTimeoutInterrupted() throws Exception {
-    Pipe pipe = Pipe.open();
-    final int timeout = TIMEOUT * 10;
-
-    try (Pipe.SourceChannel source = pipe.source();
-        InputStream in = new SocketInputStream(source, timeout)) {
-
-      TestingThread thread = new TestingThread(ctx) {
-        @Override
-        public void doWork() throws Exception {
-          try {
-            in.read();
-            fail("Did not fail with interrupt");
-          } catch (InterruptedIOException ste) {
-            String detail = ste.getMessage();
-            String totalString = "Total timeout mills is " + timeout;
-            String leftString = "millis timeout left";
-
-            assertTrue(detail.contains(totalString));
-            assertTrue(detail.contains(leftString));
-          }
-        }
-      };
-
-      ctx.addThread(thread);
-      ctx.startThreads();
-      // If the thread is interrupted before it calls read()
-      // then it throws ClosedByInterruptException due to
-      // some Java quirk. Waiting for it to call read()
-      // gets it into select(), so we get the expected
-      // InterruptedIOException.
-      Thread.sleep(1000);
-      thread.interrupt();
-      ctx.stop();
     }
   }
 }

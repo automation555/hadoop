@@ -41,6 +41,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -172,14 +173,6 @@ public class TestShuffleHandler {
     public Path getLocalPathForWrite(String path, long size)
         throws IOException {
       return new Path(ABS_LOG_DIR.getAbsolutePath());
-    }
-
-    @Override
-    public Iterable<Path> getAllLocalPathsForRead(String path)
-        throws IOException {
-      ArrayList<Path> paths = new ArrayList<>();
-      paths.add(new Path(ABS_LOG_DIR.getAbsolutePath()));
-      return paths;
     }
   }
 
@@ -747,8 +740,10 @@ public class TestShuffleHandler {
       DataOutputBuffer outputBuffer = new DataOutputBuffer();
       outputBuffer.reset();
       Token<JobTokenIdentifier> jt =
-          new Token<JobTokenIdentifier>("identifier".getBytes(),
-              "password".getBytes(), new Text(user), new Text("shuffleService"));
+          new Token<JobTokenIdentifier>(
+              "identifier".getBytes(StandardCharsets.UTF_8),
+              "password".getBytes(StandardCharsets.UTF_8), new Text(user),
+              new Text("shuffleService"));
       jt.write(outputBuffer);
       shuffleHandler
         .initializeApplication(new ApplicationInitializationContext(user,
@@ -813,7 +808,7 @@ public class TestShuffleHandler {
           throws IOException {
     FileOutputStream out = new FileOutputStream(mapOutputFile);
     out.write("Creating new dummy map output file. Used only for testing"
-        .getBytes());
+        .getBytes(StandardCharsets.UTF_8));
     out.flush();
     out.close();
   }
@@ -832,7 +827,7 @@ public class TestShuffleHandler {
     CheckedOutputStream chk = new CheckedOutputStream(output, crc);
     String msg = "Writing new index file. This file will be used only " +
         "for the testing.";
-    chk.write(Arrays.copyOf(msg.getBytes(),
+    chk.write(Arrays.copyOf(msg.getBytes(StandardCharsets.UTF_8),
         MapTask.MAP_OUTPUT_INDEX_RECORD_LENGTH));
     output.writeLong(chk.getChecksum().getValue());
     output.close();
@@ -865,7 +860,8 @@ public class TestShuffleHandler {
       DataOutputBuffer outputBuffer = new DataOutputBuffer();
       outputBuffer.reset();
       Token<JobTokenIdentifier> jt = new Token<JobTokenIdentifier>(
-          "identifier".getBytes(), "password".getBytes(), new Text(user),
+          "identifier".getBytes(StandardCharsets.UTF_8),
+          "password".getBytes(StandardCharsets.UTF_8), new Text(user),
           new Text("shuffleService"));
       jt.write(outputBuffer);
       shuffle.initializeApplication(new ApplicationInitializationContext(user,
@@ -936,7 +932,8 @@ public class TestShuffleHandler {
       DataOutputBuffer outputBuffer = new DataOutputBuffer();
       outputBuffer.reset();
       Token<JobTokenIdentifier> jt = new Token<JobTokenIdentifier>(
-          "identifier".getBytes(), "password".getBytes(), new Text(user),
+          "identifier".getBytes(StandardCharsets.UTF_8),
+          "password".getBytes(StandardCharsets.UTF_8), new Text(user),
           new Text("shuffleService"));
       jt.write(outputBuffer);
       shuffle.initializeApplication(new ApplicationInitializationContext(user,
@@ -1094,8 +1091,10 @@ public class TestShuffleHandler {
       DataOutputBuffer outputBuffer = new DataOutputBuffer();
       outputBuffer.reset();
       Token<JobTokenIdentifier> jt =
-          new Token<JobTokenIdentifier>("identifier".getBytes(),
-          "password".getBytes(), new Text(user), new Text("shuffleService"));
+          new Token<JobTokenIdentifier>(
+              "identifier".getBytes(StandardCharsets.UTF_8),
+              "password".getBytes(StandardCharsets.UTF_8), new Text(user),
+              new Text("shuffleService"));
       jt.write(outputBuffer);
       shuffleHandler
           .initializeApplication(new ApplicationInitializationContext(user,

@@ -17,7 +17,13 @@
  */
 package org.apache.hadoop.hdfs.server.mover;
 
+import com.google.common.annotations.VisibleForTesting;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.commons.cli.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -42,23 +48,14 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -66,6 +63,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -120,8 +118,6 @@ public class Mover {
   private final int retryMaxAttempts;
   private final AtomicInteger retryCount;
   private final Map<Long, Set<DatanodeInfo>> excludedPinnedBlocks;
-  private final MoverMetrics metrics;
-  private final NameNodeConnector nnc;
 
   private final BlockStoragePolicy[] blockStoragePolicies;
 
@@ -139,17 +135,9 @@ public class Mover {
     final int maxNoMoveInterval = conf.getInt(
         DFSConfigKeys.DFS_MOVER_MAX_NO_MOVE_INTERVAL_KEY,
         DFSConfigKeys.DFS_MOVER_MAX_NO_MOVE_INTERVAL_DEFAULT);
-    final int maxAttempts = conf.getInt(
+    this.retryMaxAttempts = conf.getInt(
         DFSConfigKeys.DFS_MOVER_RETRY_MAX_ATTEMPTS_KEY,
         DFSConfigKeys.DFS_MOVER_RETRY_MAX_ATTEMPTS_DEFAULT);
-    if (maxAttempts >= 0) {
-      this.retryMaxAttempts = maxAttempts;
-    } else {
-      LOG.warn(DFSConfigKeys.DFS_MOVER_RETRY_MAX_ATTEMPTS_KEY + " is "
-          + "configured with a negative value, using default value of "
-          + DFSConfigKeys.DFS_MOVER_RETRY_MAX_ATTEMPTS_DEFAULT);
-      this.retryMaxAttempts = DFSConfigKeys.DFS_MOVER_RETRY_MAX_ATTEMPTS_DEFAULT;
-    }
     this.retryCount = retryCount;
     this.dispatcher = new Dispatcher(nnc, Collections.<String> emptySet(),
         Collections.<String> emptySet(), movedWinWidth, moverThreads, 0,
@@ -159,8 +147,6 @@ public class Mover {
     this.blockStoragePolicies = new BlockStoragePolicy[1 <<
         BlockStoragePolicySuite.ID_BIT_LENGTH];
     this.excludedPinnedBlocks = excludedPinnedBlocks;
-    this.nnc = nnc;
-    this.metrics = MoverMetrics.create(this);
   }
 
   void init() throws IOException {
@@ -200,10 +186,6 @@ public class Mover {
     } finally {
       dispatcher.shutdownNow();
     }
-  }
-
-  public NameNodeConnector getNnc() {
-    return nnc;
   }
 
   DBlock newDBlock(LocatedBlock lb, List<MLocation> locations,
@@ -306,7 +288,6 @@ public class Mover {
      *         round
      */
     private Result processNamespace() throws IOException {
-      metrics.setProcessingNamespace(true);
       getSnapshottableDirs();
       Result result = new Result();
       for (Path target : targetPaths) {
@@ -333,7 +314,6 @@ public class Mover {
         retryCount.set(0);
       }
       result.updateHasRemaining(hasFailed);
-      metrics.setProcessingNamespace(false);
       return result;
     }
 
@@ -386,7 +366,6 @@ public class Mover {
             // the full path is a snapshot path but it is also included in the
             // current directory tree, thus ignore it.
             processFile(fullPath, (HdfsLocatedFileStatus) status, result);
-            metrics.incrFilesProcessed();
           }
         } catch (IOException e) {
           LOG.warn("Failed to check the status of " + parent
@@ -534,7 +513,6 @@ public class Mover {
         final PendingMove pm = source.addPendingMove(db, target);
         if (pm != null) {
           dispatcher.executePendingMove(pm);
-          metrics.incrBlocksScheduled();
           return true;
         }
       }
@@ -553,7 +531,6 @@ public class Mover {
             final PendingMove pm = source.addPendingMove(db, target);
             if (pm != null) {
               dispatcher.executePendingMove(pm);
-              metrics.incrBlocksScheduled();
               return true;
             }
           }
@@ -655,20 +632,15 @@ public class Mover {
     final long sleeptime =
         conf.getTimeDuration(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY,
             DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_DEFAULT,
-            TimeUnit.SECONDS, TimeUnit.MILLISECONDS) * 2 +
+            TimeUnit.SECONDS) * 2000 +
         conf.getTimeDuration(
             DFSConfigKeys.DFS_NAMENODE_REDUNDANCY_INTERVAL_SECONDS_KEY,
             DFSConfigKeys.DFS_NAMENODE_REDUNDANCY_INTERVAL_SECONDS_DEFAULT,
-            TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
+            TimeUnit.SECONDS) * 1000;
     AtomicInteger retryCount = new AtomicInteger(0);
     // TODO: Need to limit the size of the pinned blocks to limit memory usage
     Map<Long, Set<DatanodeInfo>> excludedPinnedBlocks = new HashMap<>();
     LOG.info("namenodes = " + namenodes);
-
-    DefaultMetricsSystem.initialize("Mover");
-    JvmMetrics.create("Mover",
-        conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
-        DefaultMetricsSystem.instance());
 
     checkKeytabAndInit(conf);
     List<NameNodeConnector> connectors = Collections.emptyList();
@@ -740,7 +712,8 @@ public class Mover {
     private static String[] readPathFile(String file) throws IOException {
       List<String> list = Lists.newArrayList();
       BufferedReader reader = new BufferedReader(
-          new InputStreamReader(new FileInputStream(file), "UTF-8"));
+          new InputStreamReader(new FileInputStream(file),
+              StandardCharsets.UTF_8));
       try {
         String line;
         while ((line = reader.readLine()) != null) {
@@ -838,7 +811,6 @@ public class Mover {
         System.out.println(e + ".  Exiting ...");
         return ExitStatus.ILLEGAL_ARGUMENTS.getExitCode();
       } finally {
-        DefaultMetricsSystem.shutdown();
         System.out.format("%-24s ", DateFormat.getDateTimeInstance().format(new Date()));
         System.out.println("Mover took " + StringUtils.formatTime(Time.monotonicNow()-startTime));
       }

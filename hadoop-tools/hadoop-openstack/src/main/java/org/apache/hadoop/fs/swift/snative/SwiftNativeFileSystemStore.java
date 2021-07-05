@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.swift.exceptions.SwiftConfigurationException;
 import org.apache.hadoop.fs.swift.exceptions.SwiftException;
@@ -48,7 +47,7 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -357,7 +356,7 @@ public class SwiftNativeFileSystemStore {
             constructCollectionType(List.class, SwiftObjectFileStatus.class);
 
     final List<SwiftObjectFileStatus> fileStatusList = JSONUtil.toObject(
-        new String(bytes, Charset.forName("UTF-8")), collectionType);
+        new String(bytes, StandardCharsets.UTF_8), collectionType);
 
     //this can happen if user lists file /data/files/file
     //in this case swift will return empty array
@@ -451,7 +450,7 @@ public class SwiftNativeFileSystemStore {
       //no object location, return an empty list
       return new LinkedList<URI>();
     }
-    return extractUris(new String(objectLocation, Charset.forName("UTF-8")), path);
+    return extractUris(new String(objectLocation, StandardCharsets.UTF_8), path);
   }
 
   /**
@@ -563,16 +562,12 @@ public class SwiftNativeFileSystemStore {
     //parent dir (in which case the dest dir exists), or the destination
     //directory is root, in which case it must also exist
     if (dstParent != null && !dstParent.equals(srcParent)) {
-      SwiftFileStatus fileStatus;
       try {
-        fileStatus = getObjectMetadata(dstParent);
+        getObjectMetadata(dstParent);
       } catch (FileNotFoundException e) {
         //destination parent doesn't exist; bail out
         LOG.debug("destination parent directory " + dstParent + " doesn't exist");
         throw e;
-      }
-      if (!fileStatus.isDir()) {
-        throw new ParentNotDirectoryException(dstParent.toString());
       }
     }
 

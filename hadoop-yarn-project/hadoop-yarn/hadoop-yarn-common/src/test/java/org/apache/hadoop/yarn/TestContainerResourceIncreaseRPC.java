@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.yarn;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.NetUtils;
@@ -65,6 +65,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -74,7 +75,7 @@ import java.util.List;
  */
 public class TestContainerResourceIncreaseRPC {
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  static final Log LOG = LogFactory.getLog(
       TestContainerResourceIncreaseRPC.class);
 
   @Test
@@ -110,7 +111,7 @@ public class TestContainerResourceIncreaseRPC {
               resource, System.currentTimeMillis() + 10000, 42, 42,
                   Priority.newInstance(0), 0);
       Token containerToken =
-          newContainerToken(nodeId, "password".getBytes(),
+          newContainerToken(nodeId, "password".getBytes(StandardCharsets.UTF_8),
               containerTokenIdentifier);
       // Construct container resource increase request,
       List<Token> increaseTokens = new ArrayList<>();
@@ -188,7 +189,7 @@ public class TestContainerResourceIncreaseRPC {
         // make the thread sleep to look like its not going to respond
         Thread.sleep(10000);
       } catch (Exception e) {
-        LOG.error(e.toString());
+        LOG.error(e);
         throw new YarnException(e);
       }
       throw new YarnException("Shouldn't happen!!");

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -45,9 +45,9 @@ import org.apache.hadoop.hdfs.server.protocol.SlowDiskReports;
 import org.apache.hadoop.hdfs.server.protocol.SlowPeerReports;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
-import org.slf4j.event.Level;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -57,6 +57,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.UUID;
 
@@ -279,7 +280,7 @@ public class TestNameNodePrunesMissingStorages {
     File newVersionFile =
         new File(versionFile.getParent(), UUID.randomUUID().toString());
     Writer out = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(newVersionFile), "UTF-8"));
+        new FileOutputStream(newVersionFile), StandardCharsets.UTF_8));
     final String STORAGE_ID = "storageID=";
     boolean success = false;
     try {
@@ -319,7 +320,7 @@ public class TestNameNodePrunesMissingStorages {
         .Builder(conf).numDataNodes(1)
         .storagesPerDatanode(1)
         .build();
-    GenericTestUtils.setLogLevel(BlockManager.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(BlockManager.LOG, Level.ALL);
     try {
       cluster.waitActive();
       final Path TEST_PATH = new Path("/foo1");

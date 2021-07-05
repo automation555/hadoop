@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.mapreduce.security;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -95,7 +96,7 @@ public class TestMRCredentials {
     jsonString.append("}");
 
     FileOutputStream fos= new FileOutputStream (fileName);
-    fos.write(jsonString.toString().getBytes());
+    fos.write(jsonString.toString().getBytes(StandardCharsets.UTF_8));
     fos.close();
   }
 
@@ -131,7 +132,7 @@ public class TestMRCredentials {
       e.printStackTrace(System.out);
       fail("Job failed");
     }
-    assertThat(res).withFailMessage("dist job res is not 0").isEqualTo(0);
+    assertEquals("dist job res is not 0", res, 0);
 
   }
 }

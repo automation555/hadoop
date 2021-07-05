@@ -27,6 +27,7 @@ import java.util.Set;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
@@ -180,7 +181,7 @@ public abstract class SchedulerMetrics {
     // application running information
     jobRuntimeLogBW =
         new BufferedWriter(new OutputStreamWriter(new FileOutputStream(
-            metricsOutputDir + "/jobruntime.csv"), "UTF-8"));
+            metricsOutputDir + "/jobruntime.csv"), StandardCharsets.UTF_8));
     jobRuntimeLogBW.write("JobID,real_start_time,real_end_time," +
         "simulate_start_time,simulate_end_time" + EOL);
     jobRuntimeLogBW.flush();
@@ -508,8 +509,9 @@ public abstract class SchedulerMetrics {
     MetricsLogRunnable() {
       try {
         metricsLogBW =
-            new BufferedWriter(new OutputStreamWriter(new FileOutputStream(
-                metricsOutputDir + "/realtimetrack.json"), "UTF-8"));
+            new BufferedWriter(new OutputStreamWriter(
+                new FileOutputStream(metricsOutputDir + "/realtimetrack.json"),
+                StandardCharsets.UTF_8));
         metricsLogBW.write("[");
       } catch (IOException e) {
         LOG.info(e.getMessage());
@@ -539,13 +541,9 @@ public abstract class SchedulerMetrics {
   }
 
   void tearDown() throws Exception {
-    setRunning(false);
-    LOG.info("Scheduler Metrics tears down");
     if (metricsLogBW != null)  {
       metricsLogBW.write("]");
       metricsLogBW.close();
-      //metricsLogBW is nullified to prevent the usage after closing
-      metricsLogBW = null;
     }
 
     if (web != null) {

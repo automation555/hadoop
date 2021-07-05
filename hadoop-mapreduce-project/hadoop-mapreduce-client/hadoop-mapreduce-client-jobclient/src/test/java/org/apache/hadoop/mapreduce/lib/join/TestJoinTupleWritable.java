@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -33,7 +34,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.junit.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -70,10 +70,10 @@ public class TestJoinTupleWritable {
       new FloatWritable(r.nextFloat()),
       new IntWritable(r.nextInt()),
       new LongWritable(r.nextLong()),
-      new BytesWritable("dingo".getBytes()),
+      new BytesWritable("dingo".getBytes(StandardCharsets.UTF_8)),
       new LongWritable(r.nextLong()),
       new IntWritable(r.nextInt()),
-      new BytesWritable("yak".getBytes()),
+      new BytesWritable("yak".getBytes(StandardCharsets.UTF_8)),
       new IntWritable(r.nextInt())
     };
     return writs;
@@ -110,10 +110,10 @@ public class TestJoinTupleWritable {
       new FloatWritable(r.nextFloat()),
       new IntWritable(r.nextInt()),
       new LongWritable(r.nextLong()),
-      new BytesWritable("dingo".getBytes()),
+      new BytesWritable("dingo".getBytes(StandardCharsets.UTF_8)),
       new LongWritable(r.nextLong()),
       new IntWritable(r.nextInt()),
-      new BytesWritable("yak".getBytes()),
+      new BytesWritable("yak".getBytes(StandardCharsets.UTF_8)),
       new IntWritable(r.nextInt())
     };
     TupleWritable t = new TupleWritable(writs);
@@ -132,10 +132,10 @@ public class TestJoinTupleWritable {
       new FloatWritable(r.nextFloat()),
       new IntWritable(r.nextInt()),
       new LongWritable(r.nextLong()),
-      new BytesWritable("dingo".getBytes()),
+      new BytesWritable("dingo".getBytes(StandardCharsets.UTF_8)),
       new LongWritable(r.nextLong()),
       new IntWritable(r.nextInt()),
-      new BytesWritable("yak".getBytes()),
+      new BytesWritable("yak".getBytes(StandardCharsets.UTF_8)),
       new IntWritable(r.nextInt())
     };
     TupleWritable sTuple = makeTuple(writs);
@@ -151,10 +151,10 @@ public class TestJoinTupleWritable {
       new FloatWritable(r.nextFloat()),
       new IntWritable(r.nextInt()),
       new LongWritable(r.nextLong()),
-      new BytesWritable("dingo".getBytes()),
+      new BytesWritable("dingo".getBytes(StandardCharsets.UTF_8)),
       new LongWritable(r.nextLong()),
       new IntWritable(r.nextInt()),
-      new BytesWritable("yak".getBytes()),
+      new BytesWritable("yak".getBytes(StandardCharsets.UTF_8)),
       new IntWritable(r.nextInt())
     };
     TupleWritable sTuple = makeTuple(writs);
@@ -182,8 +182,7 @@ public class TestJoinTupleWritable {
     ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
     TupleWritable dTuple = new TupleWritable();
     dTuple.readFields(new DataInputStream(in));
-    assertThat(dTuple).withFailMessage("Failed to write/read tuple")
-        .isEqualTo(sTuple);
+    assertTrue("Failed to write/read tuple", sTuple.equals(dTuple));
     assertEquals("All tuple data has not been read from the stream", 
       -1, in.read());
   }
@@ -202,8 +201,7 @@ public class TestJoinTupleWritable {
     ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
     TupleWritable dTuple = new TupleWritable();
     dTuple.readFields(new DataInputStream(in));
-    assertThat(dTuple).withFailMessage("Failed to write/read tuple")
-            .isEqualTo(sTuple);
+    assertTrue("Failed to write/read tuple", sTuple.equals(dTuple));
     assertEquals("All tuple data has not been read from the stream", 
       -1, in.read());
   }
@@ -228,8 +226,7 @@ public class TestJoinTupleWritable {
     ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
     TupleWritable dTuple = new TupleWritable();
     dTuple.readFields(new DataInputStream(in));
-    assertThat(dTuple).withFailMessage("Failed to write/read tuple")
-        .isEqualTo(sTuple);
+    assertTrue("Failed to write/read tuple", sTuple.equals(dTuple));
     assertEquals("All tuple data has not been read from the stream", 
       -1, in.read());
   }

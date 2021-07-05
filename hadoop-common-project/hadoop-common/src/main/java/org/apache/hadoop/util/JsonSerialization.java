@@ -21,10 +21,11 @@ package org.apache.hadoop.util;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -35,7 +36,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +65,6 @@ public class JsonSerialization<T> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(JsonSerialization.class);
-  private static final String UTF_8 = "UTF-8";
 
   private final Class<T> classType;
   private final ObjectMapper mapper;
@@ -190,7 +190,7 @@ public class JsonSerialization<T> {
    */
   public void save(File file, T instance) throws
       IOException {
-    writeJsonAsBytes(instance, Files.newOutputStream(file.toPath()));
+    writeJsonAsBytes(instance, new FileOutputStream(file));
   }
 
   /**
@@ -300,7 +300,7 @@ public class JsonSerialization<T> {
    * @throws EOFException not enough data
    */
   public T fromBytes(byte[] bytes) throws IOException {
-    return fromJson(new String(bytes, 0, bytes.length, UTF_8));
+    return fromJson(new String(bytes, 0, bytes.length, StandardCharsets.UTF_8));
   }
 
   /**

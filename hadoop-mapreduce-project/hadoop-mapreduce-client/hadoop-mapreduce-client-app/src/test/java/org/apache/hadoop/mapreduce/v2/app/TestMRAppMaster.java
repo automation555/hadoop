@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.mapreduce.v2.app;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -35,6 +34,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.HashMap;
@@ -413,8 +413,8 @@ public class TestMRAppMaster {
 
     // Simulate credentials passed to AM via client->RM->NM
     Credentials credentials = new Credentials();
-    byte[] identifier = "MyIdentifier".getBytes();
-    byte[] password = "MyPassword".getBytes();
+    byte[] identifier = "MyIdentifier".getBytes(StandardCharsets.UTF_8);
+    byte[] password = "MyPassword".getBytes(StandardCharsets.UTF_8);
     Text kind = new Text("MyTokenKind");
     Text service = new Text("host:port");
     Token<? extends TokenIdentifier> myToken =
@@ -429,7 +429,8 @@ public class TestMRAppMaster {
     credentials.addToken(appTokenService, appToken);
 
     Text keyAlias = new Text("mySecretKeyAlias");
-    credentials.addSecretKey(keyAlias, "mySecretKey".getBytes());
+    credentials.addSecretKey(keyAlias,
+        "mySecretKey".getBytes(StandardCharsets.UTF_8));
     Token<? extends TokenIdentifier> storedToken =
         credentials.getToken(tokenAlias);
 
@@ -551,8 +552,8 @@ public class TestMRAppMaster {
         .handleEvent(captor.capture());
     HistoryEvent event = captor.getValue().getHistoryEvent();
     assertTrue(event instanceof JobUnsuccessfulCompletionEvent);
-    assertThat(((JobUnsuccessfulCompletionEvent) event).getStatus())
-        .isEqualTo(expectedJobState);
+    assertEquals(((JobUnsuccessfulCompletionEvent) event).getStatus()
+        , expectedJobState);
   }
 }
 class MRAppMasterTest extends MRAppMaster {

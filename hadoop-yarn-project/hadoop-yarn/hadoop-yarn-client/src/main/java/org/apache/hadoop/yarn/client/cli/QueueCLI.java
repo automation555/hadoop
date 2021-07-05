@@ -20,7 +20,7 @@ package org.apache.hadoop.yarn.client.cli;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.util.Set;
 
@@ -36,7 +36,7 @@ import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 @Private
 @Unstable
@@ -106,7 +106,7 @@ public class QueueCLI extends YarnCLI {
   private int listQueue(String queueName) throws YarnException, IOException {
     int rc;
     PrintWriter writer = new PrintWriter(
-        new OutputStreamWriter(sysout, Charset.forName("UTF-8")));
+        new OutputStreamWriter(sysout, StandardCharsets.UTF_8));
 
     QueueInfo queueInfo = client.getQueueInfo(queueName);
     if (queueInfo != null) {
@@ -125,20 +125,16 @@ public class QueueCLI extends YarnCLI {
   private void printQueueInfo(PrintWriter writer, QueueInfo queueInfo) {
     writer.print("Queue Name : ");
     writer.println(queueInfo.getQueueName());
-    writer.print("Queue Path : ");
-    writer.println(queueInfo.getQueuePath());
 
     writer.print("\tState : ");
     writer.println(queueInfo.getQueueState());
-    DecimalFormat df = new DecimalFormat("#.00");
+    DecimalFormat df = new DecimalFormat("#.0");
     writer.print("\tCapacity : ");
     writer.println(df.format(queueInfo.getCapacity() * 100) + "%");
     writer.print("\tCurrent Capacity : ");
     writer.println(df.format(queueInfo.getCurrentCapacity() * 100) + "%");
     writer.print("\tMaximum Capacity : ");
     writer.println(df.format(queueInfo.getMaximumCapacity() * 100) + "%");
-    writer.print("\tWeight : ");
-    writer.println(df.format(queueInfo.getWeight()));
     writer.print("\tDefault Node Label expression : ");
     String nodeLabelExpression = queueInfo.getDefaultNodeLabelExpression();
     nodeLabelExpression =

@@ -18,15 +18,15 @@
 package org.apache.hadoop.util.curator;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.curator.framework.AuthInfo;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.api.transaction.CuratorOp;
+import org.apache.curator.framework.api.transaction.CuratorTransaction;
+import org.apache.curator.framework.api.transaction.CuratorTransactionFinal;
 import org.apache.curator.retry.RetryNTimes;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -39,7 +39,7 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 
 /**
  * Helper class that provides utility methods specific to ZK operations.
@@ -197,7 +197,7 @@ public final class ZKCuratorManager {
   public String getStringData(final String path) throws Exception {
     byte[] bytes = getData(path);
     if (bytes != null) {
-      return new String(bytes, Charset.forName("UTF-8"));
+      return new String(bytes, StandardCharsets.UTF_8);
     }
     return null;
   }
@@ -212,7 +212,7 @@ public final class ZKCuratorManager {
   public String getStringData(final String path, Stat stat) throws Exception {
     byte[] bytes = getData(path, stat);
     if (bytes != null) {
-      return new String(bytes, Charset.forName("UTF-8"));
+      return new String(bytes, StandardCharsets.UTF_8);
     }
     return null;
   }
@@ -236,7 +236,7 @@ public final class ZKCuratorManager {
    * @throws Exception If it cannot contact Zookeeper.
    */
   public void setData(String path, String data, int version) throws Exception {
-    byte[] bytes = data.getBytes(Charset.forName("UTF-8"));
+    byte[] bytes = data.getBytes(StandardCharsets.UTF_8);
     setData(path, bytes, version);
   }
 
@@ -387,45 +387,43 @@ public final class ZKCuratorManager {
   /**
    * Use curator transactions to ensure zk-operations are performed in an all
    * or nothing fashion. This is equivalent to using ZooKeeper#multi.
+   *
+   * TODO (YARN-3774): Curator 3.0 introduces CuratorOp similar to Op. We ll
+   * have to rewrite this inner class when we adopt that.
    */
   public class SafeTransaction {
+    private CuratorTransactionFinal transactionFinal;
     private String fencingNodePath;
-    private List<CuratorOp> curatorOperations = new LinkedList<>();
 
     SafeTransaction(List<ACL> fencingACL, String fencingNodePath)
         throws Exception {
       this.fencingNodePath = fencingNodePath;
-      curatorOperations.add(curator.transactionOp().create()
-                              .withMode(CreateMode.PERSISTENT)
-                              .withACL(fencingACL)
-                              .forPath(fencingNodePath, new byte[0]));
+      CuratorTransaction transaction = curator.inTransaction();
+      transactionFinal = transaction.create()
+          .withMode(CreateMode.PERSISTENT).withACL(fencingACL)
+          .forPath(fencingNodePath, new byte[0]).and();
     }
 
     public void commit() throws Exception {
-      curatorOperations.add(curator.transactionOp().delete()
-                              .forPath(fencingNodePath));
-      curator.transaction().forOperations(curatorOperations);
-      curatorOperations.clear();
+      transactionFinal = transactionFinal.delete()
+          .forPath(fencingNodePath).and();
+      transactionFinal.commit();
     }
 
     public void create(String path, byte[] data, List<ACL> acl, CreateMode mode)
         throws Exception {
-      curatorOperations.add(curator.transactionOp().create()
-                              .withMode(mode)
-                              .withACL(acl)
-                              .forPath(path, data));
+      transactionFinal = transactionFinal.create()
+          .withMode(mode).withACL(acl).forPath(path, data).and();
     }
 
     public void delete(String path) throws Exception {
-      curatorOperations.add(curator.transactionOp().delete()
-                              .forPath(path));
+      transactionFinal = transactionFinal.delete().forPath(path).and();
     }
 
     public void setData(String path, byte[] data, int version)
         throws Exception {
-      curatorOperations.add(curator.transactionOp().setData()
-                              .withVersion(version)
-                              .forPath(path, data));
+      transactionFinal = transactionFinal.setData()
+          .withVersion(version).forPath(path, data).and();
     }
   }
 }

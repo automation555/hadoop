@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdfs.server.common.blockaliasmap.impl;
 
+import com.google.common.collect.Lists;
+import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -26,9 +28,7 @@ import org.apache.hadoop.hdfs.server.aliasmap.InMemoryAliasMap;
 import org.apache.hadoop.hdfs.server.aliasmap.InMemoryLevelDBAliasMapServer;
 import org.apache.hadoop.hdfs.server.common.blockaliasmap.BlockAliasMap;
 import org.apache.hadoop.hdfs.server.common.FileRegion;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.apache.hadoop.util.Lists;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -44,7 +44,7 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -75,9 +75,7 @@ public class TestInMemoryLevelDBAliasMapClient {
 
     conf.set(DFSConfigKeys.DFS_PROVIDED_ALIASMAP_INMEMORY_RPC_ADDRESS,
         "localhost:" + port);
-    File testDir = GenericTestUtils.getTestDir();
-    tempDir = Files
-        .createTempDirectory(testDir.toPath(), "test").toFile();
+    tempDir = Files.createTempDir();
     File levelDBDir = new File(tempDir, BPID);
     levelDBDir.mkdirs();
     conf.set(DFSConfigKeys.DFS_PROVIDED_ALIASMAP_INMEMORY_LEVELDB_DIR,
@@ -100,7 +98,7 @@ public class TestInMemoryLevelDBAliasMapClient {
     levelDBAliasMapServer.start();
     inMemoryLevelDBAliasMapClient.setConf(conf);
     Block block = new Block(42, 43, 44);
-    byte[] nonce = "blackbird".getBytes();
+    byte[] nonce = "blackbird".getBytes(StandardCharsets.UTF_8);
     ProvidedStorageLocation providedStorageLocation
         = new ProvidedStorageLocation(new Path("cuckoo"),
         45, 46, nonce);
@@ -122,8 +120,8 @@ public class TestInMemoryLevelDBAliasMapClient {
     inMemoryLevelDBAliasMapClient.setConf(conf);
     Block block1 = new Block(42, 43, 44);
     Block block2 = new Block(43, 44, 45);
-    byte[] nonce1 = "blackbird".getBytes();
-    byte[] nonce2 = "cuckoo".getBytes();
+    byte[] nonce1 = "blackbird".getBytes(StandardCharsets.UTF_8);
+    byte[] nonce2 = "cuckoo".getBytes(StandardCharsets.UTF_8);
     ProvidedStorageLocation providedStorageLocation1 =
         new ProvidedStorageLocation(new Path("eagle"),
         46, 47, nonce1);
@@ -163,12 +161,12 @@ public class TestInMemoryLevelDBAliasMapClient {
     Block block4 = new Block(47, 48, 49);
     Block block5 = new Block(50, 51, 52);
     Block block6 = new Block(53, 54, 55);
-    byte[] nonce1 = "blackbird".getBytes();
-    byte[] nonce2 = "cuckoo".getBytes();
-    byte[] nonce3 = "sparrow".getBytes();
-    byte[] nonce4 = "magpie".getBytes();
-    byte[] nonce5 = "seagull".getBytes();
-    byte[] nonce6 = "finch".getBytes();
+    byte[] nonce1 = "blackbird".getBytes(StandardCharsets.UTF_8);
+    byte[] nonce2 = "cuckoo".getBytes(StandardCharsets.UTF_8);
+    byte[] nonce3 = "sparrow".getBytes(StandardCharsets.UTF_8);
+    byte[] nonce4 = "magpie".getBytes(StandardCharsets.UTF_8);
+    byte[] nonce5 = "seagull".getBytes(StandardCharsets.UTF_8);
+    byte[] nonce6 = "finch".getBytes(StandardCharsets.UTF_8);
     ProvidedStorageLocation providedStorageLocation1 =
         new ProvidedStorageLocation(new Path("eagle"),
             46, 47, nonce1);

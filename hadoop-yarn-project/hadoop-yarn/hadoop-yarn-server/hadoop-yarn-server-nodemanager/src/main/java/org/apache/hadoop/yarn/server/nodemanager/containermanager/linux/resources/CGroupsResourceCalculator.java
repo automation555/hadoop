@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.CpuTimeTracker;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.SysInfoLinux;
@@ -35,7 +35,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -63,8 +63,8 @@ public class CGroupsResourceCalculator extends ResourceCalculatorProcessTree {
     Continue,
     Exit
   }
-  protected static final Logger LOG = LoggerFactory
-      .getLogger(CGroupsResourceCalculator.class);
+  protected static final Log LOG = LogFactory
+      .getLog(CGroupsResourceCalculator.class);
   private static final String PROCFS = "/proc";
   static final String CGROUP = "cgroup";
   static final String CPU_STAT = "cpuacct.stat";
@@ -145,7 +145,9 @@ public class CGroupsResourceCalculator extends ResourceCalculatorProcessTree {
 
   @Override
   public float getCpuUsagePercent() {
-    LOG.debug("Process {} jiffies:{}", pid, processTotalJiffies);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Process " + pid + " jiffies:" + processTotalJiffies);
+    }
     return cpuTimeTracker.getCpuTrackerUsagePercent();
   }
 
@@ -185,9 +187,9 @@ public class CGroupsResourceCalculator extends ResourceCalculatorProcessTree {
     processPhysicalMemory = getMemorySize(memStat);
     if (memswStat.exists()) {
       processVirtualMemory = getMemorySize(memswStat);
-    } else {
-      LOG.debug("Swap cgroups monitoring is not compiled into the kernel {}",
-          memswStat.getAbsolutePath());
+    } else if(LOG.isDebugEnabled()) {
+      LOG.debug("Swap cgroups monitoring is not compiled into the kernel " +
+          memswStat.getAbsolutePath().toString());
     }
   }
 
@@ -316,7 +318,7 @@ public class CGroupsResourceCalculator extends ResourceCalculatorProcessTree {
       throws YarnException {
     // Read "procfsDir/<pid>/stat" file - typically /proc/<pid>/stat
     try (InputStreamReader fReader = new InputStreamReader(
-        new FileInputStream(file), Charset.forName("UTF-8"))) {
+        new FileInputStream(file), StandardCharsets.UTF_8)) {
       try (BufferedReader in = new BufferedReader(fReader)) {
         try {
           String str;

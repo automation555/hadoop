@@ -26,13 +26,14 @@ import static org.mockito.Mockito.times;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -53,6 +54,8 @@ import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -63,15 +66,12 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.mockito.Mockito;
-import org.slf4j.event.Level;
 
 @RunWith(Parameterized.class)
 public class TestEncryptedTransfer {
   {
-    GenericTestUtils.setLogLevel(
-        LoggerFactory.getLogger(SaslDataTransferServer.class), Level.DEBUG);
-    GenericTestUtils.setLogLevel(
-        LoggerFactory.getLogger(DataTransferSaslUtil.class), Level.DEBUG);
+    LogManager.getLogger(SaslDataTransferServer.class).setLevel(Level.DEBUG);
+    LogManager.getLogger(DataTransferSaslUtil.class).setLevel(Level.DEBUG);
   }
 
   @Rule
@@ -382,7 +382,9 @@ public class TestEncryptedTransfer {
     // use 4 datanodes to make sure that after 1 data node is stopped,
     // client only retries establishing pipeline with the 4th node.
     int numDataNodes = 4;
-
+    // do not consider load factor when selecting a data node
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_REDUNDANCY_CONSIDERLOAD_KEY,
+        false);
     setEncryptionConfigKeys();
 
     cluster = new MiniDFSCluster.Builder(conf)
@@ -426,7 +428,7 @@ public class TestEncryptedTransfer {
       DatanodeInfo[] targets = dfstream.getPipeline();
       cluster.stopDataNode(targets[0].getXferAddr());
       // write data to induce pipeline recovery
-      out.write(PLAIN_TEXT.getBytes());
+      out.write(PLAIN_TEXT.getBytes(StandardCharsets.UTF_8));
       out.hflush();
       assertFalse("The first datanode in the pipeline was not replaced.",
           Arrays.asList(dfstream.getPipeline()).contains(targets[0]));
@@ -530,7 +532,7 @@ public class TestEncryptedTransfer {
     } else {
       out = fs.append(TEST_PATH);
     }
-    out.write(PLAIN_TEXT.getBytes());
+    out.write(PLAIN_TEXT.getBytes(StandardCharsets.UTF_8));
     out.close();
   }
   

@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
@@ -47,7 +48,7 @@ import org.apache.hadoop.util.StringUtils;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList;
 
 
 public class TestTransferFsImage {
@@ -164,7 +165,7 @@ public class TestTransferFsImage {
 
       File mockImageFile = File.createTempFile("image", "", tmpDir);
       FileOutputStream imageFile = new FileOutputStream(mockImageFile);
-      imageFile.write("data".getBytes());
+      imageFile.write("data".getBytes(StandardCharsets.UTF_8));
       imageFile.close();
       Mockito.when(
           mockStorage.findImageFile(Mockito.any(NameNodeFile.class),

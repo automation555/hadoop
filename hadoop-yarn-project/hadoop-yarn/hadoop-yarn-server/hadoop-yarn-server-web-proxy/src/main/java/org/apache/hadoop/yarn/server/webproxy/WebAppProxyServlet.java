@@ -30,6 +30,7 @@ import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Enumeration;
@@ -45,7 +46,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriBuilderException;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -122,9 +123,6 @@ public class WebAppProxyServlet extends HttpServlet {
     }
   }
 
-  protected void setConf(YarnConfiguration conf){
-    this.conf = conf;
-  }
   /**
    * Default constructor
    */
@@ -233,14 +231,6 @@ public class WebAppProxyServlet extends HttpServlet {
 
     String httpsPolicy = conf.get(YarnConfiguration.RM_APPLICATION_HTTPS_POLICY,
         YarnConfiguration.DEFAULT_RM_APPLICATION_HTTPS_POLICY);
-
-    boolean connectionTimeoutEnabled =
-        conf.getBoolean(YarnConfiguration.RM_PROXY_TIMEOUT_ENABLED,
-        YarnConfiguration.DEFALUT_RM_PROXY_TIMEOUT_ENABLED);
-    int connectionTimeout =
-        conf.getInt(YarnConfiguration.RM_PROXY_CONNECTION_TIMEOUT,
-            YarnConfiguration.DEFAULT_RM_PROXY_CONNECTION_TIMEOUT);
-
     if (httpsPolicy.equals("LENIENT") || httpsPolicy.equals("STRICT")) {
       ProxyCA proxyCA = getProxyCA();
       // ProxyCA could be null when the Proxy is run outside the RM
@@ -259,20 +249,14 @@ public class WebAppProxyServlet extends HttpServlet {
     // since that is what the AM filter checks against. IP aliasing or
     // similar could cause issues otherwise.
     InetAddress localAddress = InetAddress.getByName(proxyHost);
-    LOG.debug("local InetAddress for proxy host: {}", localAddress);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("local InetAddress for proxy host: {}", localAddress);
+    }
     httpClientBuilder.setDefaultRequestConfig(
-        connectionTimeoutEnabled ?
-            RequestConfig.custom()
-                .setCircularRedirectsAllowed(true)
-                .setLocalAddress(localAddress)
-                .setConnectionRequestTimeout(connectionTimeout)
-                .setSocketTimeout(connectionTimeout)
-                .setConnectTimeout(connectionTimeout)
-                .build() :
-            RequestConfig.custom()
-                .setCircularRedirectsAllowed(true)
-                .setLocalAddress(localAddress)
-                .build());
+        RequestConfig.custom()
+        .setCircularRedirectsAllowed(true)
+        .setLocalAddress(localAddress)
+        .build());
 
     HttpRequestBase base = null;
     if (method.equals(HTTP.GET)) {
@@ -283,7 +267,8 @@ public class WebAppProxyServlet extends HttpServlet {
       StringBuilder sb = new StringBuilder();
       BufferedReader reader =
           new BufferedReader(
-              new InputStreamReader(req.getInputStream(), "UTF-8"));
+              new InputStreamReader(req.getInputStream(),
+                  StandardCharsets.UTF_8));
       String line;
       while ((line = reader.readLine()) != null) {
         sb.append(line);
@@ -301,7 +286,9 @@ public class WebAppProxyServlet extends HttpServlet {
       String name = names.nextElement();
       if (PASS_THROUGH_HEADERS.contains(name)) {
         String value = req.getHeader(name);
-        LOG.debug("REQ HEADER: {} : {}", name, value);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("REQ HEADER: {} : {}", name, value);
+        }
         base.setHeader(name, value);
       }
     }
@@ -640,6 +627,7 @@ public class WebAppProxyServlet extends HttpServlet {
    * again... If this method returns true, there was a redirect, and
    * it was handled by redirecting the current request to an error page.
    *
+   * @param path the part of the request path after the app id
    * @param id the app id
    * @param req the request object
    * @param resp the response object

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ipc;
 
-import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -59,6 +59,7 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.security.Security;
 import java.util.ArrayList;
@@ -169,7 +170,7 @@ public class TestSaslRPC extends TestRpcBase {
     clientFallBackToSimpleAllowed = true;
 
     // Set RPC engine to protobuf RPC engine
-    RPC.setProtocolEngine(conf, TestRpcService.class, ProtobufRpcEngine2.class);
+    RPC.setProtocolEngine(conf, TestRpcService.class, ProtobufRpcEngine.class);
   }
 
   static String getQOPNames (QualityOfProtection[] qops){
@@ -356,7 +357,7 @@ public class TestSaslRPC extends TestRpcBase {
       newConf.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, timeouts[0]);
       proxy1 = getClient(addr, newConf);
       proxy1.getAuthMethod(null, newEmptyRequest());
-      client = ProtobufRpcEngine2.getClient(newConf);
+      client = ProtobufRpcEngine.getClient(newConf);
       Set<ConnectionId> conns = client.getConnectionIds();
       assertEquals("number of connections in cache is wrong", 1, conns.size());
       // same conf, connection should be re-used
@@ -533,16 +534,13 @@ public class TestSaslRPC extends TestRpcBase {
   }
   
   private static Pattern BadToken =
-      Pattern.compile("^" + RemoteException.class.getName() +
-          "\\("+ SaslException.class.getName() + "\\): " +
-          "DIGEST-MD5: digest response format violation.*");
+      Pattern.compile(".*DIGEST-MD5: digest response format violation.*");
   private static Pattern KrbFailed =
       Pattern.compile(".*Failed on local exception:.* " +
                       "Failed to specify server's Kerberos principal name.*");
   private static Pattern Denied(AuthMethod method) {
-    return Pattern.compile("^" + RemoteException.class.getName() +
-        "\\(" + AccessControlException.class.getName() + "\\): "
-        + method + " authentication is not enabled.*");
+      return Pattern.compile(".*RemoteException.*AccessControlException.*: "
+          + method + " authentication is not enabled.*");
   }
   private static Pattern No(AuthMethod ... method) {
     String methods = StringUtils.join(method, ",\\s*");
@@ -550,10 +548,10 @@ public class TestSaslRPC extends TestRpcBase {
         "Client cannot authenticate via:\\[" + methods + "\\].*");
   }
   private static Pattern NoTokenAuth =
-      Pattern.compile("^" + IllegalArgumentException.class.getName() + ": " +
+      Pattern.compile(".*IllegalArgumentException: " +
                       "TOKEN authentication requires a secret manager");
   private static Pattern NoFallback = 
-      Pattern.compile("^" + AccessControlException.class.getName() + ":.* " +
+      Pattern.compile(".*Failed on local exception:.* " +
           "Server asks us to fall back to SIMPLE auth, " +
           "but this client is configured to only allow secure connections.*");
 
@@ -870,8 +868,9 @@ public class TestSaslRPC extends TestRpcBase {
           break;
         case INVALID:
           token = new Token<>(
-              tokenId.getBytes(), "bad-password!".getBytes(),
-              tokenId.getKind(), null);
+            tokenId.getBytes(),
+            "bad-password!".getBytes(StandardCharsets.UTF_8), tokenId.getKind(),
+            null);
           SecurityUtil.setTokenService(token, addr);
           break;
         case OTHER:

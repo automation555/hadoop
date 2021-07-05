@@ -22,9 +22,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.Test;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.*;
 import org.junit.Assert;
 
@@ -182,7 +182,7 @@ public class TestFileOutputCommitter {
     expectedOutput.append(key1).append("\n");
     expectedOutput.append(key2).append('\t').append(val2).append("\n");
     String output = slurp(expectedFile);
-    assertThat(output).isEqualTo(expectedOutput.toString());
+    assertEquals(output, expectedOutput.toString());
   }
 
   private void validateMapFileOutputContent(
@@ -571,7 +571,7 @@ public class TestFileOutputCommitter {
     String contents = null;
     try {
       in.read(buf, 0, len);
-      contents = new String(buf, "UTF-8");
+      contents = new String(buf, StandardCharsets.UTF_8);
     } finally {
       in.close();
     }

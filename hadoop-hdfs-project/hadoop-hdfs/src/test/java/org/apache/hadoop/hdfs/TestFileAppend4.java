@@ -29,6 +29,7 @@ import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -40,6 +41,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
@@ -47,9 +49,9 @@ import org.apache.hadoop.hdfs.server.namenode.INodeFile;
 import org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.event.Level;
 
 /* File Append tests for HDFS-200 & HDFS-142, specifically focused on:
  *  using append()/sync() to recover block information
@@ -67,9 +69,9 @@ public class TestFileAppend4 {
   FSDataOutputStream stm;
 
   {
-    DFSTestUtil.setNameNodeLogLevel(Level.TRACE);
-    GenericTestUtils.setLogLevel(DataNode.LOG, Level.TRACE);
-    GenericTestUtils.setLogLevel(DFSClient.LOG, Level.TRACE);
+    DFSTestUtil.setNameNodeLogLevel(Level.ALL);
+    GenericTestUtils.setLogLevel(DataNode.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(DFSClient.LOG, Level.ALL);
   }
 
   @Before
@@ -106,9 +108,7 @@ public class TestFileAppend4 {
 
     // set the soft limit to be 1 second so that the
     // namenode triggers lease recovery upon append request
-    cluster.setLeasePeriod(1,
-        conf.getLong(DFSConfigKeys.DFS_LEASE_HARDLIMIT_KEY,
-            DFSConfigKeys.DFS_LEASE_HARDLIMIT_DEFAULT));
+    cluster.setLeasePeriod(1000, HdfsConstants.LEASE_HARDLIMIT_PERIOD);
 
     // Trying recovery
     int tries = 60;
@@ -301,12 +301,12 @@ public class TestFileAppend4 {
       fileSystem = cluster.getFileSystem();
       Path f = new Path("/testAppend");
       FSDataOutputStream create = fileSystem.create(f, (short) 2);
-      create.write("/testAppend".getBytes());
+      create.write("/testAppend".getBytes(StandardCharsets.UTF_8));
       create.close();
 
       // Append to the file.
       FSDataOutputStream append = fileSystem.append(f);
-      append.write("/testAppend".getBytes());
+      append.write("/testAppend".getBytes(StandardCharsets.UTF_8));
       append.close();
 
       // Start a new datanode
@@ -344,7 +344,7 @@ public class TestFileAppend4 {
       fileSystem = cluster.getFileSystem();
       Path f = new Path("/testAppend");
       FSDataOutputStream create = fileSystem.create(f, (short) 2);
-      create.write("/testAppend".getBytes());
+      create.write("/testAppend".getBytes(StandardCharsets.UTF_8));
       create.close();
 
       // Check for replications

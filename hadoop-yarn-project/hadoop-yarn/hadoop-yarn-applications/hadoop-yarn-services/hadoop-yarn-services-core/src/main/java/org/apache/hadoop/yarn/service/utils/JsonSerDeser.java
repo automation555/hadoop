@@ -18,21 +18,23 @@
 
 package org.apache.hadoop.yarn.service.utils;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.map.DeserializationConfig;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.PropertyNamingStrategy;
+import org.codehaus.jackson.map.SerializationConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -62,8 +64,9 @@ public class JsonSerDeser<T> {
   public JsonSerDeser(Class<T> classType) {
     this.classType = classType;
     this.mapper = new ObjectMapper();
-    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
+    mapper.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    mapper.configure(SerializationConfig.Feature.WRITE_NULL_MAP_VALUES, false);
+    mapper.configure(SerializationConfig.Feature.WRITE_NULL_PROPERTIES, false);
   }
 
   public JsonSerDeser(Class<T> classType, PropertyNamingStrategy namingStrategy) {
@@ -174,9 +177,17 @@ public class JsonSerDeser<T> {
    * @throws JsonParseException parse problems
    * @throws JsonMappingException O/J mapping problems
    */
-  public T load(FileSystem fs, Path path) throws IOException {
+  public T load(FileSystem fs, Path path)
+    throws IOException, JsonParseException, JsonMappingException {
+    FileStatus status = fs.getFileStatus(path);
+    long len = status.getLen();
+    byte[] b = new byte[(int) len];
     FSDataInputStream dataInputStream = fs.open(path);
-    return fromStream(dataInputStream);
+    int count = dataInputStream.read(b);
+    if (count != len) {
+      throw new EOFException("Read of " + path +" finished prematurely");
+    }
+    return fromBytes(b);
   }
 
 
@@ -228,10 +239,13 @@ public class JsonSerDeser<T> {
    * Convert an object to a JSON string
    * @param instance instance to convert
    * @return a JSON string description
-   * @throws JsonProcessingException parse problems
+   * @throws JsonParseException parse problems
+   * @throws JsonMappingException O/J mapping problems
    */
-  public String toJson(T instance) throws JsonProcessingException {
-    mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+  public String toJson(T instance) throws IOException,
+                                               JsonGenerationException,
+                                               JsonMappingException {
+    mapper.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
     return mapper.writeValueAsString(instance);
   }
 

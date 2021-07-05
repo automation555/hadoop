@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -32,10 +33,8 @@ import org.apache.hadoop.security.ShellBasedIdMapping.PassThroughMap;
 import org.apache.hadoop.security.ShellBasedIdMapping.StaticMapping;
 import org.junit.Test;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.BiMap;
-import org.apache.hadoop.thirdparty.com.google.common.collect.HashBiMap;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 
 public class TestShellBasedIdMapping {
   
@@ -45,7 +44,7 @@ public class TestShellBasedIdMapping {
   private void createStaticMapFile(final File smapFile, final String smapStr)
       throws IOException {
     OutputStream out = new FileOutputStream(smapFile);
-    out.write(smapStr.getBytes());
+    out.write(smapStr.getBytes(StandardCharsets.UTF_8));
     out.close();
   }
 
@@ -297,19 +296,18 @@ public class TestShellBasedIdMapping {
   @Test
   public void testUserUpdateSetting() throws IOException {
     ShellBasedIdMapping iug = new ShellBasedIdMapping(new Configuration());
-    assertThat(iug.getTimeout()).isEqualTo(
+    assertEquals(iug.getTimeout(),
         IdMappingConstant.USERGROUPID_UPDATE_MILLIS_DEFAULT);
 
     Configuration conf = new Configuration();
     conf.setLong(IdMappingConstant.USERGROUPID_UPDATE_MILLIS_KEY, 0);
     iug = new ShellBasedIdMapping(conf);
-    assertThat(iug.getTimeout()).isEqualTo(
-        IdMappingConstant.USERGROUPID_UPDATE_MILLIS_MIN);
+    assertEquals(iug.getTimeout(), IdMappingConstant.USERGROUPID_UPDATE_MILLIS_MIN);
 
     conf.setLong(IdMappingConstant.USERGROUPID_UPDATE_MILLIS_KEY,
         IdMappingConstant.USERGROUPID_UPDATE_MILLIS_DEFAULT * 2);
     iug = new ShellBasedIdMapping(conf);
-    assertThat(iug.getTimeout()).isEqualTo(
+    assertEquals(iug.getTimeout(),
         IdMappingConstant.USERGROUPID_UPDATE_MILLIS_DEFAULT * 2);
   }
   

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +37,7 @@ import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -132,7 +133,8 @@ public class CGroupsCpuResourceHandlerImpl implements CpuResourceHandler {
     File quotaFile = new File(path,
         CPU.getName() + "." + CGroupsHandler.CGROUP_CPU_QUOTA_US);
     if (quotaFile.exists()) {
-      String contents = FileUtils.readFileToString(quotaFile, "UTF-8");
+      String contents =
+          FileUtils.readFileToString(quotaFile, StandardCharsets.UTF_8);
       int quotaUS = Integer.parseInt(contents.trim());
       if (quotaUS != -1) {
         return true;

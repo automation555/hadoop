@@ -18,52 +18,19 @@
 
 package org.apache.hadoop.yarn.server.nodemanager;
 
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.APPID;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.APPLICATION_LOCAL_DIRS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.CONTAINER_ID_STR;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.CONTAINER_LAUNCH_PREFIX_COMMANDS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.CONTAINER_LOCAL_DIRS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.CONTAINER_LOG_DIRS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.CONTAINER_RUN_CMDS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.CONTAINER_WORK_DIR;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.FILECACHE_DIRS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.LOCALIZED_RESOURCES;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.LOCAL_DIRS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.LOG_DIRS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.NM_PRIVATE_CONTAINER_SCRIPT_PATH;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.NM_PRIVATE_KEYSTORE_PATH;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.NM_PRIVATE_TOKENS_PATH;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.NM_PRIVATE_TRUSTSTORE_PATH;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.PID;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.PID_FILE_PATH;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.RESOURCES_OPTIONS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.RUN_AS_USER;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.SIGNAL;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.TC_COMMAND_FILE;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.USER;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.USER_FILECACHE_DIRS;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.USER_LOCAL_DIRS;
-
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.regex.Pattern;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
+import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
+import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerExecContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.ConfigurationException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
@@ -79,13 +46,11 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.DelegatingLinuxContainerRuntime;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.DockerLinuxContainerRuntime;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntime;
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.OCIContainerRuntime;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerCommandExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerRmCommand;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ContainerLocalizer;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerExecutionException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerRuntimeContext;
-import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerExecContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerLivenessContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerPrepareContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerReacquisitionContext;
@@ -97,8 +62,17 @@ import org.apache.hadoop.yarn.server.nodemanager.executor.LocalizerStartContext;
 import org.apache.hadoop.yarn.server.nodemanager.util.CgroupsLCEResourcesHandler;
 import org.apache.hadoop.yarn.server.nodemanager.util.DefaultLCEResourcesHandler;
 import org.apache.hadoop.yarn.server.nodemanager.util.LCEResourcesHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Pattern;
+
+import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.*;
 
 /**
  * <p>This class provides {@link Container} execution using a native
@@ -109,7 +83,7 @@ import org.slf4j.LoggerFactory;
  * mapping the application owner to a UID on the execution host, resource
  * management through Linux CGROUPS, and Docker support.</p>
  *
- * <p>If {@code hadoop.security.authentication} is set to {@code simple},
+ * <p>If {@code hadoop.security.authetication} is set to {@code simple},
  * then the
  * {@code yarn.nodemanager.linux-container-executor.nonsecure-mode.limit-users}
  * property will determine whether the {@code LinuxContainerExecutor} runs
@@ -121,14 +95,14 @@ import org.slf4j.LoggerFactory;
  * appropriate {@link LinuxContainerRuntime} instance. This class uses a
  * {@link DelegatingLinuxContainerRuntime} instance, which will delegate calls
  * to either a {@link DefaultLinuxContainerRuntime} instance or a
- * {@link OCIContainerRuntime} instance, depending on the job's
+ * {@link DockerLinuxContainerRuntime} instance, depending on the job's
  * configuration.</p>
  *
  * @see LinuxContainerRuntime
  * @see DelegatingLinuxContainerRuntime
  * @see DefaultLinuxContainerRuntime
  * @see DockerLinuxContainerRuntime
- * @see OCIContainerRuntime#isOCICompliantContainerRequested
+ * @see DockerLinuxContainerRuntime#isDockerContainerRequested
  */
 public class LinuxContainerExecutor extends ContainerExecutor {
 
@@ -237,8 +211,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
         YarnConfiguration.NM_NONSECURE_MODE_LIMIT_USERS,
         YarnConfiguration.DEFAULT_NM_NONSECURE_MODE_LIMIT_USERS);
     if (!containerLimitUsers) {
-      LOG.warn("{}: impersonation without authentication enabled",
-          YarnConfiguration.NM_NONSECURE_MODE_LIMIT_USERS);
+      LOG.warn(YarnConfiguration.NM_NONSECURE_MODE_LIMIT_USERS +
+          ": impersonation without authentication enabled");
     }
   }
 
@@ -299,7 +273,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
    * Add a niceness level to the process that will be executed.  Adds
    * {@code -n <nice>} to the given command. The niceness level will be
    * taken from the
-   * {@link YarnConfiguration#NM_CONTAINER_EXECUTOR_SCHED_PRIORITY} property.
+   * {@code yarn.nodemanager.container-executer.os.sched.prioity} property.
    *
    * @param command the command to which to add the niceness setting.
    */
@@ -331,8 +305,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
           false);
     } catch (PrivilegedOperationException e) {
       int exitCode = e.getExitCode();
-      LOG.warn("Exit code from container executor initialization is : {}",
-          exitCode, e);
+      LOG.warn("Exit code from container executor initialization is : "
+          + exitCode, e);
 
       throw new IOException("Linux container executor not configured properly"
           + " (error=" + exitCode + ")", e);
@@ -341,10 +315,12 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     try {
       resourceHandlerChain = ResourceHandlerModule
           .getConfiguredResourceHandlerChain(conf, nmContext);
-      LOG.debug("Resource handler chain enabled = {}",
-          (resourceHandlerChain != null));
+      if (LOG.isDebugEnabled()) {
+        final boolean enabled = resourceHandlerChain != null;
+        LOG.debug("Resource handler chain enabled = " + enabled);
+      }
       if (resourceHandlerChain != null) {
-        LOG.debug("Bootstrapping resource handler chain: {}",
+        LOG.debug("Bootstrapping resource handler chain: " +
             resourceHandlerChain);
         resourceHandlerChain.bootstrap(conf);
       }
@@ -367,18 +343,6 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     }
 
     resourcesHandler.init(this);
-  }
-
-  @Override
-  public void start() {
-    super.start();
-    linuxContainerRuntime.start();
-  }
-
-  @Override
-  public void stop() {
-    super.stop();
-    linuxContainerRuntime.stop();
   }
 
   @Override
@@ -445,8 +409,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
 
     } catch (PrivilegedOperationException e) {
       int exitCode = e.getExitCode();
-      LOG.warn("Exit code from container {} startLocalizer is : {}",
-          locId, exitCode, e);
+      LOG.warn("Exit code from container " + locId + " startLocalizer is : "
+          + exitCode, e);
 
       throw new IOException("Application " + appId + " initialization failed" +
           " (exitCode=" + exitCode + ") with output: " + e.getOutput(), e);
@@ -569,8 +533,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
               numaArgs = op.getArguments();
               break;
             default:
-              LOG.warn("PrivilegedOperation type unsupported in launch: {}",
-                  op.getOperationType());
+              LOG.warn("PrivilegedOperation type unsupported in launch: "
+                  + op.getOperationType());
             }
           }
 
@@ -624,21 +588,21 @@ public class LinuxContainerExecutor extends ContainerExecutor {
   private int handleExitCode(ContainerExecutionException e, Container container,
       ContainerId containerId) throws ConfigurationException {
     int exitCode = e.getExitCode();
-    LOG.warn("Exit code from container {} is : {}", containerId, exitCode);
+    LOG.warn("Exit code from container " + containerId + " is : " + exitCode);
     // 143 (SIGTERM) and 137 (SIGKILL) exit codes means the container was
     // terminated/killed forcefully. In all other cases, log the
     // output
     if (exitCode != ContainerExecutor.ExitCode.FORCE_KILLED.getExitCode()
         && exitCode != ContainerExecutor.ExitCode.TERMINATED.getExitCode()) {
-      LOG.warn("Exception from container-launch with container ID: {} "
-          + "and exit code: {}", containerId, exitCode, e);
+      LOG.warn("Exception from container-launch with container ID: "
+          + containerId + " and exit code: " + exitCode, e);
 
       StringBuilder builder = new StringBuilder();
-      builder.append("Exception from container-launch.\n")
-          .append("Container id: " + containerId + "\n")
-          .append("Exit code: " + exitCode + "\n")
-          .append("Exception message: " + e.getMessage() + "\n");
-      if (!Optional.ofNullable(e.getErrorOutput()).orElse("").isEmpty()) {
+      builder.append("Exception from container-launch.\n");
+      builder.append("Container id: " + containerId + "\n");
+      builder.append("Exit code: " + exitCode + "\n");
+      builder.append("Exception message: " + e.getMessage() + "\n");
+      if (!Optional.fromNullable(e.getErrorOutput()).or("").isEmpty()) {
         builder.append("Shell error output: " + e.getErrorOutput() + "\n");
       }
       //Skip stack trace
@@ -742,7 +706,7 @@ public class LinuxContainerExecutor extends ContainerExecutor {
           resourceHandlerChain.reacquireContainer(containerId);
         } catch (ResourceHandlerException e) {
           LOG.warn("ResourceHandlerChain.reacquireContainer failed for " +
-              "containerId: {} Exception: ", containerId, e);
+              "containerId: " + containerId + " Exception: " + e);
         }
       }
 
@@ -780,8 +744,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
           .getValue()) {
         return false;
       }
-      LOG.warn("Error in signalling container {} with {}; exit = {}",
-          pid, signal, retCode, e);
+      LOG.warn("Error in signalling container " + pid + " with " + signal
+          + "; exit = " + retCode, e);
       logOutput(e.getOutput());
       throw new IOException("Problem signalling container " + pid + " with "
           + signal + "; output: " + e.getOutput() + " and exitCode: "
@@ -814,8 +778,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
       if (retCode != 0) {
         return false;
       }
-      LOG.warn("Error in reaping container {} exit = {}",
-          container.getContainerId(), retCode, e);
+      LOG.warn("Error in reaping container "
+          + container.getContainerId().toString() + " exit = " + retCode, e);
       logOutput(e.getOutput());
       throw new IOException("Error in reaping container "
           + container.getContainerId().toString() + " exit = " + retCode, e);
@@ -843,8 +807,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
       if (retCode != 0) {
         return new IOStreamPair(null, null);
       }
-      LOG.warn("Error in executing container interactive shell {} exit = {}",
-          ctx, retCode, e);
+      LOG.warn("Error in executing container interactive shell"
+          + ctx + " exit = " + retCode, e);
       logOutput(e.getOutput());
       throw new ContainerExecutionException(
           "Error in executing container interactive shel" + ctx.getContainer()
@@ -876,12 +840,12 @@ public class LinuxContainerExecutor extends ContainerExecutor {
 
     List<String> pathsToDelete = new ArrayList<String>();
     if (baseDirs == null || baseDirs.size() == 0) {
-      LOG.info("Deleting absolute path : {}", dir);
+      LOG.info("Deleting absolute path : " + dir);
       pathsToDelete.add(dirString);
     } else {
       for (Path baseDir : baseDirs) {
         Path del = dir == null ? baseDir : new Path(baseDir, dir);
-        LOG.info("Deleting path : {}", del);
+        LOG.info("Deleting path : " + del);
         pathsToDelete.add(del.toString());
         deleteAsUserOp.appendArgs(baseDir.toUri().getPath());
       }
@@ -896,8 +860,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
           false);
     }   catch (PrivilegedOperationException e) {
       int exitCode = e.getExitCode();
-      LOG.error("DeleteAsUser for {} returned with exit code: {}",
-          StringUtils.join(" ", pathsToDelete), exitCode, e);
+      LOG.error("DeleteAsUser for " + StringUtils.join(" ", pathsToDelete)
+          + " returned with exit code: " + exitCode, e);
     }
   }
 
@@ -933,8 +897,8 @@ public class LinuxContainerExecutor extends ContainerExecutor {
         }
       }
     } catch (PrivilegedOperationException e) {
-      LOG.error("ListAsUser for {} returned with exit code: {}",
-          dir, e.getExitCode(), e);
+      LOG.error("ListAsUser for " + dir + " returned with exit code: "
+          + e.getExitCode(), e);
     }
 
     return files.toArray(new File[files.size()]);
@@ -1010,14 +974,14 @@ public class LinuxContainerExecutor extends ContainerExecutor {
       if (DockerCommandExecutor.isRemovable(
           DockerCommandExecutor.getContainerStatus(containerId, privOpExecutor,
               nmContext))) {
-        LOG.info("Removing Docker container : {}", containerId);
+        LOG.info("Removing Docker container : " + containerId);
         DockerRmCommand dockerRmCommand = new DockerRmCommand(containerId,
             ResourceHandlerModule.getCgroupsRelativeRoot());
         DockerCommandExecutor.executeDockerCommand(dockerRmCommand, containerId,
             null, privOpExecutor, false, nmContext);
       }
     } catch (ContainerExecutionException e) {
-      LOG.warn("Unable to remove docker container: {}", containerId);
+      LOG.warn("Unable to remove docker container: " + containerId);
     }
   }
 
@@ -1044,13 +1008,13 @@ public class LinuxContainerExecutor extends ContainerExecutor {
     List<String> localDirs = dirsHandler.getLocalDirs();
     if (file.exists()) {
       if (!file.delete()) {
-        LOG.warn("Unable to delete {}", sysFSPath);
+        LOG.warn("Unable to delete " + sysFSPath.toString());
       }
     }
     if (file.createNewFile()) {
       FileOutputStream output = new FileOutputStream(file);
       try {
-        output.write(spec.getBytes("UTF-8"));
+        output.write(spec.getBytes(StandardCharsets.UTF_8));
       } finally {
         output.close();
       }
@@ -1079,11 +1043,5 @@ public class LinuxContainerExecutor extends ContainerExecutor {
   public String getExposedPorts(Container container)
       throws ContainerExecutionException {
     return linuxContainerRuntime.getExposedPorts(container);
-  }
-
-  @Override
-  public Map<String, LocalResource> getLocalResources(Container container)
-      throws IOException {
-    return linuxContainerRuntime.getLocalResources(container);
   }
 }

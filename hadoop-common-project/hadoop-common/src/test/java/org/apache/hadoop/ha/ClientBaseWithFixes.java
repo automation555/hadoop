@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -51,7 +52,7 @@ import org.junit.Before;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Copy-paste of ClientBase from ZooKeeper, but without any of the
@@ -64,15 +65,6 @@ public abstract class ClientBaseWithFixes extends ZKTestCase {
 
     public static int CONNECTION_TIMEOUT = 30000;
     static final File BASETEST = GenericTestUtils.getTestDir();
-
-  static {
-    // The 4-letter-words commands are simple diagnostics telnet commands in
-    // ZooKeeper. Since ZooKeeper 3.5, these are disabled by default due to
-    // security concerns: https://issues.apache.org/jira/browse/ZOOKEEPER-2693
-    // We are enabling them for the tests here, as some tests in hadoop or in
-    // other projects might still use them
-    System.setProperty("zookeeper.4lw.commands.whitelist", "*");
-  }
 
     protected final String hostPort = initHostPort();
     protected int maxCnxns = 0;
@@ -245,7 +237,7 @@ public abstract class ClientBaseWithFixes extends ZKTestCase {
         BufferedReader reader = null;
         try {
             OutputStream outstream = sock.getOutputStream();
-            outstream.write(cmd.getBytes());
+            outstream.write(cmd.getBytes(StandardCharsets.UTF_8));
             outstream.flush();
             // this replicates NC - close the output stream before reading
             sock.shutdownOutput();

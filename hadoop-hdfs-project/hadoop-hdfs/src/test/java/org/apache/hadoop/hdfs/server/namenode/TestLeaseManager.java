@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -36,13 +37,12 @@ import org.apache.hadoop.hdfs.protocol.OpenFilesIterator;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot;
-import org.apache.hadoop.util.Lists;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -475,7 +475,7 @@ public class TestLeaseManager {
     PermissionStatus p = new PermissionStatus(
         "dummy", "dummy", new FsPermission((short) 0777));
     return new INodeFile(
-        inodeId, new String("foo-" + inodeId).getBytes(), p, 0L, 0L,
-        BlockInfo.EMPTY_ARRAY, (short) 1, 1L);
+        inodeId, new String("foo-" + inodeId).getBytes(StandardCharsets.UTF_8),
+        p, 0L, 0L, BlockInfo.EMPTY_ARRAY, (short) 1, 1L);
   }
 }
