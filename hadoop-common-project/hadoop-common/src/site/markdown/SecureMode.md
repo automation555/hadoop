@@ -42,7 +42,7 @@ It's recommended to have them share a Unix group, e.g. `hadoop`. See also "[Mapp
 | User:Group    | Daemons                                             |
 |:--------------|:----------------------------------------------------|
 | hdfs:hadoop   | NameNode, Secondary NameNode, JournalNode, DataNode |
-| yarn:hadoop   | ResourceManager, NodeManager                        |
+| yarn:hadoop   | ResourceManager, NodeManager, SharedCacheManager    |
 | mapred:hadoop | MapReduce JobHistory Server                         |
 
 ### Kerberos principals for Hadoop Daemons
@@ -113,6 +113,18 @@ The NodeManager keytab file, on each host, should look like the following:
        4 07/18/11 21:08:09 nm/full.qualified.domain.name@REALM.TLD (AES-256 CTS mode with 96-bit SHA-1 HMAC)
        4 07/18/11 21:08:09 nm/full.qualified.domain.name@REALM.TLD (AES-128 CTS mode with 96-bit SHA-1 HMAC)
        4 07/18/11 21:08:09 nm/full.qualified.domain.name@REALM.TLD (ArcFour with HMAC/md5)
+       4 07/18/11 21:08:09 host/full.qualified.domain.name@REALM.TLD (AES-256 CTS mode with 96-bit SHA-1 HMAC)
+       4 07/18/11 21:08:09 host/full.qualified.domain.name@REALM.TLD (AES-128 CTS mode with 96-bit SHA-1 HMAC)
+       4 07/18/11 21:08:09 host/full.qualified.domain.name@REALM.TLD (ArcFour with HMAC/md5)
+
+The SharedCacheManager keytab file, on that host, should look like the following:
+
+    $ klist -e -k -t /etc/security/keytab/scm.service.keytab
+    Keytab name: FILE:/etc/security/keytab/scm.service.keytab
+    KVNO Timestamp         Principal
+       4 07/18/11 21:08:09 scm/full.qualified.domain.name@REALM.TLD (AES-256 CTS mode with 96-bit SHA-1 HMAC)
+       4 07/18/11 21:08:09 scm/full.qualified.domain.name@REALM.TLD (AES-128 CTS mode with 96-bit SHA-1 HMAC)
+       4 07/18/11 21:08:09 scm/full.qualified.domain.name@REALM.TLD (ArcFour with HMAC/md5)
        4 07/18/11 21:08:09 host/full.qualified.domain.name@REALM.TLD (AES-256 CTS mode with 96-bit SHA-1 HMAC)
        4 07/18/11 21:08:09 host/full.qualified.domain.name@REALM.TLD (AES-128 CTS mode with 96-bit SHA-1 HMAC)
        4 07/18/11 21:08:09 host/full.qualified.domain.name@REALM.TLD (ArcFour with HMAC/md5)
@@ -203,8 +215,6 @@ Setting `dfs.encrypt.data.transfer.cipher.suites` to `AES/CTR/NoPadding` activat
 
 AES offers the greatest cryptographic strength and the best performance. At this time, 3DES and RC4 have been used more often in Hadoop clusters.
 
-You can also set `dfs.encrypt.data.transfer.cipher.suites` to `SM4/CTR/NoPadding` to activates SM4 encryption. By default, this is unspecified. The SM4 key bit length can be configured by setting `dfs.encrypt.data.transfer.cipher.key.bitlength` to 128, 192 or 256. The default is 128.
-
 ### Data Encryption on HTTP
 
 Data transfer between Web-console and clients are protected by using SSL(HTTPS). SSL configuration is recommended but not required to configure Hadoop security with Kerberos.
@@ -269,8 +279,9 @@ The following settings allow configuring SSL access to the NameNode web UI (opti
 
 | Parameter                    | Value                                           | Notes                                                                                                                                                                                                                                                                                                                                                                                              |
 |:-----------------------------|:------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `dfs.http.policy`            | `HTTP_ONLY` or `HTTPS_ONLY` or `HTTP_AND_HTTPS` | `HTTPS_ONLY` turns off http access. If using SASL to authenticate data transfer protocol instead of running DataNode as root and using privileged ports, then this property must be set to `HTTPS_ONLY` to guarantee authentication of HTTP servers. (See `dfs.data.transfer.protection`.) |
+| `dfs.http.policy`            | `HTTP_ONLY` or `HTTPS_ONLY` or `HTTP_AND_HTTPS` | `HTTPS_ONLY` turns off http access. This option takes precedence over the deprecated configuration dfs.https.enable and hadoop.ssl.enabled. If using SASL to authenticate data transfer protocol instead of running DataNode as root and using privileged ports, then this property must be set to `HTTPS_ONLY` to guarantee authentication of HTTP servers. (See `dfs.data.transfer.protection`.) |
 | `dfs.namenode.https-address` | `0.0.0.0:9871`                                 | This parameter is used in non-HA mode and without federation. See [HDFS High Availability](../hadoop-hdfs/HDFSHighAvailabilityWithNFS.html#Deployment) and [HDFS Federation](../hadoop-hdfs/Federation.html#Federation_Configuration) for details.                                                                                                                                                 |
+| `dfs.https.enable`           | `true`                                          | This value is deprecated. `Use dfs.http.policy`                                                                                                                                                                                                                                                                                                                                                    |
 
 ### Secondary NameNode
 
@@ -333,6 +344,13 @@ The following settings allow configuring SSL access to the NameNode web UI (opti
 | `yarn.nodemanager.linux-container-executor.group` | `hadoop`                                                           | Unix group of the NodeManager.                          |
 | `yarn.nodemanager.linux-container-executor.path`  | `/path/to/bin/container-executor`                                  | The path to the executable of Linux container executor. |
 | `yarn.nodemanager.webapp.https.address`           | `0.0.0.0:8044`                                                     | The https adddress of the NM web application.           |
+
+### SharedCacheManager
+
+| Parameter                    | Value                                     | Notes                                               |
+|:-----------------------------|:------------------------------------------|:----------------------------------------------------|
+| `yarn.sharedcache.principal` | `scm/_HOST@REALM.TLD`                     | Kerberos principal name for the SharedCacheManager. |
+| `yarn.sharedcache.keytab`    | `/etc/security/keytab/scm.service.keytab` | Kerberos keytab file for the SharedCacheManager.    |
 
 ### Configuration for WebAppProxy
 
