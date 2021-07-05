@@ -21,7 +21,9 @@ package org.apache.hadoop.mapreduce.v2.hs;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -47,6 +49,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
@@ -65,14 +68,13 @@ import org.apache.hadoop.mapreduce.v2.jobhistory.JHAdminConfig;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JobHistoryUtils;
 import org.apache.hadoop.mapreduce.v2.jobhistory.JobIndexInfo;
 import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ShutdownThreadsHelper;
 import org.apache.hadoop.util.concurrent.HadoopThreadPoolExecutor;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.slf4j.Logger;
@@ -532,7 +534,7 @@ public class HistoryFileManager extends AbstractService {
     }
 
     public synchronized void waitUntilMoved() {
-      while (isMovePending() && !didMoveFail()) {
+      while (!isReadOnlyMode() && isMovePending() && !didMoveFail()) {
         try {
           wait();
         } catch (InterruptedException e) {
@@ -579,6 +581,9 @@ public class HistoryFileManager extends AbstractService {
    */
   private int maxTasksForLoadedJob = -1;
 
+  private String readOnlyDirectoryPattern;
+  private FileSystem readOnlyDirFs;
+
   public HistoryFileManager() {
     super(HistoryFileManager.class.getName());
   }
@@ -595,7 +600,12 @@ public class HistoryFileManager extends AbstractService {
     long maxFSWaitTime = conf.getLong(
         JHAdminConfig.MR_HISTORY_MAX_START_WAIT_TIME,
         JHAdminConfig.DEFAULT_MR_HISTORY_MAX_START_WAIT_TIME);
-    createHistoryDirs(SystemClock.getInstance(), 10 * 1000, maxFSWaitTime);
+
+    readOnlyDirectoryPattern = conf.get(JHAdminConfig.MR_HISTORY_READ_ONLY_DIR_PATTERN, "");
+
+    if (!isReadOnlyMode()) {
+      createHistoryDirs(SystemClock.getInstance(), 10 * 1000, maxFSWaitTime);
+    }
 
     maxTasksForLoadedJob = conf.getInt(
         JHAdminConfig.MR_HS_LOADED_JOBS_TASKS_MAX,
@@ -612,10 +622,13 @@ public class HistoryFileManager extends AbstractService {
         JHAdminConfig.MR_HISTORY_DATESTRING_CACHE_SIZE,
         JHAdminConfig.DEFAULT_MR_HISTORY_DATESTRING_CACHE_SIZE));
 
-    int numMoveThreads = conf.getInt(
-        JHAdminConfig.MR_HISTORY_MOVE_THREAD_COUNT,
-        JHAdminConfig.DEFAULT_MR_HISTORY_MOVE_THREAD_COUNT);
-    moveToDoneExecutor = createMoveToDoneThreadPool(numMoveThreads);
+    if (!isReadOnlyMode()) {
+      int numMoveThreads = conf.getInt(
+          JHAdminConfig.MR_HISTORY_MOVE_THREAD_COUNT,
+          JHAdminConfig.DEFAULT_MR_HISTORY_MOVE_THREAD_COUNT);
+      moveToDoneExecutor = createMoveToDoneThreadPool(numMoveThreads);
+    }
+
     super.serviceInit(conf);
   }
 
@@ -783,6 +796,14 @@ public class HistoryFileManager extends AbstractService {
   @SuppressWarnings("unchecked")
   void initExisting() throws IOException {
     LOG.info("Initializing Existing Jobs...");
+    if (isReadOnlyMode()) {
+      Path readOnlyPath = new Path(readOnlyDirectoryPattern);
+      readOnlyDirFs = readOnlyPath.getFileSystem(conf);
+      scanDoneDirectoryInit();
+
+      return;
+    }
+
     List<FileStatus> timestampedDirList = findTimestampedDirectories();
     // Sort first just so insertion is in a consistent order
     Collections.sort(timestampedDirList);
@@ -895,6 +916,10 @@ public class HistoryFileManager extends AbstractService {
       FileContext fc) throws IOException {
     return scanDirectory(path, fc, JobHistoryUtils.getHistoryFileFilter());
   }
+
+  protected boolean isReadOnlyMode() {
+    return !(readOnlyDirectoryPattern.isEmpty());
+  }
   
   /**
    * Finds all history directories with a timestamp component by scanning the
@@ -909,6 +934,74 @@ public class HistoryFileManager extends AbstractService {
   }
 
   /**
+   * Scans the file system to find history files for jobs executed yesterday, today and the next day
+   *
+   * @throws IOException
+   *           if there was a error while scanning
+   */
+  void scanDoneDirectoryUpdate() throws IOException {
+    ZonedDateTime today = ZonedDateTime.now();
+    ZonedDateTime previousDay = today.minusDays(1);
+    ZonedDateTime nextDay = today.plusDays(1);
+
+    StringBuilder scanDatesPattern = new StringBuilder("{")
+        .append(JobHistoryUtils.timestampDirectoryComponent(previousDay.toInstant().toEpochMilli()))
+        .append(",")
+        .append(JobHistoryUtils.timestampDirectoryComponent(today.toInstant().toEpochMilli()))
+        .append(",")
+        .append(JobHistoryUtils.timestampDirectoryComponent(nextDay.toInstant().toEpochMilli()))
+        .append("}");
+
+    scanDoneDirectory(new Path(readOnlyDirectoryPattern, scanDatesPattern + "/*/*"));
+  }
+
+  /**
+   * Scans the file system to find all the existing history files
+   *
+   * @throws IOException
+   *           if there was a error while scanning
+   */
+  void scanDoneDirectoryInit() throws IOException {
+    scanDoneDirectory(new Path(readOnlyDirectoryPattern, "*/*/*/*/*"));
+  }
+
+  private void scanDoneDirectory(Path pathPattern) throws IOException {
+
+    List<FileStatus> fileStatusList = Arrays.asList(
+        readOnlyDirFs.globStatus(pathPattern, JobHistoryUtils.getHistoryFileFilter()));
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Found " + fileStatusList.size() + " files");
+    }
+
+    for (FileStatus fs : fileStatusList) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("scanning file: "+ fs.getPath());
+      }
+
+      try {
+        JobIndexInfo jobIndexInfo =
+            FileNameIndexUtils.getIndexInfo(fs.getPath().getName());
+        String confFileName =
+            JobHistoryUtils.getIntermediateConfFileName(jobIndexInfo.getJobId());
+        String summaryFileName =
+            JobHistoryUtils.getIntermediateSummaryFileName(jobIndexInfo.getJobId());
+        HistoryFileInfo fileInfo =
+            createHistoryFileInfo(
+                fs.getPath(),
+                new Path(fs.getPath().getParent(), confFileName),
+                new Path(fs.getPath().getParent(), summaryFileName),
+                jobIndexInfo,
+                false);
+
+        jobListCache.addIfAbsent(fileInfo);
+      } catch (Exception ex) {
+        LOG.error("Found exception while looking for history files in " + fs.getPath(), ex);
+      }
+    }
+  }
+
+  /**
    * Scans the intermediate directory to find user directories. Scans these for
    * history files if the modification time for the directory has changed. Once
    * it finds history files it starts the process of moving them to the done 
@@ -918,10 +1011,6 @@ public class HistoryFileManager extends AbstractService {
    *           if there was a error while scanning
    */
   void scanIntermediateDirectory() throws IOException {
-    if (UserGroupInformation.isSecurityEnabled()) {
-      UserGroupInformation.getLoginUser().checkTGTAndReloginFromKeytab();
-    }
-
     // TODO it would be great to limit how often this happens, except in the
     // case where we are looking for a particular job.
     List<FileStatus> userDirList = JobHistoryUtils.localGlobber(
@@ -1066,7 +1155,12 @@ public class HistoryFileManager extends AbstractService {
   }
 
   public Collection<HistoryFileInfo> getAllFileInfo() throws IOException {
-    scanIntermediateDirectory();
+    if (isReadOnlyMode()) {
+      scanDoneDirectoryUpdate();
+    } else {
+      scanIntermediateDirectory();
+    }
+
     return jobListCache.values();
   }
 
@@ -1076,8 +1170,12 @@ public class HistoryFileManager extends AbstractService {
     if (fileInfo != null) {
       return fileInfo;
     }
-    // OK so scan the intermediate to be sure we did not lose it that way
-    scanIntermediateDirectory();
+    if (isReadOnlyMode()) {
+      scanDoneDirectoryUpdate();
+    } else {
+      // OK so scan the intermediate to be sure we did not lose it that way
+      scanIntermediateDirectory();
+    }
     fileInfo = jobListCache.get(jobId);
     if (fileInfo != null) {
       return fileInfo;

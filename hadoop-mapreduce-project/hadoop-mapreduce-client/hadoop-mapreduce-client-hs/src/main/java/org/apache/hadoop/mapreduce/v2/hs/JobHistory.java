@@ -52,8 +52,8 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenSecretManager;
 import org.apache.hadoop.yarn.util.Clock;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +69,8 @@ public class JobHistory extends AbstractService implements HistoryContext {
 
   // Time interval for the move thread.
   private long moveThreadInterval;
+
+  private long readOnlyModeScanInterval;
 
   private Configuration conf;
 
@@ -92,6 +94,10 @@ public class JobHistory extends AbstractService implements HistoryContext {
     moveThreadInterval = conf.getLong(
         JHAdminConfig.MR_HISTORY_MOVE_INTERVAL_MS,
         JHAdminConfig.DEFAULT_MR_HISTORY_MOVE_INTERVAL_MS);
+
+    readOnlyModeScanInterval = conf.getLong(
+        JHAdminConfig.MR_HISTORY_READ_ONLY_INTERVAL_MS,
+        JHAdminConfig.DEFAULT_MR_HISTORY_READ_ONLY_INTERVAL_MS);
 
     hsManager = createHistoryFileManager();
     hsManager.init(conf);
@@ -132,43 +138,46 @@ public class JobHistory extends AbstractService implements HistoryContext {
         new ThreadFactoryBuilder().setNameFormat("Log Scanner/Cleaner #%d")
             .build());
 
-    scheduledExecutor.scheduleAtFixedRate(new MoveIntermediateToDoneRunnable(),
-        moveThreadInterval, moveThreadInterval, TimeUnit.MILLISECONDS);
+    if (hsManager.isReadOnlyMode()) {
+        scheduledExecutor.scheduleAtFixedRate(new ScanDoneDirectoryRunnable(),
+            readOnlyModeScanInterval, readOnlyModeScanInterval, TimeUnit.MILLISECONDS);
+    } else {
+        scheduledExecutor.scheduleAtFixedRate(new MoveIntermediateToDoneRunnable(),
+            moveThreadInterval, moveThreadInterval, TimeUnit.MILLISECONDS);
 
-    // Start historyCleaner
-    scheduleHistoryCleaner();
+        // Start historyCleaner
+        scheduleHistoryCleaner();
+    }
+
     super.serviceStart();
   }
 
   protected int getInitDelaySecs() {
     return 30;
   }
-
+  
   @Override
   protected void serviceStop() throws Exception {
     LOG.info("Stopping JobHistory");
     if (scheduledExecutor != null) {
       LOG.info("Stopping History Cleaner/Move To Done");
       scheduledExecutor.shutdown();
-      int retryCnt = 50;
-      try {
-        while (!scheduledExecutor.awaitTermination(20,
-            TimeUnit.MILLISECONDS)) {
-          if (--retryCnt == 0) {
-            scheduledExecutor.shutdownNow();
-            break;
-          }
-        }
-      } catch (InterruptedException iex) {
-        LOG.warn("HistoryCleanerService/move to done shutdown may not have " +
-            "succeeded, Forcing a shutdown", iex);
-        if (!scheduledExecutor.isShutdown()) {
-          scheduledExecutor.shutdownNow();
+      boolean interrupted = false;
+      long currentTime = System.currentTimeMillis();
+      while (!scheduledExecutor.isShutdown()
+          && System.currentTimeMillis() > currentTime + 1000l && !interrupted) {
+        try {
+          Thread.sleep(20);
+        } catch (InterruptedException e) {
+          interrupted = true;
         }
       }
-      scheduledExecutor = null;
+      if (!scheduledExecutor.isShutdown()) {
+        LOG.warn("HistoryCleanerService/move to done shutdown may not have " +
+        		"succeeded, Forcing a shutdown");
+        scheduledExecutor.shutdownNow();
+      }
     }
-    // Stop the other services.
     if (storage != null && storage instanceof Service) {
       ((Service) storage).stop();
     }
@@ -195,6 +204,19 @@ public class JobHistory extends AbstractService implements HistoryContext {
         hsManager.scanIntermediateDirectory();
       } catch (IOException e) {
         LOG.error("Error while scanning intermediate done dir ", e);
+      }
+    }
+  }
+
+  private class ScanDoneDirectoryRunnable implements Runnable {
+    @Override
+    public void run() {
+      try {
+        LOG.info("Starting scan of history files in done directory");
+        hsManager.scanDoneDirectoryUpdate();
+        LOG.info("Completed scan of history files in done directory");
+      } catch (IOException e) {
+        LOG.error("Error while scanning done dir ", e);
       }
     }
   }
