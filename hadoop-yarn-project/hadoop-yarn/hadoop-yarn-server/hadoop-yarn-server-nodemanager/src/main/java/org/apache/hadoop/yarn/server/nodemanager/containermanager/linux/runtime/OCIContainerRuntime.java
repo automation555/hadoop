@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -53,7 +53,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.DockerLinuxContainerRuntime.isDockerContainerRequested;
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.RuncContainerRuntime.isRuncContainerRequested;
 
 /**
  * <p>This class is a {@link ContainerRuntime} implementation that uses the
@@ -72,8 +71,8 @@ public abstract class OCIContainerRuntime implements LinuxContainerRuntime {
   private static final Pattern HOSTNAME_PATTERN = Pattern.compile(
       "^[a-zA-Z0-9][a-zA-Z0-9_.-]+$");
   static final Pattern USER_MOUNT_PATTERN = Pattern.compile(
-      "(?<=^|,)([^:\\x00]+):([^:\\x00]+)" +
-      "(:(r[ow]|(r[ow][+])?(r?shared|r?slave|r?private)))?(?:,|$)");
+      "(?<=^|;)([^:\\x00]+):([^:\\x00]+)" +
+      "(:(r[ow]|(r[ow][+])?(r?shared|r?slave|r?private)))?(?:;|$)");
   static final Pattern TMPFS_MOUNT_PATTERN = Pattern.compile(
       "^/[^:\\x00]+$");
   static final String PORTS_MAPPING_PATTERN =
@@ -118,8 +117,7 @@ public abstract class OCIContainerRuntime implements LinuxContainerRuntime {
 
   public static boolean isOCICompliantContainerRequested(
       Configuration daemonConf, Map<String, String> env) {
-    return isDockerContainerRequested(daemonConf, env) ||
-        isRuncContainerRequested(daemonConf, env);
+    return isDockerContainerRequested(daemonConf, env);
   }
 
   @VisibleForTesting
