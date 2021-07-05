@@ -23,20 +23,18 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 
 @InterfaceAudience.Private
 @Metrics(context="yarn")
-public class DisableEventTypeMetrics implements EventTypeMetrics {
+public class DisableEventTypeMetrics implements EventTypeMetrics{
   @Override
-  public void increment(Enum type, long processingTimeUs) {
-    //nop
+  public void incr(Enum type, long processingTimeUs) {
     return;
   }
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    //nop
     return;
   }
 
   @Override
-  public long get(Enum type) {
-    return 0;
+  public void get(Enum type) {
+
   }
 }

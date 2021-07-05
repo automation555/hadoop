@@ -26,7 +26,8 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 public interface EventTypeMetrics<T extends Enum<T>>
     extends MetricsSource {
 
-  void increment(T type, long processingTimeUs);
+  void incr(T type, long processingTimeUs);
 
-  long get(T type);
+  void get(T type);
+
 }

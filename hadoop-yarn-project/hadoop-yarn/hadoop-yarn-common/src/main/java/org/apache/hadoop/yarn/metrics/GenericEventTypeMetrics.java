@@ -24,8 +24,6 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.EnumMap;
 
@@ -34,33 +32,31 @@ import java.util.EnumMap;
 public class GenericEventTypeMetrics<T extends Enum<T>>
     implements EventTypeMetrics<T> {
 
-  static final Logger LOG =
-      LoggerFactory.getLogger(GenericEventTypeMetrics.class);
-
   private final EnumMap<T, MutableGaugeLong> eventCountMetrics;
   private final EnumMap<T, MutableGaugeLong> processingTimeMetrics;
   private final MetricsRegistry registry;
   private final MetricsSystem ms;
   private final MetricsInfo info;
   private final Class<T> enumClass;
-
-  private boolean isInitialized = false;
+  private final T[] enums;
 
   public GenericEventTypeMetrics(MetricsInfo info, MetricsSystem ms,
-                                 final T[] enums, Class<T> enumClass) {
+                                 T[] enums, Class<T> enumClass) {
+
     this.enumClass = enumClass;
     this.eventCountMetrics = new EnumMap<>(this.enumClass);
     this.processingTimeMetrics = new EnumMap<>(this.enumClass);
     this.ms = ms;
     this.info = info;
     this.registry = new MetricsRegistry(this.info);
+    this.enums = enums;
 
-    //Initialize enum
-    for (final T type : enums) {
+    //Initialze enum
+    for (T type : this.enums) {
       String eventCountMetricsName =
-          type.toString() + "_" + "event_count";
+          type.toString().toLowerCase() + "_" + "event_count";
       String processingTimeMetricsName =
-          type.toString() + "_" + "processing_time";
+          type.toString().toLowerCase() + "_" + "processing_time";
       eventCountMetrics.put(type, this.registry.
           newGauge(eventCountMetricsName, eventCountMetricsName, 0L));
       processingTimeMetrics.put(type, this.registry.
@@ -68,21 +64,8 @@ public class GenericEventTypeMetrics<T extends Enum<T>>
     }
   }
 
-  public synchronized GenericEventTypeMetrics registerMetrics() {
-    if (!isInitialized) {
-      // Register with the MetricsSystems
-      if (this.ms != null) {
-        LOG.info("Registering GenericEventTypeMetrics");
-        ms.register(info.name(),
-            info.description(), this);
-        isInitialized = true;
-      }
-    }
-    return this;
-  }
-
   @Override
-  public void increment(T type, long processingTimeUs) {
+  public void incr(T type, long processingTimeUs) {
     if (eventCountMetrics.get(type) != null) {
       eventCountMetrics.get(type).incr();
       processingTimeMetrics.get(type).incr(processingTimeUs);
@@ -90,33 +73,11 @@ public class GenericEventTypeMetrics<T extends Enum<T>>
   }
 
   @Override
-  public long get(T type) {
-    return eventCountMetrics.get(type).value();
-  }
-
-  public long getTotalProcessingTime(T type) {
-    return processingTimeMetrics.get(type).value();
-  }
-
-  public EnumMap<T, MutableGaugeLong> getEventCountMetrics() {
-    return eventCountMetrics;
-  }
-
-  public EnumMap<T, MutableGaugeLong> getProcessingTimeMetrics() {
-    return processingTimeMetrics;
-  }
-
-  public MetricsRegistry getRegistry() {
-    return registry;
-  }
-
-  public MetricsInfo getInfo() {
-    return info;
+  public void get(T type) {
   }
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    registry.snapshot(collector.addRecord(registry.info()), all);
   }
 
   public Class<T> getEnumClass() {
