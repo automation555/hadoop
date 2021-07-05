@@ -71,8 +71,8 @@ import org.apache.hadoop.security.token.TokenInfo;
 import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.hadoop.util.ProtoUtil;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
 import com.google.re2j.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -449,9 +449,6 @@ public class SaslRpcClient {
 
   private void sendSaslMessage(OutputStream out, RpcSaslProto message)
       throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Sending sasl message "+message);
-    }
     ResponseBuffer buf = new ResponseBuffer();
     saslHeader.writeDelimitedTo(buf);
     message.writeDelimitedTo(buf);
