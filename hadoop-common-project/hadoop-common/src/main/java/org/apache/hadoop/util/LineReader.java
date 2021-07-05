@@ -25,9 +25,6 @@ import java.io.InputStream;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
-import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
 import org.apache.hadoop.io.Text;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
@@ -45,7 +42,11 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_
  */
 @InterfaceAudience.LimitedPrivate({"MapReduce"})
 @InterfaceStability.Unstable
-public class LineReader implements Closeable, IOStatisticsSource {
+public class LineReader implements Closeable {
+  // Limitation for array size is VM specific. Current HotSpot VM limitation
+  // for array size is Integer.MAX_VALUE - 5 (2^31 - 1 - 5).
+  // Integer.MAX_VALUE - 8 should be safe enough.
+  private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 9;
   private static final int DEFAULT_BUFFER_SIZE = 64 * 1024;
   private int bufferSize = DEFAULT_BUFFER_SIZE;
   private InputStream in;
@@ -65,6 +66,7 @@ public class LineReader implements Closeable, IOStatisticsSource {
    * Create a line reader that reads from the given stream using the
    * default buffer-size (64k).
    * @param in The input stream
+   * @throws IOException
    */
   public LineReader(InputStream in) {
     this(in, DEFAULT_BUFFER_SIZE);
@@ -75,6 +77,7 @@ public class LineReader implements Closeable, IOStatisticsSource {
    * given buffer-size.
    * @param in The input stream
    * @param bufferSize Size of the read buffer
+   * @throws IOException
    */
   public LineReader(InputStream in, int bufferSize) {
     this.in = in;
@@ -116,6 +119,7 @@ public class LineReader implements Closeable, IOStatisticsSource {
    * @param in The input stream
    * @param bufferSize Size of the read buffer
    * @param recordDelimiterBytes The delimiter
+   * @throws IOException
    */
   public LineReader(InputStream in, int bufferSize,
       byte[] recordDelimiterBytes) {
@@ -151,16 +155,7 @@ public class LineReader implements Closeable, IOStatisticsSource {
   public void close() throws IOException {
     in.close();
   }
-
-  /**
-   * Return any IOStatistics provided by the source.
-   * @return IO stats from the input stream.
-   */
-  @Override
-  public IOStatistics getIOStatistics() {
-    return IOStatisticsSupport.retrieveIOStatistics(in);
-  }
-
+  
   /**
    * Read one line from the InputStream into the given Text.
    *
@@ -251,8 +246,14 @@ public class LineReader implements Closeable, IOStatisticsSource {
         appendLength = maxLineLength - txtLength;
       }
       if (appendLength > 0) {
+        int newTxtLength = txtLength + appendLength;
+        if (str.getBytes().length < newTxtLength && Math.max(newTxtLength, txtLength << 1) > MAX_ARRAY_SIZE) {
+          // If str need to be resized but the target capacity is over VM limit, it will trigger OOM.
+          // In such case we will throw an IOException so the caller can deal with it.
+          throw new IOException("Too many bytes before newline:  " + newTxtLength);
+        }
         str.append(buffer, startPosn, appendLength);
-        txtLength += appendLength;
+        txtLength = newTxtLength;
       }
     } while (newlineLength == 0 && bytesConsumed < maxBytesToConsume);
 
@@ -353,8 +354,14 @@ public class LineReader implements Closeable, IOStatisticsSource {
         unsetNeedAdditionalRecordAfterSplit();
       }
       if (appendLength > 0) {
+        int newTxtLength = txtLength + appendLength;
+        if (str.getBytes().length < newTxtLength && Math.max(newTxtLength, txtLength << 1) > MAX_ARRAY_SIZE) {
+          // If str need to be resized but the target capacity is over VM limit, it will trigger OOM.
+          // In such case we will throw an IOException so the caller can deal with it.
+          throw new IOException("Too many bytes before newline:  " + newTxtLength);
+        }
         str.append(buffer, startPosn, appendLength);
-        txtLength += appendLength;
+        txtLength = newTxtLength;
       }
       if (bufferPosn >= bufferLength) {
         if (delPosn > 0 && delPosn < recordDelimiterBytes.length) {
