@@ -72,7 +72,7 @@ function bundle_native_bin
   fi
 
   cd "${libdir}" || exit 1
-  ${TAR} ./*"${binpattern}"* | (cd "${TARGET_BIN_DIR}"/  || exit 1 ; ${UNTAR})
+  ${TAR} ./*"${libpattern}"* | (cd "${TARGET_BIN_DIR}"/  || exit 1 ; ${UNTAR})
   if [[ $? -ne 0 ]]; then
     echo "Bundling bin files for ${binoption} failed"
     exit 1
@@ -90,18 +90,6 @@ for i in "$@"; do
     --builddir=*)
       BUILD_DIR=${i#*=}
     ;;
-    --isallib=*)
-      ISALLIB=${i#*=}
-    ;;
-    --isalbundle=*)
-      ISALBUNDLE=${i#*=}
-    ;;
-    --pmdklib=*)
-      PMDKLIB=${i#*=}
-    ;;
-    --pmdkbundle=*)
-      PMDKBUNDLE=${i#*=}
-    ;;
     --opensslbinbundle=*)
       OPENSSLBINBUNDLE=${i#*=}
     ;;
@@ -110,6 +98,9 @@ for i in "$@"; do
     ;;
     --openssllibbundle=*)
       OPENSSLLIBBUNDLE=${i#*=}
+    ;;
+    --snappybinbundle=*)
+      SNAPPYBINBUNDLE=${i#*=}
     ;;
     --snappylib=*)
       SNAPPYLIB=${i#*=}
@@ -120,13 +111,11 @@ for i in "$@"; do
     --zstdbinbundle=*)
       ZSTDBINBUNDLE=${i#*=}
     ;;
-     --zstdlib=*)
+    --zstdlib=*)
       ZSTDLIB=${i#*=}
     ;;
     --zstdlibbundle=*)
       ZSTDLIBBUNDLE=${i#*=}
-    ;;
-
   esac
 done
 
@@ -149,22 +138,18 @@ if [[ -d "${LIB_DIR}" ]]; then
     exit 1
   fi
 
-  bundle_native_lib "${SNAPPYLIBBUNDLE}" "snappy.lib" "libsnappy." "${SNAPPYLIB}"
+  bundle_native_lib "${SNAPPYLIBBUNDLE}" "snappy.lib" "snappy" "${SNAPPYLIB}"
 
-  bundle_native_lib "${ZSTDLIBBUNDLE}" "zstd.lib" "libzstd." "${ZSTDLIB}"
+  bundle_native_lib "${ZSTDLIBBUNDLE}" "zstd.lib" "zstd" "${ZSTDLIB}"
 
-  bundle_native_lib "${OPENSSLLIBBUNDLE}" "openssl.lib" "libcrypto." "${OPENSSLLIB}"
-
-  bundle_native_lib "${ISALBUNDLE}" "isal.lib" "libisal." "${ISALLIB}"
-
-  bundle_native_lib "${PMDKBUNDLE}" "pmdk.lib" "pmdk" "${PMDKLIB}"
+  bundle_native_lib "${OPENSSLLIBBUNDLE}" "openssl.lib" "crypto" "${OPENSSLLIB}"
 fi
 
 # Windows
 
 # Windows doesn't have a LIB_DIR, everything goes into bin
 
-if [[ -d "${BIN_DIR}" && $(ls -A "${BIN_DIR}") ]] ; then
+if [[ -d "${BIN_DIR}" ]] ; then
   mkdir -p "${TARGET_BIN_DIR}"
   cd "${BIN_DIR}"  || exit 1
   ${TAR} ./* | (cd "${TARGET_BIN_DIR}"/ || exit 1; ${UNTAR})
@@ -172,6 +157,8 @@ if [[ -d "${BIN_DIR}" && $(ls -A "${BIN_DIR}") ]] ; then
     echo "Bundling bin files failed"
     exit 1
   fi
+
+  bundle_native_bin "${SNAPPYBINBUNDLE}" "${SNAPPYLIBBUNDLE}" "snappy.lib" "snappy" "${SNAPPYLIB}"
 
   bundle_native_bin "${ZSTDBINBUNDLE}" "${ZSTDLIBBUNDLE}" "zstd.lib" "zstd" "${ZSTDLIB}"
 

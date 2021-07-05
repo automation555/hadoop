@@ -34,10 +34,9 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import java.util.stream.Collectors;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +66,6 @@ public class CrossOriginFilter implements Filter {
   // Filter configuration
   public static final String ALLOWED_ORIGINS = "allowed-origins";
   public static final String ALLOWED_ORIGINS_DEFAULT = "*";
-  public static final String ALLOWED_ORIGINS_REGEX_PREFIX = "regex:";
   public static final String ALLOWED_METHODS = "allowed-methods";
   public static final String ALLOWED_METHODS_DEFAULT = "GET,POST,HEAD";
   public static final String ALLOWED_HEADERS = "allowed-headers";
@@ -196,12 +194,6 @@ public class CrossOriginFilter implements Filter {
     allowAllOrigins = allowedOrigins.contains("*");
     LOG.info("Allowed Origins: " + StringUtils.join(allowedOrigins, ','));
     LOG.info("Allow All Origins: " + allowAllOrigins);
-    List<String> discouragedAllowedOrigins = allowedOrigins.stream()
-            .filter(s -> s.length() > 1 && s.contains("*") && !(s.startsWith(ALLOWED_ORIGINS_REGEX_PREFIX)))
-            .collect(Collectors.toList());
-    for (String discouragedAllowedOrigin : discouragedAllowedOrigins) {
-        LOG.warn("Allowed Origin pattern '" + discouragedAllowedOrigin + "' is discouraged, use the 'regex:' prefix and use a Java regular expression instead.");
-    }
   }
 
   private void initializeMaxAge(FilterConfig filterConfig) {
@@ -236,20 +228,15 @@ public class CrossOriginFilter implements Filter {
     String[] origins = originsList.trim().split("\\s+");
     for (String origin : origins) {
       for (String allowedOrigin : allowedOrigins) {
-        Pattern regexPattern = null;
-        if (allowedOrigin.startsWith(ALLOWED_ORIGINS_REGEX_PREFIX)) {
-            String regex = allowedOrigin.substring(ALLOWED_ORIGINS_REGEX_PREFIX.length());
-            regexPattern = Pattern.compile(regex);
-        } else if (allowedOrigin.contains("*")) {
-            String regex = allowedOrigin.replace(".", "\\.").replace("*", ".*");
-            regexPattern = Pattern.compile(regex);
-        }
-
-        if (regexPattern != null
-                && regexPattern.matcher(origin).matches()) {
+        if (allowedOrigin.contains("*")) {
+          String regex = allowedOrigin.replace(".", "\\.").replace("*", ".*");
+          Pattern p = Pattern.compile(regex);
+          Matcher m = p.matcher(origin);
+          if (m.matches()) {
             return true;
+          }
         } else if (allowedOrigin.equals(origin)) {
-            return true;
+          return true;
         }
       }
     }

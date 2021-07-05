@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.metrics2.sink;
 
-import org.apache.commons.configuration2.SubsetConfiguration;
+import org.apache.commons.configuration.SubsetConfiguration;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.metrics2.AbstractMetric;
@@ -76,10 +76,10 @@ public class GraphiteSink implements MetricsSink, Closeable {
 
         for (MetricsTag tag : record.tags()) {
             if (tag.value() != null) {
-                metricsPathPrefix.append(".")
-                    .append(tag.name())
-                    .append("=")
-                    .append(tag.value());
+                metricsPathPrefix.append(".");
+                metricsPathPrefix.append(tag.name());
+                metricsPathPrefix.append("=");
+                metricsPathPrefix.append(tag.value());
             }
         }
 

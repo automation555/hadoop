@@ -18,10 +18,9 @@
 
 package org.apache.hadoop.ipc;
 
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -54,8 +53,8 @@ import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.AsyncGet;
-import org.apache.hadoop.tracing.Span;
-import org.apache.hadoop.tracing.Tracer;
+import org.apache.htrace.core.Span;
+import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +71,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 import static org.apache.hadoop.ipc.RpcConstants.CONNECTION_CONTEXT_CALL_ID;
 import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
@@ -86,7 +84,9 @@ import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
 @Public
 @InterfaceStability.Evolving
 public class Client implements AutoCloseable {
+  
   public static final Logger LOG = LoggerFactory.getLogger(Client.class);
+  private static final int STOP_SLEEP_TIME_MS = 10;
 
   /** A counter for generating call IDs. */
   private static final AtomicInteger callIdCounter = new AtomicInteger();
@@ -124,25 +124,24 @@ public class Client implements AutoCloseable {
     EXTERNAL_CALL_HANDLER.set(externalHandler);
   }
 
-  private final ConcurrentMap<ConnectionId, Connection> connections =
+  private ConcurrentMap<ConnectionId, Connection> connections =
       new ConcurrentHashMap<>();
-  private final Object putLock = new Object();
-  private final Object emptyCondition = new Object();
-  private final AtomicBoolean running = new AtomicBoolean(true);
 
   private Class<? extends Writable> valueClass;   // class of call values
+  private AtomicBoolean running = new AtomicBoolean(true); // if client runs
   final private Configuration conf;
 
   private SocketFactory socketFactory;           // how to create sockets
-  private final AtomicInteger refCount = new AtomicInteger(1);
+  private int refCount = 1;
 
   private final int connectionTimeout;
 
   private final boolean fallbackAllowed;
-  private final boolean bindToWildCardAddress;
   private final byte[] clientId;
   private final int maxAsyncCalls;
   private final AtomicInteger asyncCallCounter = new AtomicInteger(0);
+  
+  final static int CONNECTION_CONTEXT_CALL_ID = -3;
 
   /**
    * Executor on which IPC calls' parameters are sent.
@@ -209,7 +208,7 @@ public class Client implements AutoCloseable {
       
       return clientExecutor;
     }
-  }
+  };
   
   /**
    * set the ping interval value in configuration
@@ -283,19 +282,29 @@ public class Client implements AutoCloseable {
   public static final ExecutorService getClientExecutor() {
     return Client.clientExcecutorFactory.clientExecutor;
   }
-
   /**
    * Increment this client's reference count
+   *
    */
-  void incCount() {
-    refCount.incrementAndGet();
+  synchronized void incCount() {
+    refCount++;
   }
   
   /**
    * Decrement this client's reference count
+   *
    */
-  int decAndGetCount() {
-    return refCount.decrementAndGet();
+  synchronized void decCount() {
+    refCount--;
+  }
+  
+  /**
+   * Return if this client has no reference
+   * 
+   * @return true if this client has no reference; false otherwise
+   */
+  synchronized boolean isZeroReference() {
+    return refCount==0;
   }
 
   /** Check the rpc response header. */
@@ -444,13 +453,17 @@ public class Client implements AutoCloseable {
     private final Object sendRpcRequestLock = new Object();
 
     private AtomicReference<Thread> connectingThread = new AtomicReference<>();
-    private final Consumer<Connection> removeMethod;
 
-    Connection(ConnectionId remoteId, int serviceClass,
-        Consumer<Connection> removeMethod) {
+    public Connection(ConnectionId remoteId, int serviceClass) throws IOException {
       this.remoteId = remoteId;
       this.server = remoteId.getAddress();
-
+      if (server.isUnresolved()) {
+        throw NetUtils.wrapException(server.getHostName(),
+            server.getPort(),
+            null,
+            0,
+            new UnknownHostException());
+      }
       this.maxResponseLength = remoteId.conf.getInt(
           CommonConfigurationKeys.IPC_MAXIMUM_RESPONSE_LENGTH,
           CommonConfigurationKeys.IPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
@@ -469,12 +482,7 @@ public class Client implements AutoCloseable {
             .makeRpcRequestHeader(RpcKind.RPC_PROTOCOL_BUFFER,
                 OperationProto.RPC_FINAL_PACKET, PING_CALL_ID,
                 RpcConstants.INVALID_RETRY_COUNT, clientId);
-        try {
-          pingHeader.writeDelimitedTo(buf);
-        } catch (IOException e) {
-          throw new IllegalStateException("Failed to write to buf for "
-              + remoteId + " in " + Client.this + " due to " + e, e);
-        }
+        pingHeader.writeDelimitedTo(buf);
         pingRequest = buf.toByteArray();
       }
       this.pingInterval = remoteId.getPingInterval();
@@ -487,8 +495,6 @@ public class Client implements AutoCloseable {
         this.soTimeout = pingInterval;
       }
       this.serviceClass = serviceClass;
-      this.removeMethod = removeMethod;
-
       if (LOG.isDebugEnabled()) {
         LOG.debug("The ping interval is " + this.pingInterval + " ms.");
       }
@@ -639,10 +645,6 @@ public class Client implements AutoCloseable {
         LOG.warn("Address change detected. Old: " + server.toString() +
                                  " New: " + currentAddr.toString());
         server = currentAddr;
-        UserGroupInformation ticket = remoteId.getTicket();
-        this.setName("IPC Client (" + socketFactory.hashCode()
-            + ") connection to " + server.toString() + " from "
-            + ((ticket == null) ? "an unknown user" : ticket.getUserName()));
         return true;
       }
       return false;
@@ -689,11 +691,10 @@ public class Client implements AutoCloseable {
               InetAddress localAddr = NetUtils.getLocalInetAddress(host);
               if (localAddr != null) {
                 this.socket.setReuseAddress(true);
-                localAddr = NetUtils.bindToLocalAddress(localAddr,
-                    bindToWildCardAddress);
-                LOG.debug("Binding {} to {}", principal,
-                    (bindToWildCardAddress) ? "0.0.0.0" : localAddr);
-                this.socket.bind(new InetSocketAddress(localAddr, 0));
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Binding " + principal + " to " + localAddr);
+                }
+                bindAddr = new InetSocketAddress(localAddr, 0);
               }
             }
           }
@@ -858,8 +859,7 @@ public class Client implements AutoCloseable {
               }
             } else if (UserGroupInformation.isSecurityEnabled()) {
               if (!fallbackAllowed) {
-                throw new AccessControlException(
-                    "Server asks us to fall back to SIMPLE " +
+                throw new IOException("Server asks us to fall back to SIMPLE " +
                     "auth, but this client is configured to only allow secure " +
                     "connections.");
               }
@@ -1271,7 +1271,7 @@ public class Client implements AutoCloseable {
       // We have marked this connection as closed. Other thread could have
       // already known it and replace this closedConnection with a new one.
       // We should only remove this closedConnection.
-      removeMethod.accept(this);
+      connections.remove(remoteId, this);
 
       // close the streams and therefore the socket
       IOUtils.closeStream(ipcStreams);
@@ -1324,10 +1324,6 @@ public class Client implements AutoCloseable {
         CommonConfigurationKeys.IPC_CLIENT_CONNECT_TIMEOUT_DEFAULT);
     this.fallbackAllowed = conf.getBoolean(CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_KEY,
         CommonConfigurationKeys.IPC_CLIENT_FALLBACK_TO_SIMPLE_AUTH_ALLOWED_DEFAULT);
-    this.bindToWildCardAddress = conf
-        .getBoolean(CommonConfigurationKeys.IPC_CLIENT_BIND_WILDCARD_ADDR_KEY,
-            CommonConfigurationKeys.IPC_CLIENT_BIND_WILDCARD_ADDR_DEFAULT);
-
     this.clientId = ClientId.getClientId();
     this.sendParamsExecutor = clientExcecutorFactory.refAndGetInstance();
     this.maxAsyncCalls = conf.getInt(
@@ -1343,13 +1339,7 @@ public class Client implements AutoCloseable {
   public Client(Class<? extends Writable> valueClass, Configuration conf) {
     this(valueClass, conf, NetUtils.getDefaultSocketFactory(conf));
   }
-
-  @Override
-  public String toString() {
-    return getClass().getSimpleName() + "-"
-        + StringUtils.byteToHexString(clientId);
-  }
-
+ 
   /** Return the socket factory of this client
    *
    * @return this client's socket factory
@@ -1364,12 +1354,11 @@ public class Client implements AutoCloseable {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Stopping client");
     }
-    synchronized (putLock) { // synchronized to avoid put after stop
-      if (!running.compareAndSet(true, false)) {
-        return;
-      }
-    }
 
+    if (!running.compareAndSet(true, false)) {
+      return;
+    }
+    
     // wake up all connections
     for (Connection conn : connections.values()) {
       conn.interrupt();
@@ -1377,15 +1366,13 @@ public class Client implements AutoCloseable {
     }
     
     // wait until all connections are closed
-    synchronized (emptyCondition) {
-      // synchronized the loop to guarantee wait must be notified.
-      while (!connections.isEmpty()) {
-        try {
-          emptyCondition.wait();
-        } catch (InterruptedException e) {
-        }
+    while (!connections.isEmpty()) {
+      try {
+        Thread.sleep(STOP_SLEEP_TIME_MS);
+      } catch (InterruptedException e) {
       }
     }
+    
     clientExcecutorFactory.unrefAndCleanup();
   }
 
@@ -1398,7 +1385,7 @@ public class Client implements AutoCloseable {
    * @param remoteId - the target rpc server
    * @param fallbackToSimpleAuth - set to true or false during this method to
    *   indicate if a secure client falls back to simple auth
-   * @return the rpc response
+   * @returns the rpc response
    * Throws exceptions if there are network problems or if the remote code
    * threw an exception.
    */
@@ -1450,7 +1437,7 @@ public class Client implements AutoCloseable {
    * @param fallbackToSimpleAuth - set to true or false during this method to
    *   indicate if a secure client falls back to simple auth
    * @param alignmentContext - state alignment context
-   * @return the rpc response
+   * @returns the rpc response
    * Throws exceptions if there are network problems or if the remote code
    * threw an exception.
    */
@@ -1523,7 +1510,7 @@ public class Client implements AutoCloseable {
   /**
    * Check if RPC is in asynchronous mode or not.
    *
-   * @return true, if RPC is in asynchronous mode, otherwise false for
+   * @returns true, if RPC is in asynchronous mode, otherwise false for
    *          synchronous mode.
    */
   @Unstable
@@ -1598,37 +1585,24 @@ public class Client implements AutoCloseable {
   private Connection getConnection(ConnectionId remoteId,
       Call call, int serviceClass, AtomicBoolean fallbackToSimpleAuth)
       throws IOException {
-    final InetSocketAddress address = remoteId.getAddress();
-    if (address.isUnresolved()) {
-      throw NetUtils.wrapException(address.getHostName(),
-          address.getPort(),
-          null,
-          0,
-          new UnknownHostException());
+    if (!running.get()) {
+      // the client is stopped
+      throw new IOException("The client is stopped");
     }
-
-    final Consumer<Connection> removeMethod = c -> {
-      final boolean removed = connections.remove(remoteId, c);
-      if (removed && connections.isEmpty()) {
-        synchronized (emptyCondition) {
-          emptyCondition.notify();
-        }
-      }
-    };
-
     Connection connection;
     /* we could avoid this allocation for each RPC by having a  
      * connectionsId object and with set() method. We need to manage the
      * refs for keys in HashMap properly. For now its ok.
      */
     while (true) {
-      synchronized (putLock) { // synchronized to avoid put after stop
-        if (!running.get()) {
-          throw new IOException("Failed to get connection for " + remoteId
-              + ", " + call + ": " + this + " is already stopped");
+      // These lines below can be shorten with computeIfAbsent in Java8
+      connection = connections.get(remoteId);
+      if (connection == null) {
+        connection = new Connection(remoteId, serviceClass);
+        Connection existing = connections.putIfAbsent(remoteId, connection);
+        if (existing != null) {
+          connection = existing;
         }
-        connection = connections.computeIfAbsent(remoteId,
-            id -> new Connection(id, serviceClass, removeMethod));
       }
 
       if (connection.addCall(call)) {
@@ -1638,7 +1612,7 @@ public class Client implements AutoCloseable {
         // have already known this closedConnection, and replace it with a new
         // connection. So we should call conditional remove to make sure we only
         // remove this closedConnection.
-        removeMethod.accept(connection);
+        connections.remove(remoteId, connection);
       }
     }
 
@@ -1650,8 +1624,7 @@ public class Client implements AutoCloseable {
   
   /**
    * This class holds the address and the user ticket. The client connections
-   * to servers are uniquely identified by {@literal <}remoteAddress, protocol,
-   * ticket{@literal >}
+   * to servers are uniquely identified by <remoteAddress, protocol, ticket>
    */
   @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
   @InterfaceStability.Evolving

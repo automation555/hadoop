@@ -38,11 +38,7 @@ public class ExcludePrivateAnnotationsStandardDoclet {
   public static boolean start(RootDoc root) {
     System.out.println(
         ExcludePrivateAnnotationsStandardDoclet.class.getSimpleName());
-    RootDoc excludedDoc = RootDocProcessor.process(root);
-    if (excludedDoc.specifiedPackages().length == 0) {
-      return true;
-    }
-    return Standard.start(excludedDoc);
+    return Standard.start(RootDocProcessor.process(root));
   }
   
   public static int optionLength(String option) {

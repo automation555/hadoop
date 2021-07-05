@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.ProviderUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import com.google.common.base.Charsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,10 +147,6 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
 
   protected abstract String getSchemeName();
 
-  protected abstract String getKeyStoreType();
-
-  protected abstract String getAlgorithm();
-
   protected abstract OutputStream getOutputStreamForKeystore()
       throws IOException;
 
@@ -268,8 +264,8 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
     writeLock.lock();
     try {
       keyStore.setKeyEntry(alias,
-          new SecretKeySpec(new String(material).getBytes("UTF-8"),
-              getAlgorithm()), password, null);
+          new SecretKeySpec(new String(material).getBytes("UTF-8"), "AES"),
+          password, null);
     } catch (KeyStoreException e) {
       throw new IOException("Can't store credential " + alias + " in " + this,
           e);
@@ -319,7 +315,7 @@ public abstract class AbstractJavaKeyStoreProvider extends CredentialProvider {
         password = CREDENTIAL_PASSWORD_DEFAULT.toCharArray();
       }
       KeyStore ks;
-      ks = KeyStore.getInstance(getKeyStoreType());
+      ks = KeyStore.getInstance("jceks");
       if (keystoreExists()) {
         stashOriginalFilePermissions();
         try (InputStream in = getInputStreamForFile()) {

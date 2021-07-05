@@ -43,8 +43,8 @@ import org.apache.zookeeper.AsyncCallback.*;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.KeeperException.Code;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,10 +54,10 @@ import org.slf4j.LoggerFactory;
  * Apache Zookeeper. Using Zookeeper as a coordination service, leader election
  * can be performed by atomically creating an ephemeral lock file (znode) on
  * Zookeeper. The service instance that successfully creates the znode becomes
- * active and the rest become standbys. <br>
+ * active and the rest become standbys. <br/>
  * This election mechanism is only efficient for small number of election
  * candidates (order of 10's) because contention on single znode by a large
- * number of candidates can result in Zookeeper overload. <br>
+ * number of candidates can result in Zookeeper overload. <br/>
  * The elector does not guarantee fencing (protection of shared resources) among
  * service instances. After it has notified an instance about becoming a leader,
  * then that instance must ensure that it meets the service consistency
@@ -70,10 +70,10 @@ import org.slf4j.LoggerFactory;
 public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   /**
-   * Callback interface to interact with the ActiveStandbyElector object. <br>
+   * Callback interface to interact with the ActiveStandbyElector object. <br/>
    * The application will be notified with a callback only on state changes
    * (i.e. there will never be successive calls to becomeActive without an
-   * intermediate call to enterNeutralMode). <br>
+   * intermediate call to enterNeutralMode). <br/>
    * The callbacks will be running on Zookeeper client library threads. The
    * application should return from these callbacks quickly so as not to impede
    * Zookeeper client library performance and notifications. The app will
@@ -105,7 +105,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
      * interface. The service may choose to ignore this or stop doing state
      * changing operations. Upon reconnection, the elector verifies the leader
      * status and calls back on the becomeActive and becomeStandby app
-     * interfaces. <br>
+     * interfaces. <br/>
      * Zookeeper disconnects can happen due to network issues or loss of
      * Zookeeper quorum. Thus enterNeutralMode can be used to guard against
      * split-brain issues. In such situations it might be prudent to call
@@ -146,11 +146,11 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   private static final int SLEEP_AFTER_FAILURE_TO_BECOME_ACTIVE = 1000;
 
-  private enum ConnectionState {
+  private static enum ConnectionState {
     DISCONNECTED, CONNECTED, TERMINATED
   };
 
-  enum State {
+  static enum State {
     INIT, ACTIVE, STANDBY, NEUTRAL
   };
 
@@ -178,12 +178,12 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   private ZooKeeper monitorLockNodeClient;
 
   /**
-   * Create a new ActiveStandbyElector object <br>
+   * Create a new ActiveStandbyElector object <br/>
    * The elector is created by providing to it the Zookeeper configuration, the
    * parent znode under which to create the znode and a reference to the
-   * callback interface. <br>
+   * callback interface. <br/>
    * The parent znode name must be the same for all service instances and
-   * different across services. <br>
+   * different across services. <br/>
    * After the leader has been lost, a new leader will be elected after the
    * session timeout expires. Hence, the app must set this parameter based on
    * its needs for failure response time. The session timeout must be greater
@@ -217,12 +217,12 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   }
 
   /**
-   * Create a new ActiveStandbyElector object <br>
+   * Create a new ActiveStandbyElector object <br/>
    * The elector is created by providing to it the Zookeeper configuration, the
    * parent znode under which to create the znode and a reference to the
-   * callback interface. <br>
+   * callback interface. <br/>
    * The parent znode name must be the same for all service instances and
-   * different across services. <br>
+   * different across services. <br/>
    * After the leader has been lost, a new leader will be elected after the
    * session timeout expires. Hence, the app must set this parameter based on
    * its needs for failure response time. The session timeout must be greater
@@ -278,9 +278,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   /**
    * To participate in election, the app will call joinElection. The result will
    * be notified by a callback on either the becomeActive or becomeStandby app
-   * interfaces. <br>
+   * interfaces. <br/>
    * After this the elector will automatically monitor the leader status and
-   * perform re-election if necessary<br>
+   * perform re-election if necessary<br/>
    * The app could potentially start off in standby mode and ignore the
    * becomeStandby call.
    * 
@@ -329,12 +329,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
    * This recursively creates the znode as well as all of its parents.
    */
   public synchronized void ensureParentZNode()
-      throws IOException, InterruptedException, KeeperException {
+      throws IOException, InterruptedException {
     Preconditions.checkState(!wantToBeInElection,
         "ensureParentZNode() may not be called while in the election");
-    if (zkClient == null) {
-      createConnection();
-    }
 
     String pathParts[] = znodeWorkingDir.split("/");
     Preconditions.checkArgument(pathParts.length >= 1 &&
@@ -397,11 +394,11 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   /**
    * Any service instance can drop out of the election by calling quitElection. 
-   * <br>
+   * <br/>
    * This will lose any leader status, if held, and stop monitoring of the lock
-   * node. <br>
+   * node. <br/>
    * If the instance wants to participate in election again, then it needs to
-   * call joinElection(). <br>
+   * call joinElection(). <br/>
    * This allows service instances to take themselves out of rotation for known
    * impending unavailable states (e.g. long GC pause or software upgrade).
    * 
@@ -577,11 +574,6 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     }
 
     fatalError(errorMessage);
-  }
-
-  @VisibleForTesting
-  public boolean getWantToBeInElection() {
-    return wantToBeInElection;
   }
 
   /**
@@ -896,8 +888,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       Stat oldBreadcrumbStat = fenceOldActive();
       writeBreadCrumbNode(oldBreadcrumbStat);
 
-      LOG.debug("Becoming active for {}", this);
-
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Becoming active for " + this);
+      }
       appClient.becomeActive();
       state = State.ACTIVE;
       return true;
@@ -917,8 +910,8 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       throws KeeperException, InterruptedException {
     Preconditions.checkState(appData != null, "no appdata");
     
-    LOG.info("Writing znode {} to indicate that the local " +
-        "node is the most recent active...", zkBreadCrumbPath);
+    LOG.info("Writing znode " + zkBreadCrumbPath +
+        " to indicate that the local node is the most recent active...");
     if (oldBreadcrumbStat == null) {
       // No previous active, just create the node
       createWithRetries(zkBreadCrumbPath, appData, zkAcl,
@@ -955,8 +948,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       
       deleteWithRetries(zkBreadCrumbPath, stat.getVersion());
     } catch (Exception e) {
-      LOG.warn("Unable to delete our own bread-crumb of being active at {}." +
-          ". Expecting to be fenced by the next active.", zkBreadCrumbPath, e);
+      LOG.warn("Unable to delete our own bread-crumb of being active at " +
+          zkBreadCrumbPath + ": " + e.getLocalizedMessage() + ". " +
+          "Expecting to be fenced by the next active.");
     }
   }
 
@@ -990,7 +984,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       throw ke;
     }
 
-    LOG.info("Old node exists: {}", StringUtils.byteToHexString(data));
+    LOG.info("Old node exists: " + StringUtils.byteToHexString(data));
     if (Arrays.equals(data, appData)) {
       LOG.info("But old node has our own data, so don't need to fence it.");
     } else {
@@ -1001,7 +995,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   private void becomeStandby() {
     if (state != State.STANDBY) {
-      LOG.debug("Becoming standby for {}", this);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Becoming standby for " + this);
+      }
       state = State.STANDBY;
       appClient.becomeStandby();
     }
@@ -1009,7 +1005,9 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   private void enterNeutralMode() {
     if (state != State.NEUTRAL) {
-      LOG.debug("Entering neutral mode for {}", this);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Entering neutral mode for " + this);
+      }
       state = State.NEUTRAL;
       appClient.enterNeutralMode();
     }
@@ -1076,7 +1074,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   private void setAclsWithRetries(final String path)
       throws KeeperException, InterruptedException {
-    Stat stat = new Stat();
+    final Stat stat = new Stat();
     zkDoWithRetries(new ZKAction<Void>() {
       @Override
       public Void run() throws KeeperException, InterruptedException {
@@ -1126,7 +1124,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   private synchronized boolean isStaleClient(Object ctx) {
     Preconditions.checkNotNull(ctx);
     if (zkClient != (ZooKeeper)ctx) {
-      LOG.warn("Ignoring stale result from old client with sessionId {}",
+      LOG.warn("Ignoring stale result from old client with sessionId " +
           String.format("0x%08x", ((ZooKeeper)ctx).getSessionId()));
       return true;
     }
@@ -1164,8 +1162,8 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
         throws KeeperException, IOException {
       try {
         if (!hasReceivedEvent.await(connectionTimeoutMs, TimeUnit.MILLISECONDS)) {
-          LOG.error("Connection timed out: couldn't connect to ZooKeeper in " +
-              "{} milliseconds", connectionTimeoutMs);
+          LOG.error("Connection timed out: couldn't connect to ZooKeeper in "
+              + connectionTimeoutMs + " milliseconds");
           zk.close();
           throw KeeperException.create(Code.CONNECTIONLOSS);
         }

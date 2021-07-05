@@ -18,20 +18,20 @@
 
 package org.apache.hadoop.metrics2.util;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.MetricsTag;
+
+import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.StringJoiner;
 
 /**
  * A metrics cache for sinks that don't support sparse updates.
@@ -126,10 +126,13 @@ public class MetricsCache {
     }
 
     @Override public String toString() {
-      return new StringJoiner(", ", this.getClass().getSimpleName() + "{", "}")
-          .add("tags=" + tags)
-          .add("metrics=" + metrics)
-          .toString();
+      StringBuilder sb = new StringBuilder(32);
+      sb.append(this.getClass().getSimpleName());
+      sb.append("{tags=");
+      sb.append(tags);
+      sb.append(", metrics=");
+      sb.append(metrics);
+      return sb.append('}').toString();
     }
   }
 

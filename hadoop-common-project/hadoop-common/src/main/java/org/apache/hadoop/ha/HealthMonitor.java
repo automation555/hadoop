@@ -32,7 +32,7 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.util.Daemon;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +55,6 @@ public class HealthMonitor {
   private long checkIntervalMillis;
   private long sleepAfterDisconnectMillis;
 
-  private int rpcConnectRetries;
   private int rpcTimeout;
 
   private volatile boolean shouldRun = true;
@@ -125,8 +124,6 @@ public class HealthMonitor {
     this.connectRetryInterval = conf.getLong(
         HA_HM_CONNECT_RETRY_INTERVAL_KEY,
         HA_HM_CONNECT_RETRY_INTERVAL_DEFAULT);
-    this.rpcConnectRetries = conf.getInt(HA_HM_RPC_CONNECT_MAX_RETRIES_KEY,
-        HA_HM_RPC_CONNECT_MAX_RETRIES_DEFAULT);
     this.rpcTimeout = conf.getInt(
         HA_HM_RPC_TIMEOUT_KEY,
         HA_HM_RPC_TIMEOUT_DEFAULT);
@@ -137,9 +134,17 @@ public class HealthMonitor {
   public void addCallback(Callback cb) {
     this.callbacks.add(cb);
   }
+  
+  public void removeCallback(Callback cb) {
+    callbacks.remove(cb);
+  }
 
   public synchronized void addServiceStateCallback(ServiceStateCallback cb) {
     this.serviceStateCallbacks.add(cb);
+  }
+
+  public synchronized void removeServiceStateCallback(ServiceStateCallback cb) {
+    serviceStateCallbacks.remove(cb);
   }
 
   public void shutdown() {
@@ -186,7 +191,7 @@ public class HealthMonitor {
    * Connect to the service to be monitored. Stubbed out for easier testing.
    */
   protected HAServiceProtocol createProxy() throws IOException {
-    return targetToMonitor.getHealthMonitorProxy(conf, rpcTimeout, rpcConnectRetries);
+    return targetToMonitor.getHealthMonitorProxy(conf, rpcTimeout);
   }
 
   private void doHealthChecks() throws InterruptedException {
@@ -199,11 +204,12 @@ public class HealthMonitor {
         healthy = true;
       } catch (Throwable t) {
         if (isHealthCheckFailedException(t)) {
-          LOG.warn("Service health check failed for {}", targetToMonitor, t);
+          LOG.warn("Service health check failed for " + targetToMonitor
+              + ": " + t.getMessage());
           enterState(State.SERVICE_UNHEALTHY);
         } else {
-          LOG.warn("Transport-level exception trying to monitor health of {}",
-              targetToMonitor, t);
+          LOG.warn("Transport-level exception trying to monitor health of " +
+              targetToMonitor + ": " + t.getCause() + " " + t.getLocalizedMessage());
           RPC.stopProxy(proxy);
           proxy = null;
           enterState(State.SERVICE_NOT_RESPONDING);
@@ -240,7 +246,7 @@ public class HealthMonitor {
 
   private synchronized void enterState(State newState) {
     if (newState != state) {
-      LOG.info("Entering state {}", newState);
+      LOG.info("Entering state " + newState);
       state = newState;
       synchronized (callbacks) {
         for (Callback cb : callbacks) {
@@ -253,7 +259,11 @@ public class HealthMonitor {
   synchronized State getHealthState() {
     return state;
   }
-
+  
+  synchronized HAServiceStatus getLastServiceStatus() {
+    return lastServiceState;
+  }
+  
   boolean isAlive() {
     return daemon.isAlive();
   }

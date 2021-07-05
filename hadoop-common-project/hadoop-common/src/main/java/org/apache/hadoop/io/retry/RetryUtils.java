@@ -23,7 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.retry.RetryPolicies.MultipleLinearRandomRetry;
 import org.apache.hadoop.ipc.RemoteException;
 
-import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ipc.RetriableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +72,9 @@ public class RetryUtils {
             retryPolicySpecKey, defaultRetryPolicySpec
             );
     
-    LOG.debug("multipleLinearRandomRetry = {}", multipleLinearRandomRetry);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("multipleLinearRandomRetry = " + multipleLinearRandomRetry);
+    }
 
     if (multipleLinearRandomRetry == null) {
       //no retry
@@ -122,9 +124,10 @@ public class RetryUtils {
         p = RetryPolicies.TRY_ONCE_THEN_FAIL;
       }
 
-      LOG.debug("RETRY {}) policy={}", retries,
-            p.getClass().getSimpleName(), e);
-
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("RETRY " + retries + ") policy="
+            + p.getClass().getSimpleName() + ", exception=" + e);
+      }
       return p.shouldRetry(e, retries, failovers, isMethodIdempotent);
     }
 

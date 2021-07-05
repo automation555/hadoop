@@ -39,7 +39,6 @@ public class ContentSummary extends QuotaUsage implements Writable{
   private long snapshotFileCount;
   private long snapshotDirectoryCount;
   private long snapshotSpaceConsumed;
-  private String erasureCodingPolicy;
 
   /** We don't use generics. Instead override spaceConsumed and other methods
       in order to keep backward compatibility. */
@@ -79,11 +78,6 @@ public class ContentSummary extends QuotaUsage implements Writable{
 
     public Builder snapshotSpaceConsumed(long snapshotSpaceConsumed) {
       this.snapshotSpaceConsumed = snapshotSpaceConsumed;
-      return this;
-    }
-
-    public Builder erasureCodingPolicy(String ecPolicy) {
-      this.erasureCodingPolicy = ecPolicy;
       return this;
     }
 
@@ -142,7 +136,6 @@ public class ContentSummary extends QuotaUsage implements Writable{
     private long snapshotFileCount;
     private long snapshotDirectoryCount;
     private long snapshotSpaceConsumed;
-    private String erasureCodingPolicy;
   }
 
   /** Constructor deprecated by ContentSummary.Builder*/
@@ -182,7 +175,6 @@ public class ContentSummary extends QuotaUsage implements Writable{
     this.snapshotFileCount = builder.snapshotFileCount;
     this.snapshotDirectoryCount = builder.snapshotDirectoryCount;
     this.snapshotSpaceConsumed = builder.snapshotSpaceConsumed;
-    this.erasureCodingPolicy = builder.erasureCodingPolicy;
   }
 
   /** @return the length */
@@ -208,10 +200,6 @@ public class ContentSummary extends QuotaUsage implements Writable{
 
   public long getSnapshotSpaceConsumed() {
     return snapshotSpaceConsumed;
-  }
-
-  public String getErasureCodingPolicy() {
-    return erasureCodingPolicy;
   }
 
   @Override
@@ -249,7 +237,6 @@ public class ContentSummary extends QuotaUsage implements Writable{
           getSnapshotFileCount() == right.getSnapshotFileCount() &&
           getSnapshotDirectoryCount() == right.getSnapshotDirectoryCount() &&
           getSnapshotSpaceConsumed() == right.getSnapshotSpaceConsumed() &&
-          getErasureCodingPolicy().equals(right.getErasureCodingPolicy()) &&
           super.equals(to);
     } else {
       return super.equals(to);
@@ -260,8 +247,7 @@ public class ContentSummary extends QuotaUsage implements Writable{
   public int hashCode() {
     long result = getLength() ^ getFileCount() ^ getDirectoryCount()
         ^ getSnapshotLength() ^ getSnapshotFileCount()
-        ^ getSnapshotDirectoryCount() ^ getSnapshotSpaceConsumed()
-        ^ getErasureCodingPolicy().hashCode();
+        ^ getSnapshotDirectoryCount() ^ getSnapshotSpaceConsumed();
     return ((int) result) ^ super.hashCode();
   }
 
@@ -281,35 +267,6 @@ public class ContentSummary extends QuotaUsage implements Writable{
 
   private static final String ALL_HEADER = QUOTA_HEADER + SUMMARY_HEADER;
 
-  /**
-   * Output format:
-   * <--------20-------->
-   * ERASURECODING_POLICY
-   */
-  private static final String ERASURECODING_POLICY_FORMAT = "%20s ";
-
-  private static final String ERASURECODING_POLICY_HEADER_FIELD =
-      "ERASURECODING_POLICY";
-
-  /** The header string. */
-  private static final String ERASURECODING_POLICY_HEADER = String.format(
-      ERASURECODING_POLICY_FORMAT, ERASURECODING_POLICY_HEADER_FIELD);
-
-  /**
-   * Output format:<-------18-------> <----------24---------->
-   * <----------24---------->. <-------------28------------> SNAPSHOT_LENGTH
-   * SNAPSHOT_FILE_COUNT SNAPSHOT_DIR_COUNT SNAPSHOT_SPACE_CONSUMED
-   */
-  private static final String SNAPSHOT_FORMAT = "%18s %24s %24s %28s ";
-
-  private static final String[] SNAPSHOT_HEADER_FIELDS =
-      new String[] {"SNAPSHOT_LENGTH", "SNAPSHOT_FILE_COUNT",
-          "SNAPSHOT_DIR_COUNT", "SNAPSHOT_SPACE_CONSUMED"};
-
-  /** The header string. */
-  private static final String SNAPSHOT_HEADER =
-      String.format(SNAPSHOT_FORMAT, (Object[]) SNAPSHOT_HEADER_FIELDS);
-
 
   /** Return the header of the output.
    * if qOption is false, output directory count, file count, and content size;
@@ -322,13 +279,7 @@ public class ContentSummary extends QuotaUsage implements Writable{
     return qOption ? ALL_HEADER : SUMMARY_HEADER;
   }
 
-  public static String getErasureCodingPolicyHeader() {
-    return ERASURECODING_POLICY_HEADER;
-  }
 
-  public static String getSnapshotHeader() {
-    return SNAPSHOT_HEADER;
-  }
 
   /**
    * Returns the names of the fields from the summary header.
@@ -451,7 +402,7 @@ public class ContentSummary extends QuotaUsage implements Writable{
   }
 
   /**
-   * Formats a size to be human readable or in bytes.
+   * Formats a size to be human readable or in bytes
    * @param size value to be formatted
    * @param humanReadable flag indicating human readable or not
    * @return String representation of the size
@@ -460,27 +411,5 @@ public class ContentSummary extends QuotaUsage implements Writable{
     return humanReadable
       ? StringUtils.TraditionalBinaryPrefix.long2String(size, "", 1)
       : String.valueOf(size);
-  }
-
-  /**
-   * @return Constant-width String representation of Erasure Coding Policy
-   */
-  public String toErasureCodingPolicy() {
-    return String.format(ERASURECODING_POLICY_FORMAT,
-        erasureCodingPolicy.equals("Replicated")
-            ? erasureCodingPolicy : "EC:" + erasureCodingPolicy);
-  }
-
-  /**
-   * Return the string representation of the snapshot counts in the output
-   * format.
-   * @param hOption flag indicating human readable or not
-   * @return String representation of the snapshot counts
-   */
-  public String toSnapshot(boolean hOption) {
-    return String.format(SNAPSHOT_FORMAT, formatSize(snapshotLength, hOption),
-        formatSize(snapshotFileCount, hOption),
-        formatSize(snapshotDirectoryCount, hOption),
-        formatSize(snapshotSpaceConsumed, hOption));
   }
 }

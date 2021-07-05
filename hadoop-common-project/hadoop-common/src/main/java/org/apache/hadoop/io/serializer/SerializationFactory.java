@@ -40,12 +40,12 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
 @InterfaceStability.Evolving
 public class SerializationFactory extends Configured {
-
-  static final Logger LOG =
+  
+  private static final Logger LOG =
       LoggerFactory.getLogger(SerializationFactory.class.getName());
 
   private List<Serialization<?>> serializations = new ArrayList<Serialization<?>>();
-
+  
   /**
    * <p>
    * Serializations are found by reading the <code>io.serializations</code>
@@ -56,14 +56,14 @@ public class SerializationFactory extends Configured {
   public SerializationFactory(Configuration conf) {
     super(conf);
     for (String serializerName : conf.getTrimmedStrings(
-            CommonConfigurationKeys.IO_SERIALIZATIONS_KEY,
-            new String[]{WritableSerialization.class.getName(),
-                    AvroSpecificSerialization.class.getName(),
-                    AvroReflectSerialization.class.getName()})) {
+      CommonConfigurationKeys.IO_SERIALIZATIONS_KEY,
+      new String[]{WritableSerialization.class.getName(),
+        AvroSpecificSerialization.class.getName(),
+        AvroReflectSerialization.class.getName()})) {
       add(conf, serializerName);
     }
   }
-
+  
   @SuppressWarnings("unchecked")
   private void add(Configuration conf, String serializationName) {
     try {
@@ -101,5 +101,5 @@ public class SerializationFactory extends Configured {
     }
     return null;
   }
-
+  
 }

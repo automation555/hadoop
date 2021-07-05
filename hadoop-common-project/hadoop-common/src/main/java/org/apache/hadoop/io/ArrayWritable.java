@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.io;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-import java.util.Arrays;
+import java.io.*;
+import java.lang.reflect.Array;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -44,7 +42,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class ArrayWritable implements Writable {
-  private final Class<? extends Writable> valueClass;
+  private Class<? extends Writable> valueClass;
   private Writable[] values;
 
   public ArrayWritable(Class<? extends Writable> valueClass) {
@@ -60,13 +58,13 @@ public class ArrayWritable implements Writable {
   }
 
   public ArrayWritable(String[] strings) {
-    this(Text.class, new Writable[strings.length]);
+    this(UTF8.class, new Writable[strings.length]);
     for (int i = 0; i < strings.length; i++) {
       values[i] = new UTF8(strings[i]);
     }
   }
 
-  public Class<? extends Writable> getValueClass() {
+  public Class getValueClass() {
     return valueClass;
   }
 
@@ -79,16 +77,16 @@ public class ArrayWritable implements Writable {
   }
 
   public Object toArray() {
-    return Arrays.copyOf(values, values.length);
+    Object result = Array.newInstance(valueClass, values.length);
+    for (int i = 0; i < values.length; i++) {
+      Array.set(result, i, values[i]);
+    }
+    return result;
   }
 
-  public void set(Writable[] values) {
-    this.values = values;
-  }
+  public void set(Writable[] values) { this.values = values; }
 
-  public Writable[] get() {
-    return values;
-  }
+  public Writable[] get() { return values; }
 
   @Override
   public void readFields(DataInput in) throws IOException {
@@ -106,12 +104,6 @@ public class ArrayWritable implements Writable {
     for (int i = 0; i < values.length; i++) {
       values[i].write(out);
     }
-  }
-
-  @Override
-  public String toString() {
-    return "ArrayWritable [valueClass=" + valueClass + ", values="
-        + Arrays.toString(values) + "]";
   }
 
 }

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.io.compress.zstd;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -159,7 +159,7 @@ public class ZStandardCompressor implements Compressor {
     }
 
     // have we consumed all input
-    if (keepUncompressedBuf && uncompressedDirectBufLen - uncompressedDirectBufOff > 0) {
+    if (keepUncompressedBuf && uncompressedDirectBufLen > 0) {
       return false;
     }
 
@@ -223,7 +223,7 @@ public class ZStandardCompressor implements Compressor {
     compressedDirectBuf.limit(n);
 
     // Check if we have consumed all input buffer
-    if (uncompressedDirectBufLen - uncompressedDirectBufOff <= 0) {
+    if (uncompressedDirectBufLen <= 0) {
       // consumed all input buffer
       keepUncompressedBuf = false;
       uncompressedDirectBuf.clear();

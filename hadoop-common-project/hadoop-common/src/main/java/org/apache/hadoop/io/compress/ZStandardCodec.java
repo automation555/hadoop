@@ -193,7 +193,7 @@ public class ZStandardCodec implements
    */
   @Override
   public CompressionInputStream createInputStream(InputStream in,
-                                                  Decompressor decompressor)
+      Decompressor decompressor)
       throws IOException {
     checkNativeCodeLoaded();
     return new DecompressorStream(in, decompressor,
@@ -230,7 +230,7 @@ public class ZStandardCodec implements
    */
   @Override
   public String getDefaultExtension() {
-    return CodecConstants.ZSTANDARD_CODEC_EXTENSION;
+    return ".zst";
   }
 
   @Override

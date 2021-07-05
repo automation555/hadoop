@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * Abstract Checksumed Fs.
  * It provide a basic implementation of a Checksumed Fs,
  * which creates a checksum file for each raw file.
- * It generates &amp; verifies checksums at the client side.
+ * It generates & verifies checksums at the client side.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving /*Evolving for a release,to be changed to Stable */
@@ -299,8 +299,7 @@ public abstract class ChecksumFs extends FilterFs {
 
   @Override
   public boolean truncate(Path f, long newLength) throws IOException {
-    throw new UnsupportedOperationException("Truncate is not supported "
-        + "by ChecksumFs");
+    throw new IOException("Not supported");
   }
 
   /**
@@ -534,7 +533,7 @@ public abstract class ChecksumFs extends FilterFs {
    * @param sums the stream open on the checksum file
    * @param sumsPos the position of the beginning of the bad data in the
    *         checksum file
-   * @return if retry is necessary
+   * @return if retry is neccessary
    */
   public boolean reportChecksumFailure(Path f, FSDataInputStream in,
     long inPos, FSDataInputStream sums, long sumsPos) {

@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 
+import org.apache.commons.lang.WordUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -35,8 +36,8 @@ import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.hadoop.tracing.TraceScope;
-import org.apache.hadoop.tracing.Tracer;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,12 +51,12 @@ public class FsShell extends Configured implements Tool {
 
   private FileSystem fs;
   private Trash trash;
-  private Help help;
   protected CommandFactory commandFactory;
 
   private final String usagePrefix =
     "Usage: hadoop fs [generic options]";
 
+  private Tracer tracer;
   static final String SHELL_HTRACE_PREFIX = "fs.shell.htrace.";
 
   /**
@@ -89,15 +90,8 @@ public class FsShell extends Configured implements Tool {
     }
     return this.trash;
   }
-
-  protected Help getHelp() throws IOException {
-    if (this.help == null){
-      this.help = new Help();
-    }
-    return this.help;
-  }
   
-  protected void init() {
+  protected void init() throws IOException {
     getConf().setQuietMode(true);
     UserGroupInformation.setConfiguration(getConf());
     if (commandFactory == null) {
@@ -106,6 +100,9 @@ public class FsShell extends Configured implements Tool {
       commandFactory.addObject(new Usage(), "-usage");
       registerCommands(commandFactory);
     }
+    this.tracer = new Tracer.Builder("FsShell").
+        conf(TraceUtils.wrapHadoopConf(SHELL_HTRACE_PREFIX, getConf())).
+        build();
   }
 
   protected void registerCommands(CommandFactory factory) {
@@ -134,10 +131,6 @@ public class FsShell extends Configured implements Tool {
    */
   public Path getCurrentTrashDir(Path path) throws IOException {
     return getTrash().getCurrentTrashDir(path);
-  }
-
-  protected String getUsagePrefix() {
-    return usagePrefix;
   }
 
   // NOTE: Usage/Help are inner classes to allow access to outer methods
@@ -223,7 +216,7 @@ public class FsShell extends Configured implements Tool {
       }
     } else {
       // display help or usage for all commands 
-      out.println(getUsagePrefix());
+      out.println(usagePrefix);
       
       // display list of short usages
       ArrayList<Command> instances = new ArrayList<Command>();
@@ -247,7 +240,7 @@ public class FsShell extends Configured implements Tool {
   }
 
   private void printInstanceUsage(PrintStream out, Command instance) {
-    out.println(getUsagePrefix() + " " + instance.getUsage());
+    out.println(usagePrefix + " " + instance.getUsage());
   }
 
   private void printInstanceHelp(PrintStream out, Command instance) {
@@ -274,7 +267,7 @@ public class FsShell extends Configured implements Tool {
         listing = null;
       }
 
-      for (String descLine : StringUtils.wrap(
+      for (String descLine : WordUtils.wrap(
           line, MAX_LINE_WIDTH, "\n", true).split("\n")) {
         out.println(prefix + descLine);
       }
@@ -298,12 +291,9 @@ public class FsShell extends Configured implements Tool {
    * run
    */
   @Override
-  public int run(String[] argv) {
+  public int run(String argv[]) throws Exception {
     // initialize FsShell
     init();
-    Tracer tracer = new Tracer.Builder("FsShell").
-        conf(TraceUtils.wrapHadoopConf(SHELL_HTRACE_PREFIX, getConf())).
-        build();
     int exitCode = -1;
     if (argv.length < 1) {
       printUsage(System.err);

@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.jmx;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
 import org.apache.hadoop.http.HttpServer2;
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +70,7 @@ import java.util.Set;
  * <p>
  * The optional <code>get</code> parameter is used to query an specific 
  * attribute of a JMX bean.  The format of the URL is
- * <code>http://.../jmx?get=MXBeanName::AttributeName</code>
+ * <code>http://.../jmx?get=MXBeanName::AttributeName<code>
  * <p>
  * For example 
  * <code>
@@ -85,7 +85,7 @@ import java.util.Set;
  * <p>
  * The return format is JSON and in the form
  * <p>
- *  <pre><code>
+ *  <code><pre>
  *  {
  *    "beans" : [
  *      {
@@ -94,7 +94,7 @@ import java.util.Set;
  *      }
  *    ]
  *  }
- *  </code></pre>
+ *  </pre></code>
  *  <p>
  *  The servlet attempts to convert the the JMXBeans into JSON. Each
  *  bean's attributes will be converted to a JSON object member.
@@ -127,12 +127,9 @@ public class JMXJsonServlet extends HttpServlet {
   /**
    * MBean server.
    */
-  protected transient MBeanServer mBeanServer;
+  protected transient MBeanServer mBeanServer = null;
 
-  /**
-   * Json Factory to create Json generators for write objects in json format
-   */
-  protected transient JsonFactory jsonFactory;
+  // --------------------------------------------------------- Public Methods
   /**
    * Initialize this servlet.
    */
@@ -140,10 +137,9 @@ public class JMXJsonServlet extends HttpServlet {
   public void init() throws ServletException {
     // Retrieve the MBean server
     mBeanServer = ManagementFactory.getPlatformMBeanServer();
-    jsonFactory = new JsonFactory();
   }
 
-  protected boolean isInstrumentationAccessAllowed(HttpServletRequest request, 
+  protected boolean isInstrumentationAccessAllowed(HttpServletRequest request,
       HttpServletResponse response) throws IOException {
     return HttpServer2.isInstrumentationAccessAllowed(getServletContext(),
         request, response);
@@ -168,12 +164,14 @@ public class JMXJsonServlet extends HttpServlet {
    */
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response) {
+    String jsonpcb = null;
+    PrintWriter writer = null;
     try {
       if (!isInstrumentationAccessAllowed(request, response)) {
         return;
       }
+      
       JsonGenerator jg = null;
-      PrintWriter writer = null;
       try {
         writer = response.getWriter();
  
@@ -181,26 +179,38 @@ public class JMXJsonServlet extends HttpServlet {
         response.setHeader(ACCESS_CONTROL_ALLOW_METHODS, "GET");
         response.setHeader(ACCESS_CONTROL_ALLOW_ORIGIN, "*");
 
-        jg = jsonFactory.createGenerator(writer);
-        jg.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
-        jg.useDefaultPrettyPrinter();
-        jg.writeStartObject();
+      JsonFactory jsonFactory = new JsonFactory();
+      jg = jsonFactory.createJsonGenerator(writer);
+      jg.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+      jg.useDefaultPrettyPrinter();
+      jg.writeStartObject();
 
-        // query per mbean attribute
-        String getmethod = request.getParameter("get");
-        if (getmethod != null) {
-          String[] splitStrings = getmethod.split("\\:\\:");
-          if (splitStrings.length != 2) {
-            jg.writeStringField("result", "ERROR");
-            jg.writeStringField("message", "query format is not as expected.");
-            jg.flush();
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            return;
-          }
-          listBeans(jg, new ObjectName(splitStrings[0]), splitStrings[1],
-              response);
+      if (mBeanServer == null) {
+        jg.writeStringField("result", "ERROR");
+        jg.writeStringField("message", "No MBeanServer could be found");
+        jg.close();
+        LOG.error("No MBeanServer could be found.");
+        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+        return;
+      }
+      
+      // query per mbean attribute
+      String getmethod = request.getParameter("get");
+      if (getmethod != null) {
+        String[] splitStrings = getmethod.split("\\:\\:");
+        if (splitStrings.length != 2) {
+          jg.writeStringField("result", "ERROR");
+          jg.writeStringField("message", "query format is not as expected.");
+          jg.close();
+          response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
           return;
         }
+        listBeans(jg, new ObjectName(splitStrings[0]), splitStrings[1],
+            response);
+        jg.close();
+        return;
+        
+      }
 
         // query per mbean
         String qry = request.getParameter("qry");
@@ -216,12 +226,16 @@ public class JMXJsonServlet extends HttpServlet {
           writer.close();
         }
       }
-    } catch (IOException e) {
+    } catch ( IOException e ) {
       LOG.error("Caught an exception while processing JMX request", e);
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    } catch (MalformedObjectNameException e) {
+    } catch ( MalformedObjectNameException e ) {
       LOG.error("Caught an exception while processing JMX request", e);
       response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    } finally {
+      if (writer != null) {
+        writer.close();
+      }
     }
   }
 
@@ -348,8 +362,7 @@ public class JMXJsonServlet extends HttpServlet {
     } catch (RuntimeErrorException e) {
       // RuntimeErrorException happens when an unexpected failure occurs in getAttribute
       // for example https://issues.apache.org/jira/browse/DAEMON-120
-      LOG.error("getting attribute {} of {} threw an exception",
-          attName, oname, e);
+      LOG.debug("getting attribute "+attName+" of "+oname+" threw an exception", e);
       return;
     } catch (AttributeNotFoundException e) {
       //Ignored the attribute was not found, which should never happen because the bean

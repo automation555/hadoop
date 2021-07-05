@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,26 +18,21 @@
 
 package org.apache.hadoop.util;
 
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ForwardingExecutorService;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ForwardingListeningExecutorService;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.statistics.DurationTracker;
-import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static java.util.Objects.requireNonNull;
-import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.stubDurationTrackerFactory;
-import static org.apache.hadoop.fs.statistics.StoreStatisticNames.ACTION_EXECUTOR_ACQUIRED;
 
 /**
  * This ExecutorService blocks the submission of new tasks when its queue is
@@ -54,48 +49,29 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.ACTION_EXECUTO
 @SuppressWarnings("NullableProblems")
 @InterfaceAudience.Private
 public class SemaphoredDelegatingExecutor extends
-    ForwardingExecutorService {
+    ForwardingListeningExecutorService {
 
   private final Semaphore queueingPermits;
-  private final ExecutorService executorDelegatee;
+  private final ListeningExecutorService executorDelegatee;
   private final int permitCount;
-  private final DurationTrackerFactory trackerFactory;
 
   /**
    * Instantiate.
    * @param executorDelegatee Executor to delegate to
    * @param permitCount number of permits into the queue permitted
    * @param fair should the semaphore be "fair"
-   * @param trackerFactory duration tracker factory.
    */
   public SemaphoredDelegatingExecutor(
-      ExecutorService executorDelegatee,
-      int permitCount,
-      boolean fair,
-      DurationTrackerFactory trackerFactory) {
-    this.permitCount = permitCount;
-    queueingPermits = new Semaphore(permitCount, fair);
-    this.executorDelegatee = requireNonNull(executorDelegatee);
-    this.trackerFactory = trackerFactory != null
-        ? trackerFactory
-        : stubDurationTrackerFactory();
-  }
-
-  /**
-   * Instantiate without collecting executor aquisition duration information.
-   * @param executorDelegatee Executor to delegate to
-   * @param permitCount number of permits into the queue permitted
-   * @param fair should the semaphore be "fair"
-   */
-  public SemaphoredDelegatingExecutor(
-      ExecutorService executorDelegatee,
+      ListeningExecutorService executorDelegatee,
       int permitCount,
       boolean fair) {
-    this(executorDelegatee, permitCount, fair, null);
+    this.permitCount = permitCount;
+    queueingPermits = new Semaphore(permitCount, fair);
+    this.executorDelegatee = executorDelegatee;
   }
 
   @Override
-  protected ExecutorService delegate() {
+  protected ListeningExecutorService delegate() {
     return executorDelegatee;
   }
 
@@ -126,45 +102,41 @@ public class SemaphoredDelegatingExecutor extends
   }
 
   @Override
-  public <T> Future<T> submit(Callable<T> task) {
-    try (DurationTracker ignored =
-             trackerFactory.trackDuration(ACTION_EXECUTOR_ACQUIRED)) {
+  public <T> ListenableFuture<T> submit(Callable<T> task) {
+    try {
       queueingPermits.acquire();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      return Futures.immediateFailedFuture(e);
+      return Futures.immediateFailedCheckedFuture(e);
     }
     return super.submit(new CallableWithPermitRelease<>(task));
   }
 
   @Override
-  public <T> Future<T> submit(Runnable task, T result) {
-    try (DurationTracker ignored =
-             trackerFactory.trackDuration(ACTION_EXECUTOR_ACQUIRED)) {
+  public <T> ListenableFuture<T> submit(Runnable task, T result) {
+    try {
       queueingPermits.acquire();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      return Futures.immediateFailedFuture(e);
+      return Futures.immediateFailedCheckedFuture(e);
     }
     return super.submit(new RunnableWithPermitRelease(task), result);
   }
 
   @Override
-  public Future<?> submit(Runnable task) {
-    try (DurationTracker ignored =
-             trackerFactory.trackDuration(ACTION_EXECUTOR_ACQUIRED)) {
+  public ListenableFuture<?> submit(Runnable task) {
+    try {
       queueingPermits.acquire();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      return Futures.immediateFailedFuture(e);
+      return Futures.immediateFailedCheckedFuture(e);
     }
     return super.submit(new RunnableWithPermitRelease(task));
   }
 
   @Override
   public void execute(Runnable command) {
-    try (DurationTracker ignored =
-             trackerFactory.trackDuration(ACTION_EXECUTOR_ACQUIRED)) {
+    try {
       queueingPermits.acquire();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -201,10 +173,10 @@ public class SemaphoredDelegatingExecutor extends
   public String toString() {
     final StringBuilder sb = new StringBuilder(
         "SemaphoredDelegatingExecutor{");
-    sb.append("permitCount=").append(getPermitCount())
-        .append(", available=").append(getAvailablePermits())
-        .append(", waiting=").append(getWaitingCount())
-        .append('}');
+    sb.append("permitCount=").append(getPermitCount());
+    sb.append(", available=").append(getAvailablePermits());
+    sb.append(", waiting=").append(getWaitingCount());
+    sb.append('}');
     return sb.toString();
   }
 

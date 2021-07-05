@@ -27,12 +27,11 @@ import java.lang.management.GarbageCollectorMXBean;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.log.metrics.EventCounter;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -85,7 +84,7 @@ public class JvmMetrics implements MetricsSource {
   final MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
   final List<GarbageCollectorMXBean> gcBeans =
       ManagementFactory.getGarbageCollectorMXBeans();
-  private ThreadMXBean threadMXBean;
+  final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
   final String processName, sessionId;
   private JvmPauseMonitor pauseMonitor = null;
   final ConcurrentHashMap<String, MetricsInfo[]> gcInfoCache =
@@ -93,12 +92,9 @@ public class JvmMetrics implements MetricsSource {
   private GcTimeMonitor gcTimeMonitor = null;
 
   @VisibleForTesting
-  JvmMetrics(String processName, String sessionId, boolean useThreadMXBean) {
+  JvmMetrics(String processName, String sessionId) {
     this.processName = processName;
     this.sessionId = sessionId;
-    if (useThreadMXBean) {
-      this.threadMXBean = ManagementFactory.getThreadMXBean();
-    }
   }
 
   public void setPauseMonitor(final JvmPauseMonitor pauseMonitor) {
@@ -112,15 +108,8 @@ public class JvmMetrics implements MetricsSource {
 
   public static JvmMetrics create(String processName, String sessionId,
                                   MetricsSystem ms) {
-    // Reloading conf instead of getting from outside since it's redundant in
-    // code level to update all the callers across lots of modules,
-    // this method is called at most once for components (NN/DN/RM/NM/...)
-    // so that the overall cost is not expensive.
-    boolean useThreadMXBean = new Configuration().getBoolean(
-        CommonConfigurationKeys.HADOOP_METRICS_JVM_USE_THREAD_MXBEAN,
-        CommonConfigurationKeys.HADOOP_METRICS_JVM_USE_THREAD_MXBEAN_DEFAULT);
     return ms.register(JvmMetrics.name(), JvmMetrics.description(),
-                       new JvmMetrics(processName, sessionId, useThreadMXBean));
+                       new JvmMetrics(processName, sessionId));
   }
 
   public static void reattach(MetricsSystem ms, JvmMetrics jvmMetrics) {
@@ -148,11 +137,8 @@ public class JvmMetrics implements MetricsSource {
         .tag(SessionId, sessionId);
     getMemoryUsage(rb);
     getGcUsage(rb);
-    if (threadMXBean != null) {
-      getThreadUsage(rb);
-    } else {
-      getThreadUsageFromGroup(rb);
-    }
+    getThreadUsage(rb);
+    getEventCounters(rb);
   }
 
   private void getMemoryUsage(MetricsRecordBuilder rb) {
@@ -249,37 +235,10 @@ public class JvmMetrics implements MetricsSource {
       .addGauge(ThreadsTerminated, threadsTerminated);
   }
 
-  private void getThreadUsageFromGroup(MetricsRecordBuilder rb) {
-    int threadsNew = 0;
-    int threadsRunnable = 0;
-    int threadsBlocked = 0;
-    int threadsWaiting = 0;
-    int threadsTimedWaiting = 0;
-    int threadsTerminated = 0;
-    ThreadGroup threadGroup = Thread.currentThread().getThreadGroup();
-    Thread[] threads = new Thread[threadGroup.activeCount()];
-    threadGroup.enumerate(threads);
-    for (Thread thread : threads) {
-      if (thread == null) {
-        // race protection
-        continue;
-      }
-      switch (thread.getState()) {
-      case NEW:           threadsNew++;           break;
-      case RUNNABLE:      threadsRunnable++;      break;
-      case BLOCKED:       threadsBlocked++;       break;
-      case WAITING:       threadsWaiting++;       break;
-      case TIMED_WAITING: threadsTimedWaiting++;  break;
-      case TERMINATED:    threadsTerminated++;    break;
-      default:
-      }
-    }
-    rb.addGauge(ThreadsNew, threadsNew)
-        .addGauge(ThreadsRunnable, threadsRunnable)
-        .addGauge(ThreadsBlocked, threadsBlocked)
-        .addGauge(ThreadsWaiting, threadsWaiting)
-        .addGauge(ThreadsTimedWaiting, threadsTimedWaiting)
-        .addGauge(ThreadsTerminated, threadsTerminated);
+  private void getEventCounters(MetricsRecordBuilder rb) {
+    rb.addCounter(LogFatal, EventCounter.getFatal())
+      .addCounter(LogError, EventCounter.getError())
+      .addCounter(LogWarn, EventCounter.getWarn())
+      .addCounter(LogInfo, EventCounter.getInfo());
   }
-
 }

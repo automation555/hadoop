@@ -43,8 +43,11 @@ public class VersionInfo {
     String versionInfoFile = component + "-version-info.properties";
     InputStream is = null;
     try {
-      is = ThreadUtil.getResourceAsStream(VersionInfo.class.getClassLoader(),
-          versionInfoFile);
+      is = Thread.currentThread().getContextClassLoader()
+        .getResourceAsStream(versionInfoFile);
+      if (is == null) {
+        throw new IOException("Resource not found");
+      }
       info.load(is);
     } catch (IOException ex) {
       LoggerFactory.getLogger(getClass()).warn("Could not read '" +
@@ -170,8 +173,7 @@ public class VersionInfo {
   public static void main(String[] args) {
     LOG.debug("version: "+ getVersion());
     System.out.println("Hadoop " + getVersion());
-    System.out.println("Source code repository " + getUrl() + " -r " +
-        getRevision());
+    System.out.println("Subversion " + getUrl() + " -r " + getRevision());
     System.out.println("Compiled by " + getUser() + " on " + getDate());
     System.out.println("Compiled with protoc " + getProtocVersion());
     System.out.println("From source with checksum " + getSrcChecksum());

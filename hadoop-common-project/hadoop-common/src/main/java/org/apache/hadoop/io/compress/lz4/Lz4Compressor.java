@@ -22,11 +22,9 @@ import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
-import net.jpountz.lz4.LZ4Factory;
-import net.jpountz.lz4.LZ4Compressor;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.Compressor;
+import org.apache.hadoop.util.NativeCodeLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,12 +44,26 @@ public class Lz4Compressor implements Compressor {
   private byte[] userBuf = null;
   private int userBufOff = 0, userBufLen = 0;
   private boolean finish, finished;
-  private int dstCapacity;
 
   private long bytesRead = 0L;
   private long bytesWritten = 0L;
 
-  private final LZ4Compressor lz4Compressor;
+  private final boolean useLz4HC;
+
+  static {
+    if (NativeCodeLoader.isNativeCodeLoaded()) {
+      // Initialize the native library
+      try {
+        initIDs();
+      } catch (Throwable t) {
+        // Ignore failure to load/initialize lz4
+        LOG.warn(t.toString());
+      }
+    } else {
+      LOG.error("Cannot load " + Lz4Compressor.class.getName() +
+          " without native hadoop library!");
+    }
+  }
 
   /**
    * Creates a new compressor.
@@ -61,30 +73,12 @@ public class Lz4Compressor implements Compressor {
    *                 which trades CPU for compression ratio.
    */
   public Lz4Compressor(int directBufferSize, boolean useLz4HC) {
+    this.useLz4HC = useLz4HC;
     this.directBufferSize = directBufferSize;
 
-    try {
-      LZ4Factory lz4Factory = LZ4Factory.fastestInstance();
-      if (useLz4HC) {
-        lz4Compressor = lz4Factory.highCompressor();
-      } else {
-        lz4Compressor = lz4Factory.fastCompressor();
-      }
-    } catch (AssertionError t) {
-      throw new RuntimeException("lz4-java library is not available: " +
-              "Lz4Compressor has not been loaded. You need to add " +
-              "lz4-java.jar to your CLASSPATH. " + t, t);
-    }
-
     uncompressedDirectBuf = ByteBuffer.allocateDirect(directBufferSize);
-
-    // Compression is guaranteed to succeed if 'dstCapacity' >=
-    // LZ4_compressBound(srcSize)
-    // whereas LZ4_compressBound(isize) is (isize) + ((isize)/255) + 16)
-    this.dstCapacity = (directBufferSize) + ((directBufferSize) / 255) + 16;
-
-    compressedDirectBuf = ByteBuffer.allocateDirect(this.dstCapacity);
-    compressedDirectBuf.position(this.dstCapacity);
+    compressedDirectBuf = ByteBuffer.allocateDirect(directBufferSize);
+    compressedDirectBuf.position(directBufferSize);
   }
 
   /**
@@ -242,7 +236,7 @@ public class Lz4Compressor implements Compressor {
     }
 
     // Compress data
-    n = compressDirectBuf();
+    n = useLz4HC ? compressBytesDirectHC() : compressBytesDirect();
     compressedDirectBuf.limit(n);
     uncompressedDirectBuf.clear(); // lz4 consumes all buffer input
 
@@ -308,20 +302,11 @@ public class Lz4Compressor implements Compressor {
   public synchronized void end() {
   }
 
-  private int compressDirectBuf() {
-    if (uncompressedDirectBufLen == 0) {
-      return 0;
-    } else {
-      // Set the position and limit of `uncompressedDirectBuf` for reading
-      uncompressedDirectBuf.limit(uncompressedDirectBufLen).position(0);
-      compressedDirectBuf.clear();
-      lz4Compressor.compress((ByteBuffer) uncompressedDirectBuf,
-              (ByteBuffer) compressedDirectBuf);
-      uncompressedDirectBufLen = 0;
-      uncompressedDirectBuf.limit(directBufferSize).position(0);
-      int size = compressedDirectBuf.position();
-      compressedDirectBuf.position(0);
-      return size;
-    }
-  }
+  private native static void initIDs();
+
+  private native int compressBytesDirect();
+
+  private native int compressBytesDirectHC();
+
+  public native static String getLibraryName();
 }

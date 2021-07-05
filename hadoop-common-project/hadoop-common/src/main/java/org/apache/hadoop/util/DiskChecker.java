@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -64,7 +64,7 @@ public class DiskChecker {
   // Provider that abstracts some FileOutputStream operations for
   // testability.
   private static AtomicReference<FileIoProvider> fileIoProvider =
-      new AtomicReference<>(new DefaultFileIoProvider());
+      new AtomicReference<FileIoProvider>(new DefaultFileIoProvider());
 
   /**
    * Create the directory if it doesn't exist and check that dir is readable,
@@ -296,7 +296,7 @@ public class DiskChecker {
       }
       file = null;
     } finally {
-      IOUtils.cleanupWithLogger(LOG, fos);
+      IOUtils.cleanup(null, fos);
       FileUtils.deleteQuietly(file);
     }
   }

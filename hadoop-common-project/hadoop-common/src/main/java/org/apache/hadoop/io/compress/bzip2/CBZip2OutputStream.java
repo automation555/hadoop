@@ -64,8 +64,7 @@ import org.apache.hadoop.io.IOUtils;
  * </pre>
  *
  * <table width="100%" border="1">
- *   <caption></caption>
- * <colgroup> <col width="33%" > <col width="33%" > <col width="33%" >
+ * <colgroup> <col width="33%" /> <col width="33%" /> <col width="33%" />
  * </colgroup>
  * <tr>
  * <th colspan="3">Memory usage by blocksize</th>
@@ -615,9 +614,9 @@ public class CBZip2OutputStream extends OutputStream implements BZip2Constants {
   * @throws IOException
   *             if an I/O error occurs in the specified stream.
   * @throws IllegalArgumentException
-  *             if {@code (blockSize < 1) || (blockSize > 9)}
+  *             if <code>(blockSize < 1) || (blockSize > 9)</code>.
   * @throws NullPointerException
-  *             if {@code out == null}.
+  *             if <code>out == null</code>.
   *
   * @see #MIN_BLOCKSIZE
   * @see #MAX_BLOCKSIZE

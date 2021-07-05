@@ -30,8 +30,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
  * abstraction to separate credential storage from users of them. It
  * is intended to support getting or storing passwords in a variety of ways,
  * including third party bindings.
- * 
- * <code>CredentialProvider</code> implementations must be thread safe.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -63,9 +61,9 @@ public abstract class CredentialProvider {
 
     public String toString() {
       StringBuilder buf = new StringBuilder();
-      buf.append("alias(")
-          .append(alias)
-          .append(")=");
+      buf.append("alias(");
+      buf.append(alias);
+      buf.append(")=");
       if (credential == null) {
         buf.append("null");
       } else {

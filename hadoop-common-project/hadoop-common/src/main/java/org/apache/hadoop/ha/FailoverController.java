@@ -28,7 +28,7 @@ import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.ha.HAServiceProtocol.RequestSource;
 import org.apache.hadoop.ipc.RPC;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,7 +123,7 @@ public class FailoverController {
       toSvcStatus = toSvc.getServiceStatus();
     } catch (IOException e) {
       String msg = "Unable to get service state for " + target;
-      LOG.error(msg, e);
+      LOG.error(msg + ": " + e.getLocalizedMessage());
       throw new FailoverFailedException(msg, e);
     }
 
@@ -139,7 +139,7 @@ public class FailoverController {
             target + " is not ready to become active: " +
             notReadyReason);
       } else {
-        LOG.warn("Service is not ready to become active, but forcing: {}",
+        LOG.warn("Service is not ready to become active, but forcing: " +
             notReadyReason);
       }
     }
@@ -172,11 +172,11 @@ public class FailoverController {
       proxy.transitionToStandby(createReqInfo());
       return true;
     } catch (ServiceFailedException sfe) {
-      LOG.warn("Unable to gracefully make {} standby ({})",
-          svc, sfe.getMessage());
+      LOG.warn("Unable to gracefully make " + svc + " standby (" +
+          sfe.getMessage() + ")");
     } catch (IOException ioe) {
-      LOG.warn("Unable to gracefully make {} standby (unable to connect)",
-          svc, ioe);
+      LOG.warn("Unable to gracefully make " + svc +
+          " standby (unable to connect)", ioe);
     } finally {
       if (proxy != null) {
         RPC.stopProxy(proxy);
@@ -227,13 +227,13 @@ public class FailoverController {
           toSvc.getProxy(conf, rpcTimeoutToNewActive),
           createReqInfo());
     } catch (ServiceFailedException sfe) {
-      LOG.error("Unable to make {} active ({}). Failing back.",
-          toSvc, sfe.getMessage());
+      LOG.error("Unable to make " + toSvc + " active (" +
+          sfe.getMessage() + "). Failing back.");
       failed = true;
       cause = sfe;
     } catch (IOException ioe) {
-      LOG.error("Unable to make {} active (unable to connect). Failing back.",
-          toSvc, ioe);
+      LOG.error("Unable to make " + toSvc +
+          " active (unable to connect). Failing back.", ioe);
       failed = true;
       cause = ioe;
     }

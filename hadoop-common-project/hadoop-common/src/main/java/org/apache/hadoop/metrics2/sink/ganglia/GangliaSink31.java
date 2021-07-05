@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-
 /**
  * This code supports Ganglia 3.1
  *
@@ -44,7 +43,6 @@ public class GangliaSink31 extends GangliaSink30 {
    * @param gSlope The slope for this metric
    * @throws IOException
    */
-  @Override
   protected void emitMetric(String groupName, String name, String type,
       String value, GangliaConf gConf, GangliaSlope gSlope) 
     throws IOException {

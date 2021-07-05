@@ -17,7 +17,7 @@
 Overview
 ========
 
-The File System (FS) shell includes various shell-like commands that directly interact with the Hadoop Distributed File System (HDFS) as well as other file systems that Hadoop supports, such as Local FS, WebHDFS, S3 FS, and others. The FS shell is invoked by:
+The File System (FS) shell includes various shell-like commands that directly interact with the Hadoop Distributed File System (HDFS) as well as other file systems that Hadoop supports, such as Local FS, HFTP FS, S3 FS, and others. The FS shell is invoked by:
 
     bin/hadoop fs <args>
 
@@ -73,13 +73,9 @@ Returns 0 on success and -1 on error.
 checksum
 --------
 
-Usage: `hadoop fs -checksum [-v] URI`
+Usage: `hadoop fs -checksum URI`
 
 Returns the checksum information of a file.
-
-Options
-
-* The `-v` option displays blocks size for the file.
 
 Example:
 
@@ -122,17 +118,30 @@ Options
 copyFromLocal
 -------------
 
-Identical to the -put command.
+Usage: `hadoop fs -copyFromLocal <localsrc> URI`
+
+Similar to the `fs -put` command, except that the source is restricted to a local file reference.
+
+Options:
+
+* `-p` : Preserves access and modification times, ownership and the permissions.
+(assuming the permissions can be propagated across filesystems)
+* `-f` : Overwrites the destination if it already exists.
+* `-l` : Allow DataNode to lazily persist the file to disk, Forces a replication
+ factor of 1. This flag will result in reduced durability. Use with care.
+* `-d` : Skip creation of temporary file with the suffix `._COPYING_`.
 
 copyToLocal
 -----------
 
-Identical to the -get command.
+Usage: `hadoop fs -copyToLocal [-ignorecrc] [-crc] URI <localdst> `
+
+Similar to get command, except that the destination is restricted to a local file reference.
 
 count
 -----
 
-Usage: `hadoop fs -count [-q] [-h] [-v] [-x] [-t [<storage type>]] [-u] [-e] [-s] <paths> `
+Usage: `hadoop fs -count [-q] [-h] [-v] [-x] [-t [<storage type>]] [-u] <paths> `
 
 Count the number of directories, files and bytes under the paths that match the specified file pattern. Get the quota and the usage. The output columns with -count are: DIR\_COUNT, FILE\_COUNT, CONTENT\_SIZE, PATHNAME
 
@@ -150,14 +159,6 @@ The -v option displays a header line.
 
 The -x option excludes snapshots from the result calculation. Without the -x option (default), the result is always calculated from all INodes, including all snapshots under the given path. The -x option is ignored if -u or -q option is given.
 
-The -e option shows the erasure coding policy for each file.
-
-The output columns with -count -e are: DIR\_COUNT, FILE\_COUNT, CONTENT_SIZE, ERASURECODING\_POLICY, PATHNAME
-
-The ERASURECODING\_POLICY is name of the policy for the file. If an erasure coding policy is set on that file, it will return the name of the policy. Otherwise, it will return \"Replicated\" which means it uses the replication storage strategy.
-
-The -s option shows the snapshot counts for each directory.
-
 Example:
 
 * `hadoop fs -count hdfs://nn1.example.com/file1 hdfs://nn2.example.com/file2`
@@ -167,8 +168,6 @@ Example:
 * `hadoop fs -count -u hdfs://nn1.example.com/file1`
 * `hadoop fs -count -u -h hdfs://nn1.example.com/file1`
 * `hadoop fs -count -u -h -v hdfs://nn1.example.com/file1`
-* `hadoop fs -count -e hdfs://nn1.example.com/file1`
-* `hadoop fs -count -s hdfs://nn1.example.com/file1`
 
 Exit Code:
 
@@ -225,7 +224,7 @@ Example:
 du
 ----
 
-Usage: `hadoop fs -du [-s] [-h] [-v] [-x] URI [URI ...]`
+Usage: `hadoop fs -du [-s] [-h] [-x] URI [URI ...]`
 
 Displays sizes of files and directories contained in the given directory or the length of a file in case its just a file.
 
@@ -233,7 +232,6 @@ Options:
 
 * The -s option will result in an aggregate summary of file lengths being displayed, rather than the individual files. Without the -s option, calculation is done by going 1-level deep from the given path.
 * The -h option will format file sizes in a "human-readable" fashion (e.g 64.0m instead of 67108864)
-* The -v option will display the names of columns as a header line.
 * The -x option will exclude snapshots from the result calculation. Without the -x option (default), the result is always calculated from all INodes, including all snapshots under the given path.
 
 The du returns three columns with the following format:
@@ -258,7 +256,7 @@ Displays a summary of file lengths.
 expunge
 -------
 
-Usage: `hadoop fs -expunge [-immediate] [-fs <path>]`
+Usage: `hadoop fs -expunge`
 
 Permanently delete files in checkpoints older than the retention threshold
 from trash directory, and create new checkpoint.
@@ -272,18 +270,6 @@ If the file system supports the feature,
 users can configure to create and delete checkpoints periodically
 by the parameter stored as `fs.trash.checkpoint.interval` (in core-site.xml).
 This value should be smaller or equal to `fs.trash.interval`.
-
-If the `-immediate` option is passed, all files in the trash for the current
-user are immediately deleted, ignoring the `fs.trash.interval` setting.
-
-If the `-fs` option is passed, the supplied filesystem will be expunged,
-rather than the default filesystem and checkpoint is created.
-
-For example
-
-```
-hadoop fs -expunge --immediate -fs s3a://landsat-pds/
-```
 
 Refer to the
 [HDFS Architecture guide](../hadoop-hdfs/HdfsDesign.html#File_Deletes_and_Undeletes)
@@ -406,19 +392,6 @@ Exit Code:
 
 Returns 0 on success and non-zero on error.
 
-head
-----
-
-Usage: `hadoop fs -head URI`
-
-Displays first kilobyte of the file to stdout.
-
-Example:
-
-* `hadoop fs -head pathname`
-
-Exit Code: Returns 0 on success and -1 on error.
-
 help
 ----
 
@@ -429,7 +402,7 @@ Return usage output.
 ls
 ----
 
-Usage: `hadoop fs -ls [-C] [-d] [-h] [-q] [-R] [-t] [-S] [-r] [-u] [-e] <args> `
+Usage: `hadoop fs -ls [-C] [-d] [-h] [-q] [-R] [-t] [-S] [-r] [-u] <args> `
 
 Options:
 
@@ -442,7 +415,6 @@ Options:
 * -S: Sort output by file size.
 * -r: Reverse the sort order.
 * -u: Use access time rather than modification time for display and sorting.  
-* -e: Display the erasure coding policy of files and directories only.
 
 For a file ls returns stat on the file with the following format:
 
@@ -457,7 +429,6 @@ Files within a directory are order by filename by default.
 Example:
 
 * `hadoop fs -ls /user/hadoop/file1`
-* `hadoop fs -ls -e /ecdir`
 
 Exit Code:
 
@@ -525,7 +496,7 @@ Returns 0 on success and -1 on error.
 put
 ---
 
-Usage: `hadoop fs -put  [-f] [-p] [-l] [-d] [-t <thread count>] [ - | <localsrc1>  .. ]. <dst>`
+Usage: `hadoop fs -put  [-f] [-p] [-l] [-d] [ - | <localsrc1>  .. ]. <dst>`
 
 Copy single src, or multiple srcs from local file system to the destination file system.
 Also reads input from stdin and writes to destination file system if the source is set to "-"
@@ -537,8 +508,6 @@ Options:
 * `-p` : Preserves access and modification times, ownership and the permissions.
 (assuming the permissions can be propagated across filesystems)
 * `-f` : Overwrites the destination if it already exists.
-* `-t <thread count>` : Number of threads to be used, default is 1. Useful
- when uploading a directory containing more than 1 file.
 * `-l` : Allow DataNode to lazily persist the file to disk, Forces a replication
  factor of 1. This flag will result in reduced durability. Use with care.
 * `-d` : Skip creation of temporary file with the suffix `._COPYING_`.
@@ -630,7 +599,7 @@ Options:
 * -R: Apply operations to all files and directories recursively.
 * -m: Modify ACL. New entries are added to the ACL, and existing entries are retained.
 * -x: Remove specified ACL entries. Other ACL entries are retained.
-* ``--set``: Fully replace the ACL, discarding all existing entries. The *acl\_spec* must include entries for user, group, and others for compatibility with permission bits. If the ACL spec contains only access entries, then the existing default entries are retained. If the ACL spec contains only default entries, then the existing access entries are retained. If the ACL spec contains both access and default entries, then both are replaced.
+* ``--set``: Fully replace the ACL, discarding all existing entries. The *acl\_spec* must include entries for user, group, and others for compatibility with permission bits.
 * *acl\_spec*: Comma separated list of ACL entries.
 * *path*: File or directory to modify.
 
@@ -677,7 +646,7 @@ setrep
 
 Usage: `hadoop fs -setrep [-R] [-w] <numReplicas> <path> `
 
-Changes the replication factor of a file. If *path* is a directory then the command recursively changes the replication factor of all files under the directory tree rooted at *path*. The EC files will be ignored when executing this command.
+Changes the replication factor of a file. If *path* is a directory then the command recursively changes the replication factor of all files under the directory tree rooted at *path*.
 
 Options:
 
@@ -725,16 +694,16 @@ Exit Code: Returns 0 on success and -1 on error.
 test
 ----
 
-Usage: `hadoop fs -test -[defswrz] URI`
+Usage: `hadoop fs -test -[defsz] URI`
 
 Options:
 
-* -d: if the path is a directory, return 0.
+* -d: f the path is a directory, return 0.
 * -e: if the path exists, return 0.
 * -f: if the path is a file, return 0.
 * -s: if the path is not empty, return 0.
-* -w: if the path exists and write permission is granted, return 0.
 * -r: if the path exists and read permission is granted, return 0.
+* -w: if the path exists and write permission is granted, return 0.
 * -z: if the file is zero length, return 0.
 
 
@@ -748,38 +717,6 @@ text
 Usage: `hadoop fs -text <src> `
 
 Takes a source file and outputs the file in text format. The allowed formats are zip and TextRecordInputStream.
-
-touch
-------
-
-Usage: `hadoop fs -touch [-a] [-m] [-t TIMESTAMP] [-c] URI [URI ...]`
-
-Updates the access and modification times of the file specified by the URI to the current time.
-If the file does not exist, then a zero length file is created at URI with current time as the
-timestamp of that URI.
-
-* Use -a option to change only the access time
-* Use -m option to change only the modification time
-* Use -t option to specify timestamp (in format yyyyMMdd:HHmmss) instead of current time
-* Use -c option to not create file if it does not exist
-
-The timestamp format is as follows
-* yyyy Four digit year (e.g. 2018)
-* MM Two digit month of the year (e.g. 08 for month of August)
-* dd Two digit day of the month (e.g. 01 for first day of the month)
-* HH Two digit hour of the day using 24 hour notation (e.g. 23 stands for 11 pm, 11 stands for 11 am)
-* mm Two digit minutes of the hour
-* ss Two digit seconds of the minute
-e.g. 20180809:230000 represents August 9th 2018, 11pm
-
-Example:
-
-* `hadoop fs -touch pathname`
-* `hadoop fs -touch -m -t 20180809:230000 pathname`
-* `hadoop fs -touch -t 20180809:230000 pathname`
-* `hadoop fs -touch -a pathname`
-
-Exit Code: Returns 0 on success and -1 on error.
 
 touchz
 ------
@@ -799,31 +736,20 @@ truncate
 
 Usage: `hadoop fs -truncate [-w] <length> <paths>`
 
-Truncate all files that match the specified file pattern
-to the specified length.
+Truncate all files that match the specified file pattern to the
+specified length.
 
 Options:
 
-* The -w flag requests that the command waits for block recovery to complete, if necessary.  
-Without -w flag the file may remain unclosed for some time while the recovery is in progress.  
-During this time file cannot be reopened for append.
+* The `-w` flag requests that the command waits for block recovery
+  to complete, if necessary. Without -w flag the file may remain
+  unclosed for some time while the recovery is in progress.
+  During this time file cannot be reopened for append.
 
 Example:
 
 * `hadoop fs -truncate 55 /user/hadoop/file1 /user/hadoop/file2`
 * `hadoop fs -truncate -w 127 hdfs://nn1.example.com/user/hadoop/file1`
-
-concat
---------
-
-Usage: `hadoop fs -concat <target file> <source files>`
-
-Concatenate existing source files into the target file. Target file and source
-files should be in the same directory.
-
-Example:
-
-* `hadoop fs -concat hdfs://cluster/user/hadoop/target-file hdfs://cluster/user/hadoop/file-0 hdfs://cluster/user/hadoop/file-1`
 
 usage
 -----
@@ -1104,7 +1030,6 @@ actually fail.
 | `setfattr` | generally unsupported permissions model |
 | `setrep`| has no effect |
 | `truncate` | generally unsupported |
-| `concat` | generally unsupported |
 
 Different object store clients *may* support these commands: do consult the
 documentation and test against the target store.

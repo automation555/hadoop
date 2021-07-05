@@ -80,7 +80,6 @@ public class MutableGaugeLong extends MutableGauge {
     setChanged();
   }
 
-  @Override
   public void snapshot(MetricsRecordBuilder builder, boolean all) {
     if (all || changed()) {
       builder.addGauge(info(), value());
@@ -88,10 +87,4 @@ public class MutableGaugeLong extends MutableGauge {
     }
   }
 
-  /**
-   * @return  the value of the metric
-   */
-  public String toString() {
-    return value.toString();
-  }
 }

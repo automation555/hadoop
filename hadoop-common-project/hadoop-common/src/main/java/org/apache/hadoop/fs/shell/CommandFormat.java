@@ -43,7 +43,7 @@ public class CommandFormat {
    * @see #CommandFormat(int, int, String...)
    */
   @Deprecated
-  public CommandFormat(String name, int min, int max, String ... possibleOpt) {
+  public CommandFormat(String n, int min, int max, String ... possibleOpt) {
     this(min, max, possibleOpt);
   }
   
@@ -162,7 +162,7 @@ public class CommandFormat {
 
   /** Returns all the options that are set
    * 
-   * @return Set{@literal <}String{@literal >} of the enabled options
+   * @return Set<String> of the enabled options
    */
   public Set<String> getOpts() {
     Set<String> optSet = new HashSet<String>();

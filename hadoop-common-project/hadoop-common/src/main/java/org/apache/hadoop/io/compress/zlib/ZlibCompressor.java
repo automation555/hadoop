@@ -57,7 +57,7 @@ public class ZlibCompressor implements Compressor {
   /**
    * The compression level for zlib library.
    */
-  public enum CompressionLevel {
+  public static enum CompressionLevel {
     /**
      * Compression level for no compression.
      */
@@ -133,7 +133,7 @@ public class ZlibCompressor implements Compressor {
   /**
    * The compression level for zlib library.
    */
-  public enum CompressionStrategy {
+  public static enum CompressionStrategy {
     /**
      * Compression strategy best used for data consisting mostly of small
      * values with a somewhat random distribution. Forces more Huffman coding
@@ -178,7 +178,7 @@ public class ZlibCompressor implements Compressor {
   /**
    * The type of header for compressed data.
    */
-  public enum CompressionHeader {
+  public static enum CompressionHeader {
     /**
      * No headers/trailers/checksums.
      */
@@ -435,7 +435,7 @@ public class ZlibCompressor implements Compressor {
   }
 
   /**
-   * Returns the total number of uncompressed bytes input so far.
+   * Returns the total number of uncompressed bytes input so far.</p>
    *
    * @return the total (non-negative) number of uncompressed bytes input so far
    */

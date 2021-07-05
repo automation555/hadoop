@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.metrics2.lib;
 
-import org.apache.hadoop.util.Sets;
+import com.google.common.collect.Sets;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.Iterator;
@@ -58,8 +58,6 @@ public class MutableRatesWithAggregation extends MutableMetric {
       weakReferenceQueue = new ConcurrentLinkedDeque<>();
   private final ThreadLocal<ConcurrentMap<String, ThreadSafeSampleStat>>
       threadLocalMetricsMap = new ThreadLocal<>();
-  // prefix for metric name
-  private String typePrefix = "";
 
   /**
    * Initialize the registry with all the methods in a protocol
@@ -75,18 +73,6 @@ public class MutableRatesWithAggregation extends MutableMetric {
     for (Method method : protocol.getDeclaredMethods()) {
       String name = method.getName();
       LOG.debug(name);
-      addMetricIfNotExists(name);
-    }
-  }
-
-  /**
-   * Initialize the registry with all rate names passed in.
-   * This is an alternative to the above init function since this metric
-   * can be used more than just for rpc name.
-   * @param names the array of all rate names
-   */
-  public void init(String[] names) {
-    for (String name : names) {
       addMetricIfNotExists(name);
     }
   }
@@ -162,7 +148,7 @@ public class MutableRatesWithAggregation extends MutableMetric {
   private synchronized MutableRate addMetricIfNotExists(String name) {
     MutableRate metric = globalMetrics.get(name);
     if (metric == null) {
-      metric = new MutableRate(name + typePrefix, name + typePrefix, false);
+      metric = new MutableRate(name, name, false);
       metric.setUpdateTimeStamp(true);
       globalMetrics.put(name, metric);
     }
@@ -183,11 +169,6 @@ public class MutableRatesWithAggregation extends MutableMetric {
         stat.reset();
       }
     }
-  }
-
-  public void init(Class<?> protocol, String prefix) {
-    this.typePrefix = prefix;
-    init(protocol);
   }
 
 }

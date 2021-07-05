@@ -25,10 +25,10 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ReflectionUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * <code>com.example.foo.MyMethod</code>
  * The class provided must implement the {@link FenceMethod} interface.
  * The fencing methods that ship with Hadoop may also be referred to
- * by shortened names:<br>
+ * by shortened names:<p>
  * <ul>
  * <li><code>shell(/path/to/some/script.sh args...)</code></li>
  * <li><code>sshfence(...)</code> (see {@link SshFenceByTcpPort})

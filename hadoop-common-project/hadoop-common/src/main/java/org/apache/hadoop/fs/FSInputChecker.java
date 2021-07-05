@@ -101,7 +101,7 @@ abstract public class FSInputChecker extends FSInputStream {
    *     Implementors should simply pass through to the underlying data stream.
    * or
    *  (b) needChecksum() will return true:
-   *    - len {@literal >=} maxChunkSize
+   *    - len >= maxChunkSize
    *    - checksum.length is a multiple of CHECKSUM_SIZE
    *    Implementors should read an integer number of data chunks into
    *    buf. The amount read should be bounded by len or by 
@@ -113,7 +113,7 @@ abstract public class FSInputChecker extends FSInputStream {
    * for sequential reading.
    *
    * @param pos chunkPos
-   * @param buf destination buffer
+   * @param buf desitination buffer
    * @param offset offset in buf at which to store data
    * @param len maximum number of bytes to read
    * @param checksum the data buffer into which to write checksums
@@ -124,7 +124,7 @@ abstract public class FSInputChecker extends FSInputStream {
 
   /** Return position of beginning of chunk containing pos. 
    *
-   * @param pos a position in the file
+   * @param pos a postion in the file
    * @return the starting position of the chunk which contains the byte
    */
   abstract protected long getChunkPosition(long pos);
@@ -412,7 +412,7 @@ abstract public class FSInputChecker extends FSInputStream {
    * This produces no exception and an attempt to read from
    * the stream will result in -1 indicating the end of the file.
    *
-   * @param      pos   the position to seek to.
+   * @param      pos   the postion to seek to.
    * @exception  IOException  if an I/O error occurs.
    *             ChecksumException if the chunk to seek to is corrupted
    */
@@ -447,7 +447,7 @@ abstract public class FSInputChecker extends FSInputStream {
    * <code>stm</code>
    * 
    * @param stm    an input stream
-   * @param buf    destination buffer
+   * @param buf    destiniation buffer
    * @param offset offset at which to store data
    * @param len    number of bytes to read
    * @return actual number of bytes read

@@ -27,9 +27,7 @@
 
 #include "org_apache_hadoop.h"
 
-#ifndef HADOOP_BZIP2_LIBRARY
 #define HADOOP_BZIP2_LIBRARY "libbz2.so.1"
-#endif
 
 
 /* A helper macro to convert the java 'stream-handle' to a bz_stream pointer. */

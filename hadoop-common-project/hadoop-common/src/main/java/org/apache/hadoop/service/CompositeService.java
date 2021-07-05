@@ -19,7 +19,6 @@
 package org.apache.hadoop.service;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
@@ -61,7 +60,7 @@ public class CompositeService extends AbstractService {
    */
   public List<Service> getServices() {
     synchronized (serviceList) {
-      return Collections.unmodifiableList(new ArrayList<>(serviceList));
+      return new ArrayList<Service>(serviceList);
     }
   }
 
@@ -94,8 +93,7 @@ public class CompositeService extends AbstractService {
     }
   }
 
-  protected boolean removeService(Service service) {
-    LOG.debug("Removing service {}", service.getName());
+  protected synchronized boolean removeService(Service service) {
     synchronized (serviceList) {
       return serviceList.remove(service);
     }

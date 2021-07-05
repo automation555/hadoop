@@ -21,8 +21,6 @@ package org.apache.hadoop.metrics2.source;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsInfo;
 
-import java.util.StringJoiner;
-
 /**
  * JVM and logging related metrics info instances
  */
@@ -61,9 +59,12 @@ public enum JvmMetricsInfo implements MetricsInfo {
   @Override public String description() { return desc; }
 
   @Override public String toString() {
-    return new StringJoiner(", ", this.getClass().getSimpleName() + "{", "}")
-        .add("name=" + name())
-        .add("description=" + desc)
-        .toString();
+    StringBuilder sb = new StringBuilder(32);
+    sb.append(this.getClass().getSimpleName());
+    sb.append("{name=");
+    sb.append(name());
+    sb.append(", description=");
+    sb.append(desc);
+    return sb.append('}').toString();
   }
 }

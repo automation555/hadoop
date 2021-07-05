@@ -36,9 +36,8 @@ import org.apache.hadoop.classification.InterfaceStability;
  * satisfy this property.</p>
  *  
  * <p>Example:</p>
- * <blockquote><pre>
- *     public class MyWritableComparable implements
- *      WritableComparable{@literal <MyWritableComparable>} {
+ * <p><blockquote><pre>
+ *     public class MyWritableComparable implements WritableComparable<MyWritableComparable> {
  *       // Some data
  *       private int counter;
  *       private long timestamp;
@@ -67,7 +66,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  *         return result
  *       }
  *     }
- * </pre></blockquote>
+ * </pre></blockquote></p>
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

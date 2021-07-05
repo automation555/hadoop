@@ -1013,14 +1013,15 @@ public class MapFile {
     MapFile.Reader reader = null;
     try {
       reader = new MapFile.Reader(fs, in, conf);
-      WritableComparable<?> key = ReflectionUtils.newInstance(
-          reader.getKeyClass().asSubclass(WritableComparable.class), conf);
+
+      WritableComparable key = ReflectionUtils.newInstance(reader.getKeyClass()
+        .asSubclass(WritableComparable.class), conf);
       Writable value = ReflectionUtils.newInstance(reader.getValueClass()
         .asSubclass(Writable.class), conf);
 
       try (MapFile.Writer writer = new MapFile.Writer(conf, fs, out,
-            reader.getKeyClass().asSubclass(WritableComparable.class),
-            reader.getValueClass())) {
+          reader.getKeyClass().asSubclass(WritableComparable.class),
+          reader.getValueClass())) {
         while (reader.next(key, value)) {             // copy all entries
           writer.append(key, value);
         }

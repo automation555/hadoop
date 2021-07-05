@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.security.authorize;
 
-import java.net.InetAddress;
-
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -28,7 +26,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 @InterfaceStability.Unstable
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce", "HBase", "Hive"})
@@ -88,58 +86,39 @@ public class ProxyUsers {
   }
   
   /**
-   * Authorize the superuser which is doing doAs.
-   * {@link #authorize(UserGroupInformation, InetAddress)} should be preferred
-   * to avoid possibly re-resolving the ip address.
-   *
+   * Authorize the superuser which is doing doAs
+   * 
    * @param user ugi of the effective or proxy user which contains a real user
    * @param remoteAddress the ip address of client
    * @throws AuthorizationException
    */
   public static void authorize(UserGroupInformation user, 
       String remoteAddress) throws AuthorizationException {
-    getSip().authorize(user, remoteAddress);
-  }
-
-  /**
-   * Authorize the superuser which is doing doAs.
-   *
-   * @param user ugi of the effective or proxy user which contains a real user
-   * @param remoteAddress the inet address of client
-   * @throws AuthorizationException
-   */
-  public static void authorize(UserGroupInformation user,
-      InetAddress remoteAddress) throws AuthorizationException {
-    getSip().authorize(user, remoteAddress);
-  }
-
-  private static ImpersonationProvider getSip() {
-    if (sip == null) {
-      // In a race situation, It is possible for multiple threads to satisfy
-      // this condition.
+    if (sip==null) {
+      // In a race situation, It is possible for multiple threads to satisfy this condition.
       // The last assignment will prevail.
-      refreshSuperUserGroupsConfiguration();
+      refreshSuperUserGroupsConfiguration(); 
     }
-    return sip;
+    sip.authorize(user, remoteAddress);
   }
-
+  
   /**
    * This function is kept to provide backward compatibility.
    * @param user
    * @param remoteAddress
    * @param conf
    * @throws AuthorizationException
-   * @deprecated use {@link #authorize(UserGroupInformation, String)} instead.
+   * @deprecated use {@link #authorize(UserGroupInformation, String) instead. 
    */
   @Deprecated
   public static void authorize(UserGroupInformation user, 
       String remoteAddress, Configuration conf) throws AuthorizationException {
-    authorize(user, remoteAddress);
+    authorize(user,remoteAddress);
   }
   
   @VisibleForTesting 
   public static DefaultImpersonationProvider getDefaultImpersonationProvider() {
-    return ((DefaultImpersonationProvider) getSip());
+    return ((DefaultImpersonationProvider)sip);
   }
       
 }

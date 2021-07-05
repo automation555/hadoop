@@ -27,27 +27,24 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.BlockStoragePolicySpi;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FSDataOutputStreamBuilder;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.FsStatus;
-import org.apache.hadoop.fs.FutureDataInputStreamBuilder;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.QuotaUsage;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Progressable;
@@ -234,20 +231,9 @@ class ChRootedFileSystem extends FilterFileSystem {
   }
 
   @Override
-  public FileChecksum getFileChecksum(final Path f, final long length)
-      throws IOException {
-    return super.getFileChecksum(fullPath(f), length);
-  }
-
-  @Override
   public FileStatus getFileStatus(final Path f) 
       throws IOException {
     return super.getFileStatus(fullPath(f));
-  }
-
-  @Override
-  public Path getLinkTarget(Path f) throws IOException {
-    return super.getLinkTarget(fullPath(f));
   }
 
   @Override
@@ -459,42 +445,5 @@ class ChRootedFileSystem extends FilterFileSystem {
   @Override
   public FsServerDefaults getServerDefaults(Path f) throws IOException {
     return super.getServerDefaults(fullPath(f));
-  }
-
-  @Override
-  public BlockStoragePolicySpi getStoragePolicy(Path src) throws IOException {
-    return super.getStoragePolicy(fullPath(src));
-  }
-
-  @Override
-  public void satisfyStoragePolicy(Path src) throws IOException {
-    super.satisfyStoragePolicy(fullPath(src));
-  }
-
-  @Override
-  public void setStoragePolicy(Path src, String policyName) throws IOException {
-    super.setStoragePolicy(fullPath(src), policyName);
-  }
-
-  @Override
-  public void unsetStoragePolicy(Path src) throws IOException {
-    super.unsetStoragePolicy(fullPath(src));
-  }
-
-  @Override
-  public FSDataOutputStreamBuilder createFile(final Path path) {
-    return super.createFile(fullPath(path));
-  }
-
-  @Override
-  public FutureDataInputStreamBuilder openFile(final Path path)
-      throws IOException, UnsupportedOperationException {
-    return super.openFile(fullPath(path));
-  }
-
-  @Override
-  public boolean hasPathCapability(final Path path, final String capability)
-      throws IOException {
-    return super.hasPathCapability(fullPath(path), capability);
-  }
+  }  
 }

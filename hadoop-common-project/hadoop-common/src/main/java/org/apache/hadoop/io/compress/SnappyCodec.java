@@ -28,6 +28,7 @@ import org.apache.hadoop.io.compress.snappy.SnappyCompressor;
 import org.apache.hadoop.io.compress.snappy.SnappyDecompressor;
 import org.apache.hadoop.io.compress.snappy.SnappyDecompressor.SnappyDirectDecompressor;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.util.NativeCodeLoader;
 
 /**
  * This class creates snappy compressors/decompressors.
@@ -53,6 +54,37 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
   @Override
   public Configuration getConf() {
     return conf;
+  }
+
+  /**
+   * Are the native snappy libraries loaded & initialized?
+   */
+  public static void checkNativeCodeLoaded() {
+    if (!NativeCodeLoader.buildSupportsSnappy()) {
+      throw new RuntimeException("native snappy library not available: " +
+          "this version of libhadoop was built without " +
+          "snappy support.");
+    }
+    if (!NativeCodeLoader.isNativeCodeLoaded()) {
+      throw new RuntimeException("Failed to load libhadoop.");
+    }
+    if (!SnappyCompressor.isNativeCodeLoaded()) {
+      throw new RuntimeException("native snappy library not available: " +
+          "SnappyCompressor has not been loaded.");
+    }
+    if (!SnappyDecompressor.isNativeCodeLoaded()) {
+      throw new RuntimeException("native snappy library not available: " +
+          "SnappyDecompressor has not been loaded.");
+    }
+  }
+  
+  public static boolean isNativeCodeLoaded() {
+    return SnappyCompressor.isNativeCodeLoaded() && 
+        SnappyDecompressor.isNativeCodeLoaded();
+  }
+
+  public static String getLibraryName() {
+    return SnappyCompressor.getLibraryName();
   }
 
   /**
@@ -83,6 +115,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
   public CompressionOutputStream createOutputStream(OutputStream out,
                                                     Compressor compressor)
       throws IOException {
+    checkNativeCodeLoaded();
     int bufferSize = conf.getInt(
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
@@ -100,6 +133,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public Class<? extends Compressor> getCompressorType() {
+    checkNativeCodeLoaded();
     return SnappyCompressor.class;
   }
 
@@ -110,6 +144,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public Compressor createCompressor() {
+    checkNativeCodeLoaded();
     int bufferSize = conf.getInt(
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
@@ -144,6 +179,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
   public CompressionInputStream createInputStream(InputStream in,
                                                   Decompressor decompressor)
       throws IOException {
+    checkNativeCodeLoaded();
     return new BlockDecompressorStream(in, decompressor, conf.getInt(
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT));
@@ -156,6 +192,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public Class<? extends Decompressor> getDecompressorType() {
+    checkNativeCodeLoaded();
     return SnappyDecompressor.class;
   }
 
@@ -166,6 +203,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public Decompressor createDecompressor() {
+    checkNativeCodeLoaded();
     int bufferSize = conf.getInt(
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
@@ -177,7 +215,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public DirectDecompressor createDirectDecompressor() {
-    return new SnappyDirectDecompressor();
+    return isNativeCodeLoaded() ? new SnappyDirectDecompressor() : null;
   }
 
   /**
@@ -187,6 +225,6 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public String getDefaultExtension() {
-    return CodecConstants.SNAPPY_CODEC_EXTENSION;
+    return ".snappy";
   }
 }

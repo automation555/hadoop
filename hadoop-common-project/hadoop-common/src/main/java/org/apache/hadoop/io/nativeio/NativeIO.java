@@ -35,10 +35,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.HardLink;
-import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException;
-import org.apache.hadoop.util.CleanerUtil;
 import org.apache.hadoop.util.NativeCodeLoader;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.PerformanceAdvisory;
@@ -47,7 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.misc.Unsafe;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * JNI wrappers for various native IO-related calls not available in Java.
@@ -100,51 +98,6 @@ public class NativeIO {
        write.  */
     public static int SYNC_FILE_RANGE_WAIT_AFTER = 4;
 
-    /**
-     * Keeps the support state of PMDK.
-     */
-    public enum SupportState {
-      UNSUPPORTED(-1),
-      PMDK_LIB_NOT_FOUND(1),
-      SUPPORTED(0);
-
-      private byte stateCode;
-      SupportState(int stateCode) {
-        this.stateCode = (byte) stateCode;
-      }
-
-      public int getStateCode() {
-        return stateCode;
-      }
-
-      public String getMessage() {
-        String msg;
-        switch (stateCode) {
-        // -1 represents UNSUPPORTED.
-        case -1:
-          msg = "The native code was built without PMDK support.";
-          break;
-        // 1 represents PMDK_LIB_NOT_FOUND.
-        case 1:
-          msg = "The native code was built with PMDK support, but PMDK libs " +
-              "were NOT found in execution environment or failed to be loaded.";
-          break;
-        // 0 represents SUPPORTED.
-        case 0:
-          msg = "The native code was built with PMDK support, and PMDK libs " +
-              "were loaded successfully.";
-          break;
-        default:
-          msg = "The state code: " + stateCode + " is unrecognized!";
-        }
-        return msg;
-      }
-    }
-
-    // Denotes the state of supporting PMDK. The value is set by JNI.
-    private static SupportState pmdkSupportState =
-        SupportState.UNSUPPORTED;
-
     private static final Logger LOG = LoggerFactory.getLogger(NativeIO.class);
 
     // Set to true via JNI if possible
@@ -169,109 +122,6 @@ public class NativeIO {
       POSIX.cacheManipulator = cacheManipulator;
     }
 
-    // This method is invoked by JNI.
-    public static void setPmdkSupportState(int stateCode) {
-      for (SupportState state : SupportState.values()) {
-        if (state.getStateCode() == stateCode) {
-          pmdkSupportState = state;
-          return;
-        }
-      }
-      LOG.error("The state code: " + stateCode + " is unrecognized!");
-    }
-
-    public static String getPmdkSupportStateMessage() {
-      if (getPmdkLibPath() != null) {
-        return pmdkSupportState.getMessage() +
-            " The pmdk lib path: " + getPmdkLibPath();
-      }
-      return pmdkSupportState.getMessage();
-    }
-
-    public static boolean isPmdkAvailable() {
-      LOG.info(pmdkSupportState.getMessage());
-      return pmdkSupportState == SupportState.SUPPORTED;
-    }
-
-    /**
-     * Denote memory region for a file mapped.
-     */
-    public static class PmemMappedRegion {
-      private long address;
-      private long length;
-      private boolean isPmem;
-
-      public PmemMappedRegion(long address, long length, boolean isPmem) {
-        this.address = address;
-        this.length = length;
-        this.isPmem = isPmem;
-      }
-
-      public boolean isPmem() {
-        return this.isPmem;
-      }
-
-      public long getAddress() {
-        return this.address;
-      }
-
-      public long getLength() {
-        return this.length;
-      }
-    }
-
-    /**
-     * JNI wrapper of persist memory operations.
-     */
-    public static class Pmem {
-      // Check whether the address is a Pmem address or DIMM address
-      public static boolean isPmem(long address, long length) {
-        return NativeIO.POSIX.isPmemCheck(address, length);
-      }
-
-      // Map a file in persistent memory, if the given file exists,
-      // directly map it. If not, create the named file on persistent memory
-      // and then map it.
-      public static PmemMappedRegion mapBlock(
-          String path, long length, boolean isFileExist) {
-        return NativeIO.POSIX.pmemMapFile(path, length, isFileExist);
-      }
-
-      // Unmap a pmem file
-      public static boolean unmapBlock(long address, long length) {
-        return NativeIO.POSIX.pmemUnMap(address, length);
-      }
-
-      // Copy data from disk file(src) to pmem file(dest), without flush
-      public static void memCopy(byte[] src, long dest, boolean isPmem,
-          long length) {
-        NativeIO.POSIX.pmemCopy(src, dest, isPmem, length);
-      }
-
-      // Flush the memory content to persistent storage
-      public static void memSync(PmemMappedRegion region) {
-        if (region.isPmem()) {
-          NativeIO.POSIX.pmemDrain();
-        } else {
-          NativeIO.POSIX.pmemSync(region.getAddress(), region.getLength());
-        }
-      }
-
-      public static String getPmdkLibPath() {
-        return POSIX.getPmdkLibPath();
-      }
-    }
-
-    private static native String getPmdkLibPath();
-    private static native boolean isPmemCheck(long address, long length);
-    private static native PmemMappedRegion pmemMapFile(String path,
-        long length, boolean isFileExist);
-    private static native boolean pmemUnMap(long address, long length);
-    private static native void pmemCopy(byte[] src, long dest, boolean isPmem,
-        long length);
-    private static native void pmemDrain();
-    private static native void pmemSync(long address, long length);
-
     /**
      * Used to manipulate the operating system cache.
      */
@@ -291,8 +141,8 @@ public class NativeIO {
       }
 
       public void posixFadviseIfPossible(String identifier,
-          FileDescriptor fd, long offset, long len, int flags)
-          throws NativeIOException {
+        FileDescriptor fd, long offset, long len, int flags)
+            throws NativeIOException {
         NativeIO.POSIX.posixFadviseIfPossible(identifier, fd, offset,
             len, flags);
       }
@@ -371,8 +221,6 @@ public class NativeIO {
     public static native FileDescriptor open(String path, int flags, int mode) throws IOException;
     /** Wrapper around fstat(2) */
     private static native Stat fstat(FileDescriptor fd) throws IOException;
-    /** Wrapper around stat(2). */
-    private static native Stat stat(String path) throws IOException;
 
     /** Native chmod implementation. On UNIX, it is a wrapper around chmod(2) */
     private static native void chmodImpl(String path, int mode) throws IOException;
@@ -464,7 +312,7 @@ public class NativeIO {
       }
       mlock_native(buffer, len);
     }
-
+    
     /**
      * Unmaps the block from memory. See munmap(2).
      *
@@ -478,14 +326,10 @@ public class NativeIO {
      * @param buffer    The buffer to unmap.
      */
     public static void munmap(MappedByteBuffer buffer) {
-      if (CleanerUtil.UNMAP_SUPPORTED) {
-        try {
-          CleanerUtil.getCleaner().freeBuffer(buffer);
-        } catch (IOException e) {
-          LOG.info("Failed to unmap the buffer", e);
-        }
-      } else {
-        LOG.trace(CleanerUtil.UNMAP_NOT_SUPPORTED_REASON);
+      if (buffer instanceof sun.nio.ch.DirectBuffer) {
+        sun.misc.Cleaner cleaner =
+            ((sun.nio.ch.DirectBuffer)buffer).cleaner();
+        cleaner.clean();
       }
     }
 
@@ -580,37 +424,6 @@ public class NativeIO {
             throw new NativeIOException("Unknown error", Errno.UNKNOWN);
           }
         }
-      }
-      return stat;
-    }
-
-    /**
-     * Return the file stat for a file path.
-     *
-     * @param path  file path
-     * @return  the file stat
-     * @throws IOException  thrown if there is an IO error while obtaining the
-     * file stat
-     */
-    public static Stat getStat(String path) throws IOException {
-      if (path == null) {
-        String errMessage = "Path is null";
-        LOG.warn(errMessage);
-        throw new IOException(errMessage);
-      }
-      Stat stat = null;
-      try {
-        if (!Shell.WINDOWS) {
-          stat = stat(path);
-          stat.owner = getName(IdCache.USER, stat.ownerId);
-          stat.group = getName(IdCache.GROUP, stat.groupId);
-        } else {
-          stat = stat(path);
-        }
-      } catch (NativeIOException nioe) {
-        LOG.warn("NativeIO.getStat error ({}): {} -- file path: {}",
-            nioe.getErrorCode(), nioe.getMessage(), path);
-        throw new PathIOException(path, nioe);
       }
       return stat;
     }
@@ -757,7 +570,7 @@ public class NativeIO {
     private static native String getOwner(FileDescriptor fd) throws IOException;
 
     /** Supported list of Windows access right flags */
-    public enum AccessRight {
+    public static enum AccessRight {
       ACCESS_READ (0x0001),      // FILE_READ_DATA
       ACCESS_WRITE (0x0002),     // FILE_WRITE_DATA
       ACCESS_EXECUTE (0x0020);   // FILE_EXECUTE
@@ -896,7 +709,7 @@ public class NativeIO {
    * user account name, of the format DOMAIN\UserName. This method
    * will remove the domain part of the full logon name.
    *
-   * @param name the full principal name containing the domain
+   * @param Fthe full principal name containing the domain
    * @return name with domain removed
    */
   private static String stripDomain(String name) {
@@ -943,7 +756,7 @@ public class NativeIO {
       }
       return rf.getFD();
     } else {
-      // Use Windows native interface to create a FileInputStream that
+      // Use Windows native interface to create a FileDescriptor that
       // shares delete permission on the file opened, and set it to the
       // given offset.
       //
