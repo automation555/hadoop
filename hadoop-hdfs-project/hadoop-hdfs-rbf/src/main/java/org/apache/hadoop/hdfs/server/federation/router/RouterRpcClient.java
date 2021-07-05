@@ -261,24 +261,6 @@ public class RouterRpcClient {
   }
 
   /**
-   * Total number of idle sockets between the router and NNs.
-   *
-   * @return Number of namenode clients.
-   */
-  public int getNumIdleConnections() {
-    return this.connectionManager.getNumIdleConnections();
-  }
-
-  /**
-   * Total number of active sockets between the router and NNs.
-   *
-   * @return Number of recently active namenode clients.
-   */
-  public int getNumActiveConnectionsRecently() {
-    return this.connectionManager.getNumActiveConnectionsRecently();
-  }
-
-  /**
    * Total number of open connection pools to a NN. Each connection pool.
    * represents one user + one NN.
    *
@@ -566,14 +548,14 @@ public class RouterRpcClient {
    * It adds trace info "clientIp:ip" to caller context if it's absent.
    */
   private void appendClientIpToCallerContextIfAbsent() {
-    String clientIpInfo = CLIENT_IP_STR + ":" + Server.getRemoteAddress();
+    String clientIpInfo = CallerContext.CLIENT_IP_STR + ":" + Server.getRemoteAddress();
     final CallerContext ctx = CallerContext.getCurrent();
     if (isClientIpInfoAbsent(clientIpInfo, ctx)) {
       String origContext = ctx == null ? null : ctx.getContext();
       byte[] origSignature = ctx == null ? null : ctx.getSignature();
       CallerContext.setCurrent(
-          new CallerContext.Builder(origContext, contextFieldSeparator)
-              .append(clientIpInfo)
+          new CallerContext.Builder(clientIpInfo, contextFieldSeparator)
+              .append(origContext)
               .setSignature(origSignature)
               .build());
     }
@@ -1129,17 +1111,25 @@ public class RouterRpcClient {
    * Invoke method in all locations and return success if any succeeds.
    *
    * @param <T> The type of the remote location.
+   * @param <R> The type of the remote method return.
    * @param locations List of remote locations to call concurrently.
    * @param method The remote method and parameters to invoke.
    * @return If the call succeeds in any location.
    * @throws IOException If any of the calls return an exception.
    */
-  public <T extends RemoteLocationContext> boolean invokeAll(
+  public <T extends RemoteLocationContext, R> boolean invokeAll(
       final Collection<T> locations, final RemoteMethod method)
-      throws IOException {
+          throws IOException {
+    boolean anyResult = false;
     Map<T, Boolean> results =
         invokeConcurrent(locations, method, false, false, Boolean.class);
-    return results.containsValue(true);
+    for (Boolean value : results.values()) {
+      boolean result = value.booleanValue();
+      if (result) {
+        anyResult = true;
+      }
+    }
+    return anyResult;
   }
 
   /**

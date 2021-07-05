@@ -65,6 +65,11 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   /** Default value for IPC_SERVER_RPC_MAX_RESPONSE_SIZE_KEY */
   public static final int     IPC_SERVER_RPC_MAX_RESPONSE_SIZE_DEFAULT =
     1024*1024;
+  /** Get the user's real IP */
+  public static final String  IPC_SERVER_RPC_GET_REAL_CLIENT_IP_KEY =
+      "ipc.server.get.real.client.ip";
+  public static final boolean  IPC_SERVER_RPC_GET_REAL_CLIENT_IP_DEFAULT =
+      false;
   /** Number of threads in RPC server reading from the socket */
   public static final String  IPC_SERVER_RPC_READ_THREADS_KEY =
     "ipc.server.read.threadpool.size";
@@ -438,28 +443,4 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       "hadoop.metrics.jvm.use-thread-mxbean";
   public static final boolean HADOOP_METRICS_JVM_USE_THREAD_MXBEAN_DEFAULT =
       false;
-
-  /** logging level for IOStatistics (debug or info). */
-  public static final String IOSTATISTICS_LOGGING_LEVEL
-      = "fs.iostatistics.logging.level";
-
-  /** DEBUG logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_DEBUG
-      = "debug";
-
-  /** WARN logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_WARN
-      = "warn";
-
-  /** ERROR logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_ERROR
-      = "error";
-
-  /** INFO logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_INFO
-      = "info";
-
-  /** Default value for IOStatistics logging level. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_DEFAULT
-      = IOSTATISTICS_LOGGING_LEVEL_DEBUG;
 }
