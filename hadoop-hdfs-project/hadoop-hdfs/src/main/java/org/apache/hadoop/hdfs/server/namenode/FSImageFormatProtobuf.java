@@ -75,8 +75,8 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.LimitInputStream;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.Lists;
 
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 import org.apache.hadoop.thirdparty.protobuf.CodedOutputStream;
 
@@ -385,7 +385,7 @@ public final class FSImageFormatProtobuf {
           if (n1 == null) {
             return n2 == null ? 0 : -1;
           } else if (n2 == null) {
-            return -1;
+            return 1;
           } else {
             return n1.ordinal() - n2.ordinal();
           }
