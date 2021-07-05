@@ -31,8 +31,8 @@ import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AnonymousAWSCredentials;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -223,7 +223,7 @@ public class AWSCredentialProviderList implements AWSCredentialsProvider,
    * @return providers
    */
   @VisibleForTesting
-  List<AWSCredentialsProvider> getProviders() {
+  public List<AWSCredentialsProvider> getProviders() {
     return providers;
   }
 
