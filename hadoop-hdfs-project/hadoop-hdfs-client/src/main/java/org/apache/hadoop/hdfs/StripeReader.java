@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
@@ -215,7 +215,7 @@ abstract class StripeReader {
     if (chunk.useByteBuffer()) {
       ByteBufferStrategy strategy = new ByteBufferStrategy(
           chunk.getByteBuffer(), dfsStripedInputStream.getReadStatistics(),
-          dfsStripedInputStream.getDFSClient());
+          dfsStripedInputStream.getDfsClient());
       return new ByteBufferStrategy[]{strategy};
     }
 
@@ -225,7 +225,7 @@ abstract class StripeReader {
       ByteBuffer buffer = chunk.getChunkBuffer().getSlice(i);
       strategies[i] = new ByteBufferStrategy(buffer,
               dfsStripedInputStream.getReadStatistics(),
-              dfsStripedInputStream.getDFSClient());
+              dfsStripedInputStream.getDfsClient());
     }
     return strategies;
   }
@@ -248,8 +248,6 @@ abstract class StripeReader {
       DFSClient.LOG.warn("Found Checksum error for "
           + currentBlock + " from " + currentNode
           + " at " + ce.getPos());
-      //Clear buffer to make next decode success
-      strategy.getReadBuffer().clear();
       // we want to remember which block replicas we have tried
       corruptedBlocks.addCorruptedBlock(currentBlock, currentNode);
       throw ce;
@@ -257,8 +255,6 @@ abstract class StripeReader {
       DFSClient.LOG.warn("Exception while reading from "
           + currentBlock + " of " + dfsStripedInputStream.getSrc() + " from "
           + currentNode, e);
-      //Clear buffer to make next decode success
-      strategy.getReadBuffer().clear();
       throw e;
     }
   }
@@ -353,8 +349,10 @@ abstract class StripeReader {
         StripingChunkReadResult r = StripedBlockUtil
             .getNextCompletedStripedRead(service, futures, 0);
         dfsStripedInputStream.updateReadStats(r.getReadStats());
-        DFSClient.LOG.debug("Read task returned: {}, for stripe {}",
-            r, alignedStripe);
+        if (DFSClient.LOG.isDebugEnabled()) {
+          DFSClient.LOG.debug("Read task returned: " + r + ", for stripe "
+              + alignedStripe);
+        }
         StripingChunk returnedChunk = alignedStripe.chunks[r.index];
         Preconditions.checkNotNull(returnedChunk);
         Preconditions.checkState(returnedChunk.state == StripingChunk.PENDING);
