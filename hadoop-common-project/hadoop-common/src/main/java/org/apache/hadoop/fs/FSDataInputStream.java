@@ -1,4 +1,4 @@
-/**
+/*
  * 
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,13 +26,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.function.IntFunction;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.fs.impl.StoreImplementationUtils;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
-import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.util.IdentityHashStore;
 
@@ -44,14 +42,14 @@ public class FSDataInputStream extends DataInputStream
     implements Seekable, PositionedReadable, 
       ByteBufferReadable, HasFileDescriptor, CanSetDropBehind, CanSetReadahead,
       HasEnhancedByteBufferAccess, CanUnbuffer, StreamCapabilities,
-      ByteBufferPositionedReadable, IOStatisticsSource {
+      ByteBufferPositionedReadable {
   /**
    * Map ByteBuffers that we have handed out to readers to ByteBufferPool 
    * objects
    */
   private final IdentityHashStore<ByteBuffer, ByteBufferPool>
     extendedReadBuffers
-      = new IdentityHashStore<ByteBuffer, ByteBufferPool>(0);
+      = new IdentityHashStore<>(0);
 
   public FSDataInputStream(InputStream in) {
     super(in);
@@ -238,7 +236,10 @@ public class FSDataInputStream extends DataInputStream
 
   @Override
   public boolean hasCapability(String capability) {
-    return StoreImplementationUtils.hasCapability(in, capability);
+    if (in instanceof StreamCapabilities) {
+      return ((StreamCapabilities) in).hasCapability(capability);
+    }
+    return false;
   }
 
   /**
@@ -269,14 +270,19 @@ public class FSDataInputStream extends DataInputStream
     }
   }
 
-  /**
-   * Get the IO Statistics of the nested stream, falling back to
-   * null if the stream does not implement the interface
-   * {@link IOStatisticsSource}.
-   * @return an IOStatistics instance or null
-   */
   @Override
-  public IOStatistics getIOStatistics() {
-    return IOStatisticsSupport.retrieveIOStatistics(in);
+  public int minimumReasonableSeek() {
+    return ((PositionedReadable) in).minimumReasonableSeek();
+  }
+
+  @Override
+  public int maximumReadSize() {
+    return ((PositionedReadable) in).maximumReadSize();
+  }
+
+  @Override
+  public void readAsync(List<? extends FileRange> ranges,
+                        IntFunction<ByteBuffer> allocate) {
+    ((PositionedReadable) in).readAsync(ranges, allocate);
   }
 }

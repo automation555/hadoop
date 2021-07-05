@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,14 +21,12 @@ import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.util.StringJoiner;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.function.IntFunction;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
-
-import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.retrieveIOStatistics;
 
 
 /**
@@ -38,8 +36,7 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.retrieveIOStat
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class BufferedFSInputStream extends BufferedInputStream
-    implements Seekable, PositionedReadable, HasFileDescriptor,
-    IOStatisticsSource, StreamCapabilities {
+implements Seekable, PositionedReadable, HasFileDescriptor {
   /**
    * Creates a <code>BufferedFSInputStream</code>
    * with the specified buffer size,
@@ -133,33 +130,19 @@ public class BufferedFSInputStream extends BufferedInputStream
     }
   }
 
-  /**
-   * If the inner stream supports {@link StreamCapabilities},
-   * forward the probe to it.
-   * Otherwise: return false.
-   *
-   * @param capability string to query the stream support for.
-   * @return true if a capability is known to be supported.
-   */
   @Override
-  public boolean hasCapability(final String capability) {
-    if (in instanceof StreamCapabilities) {
-      return ((StreamCapabilities) in).hasCapability(capability);
-    } else {
-      return false;
-    }
+  public int minimumReasonableSeek() {
+    return ((PositionedReadable) in).minimumReasonableSeek();
   }
 
   @Override
-  public IOStatistics getIOStatistics() {
-    return retrieveIOStatistics(in);
+  public int maximumReadSize() {
+    return ((PositionedReadable) in).maximumReadSize();
   }
 
   @Override
-  public String toString() {
-    return new StringJoiner(", ",
-        BufferedFSInputStream.class.getSimpleName() + "[", "]")
-        .add("in=" + in)
-        .toString();
+  public void readAsync(List<? extends FileRange> ranges,
+                        IntFunction<ByteBuffer> allocate) {
+    ((PositionedReadable) in).readAsync(ranges, allocate);
   }
 }
