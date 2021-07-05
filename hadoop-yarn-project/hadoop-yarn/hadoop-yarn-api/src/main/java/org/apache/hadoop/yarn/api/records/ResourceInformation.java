@@ -18,16 +18,12 @@
 
 package org.apache.hadoop.yarn.api.records;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.yarn.api.protocolrecords.ResourceTypes;
 import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Class to encapsulate information about a Resource - the name of the resource,
@@ -41,14 +37,11 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
   private long value;
   private long minimumAllocation;
   private long maximumAllocation;
-  private Set<String> tags = new HashSet<>();
-  private Map<String, String> attributes = new HashMap<>();
 
   // Known resource types
   public static final String MEMORY_URI = "memory-mb";
   public static final String VCORES_URI = "vcores";
   public static final String GPU_URI = "yarn.io/gpu";
-  public static final String FPGA_URI = "yarn.io/fpga";
 
   public static final ResourceInformation MEMORY_MB =
       ResourceInformation.newInstance(MEMORY_URI, "Mi");
@@ -56,15 +49,9 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
       ResourceInformation.newInstance(VCORES_URI);
   public static final ResourceInformation GPUS =
       ResourceInformation.newInstance(GPU_URI);
-  public static final ResourceInformation FPGAS =
-          ResourceInformation.newInstance(FPGA_URI);
 
-  /**
-   * Special resources that should be treated separately
-   * from arbitrary resource types.
-   */
-  public static final Map<String, ResourceInformation> SPECIAL_RESOURCES =
-      ImmutableMap.of(MEMORY_URI, MEMORY_MB, VCORES_URI, VCORES, GPU_URI, GPUS, FPGA_URI, FPGAS);
+  public static final Map<String, ResourceInformation> MANDATORY_RESOURCES =
+      ImmutableMap.of(MEMORY_URI, MEMORY_MB, VCORES_URI, VCORES, GPU_URI, GPUS);
 
   /**
    * Get the name for the resource.
@@ -77,11 +64,6 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
 
   /**
    * Set the name for the resource.
-   *
-   * A valid resource name must begin with a letter and contain only letters,
-   * numbers, and any of: '.', '_', or '-'. A valid resource name may also be
-   * optionally preceded by a name space followed by a slash. A valid name space
-   * consists of period-separated groups of letters, numbers, and dashes."
    *
    * @param rName name for the resource
    */
@@ -195,42 +177,6 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
   }
 
   /**
-   * Get the attributes of the resource.
-   * @return resource attributes
-   */
-  public Map<String, String> getAttributes() {
-    return attributes;
-  }
-
-  /**
-   * Set a map of attributes to the resource.
-   * @param attributes resource attributes
-   */
-  public void setAttributes(Map<String, String> attributes) {
-    if (attributes != null) {
-      this.attributes = attributes;
-    }
-  }
-
-  /**
-   * Get resource tags.
-   * @return resource tags
-   */
-  public Set<String> getTags() {
-    return this.tags;
-  }
-
-  /**
-   * Add tags to the resource.
-   * @param tags resource tags
-   */
-  public void setTags(Set<String> tags) {
-    if (tags != null) {
-      this.tags = tags;
-    }
-  }
-
-  /**
    * Create a new instance of ResourceInformation from another object.
    *
    * @param other the object from which the new object should be created
@@ -245,24 +191,13 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
   public static ResourceInformation newInstance(String name, String units,
       long value, ResourceTypes type, long minimumAllocation,
       long maximumAllocation) {
-    return ResourceInformation.newInstance(name, units, value, type,
-        minimumAllocation, maximumAllocation,
-        ImmutableSet.of(), ImmutableMap.of());
-  }
-
-  public static ResourceInformation newInstance(String name, String units,
-      long value, ResourceTypes type, long minimumAllocation,
-      long maximumAllocation,
-      Set<String> tags, Map<String, String> attributes) {
     ResourceInformation ret = new ResourceInformation();
     ret.setName(name);
     ret.setResourceType(type);
-    ret.setUnitsWithoutValidation(units);
+    ret.setUnits(units);
     ret.setValue(value);
     ret.setMinimumAllocation(minimumAllocation);
     ret.setMaximumAllocation(maximumAllocation);
-    ret.setTags(tags);
-    ret.setAttributes(attributes);
     return ret;
   }
 
@@ -280,22 +215,15 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
   }
 
   public static ResourceInformation newInstance(String name, String units,
-      long value, Set<String> tags, Map<String, String> attributes) {
+      long minRes, long maxRes) {
     return ResourceInformation
-        .newInstance(name, units, value, ResourceTypes.COUNTABLE, 0L,
-            Long.MAX_VALUE, tags, attributes);
+        .newInstance(name, units, 0L, ResourceTypes.COUNTABLE, minRes, maxRes);
   }
 
   public static ResourceInformation newInstance(String name, String units,
       ResourceTypes resourceType) {
     return ResourceInformation.newInstance(name, units, 0L, resourceType, 0L,
         Long.MAX_VALUE);
-  }
-
-  public static ResourceInformation newInstance(String name, String units,
-      long minRes, long maxRes) {
-    return ResourceInformation.newInstance(name, units, 0L,
-        ResourceTypes.COUNTABLE, minRes, maxRes);
   }
 
   public static ResourceInformation newInstance(String name, long value) {
@@ -322,16 +250,13 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
     dst.setValue(src.getValue());
     dst.setMinimumAllocation(src.getMinimumAllocation());
     dst.setMaximumAllocation(src.getMaximumAllocation());
-    dst.setTags(src.getTags());
-    dst.setAttributes(src.getAttributes());
   }
 
   @Override
   public String toString() {
     return "name: " + this.name + ", units: " + this.units + ", type: "
         + resourceType + ", value: " + value + ", minimum allocation: "
-        + minimumAllocation + ", maximum allocation: " + maximumAllocation
-        + ", tags: " + tags + ", attributes " + attributes;
+        + minimumAllocation + ", maximum allocation: " + maximumAllocation;
   }
 
   public String getShorthandRepresentation() {
@@ -351,9 +276,7 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
     }
     ResourceInformation r = (ResourceInformation) obj;
     if (!this.name.equals(r.getName())
-        || !this.resourceType.equals(r.getResourceType())
-        || !this.tags.equals(r.getTags())
-        || !this.attributes.equals(r.getAttributes())) {
+        || !this.resourceType.equals(r.getResourceType())) {
       return false;
     }
     if (this.units.equals(r.units)) {
@@ -370,13 +293,7 @@ public class ResourceInformation implements Comparable<ResourceInformation> {
         939769357 + name.hashCode(); // prime * result = 939769357 initially
     result = prime * result + resourceType.hashCode();
     result = prime * result + units.hashCode();
-    result = prime * result + Long.hashCode(value);
-    if (tags != null && !tags.isEmpty()) {
-      result = prime * result + tags.hashCode();
-    }
-    if (attributes != null && !attributes.isEmpty()) {
-      result = prime * result + attributes.hashCode();
-    }
+    result = prime * result + Long.valueOf(value).hashCode();
     return result;
   }
 
