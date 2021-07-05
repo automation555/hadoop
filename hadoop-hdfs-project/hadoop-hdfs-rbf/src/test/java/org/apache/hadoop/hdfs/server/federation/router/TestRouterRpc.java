@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.getFi
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.verifyFileExists;
 import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.TEST_STRING;
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -186,7 +185,6 @@ public class TestRouterRpc {
   private NamenodeProtocol routerNamenodeProtocol;
   /** NameNodeProtocol interface to the Namenode. */
   private NamenodeProtocol nnNamenodeProtocol;
-  private NamenodeProtocol nnNamenodeProtocol1;
 
   /** Filesystem interface to the Router. */
   private FileSystem routerFS;
@@ -368,11 +366,6 @@ public class TestRouterRpc {
     NamenodeContext nn0 = cluster.getNamenode(ns0, null);
     this.nnNamenodeProtocol = NameNodeProxies.createProxy(nn0.getConf(),
         nn0.getFileSystem().getUri(), NamenodeProtocol.class).getProxy();
-    // Namenode from the other namespace
-    String ns1 = cluster.getNameservices().get(1);
-    NamenodeContext nn1 = cluster.getNamenode(ns1, null);
-    this.nnNamenodeProtocol1 = NameNodeProxies.createProxy(nn1.getConf(),
-        nn1.getFileSystem().getUri(), NamenodeProtocol.class).getProxy();
   }
 
   protected String getNs() {
@@ -518,6 +511,44 @@ public class TestRouterRpc {
     for (int i = 0; i < 10; i++) {
       assertEquals("file-"+i, result[i].getPath().getName());
     }
+  }
+
+  @Test
+  public void testProxyListFilesWithOverwrite() throws IOException {
+    // Create a parent point as well as a subfolder mount
+    // /parent
+    //    ns0 -> /parent
+    // /parent/sub1
+    //    ns0 -> /parent/sub1
+    String parent = "/parent";
+    String sub1 = parent + "/sub1";
+    Path parentPath = new Path(parent);
+    // Add mount point
+    for (RouterContext rc : cluster.getRouters()) {
+      MockResolver resolver =
+          (MockResolver) rc.getRouter().getSubclusterResolver();
+      resolver.addLocation(parent, ns, parent);
+      resolver.addLocation(sub1, ns, sub1);
+    }
+    // The sub1 folder created is the same as the sub1 mount point directory
+    nnFS.mkdirs(new Path(sub1));
+
+    FileStatus[] routerFsResult = routerFS.listStatus(parentPath);
+    FileStatus[] nnFsResult = nnFS.listStatus(parentPath);
+    // Checking
+    assertEquals(1, routerFsResult.length);
+    assertEquals(1, nnFsResult.length);
+
+    FileStatus nnFileStatus = nnFsResult[0];
+    FileStatus routerFileStatus = routerFsResult[0];
+
+    assertNotNull(nnFileStatus);
+    assertNotNull(routerFileStatus);
+
+    assertEquals(nnFileStatus.getPath().getName(),
+        routerFileStatus.getPath().getName());
+    assertEquals(nnFileStatus.getModificationTime(),
+        routerFileStatus.getModificationTime());
   }
 
   @Test
@@ -1241,7 +1272,7 @@ public class TestRouterRpc {
         newRouterFile, clientName, null, null,
         status.getFileId(), null, null);
 
-    DatanodeInfo[] exclusions = DatanodeInfo.EMPTY_ARRAY;
+    DatanodeInfo[] exclusions = new DatanodeInfo[0];
     LocatedBlock newBlock = routerProtocol.getAdditionalDatanode(
         newRouterFile, status.getFileId(), block.getBlock(),
         block.getLocations(), block.getStorageIDs(), exclusions, 1, clientName);
@@ -1309,14 +1340,11 @@ public class TestRouterRpc {
       // Check with default namespace specified.
       NamespaceInfo rVersion = routerNamenodeProtocol.versionRequest();
       NamespaceInfo nnVersion = nnNamenodeProtocol.versionRequest();
-      NamespaceInfo nnVersion1 = nnNamenodeProtocol1.versionRequest();
       compareVersion(rVersion, nnVersion);
       // Check with default namespace unspecified.
       resolver.setDisableNamespace(true);
-      // Verify the NamespaceInfo is of nn0 or nn1
-      boolean isNN0 =
-          rVersion.getBlockPoolID().equals(nnVersion.getBlockPoolID());
-      compareVersion(rVersion, isNN0 ? nnVersion : nnVersion1);
+      rVersion = routerNamenodeProtocol.versionRequest();
+      compareVersion(rVersion, nnVersion);
     } finally {
       resolver.setDisableNamespace(false);
     }
@@ -1385,13 +1413,11 @@ public class TestRouterRpc {
       // Check with default namespace specified.
       long routerTransactionID = routerNamenodeProtocol.getTransactionID();
       long nnTransactionID = nnNamenodeProtocol.getTransactionID();
-      long nnTransactionID1 = nnNamenodeProtocol1.getTransactionID();
       assertEquals(nnTransactionID, routerTransactionID);
       // Check with default namespace unspecified.
       resolver.setDisableNamespace(true);
-      // Verify the transaction ID is of nn0 or nn1
       routerTransactionID = routerNamenodeProtocol.getTransactionID();
-      assertThat(routerTransactionID).isIn(nnTransactionID, nnTransactionID1);
+      assertEquals(nnTransactionID, routerTransactionID);
     } finally {
       resolver.setDisableNamespace(false);
     }
@@ -1758,14 +1784,6 @@ public class TestRouterRpc {
     // {@link RBFMetrics#getActiveNamenodeRegistration()}
     assertEquals("{}", metrics.getNameservices());
     assertEquals(0, metrics.getNumLiveNodes());
-  }
-
-  @Test
-  public void testNamenodeMetricsEnteringMaintenanceNodes() throws IOException {
-    final NamenodeBeanMetrics metrics =
-            router.getRouter().getNamenodeMetrics();
-
-    assertEquals("{}", metrics.getEnteringMaintenanceNodes());
   }
 
   @Test
