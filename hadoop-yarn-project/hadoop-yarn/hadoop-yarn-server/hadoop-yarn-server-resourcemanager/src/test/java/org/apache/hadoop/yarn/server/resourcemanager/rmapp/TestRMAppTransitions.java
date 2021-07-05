@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
+import com.google.common.collect.Lists;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
@@ -29,7 +33,6 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.yarn.MockApps;
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -70,7 +73,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptI
 
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt
     .RMAppAttemptState;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
 
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
@@ -86,16 +88,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSe
 import org.apache.hadoop.yarn.server.resourcemanager.timelineservice.RMTimelineCollectorManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
-
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -111,7 +109,6 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static junit.framework.TestCase.assertTrue;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -237,8 +234,8 @@ public class TestRMAppTransitions {
     UserGroupInformation.setConfiguration(conf);
 
     rmDispatcher = new DrainDispatcher();
-    ContainerAllocationExpirer containerAllocationExpirer = 
-        mock(ContainerAllocationExpirer.class);
+    ContainerAllocationExpired containerAllocationExpirer =
+        mock(ContainerAllocationExpired.class);
     AMLivelinessMonitor amLivelinessMonitor = mock(AMLivelinessMonitor.class);
     AMLivelinessMonitor amFinishingMonitor = mock(AMLivelinessMonitor.class);
     store = mock(RMStateStore.class);
@@ -486,17 +483,6 @@ public class TestRMAppTransitions {
         any(ApplicationStateData.class));
   }
 
-  private void assertAppStateLaunchTimeSaved(long expectedLaunchTime) {
-    ArgumentCaptor<ApplicationStateData> state =
-        ArgumentCaptor.forClass(ApplicationStateData.class);
-    ArgumentCaptor<Boolean> notifyApp =
-        ArgumentCaptor.forClass(Boolean.class);
-    verify(store, times(1)).updateApplicationState(state.capture(),
-        notifyApp.capture());
-    assertEquals(expectedLaunchTime, state.getValue().getLaunchTime());
-    assertFalse(notifyApp.getValue());
-  }
-
   private void assertKilled(RMApp application) {
     assertTimesAtFinish(application);
     assertAppState(RMAppState.KILLED, application);
@@ -660,7 +646,6 @@ public class TestRMAppTransitions {
     RMAppEvent finishedEvent = new RMAppEvent(application.getApplicationId(),
         RMAppEventType.ATTEMPT_FINISHED, diagnostics);
     application.handle(finishedEvent);
-    rmDispatcher.await();
 
     //only run this verification if we created a finishing app
     if (submissionContext == null) {
@@ -945,21 +930,6 @@ public class TestRMAppTransitions {
     verifyApplicationFinished(RMAppState.KILLED);
     verifyAppRemovedSchedulerEvent(application, RMAppState.KILLED);
     verifyRMAppFieldsForFinalTransitions(application);
-  }
-
-  @Test
-  public void testAppAcceptedAccepted() throws IOException {
-    LOG.info("--- START: testAppAcceptedAccepted ---");
-
-    RMApp application = testCreateAppAccepted(null);
-    // ACCEPTED => ACCEPTED event RMAppEventType.ATTEMPT_LAUNCHED
-    RMAppEvent appAttemptLaunched =
-        new RMAppEvent(application.getApplicationId(),
-            RMAppEventType.ATTEMPT_LAUNCHED, 1234L);
-    application.handle(appAttemptLaunched);
-    rmDispatcher.await();
-    assertAppState(RMAppState.ACCEPTED, application);
-    assertAppStateLaunchTimeSaved(1234L);
   }
 
   @Test

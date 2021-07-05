@@ -36,7 +36,7 @@ public enum SchedulerEventType {
   APP_ATTEMPT_ADDED,
   APP_ATTEMPT_REMOVED,
 
-  // Source: ContainerAllocationExpirer
+  // Source: ContainerAllocationExpired
   CONTAINER_EXPIRED,
 
   // Source: SchedulerAppAttempt::pullNewlyUpdatedContainer.
@@ -55,8 +55,5 @@ public enum SchedulerEventType {
   MARK_CONTAINER_FOR_NONKILLABLE,
 
   //Queue Management Change
-  MANAGE_QUEUE,
-
-  // Auto created queue, auto deletion check
-  AUTO_QUEUE_DELETION
+  MANAGE_QUEUE
 }

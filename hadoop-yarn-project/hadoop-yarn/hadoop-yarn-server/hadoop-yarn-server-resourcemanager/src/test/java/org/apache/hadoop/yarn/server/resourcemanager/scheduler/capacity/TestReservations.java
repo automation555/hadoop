@@ -29,10 +29,12 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -53,7 +55,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWri
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
@@ -91,11 +92,11 @@ public class TestReservations {
   // CapacitySchedulerConfiguration csConf;
   CapacitySchedulerContext csContext;
 
-  private final ResourceCalculator resourceCalculator =
-      new DefaultResourceCalculator();
+  private final ResourceCalculator resourceCalculator = new DefaultResourceCalculator();
 
   CSQueue root;
-  private CSQueueStore queues = new CSQueueStore();
+  Map<String, CSQueue> queues = new HashMap<String, CSQueue>();
+  Map<String, CSQueue> oldQueues = new HashMap<String, CSQueue>();
 
   final static int GB = 1024;
   final static String DEFAULT_RACK = "/default";
@@ -105,6 +106,7 @@ public class TestReservations {
     CapacityScheduler spyCs = new CapacityScheduler();
     cs = spy(spyCs);
     rmContext = TestUtils.getMockRMContext();
+
   }
 
   private void setup(CapacitySchedulerConfiguration csConf) throws Exception {
@@ -113,9 +115,6 @@ public class TestReservations {
 
   private void setup(CapacitySchedulerConfiguration csConf,
       boolean addUserLimits) throws Exception {
-    //All stub calls on the spy object of the 'cs' field should happen
-    //before cs.start() is invoked. See YARN-10672 for more details.
-    when(cs.getNumClusterNodes()).thenReturn(3);
 
     csConf.setBoolean(CapacitySchedulerConfiguration.ENABLE_USER_METRICS, true);
     final String newRoot = "root" + System.currentTimeMillis();
@@ -158,6 +157,8 @@ public class TestReservations {
     cs.setRMContext(spyRMContext);
     cs.init(csConf);
     cs.start();
+
+    when(cs.getNumClusterNodes()).thenReturn(3);
   }
 
   private static final String A = "a";
@@ -545,7 +546,7 @@ public class TestReservations {
     // Test that with reservations-continue-look-all-nodes feature off
     // we don't unreserve and show we could get stuck
 
-    queues = new CSQueueStore();
+    queues = new HashMap<String, CSQueue>();
     // test that the deadlock occurs when turned off
     CapacitySchedulerConfiguration csConf = new CapacitySchedulerConfiguration();
     csConf.setBoolean(CapacitySchedulerConfiguration.RESERVE_CONT_LOOK_ALL_NODES,
@@ -915,8 +916,8 @@ public class TestReservations {
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     SystemMetricsPublisher publisher = mock(SystemMetricsPublisher.class);
     RMContext rmContext = mock(RMContext.class);
-    ContainerAllocationExpirer expirer =
-      mock(ContainerAllocationExpirer.class);
+    ContainerAllocationExpired expirer =
+      mock(ContainerAllocationExpired.class);
     DrainDispatcher drainDispatcher = new DrainDispatcher();
     when(rmContext.getContainerAllocationExpirer()).thenReturn(expirer);
     when(rmContext.getDispatcher()).thenReturn(drainDispatcher);
@@ -989,8 +990,8 @@ public class TestReservations {
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     SystemMetricsPublisher publisher = mock(SystemMetricsPublisher.class);
     RMContext rmContext = mock(RMContext.class);
-    ContainerAllocationExpirer expirer =
-      mock(ContainerAllocationExpirer.class);
+    ContainerAllocationExpired expirer =
+      mock(ContainerAllocationExpired.class);
     DrainDispatcher drainDispatcher = new DrainDispatcher();
     when(rmContext.getContainerAllocationExpirer()).thenReturn(expirer);
     when(rmContext.getDispatcher()).thenReturn(drainDispatcher);
@@ -1187,7 +1188,7 @@ public class TestReservations {
 
     csConf.setBoolean(
         CapacitySchedulerConfiguration.RESERVE_CONT_LOOK_ALL_NODES, false);
-    CSQueueStore newQueues = new CSQueueStore();
+    Map<String, CSQueue> newQueues = new HashMap<String, CSQueue>();
     CSQueue newRoot = CapacitySchedulerQueueManager.parseQueue(csContext,
         csConf, null, CapacitySchedulerConfiguration.ROOT, newQueues, queues,
         TestUtils.spyHook);
