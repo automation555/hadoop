@@ -29,6 +29,8 @@ import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.fs.viewfs.ViewFileSystem.MountPoint;
+import org.apache.hadoop.security.AccessControlException;
+
 
 /**
  * Utility APIs for ViewFileSystem.
@@ -49,17 +51,6 @@ public final class ViewFileSystemUtil {
    */
   public static boolean isViewFileSystem(final FileSystem fileSystem) {
     return fileSystem.getScheme().equals(FsConstants.VIEWFS_SCHEME);
-  }
-
-  /**
-   * Check if the FileSystem is a ViewFileSystemOverloadScheme.
-   *
-   * @param fileSystem
-   * @return true if the fileSystem is ViewFileSystemOverloadScheme
-   */
-  public static boolean isViewFileSystemOverloadScheme(
-      final FileSystem fileSystem) {
-    return fileSystem instanceof ViewFileSystemOverloadScheme;
   }
 
   /**
@@ -104,8 +95,7 @@ public final class ViewFileSystemUtil {
    */
   public static Map<MountPoint, FsStatus> getStatus(
       FileSystem fileSystem, Path path) throws IOException {
-    if (!(isViewFileSystem(fileSystem)
-        || isViewFileSystemOverloadScheme(fileSystem))) {
+    if (!isViewFileSystem(fileSystem)) {
       throw new UnsupportedFileSystemException("FileSystem '"
           + fileSystem.getUri() + "'is not a ViewFileSystem.");
     }
@@ -171,6 +161,17 @@ public final class ViewFileSystemUtil {
       final MountPoint mountPoint, final Path path) throws IOException {
     FsStatus fsStatus = viewFileSystem.getStatus(path);
     mountPointMap.put(mountPoint, fsStatus);
+  }
+
+  static AccessControlException readOnlyMountTable(final String operation,
+      final String p) {
+    return new AccessControlException(
+        "InternalDir of ViewFileSystem is readonly, operation " + operation +
+            " not permitted on path " + p + ".");
+  }
+  static AccessControlException readOnlyMountTable(final String operation,
+      final Path p) {
+    return readOnlyMountTable(operation, p.toString());
   }
 
 }

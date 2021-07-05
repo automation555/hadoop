@@ -18,9 +18,10 @@
 package org.apache.hadoop.fs.viewfs;
 
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -57,7 +58,8 @@ import java.util.List;
 /**
  * Nfly is a multi filesystem mount point.
  */
-@Private
+@InterfaceAudience.Public
+@InterfaceStability.Unstable
 final class NflyFSystem extends FileSystem {
   private static final Logger LOG = LoggerFactory.getLogger(NflyFSystem.class);
   private static final String NFLY_TMP_PREFIX = "_nfly_tmp_";
@@ -212,21 +214,6 @@ final class NflyFSystem extends FileSystem {
    */
   private NflyFSystem(URI[] uris, Configuration conf, int minReplication,
       EnumSet<NflyKey> nflyFlags) throws IOException {
-    this(uris, conf, minReplication, nflyFlags, null);
-  }
-
-  /**
-   * Creates a new Nfly instance.
-   *
-   * @param uris the list of uris in the mount point
-   * @param conf configuration object
-   * @param minReplication minimum copies to commit a write op
-   * @param nflyFlags modes such readMostRecent
-   * @param fsGetter to get the file system instance with the given uri
-   * @throws IOException
-   */
-  private NflyFSystem(URI[] uris, Configuration conf, int minReplication,
-      EnumSet<NflyKey> nflyFlags, FsGetter fsGetter) throws IOException {
     if (uris.length < minReplication) {
       throw new IOException(minReplication + " < " + uris.length
           + ": Minimum replication < #destinations");
@@ -253,14 +240,8 @@ final class NflyFSystem extends FileSystem {
     nodes = new NflyNode[uris.length];
     final Iterator<String> rackIter = rackStrings.iterator();
     for (int i = 0; i < nodes.length; i++) {
-      if (fsGetter != null) {
-        nodes[i] = new NflyNode(hostStrings.get(i), rackIter.next(),
-            new ChRootedFileSystem(fsGetter.getNewInstance(uris[i], conf),
-                uris[i]));
-      } else {
-        nodes[i] =
-            new NflyNode(hostStrings.get(i), rackIter.next(), uris[i], conf);
-      }
+      nodes[i] = new NflyNode(hostStrings.get(i), rackIter.next(), uris[i],
+          conf);
     }
     // sort all the uri's by distance from myNode, the local file system will
     // automatically be the the first one.
@@ -941,8 +922,8 @@ final class NflyFSystem extends FileSystem {
    * @return an Nfly filesystem
    * @throws IOException
    */
-  static FileSystem createFileSystem(URI[] uris, Configuration conf,
-      String settings, FsGetter fsGetter) throws IOException {
+  public static FileSystem createFileSystem(URI[] uris, Configuration conf,
+      String settings) throws IOException {
     // assert settings != null
     int minRepl = DEFAULT_MIN_REPLICATION;
     EnumSet<NflyKey> nflyFlags = EnumSet.noneOf(NflyKey.class);
@@ -967,6 +948,6 @@ final class NflyFSystem extends FileSystem {
         throw new IllegalArgumentException(nflyKey + ": Infeasible");
       }
     }
-    return new NflyFSystem(uris, conf, minRepl, nflyFlags, fsGetter);
+    return new NflyFSystem(uris, conf, minRepl, nflyFlags);
   }
 }
