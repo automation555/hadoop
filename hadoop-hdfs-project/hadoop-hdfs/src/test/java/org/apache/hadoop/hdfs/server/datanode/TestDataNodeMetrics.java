@@ -33,12 +33,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
+
 import java.util.function.Supplier;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 import net.jcip.annotations.NotThreadSafe;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.MiniDFSNNTopology;
-import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -165,10 +166,13 @@ public class TestDataNodeMetrics {
   @Test
   public void testReceivePacketSlowMetrics() throws Exception {
     Configuration conf = new HdfsConfiguration();
+    // This is required to trigger the PacketsSlowWriteToOsCache counter since we are only writing a 1-byte file.
+    BlockReceiver.CACHE_DROP_LAG_BYTES = 0;
     final int interval = 1;
     conf.setInt(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY, interval);
+    final int NUM_DATANODES = 3;
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
-        .numDataNodes(3).build();
+        .numDataNodes(NUM_DATANODES).build();
     try {
       cluster.waitActive();
       DistributedFileSystem fs = cluster.getFileSystem();
@@ -194,14 +198,25 @@ public class TestDataNodeMetrics {
       fout.hsync();
       fout.close();
       List<DataNode> datanodes = cluster.getDataNodes();
-      DataNode datanode = datanodes.get(0);
-      MetricsRecordBuilder dnMetrics = getMetrics(datanode.getMetrics().name());
-      assertTrue("More than 1 packet received",
-          getLongCounter("TotalPacketsReceived", dnMetrics) > 1L);
-      assertTrue("More than 1 slow packet to mirror",
-          getLongCounter("TotalPacketsSlowWriteToMirror", dnMetrics) > 1L);
-      assertCounter("TotalPacketsSlowWriteToDisk", 1L, dnMetrics);
-      assertCounter("TotalPacketsSlowWriteToOsCache", 0L, dnMetrics);
+      long sumPacketsReceived = 0;
+      long sumPacketsSlowWriteToMirror = 0;
+      long sumPacketsSlowWriteToDisk = 0;
+      long sumPacketsSlowWriteToOsCache = 0;
+      for (DataNode datanode : datanodes) {
+        MetricsRecordBuilder dnMetrics = getMetrics(datanode.getMetrics().name());
+        sumPacketsReceived += getLongCounter("PacketsReceived", dnMetrics);
+        sumPacketsSlowWriteToMirror += getLongCounter("PacketsSlowWriteToMirror", dnMetrics);
+        sumPacketsSlowWriteToDisk += getLongCounter("PacketsSlowWriteToDisk", dnMetrics);
+        sumPacketsSlowWriteToOsCache += getLongCounter("PacketsSlowWriteToOsCache", dnMetrics);
+      }
+      assertTrue("At least 3 packets received",
+              sumPacketsReceived >= 3L);
+      assertTrue("At least 2 slow packets to mirror",
+              sumPacketsSlowWriteToMirror >= 2L);
+      assertEquals("Exactly 3 PacketsSlowWriteToDisk",
+              3L, sumPacketsSlowWriteToDisk);
+      assertEquals("Exactly 3 PacketsSlowWriteToOsCache",
+              3L, sumPacketsSlowWriteToOsCache);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
