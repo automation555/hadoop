@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.util;
 
 import java.util.concurrent.BlockingQueue;
@@ -27,6 +28,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.util.concurrent.MoreExecutors;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
@@ -103,7 +106,8 @@ public final class BlockingThreadPoolExecutorService
 
   private BlockingThreadPoolExecutorService(int permitCount,
       ThreadPoolExecutor eventProcessingExecutor) {
-    super(eventProcessingExecutor, permitCount, false);
+    super(MoreExecutors.listeningDecorator(eventProcessingExecutor),
+        permitCount, false);
     this.eventProcessingExecutor = eventProcessingExecutor;
   }
 
@@ -158,9 +162,9 @@ public final class BlockingThreadPoolExecutorService
   public String toString() {
     final StringBuilder sb = new StringBuilder(
         "BlockingThreadPoolExecutorService{");
-    sb.append(super.toString())
-        .append(", activeCount=").append(getActiveCount())
-        .append('}');
+    sb.append(super.toString());
+    sb.append(", activeCount=").append(getActiveCount());
+    sb.append('}');
     return sb.toString();
   }
 }

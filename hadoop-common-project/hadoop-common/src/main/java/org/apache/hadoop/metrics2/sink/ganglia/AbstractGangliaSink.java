@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.configuration2.SubsetConfiguration;
+import org.apache.commons.configuration.SubsetConfiguration;
 import org.apache.hadoop.metrics2.MetricsSink;
 import org.apache.hadoop.metrics2.util.Servers;
 import org.apache.hadoop.net.DNS;
@@ -112,7 +112,6 @@ public abstract class AbstractGangliaSink implements MetricsSink {
    * org.apache.hadoop.metrics2.MetricsPlugin#init(org.apache.commons.configuration
    * .SubsetConfiguration)
    */
-  @Override
   public void init(SubsetConfiguration conf) {
     LOG.debug("Initializing the GangliaSink for Ganglia metrics.");
 
@@ -168,7 +167,6 @@ public abstract class AbstractGangliaSink implements MetricsSink {
    *
    * @see org.apache.hadoop.metrics2.MetricsSink#flush()
    */
-  @Override
   public void flush() {
     // nothing to do as we are not buffering data
   }

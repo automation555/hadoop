@@ -30,7 +30,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.http.HttpServer2;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * A servlet to print out the running configuration data.
@@ -63,7 +63,7 @@ public class ConfServlet extends HttpServlet {
       return;
     }
 
-    String format = parseAcceptHeader(request);
+    String format = parseAccecptHeader(request);
     if (FORMAT_XML.equals(format)) {
       response.setContentType("text/xml; charset=utf-8");
     } else if (FORMAT_JSON.equals(format)) {
@@ -83,7 +83,7 @@ public class ConfServlet extends HttpServlet {
   }
 
   @VisibleForTesting
-  static String parseAcceptHeader(HttpServletRequest request) {
+  static String parseAccecptHeader(HttpServletRequest request) {
     String format = request.getHeader(HttpHeaders.ACCEPT);
     return format != null && format.contains(FORMAT_JSON) ?
         FORMAT_JSON : FORMAT_XML;

@@ -15,8 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.util;
-import java.io.File;
+package org.apache.hadoop.util;import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -55,9 +54,9 @@ import org.slf4j.LoggerFactory;
  * line arguments, enabling applications to easily specify a namenode, a 
  * ResourceManager, additional configuration resources etc.
  * 
- * <h3 id="GenericOptions">Generic Options</h3>
+ * <h4 id="GenericOptions">Generic Options</h4>
  * 
- * <p>The supported generic options are:
+ * <p>The supported generic options are:</p>
  * <p><blockquote><pre>
  *     -conf &lt;configuration file&gt;     specify a configuration file
  *     -D &lt;property=value&gt;            use value for given property
@@ -70,12 +69,12 @@ import org.slf4j.LoggerFactory;
  *     -archives &lt;comma separated list of archives&gt;    specify comma
  *             separated archives to be unarchived on the compute machines.
 
- * </pre></blockquote><p>
+ * </pre></blockquote></p>
  * 
  * <p>The general command line syntax is:</p>
- * <p><pre><code>
+ * <p><tt><pre>
  * bin/hadoop command [genericOptions] [commandOptions]
- * </code></pre><p>
+ * </pre></tt></p>
  * 
  * <p>Generic command line arguments <strong>might</strong> modify 
  * <code>Configuration </code> objects, given to constructors.</p>
@@ -105,7 +104,7 @@ import org.slf4j.LoggerFactory;
  * $ bin/hadoop jar -libjars testlib.jar 
  * -archives test.tgz -files file.txt inputjar args
  * job submission with libjars, files and archives
- * </pre></blockquote><p>
+ * </pre></blockquote></p>
  *
  * @see Tool
  * @see ToolRunner
@@ -142,8 +141,8 @@ public class GenericOptionsParser {
   }
   
   /** 
-   * Create a <code>GenericOptionsParser</code> to parse only the generic
-   * Hadoop arguments.
+   * Create a <code>GenericOptionsParser<code> to parse only the generic Hadoop  
+   * arguments. 
    * 
    * The array of string arguments other than the generic arguments can be 
    * obtained by {@link #getRemainingArgs()}.
@@ -218,7 +217,7 @@ public class GenericOptionsParser {
 
   /**
    * Specify properties of each generic option.
-   * <i>Important</i>: as {@link OptionBuilder} is not thread safe, subclasses
+   * <i>Important</i?: as {@link OptionBuilder} is not thread safe, subclasses
    * must synchronize use on {@code OptionBuilder.class}
    */
   @SuppressWarnings("static-access")

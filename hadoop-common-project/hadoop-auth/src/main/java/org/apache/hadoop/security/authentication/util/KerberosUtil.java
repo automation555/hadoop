@@ -22,7 +22,9 @@ import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -36,13 +38,12 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.apache.kerby.kerberos.kerb.keytab.Keytab;
-import org.apache.kerby.kerberos.kerb.type.base.PrincipalName;
+import org.apache.directory.server.kerberos.shared.keytab.Keytab;
+import org.apache.directory.server.kerberos.shared.keytab.KeytabEntry;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.Oid;
 
 import javax.security.auth.Subject;
-import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.kerberos.KeyTab;
 
@@ -50,7 +51,7 @@ public class KerberosUtil {
 
   /* Return the Kerberos login module name */
   public static String getKrb5LoginModuleName() {
-    return (IBM_JAVA)
+    return System.getProperty("java.vendor").contains("IBM")
       ? "com.ibm.security.auth.module.Krb5LoginModule"
       : "com.sun.security.auth.module.Krb5LoginModule";
   }
@@ -72,67 +73,53 @@ public class KerberosUtil {
     }
   }
 
-  /**
-   * Returns the Oid instance from string oidName.
-   * Use {@link GSS_SPNEGO_MECH_OID}, {@link GSS_KRB5_MECH_OID},
-   * or {@link NT_GSS_KRB5_PRINCIPAL_OID} instead.
-   *
-   * @return Oid instance
-   * @param oidName The oid Name
-   * @throws ClassNotFoundException for backward compatibility.
-   * @throws GSSException for backward compatibility.
-   * @throws NoSuchFieldException if the input is not supported.
-   * @throws IllegalAccessException for backward compatibility.
-   *
-   */
-  @Deprecated
-  public static Oid getOidInstance(String oidName)
+  public static Oid getOidInstance(String oidName) 
       throws ClassNotFoundException, GSSException, NoSuchFieldException,
       IllegalAccessException {
-    switch (oidName) {
-    case "GSS_SPNEGO_MECH_OID":
-      return GSS_SPNEGO_MECH_OID;
-    case "GSS_KRB5_MECH_OID":
-      return GSS_KRB5_MECH_OID;
-    case "NT_GSS_KRB5_PRINCIPAL":
-      return NT_GSS_KRB5_PRINCIPAL_OID;
-    default:
-      throw new NoSuchFieldException(
-          "oidName: " + oidName + " is not supported.");
+    Class<?> oidClass;
+    if (IBM_JAVA) {
+      if ("NT_GSS_KRB5_PRINCIPAL".equals(oidName)) {
+        // IBM JDK GSSUtil class does not have field for krb5 principal oid
+        return new Oid("1.2.840.113554.1.2.2.1");
+      }
+      oidClass = Class.forName("com.ibm.security.jgss.GSSUtil");
+    } else {
+      oidClass = Class.forName("sun.security.jgss.GSSUtil");
     }
+    Field oidField = oidClass.getDeclaredField(oidName);
+    return (Oid)oidField.get(oidClass);
   }
 
-  /**
-   * Return the default realm for this JVM.
-   *
-   * @return The default realm
-   * @throws IllegalArgumentException If the default realm does not exist.
-   * @throws ClassNotFoundException Not thrown. Exists for compatibility.
-   * @throws NoSuchMethodException Not thrown. Exists for compatibility.
-   * @throws IllegalAccessException Not thrown. Exists for compatibility.
-   * @throws InvocationTargetException Not thrown. Exists for compatibility.
-   */
-  public static String getDefaultRealm()
-      throws ClassNotFoundException, NoSuchMethodException,
-      IllegalArgumentException, IllegalAccessException,
+  public static String getDefaultRealm() 
+      throws ClassNotFoundException, NoSuchMethodException, 
+      IllegalArgumentException, IllegalAccessException, 
       InvocationTargetException {
-    // Any name is okay.
-    return new KerberosPrincipal("tmp", 1).getRealm();
+    Object kerbConf;
+    Class<?> classRef;
+    Method getInstanceMethod;
+    Method getDefaultRealmMethod;
+    if (System.getProperty("java.vendor").contains("IBM")) {
+      classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+    } else {
+      classRef = Class.forName("sun.security.krb5.Config");
+    }
+    getInstanceMethod = classRef.getMethod("getInstance", new Class[0]);
+    kerbConf = getInstanceMethod.invoke(classRef, new Object[0]);
+    getDefaultRealmMethod = classRef.getDeclaredMethod("getDefaultRealm",
+         new Class[0]);
+    return (String)getDefaultRealmMethod.invoke(kerbConf, new Object[0]);
   }
 
-  /**
-   * Return the default realm for this JVM.
-   * If the default realm does not exist, this method returns null.
-   *
-   * @return The default realm
-   */
   public static String getDefaultRealmProtected() {
+    String realmString = null;
     try {
-      return getDefaultRealm();
-    } catch (Exception e) {
+      realmString = getDefaultRealm();
+    } catch (RuntimeException rte) {
       //silently catch everything
-      return null;
+    } catch (Exception e) {
+      //silently return null
     }
+    return realmString;
   }
 
   /*
@@ -157,7 +144,7 @@ public class KerberosUtil {
     Object principalName; //of type sun.security.krb5.PrincipalName or IBM equiv
     String realmString = null;
     try {
-      if (IBM_JAVA) {
+      if (System.getProperty("java.vendor").contains("IBM")) {
         classRef = Class.forName("com.ibm.security.krb5.PrincipalName");
       } else {
         classRef = Class.forName("sun.security.krb5.PrincipalName");
@@ -180,7 +167,7 @@ public class KerberosUtil {
   }
 
   /* Return fqdn of the current host */
-  public static String getLocalHostName() throws UnknownHostException {
+  static String getLocalHostName() throws UnknownHostException {
     return InetAddress.getLocalHost().getCanonicalHostName();
   }
   
@@ -214,7 +201,7 @@ public class KerberosUtil {
     }
     // convert hostname to lowercase as kerberos does not work with hostnames
     // with uppercase characters.
-    fqdn = fqdn.toLowerCase(Locale.US);
+    fqdn = fqdn.toLowerCase(Locale.ENGLISH);
     shortprinc = service + "/" + fqdn;
     // Obtain the realm name inferred from the domain of the host
     realmString = getDomainRealm(shortprinc);
@@ -235,14 +222,14 @@ public class KerberosUtil {
    *          If keytab entries cannot be read from the file.
    */
   static final String[] getPrincipalNames(String keytabFileName) throws IOException {
-    Keytab keytab = Keytab.loadKeytab(new File(keytabFileName));
-    Set<String> principals = new HashSet<String>();
-    List<PrincipalName> entries = keytab.getPrincipals();
-    for (PrincipalName entry : entries) {
-      principals.add(entry.getName().replace("\\", "/"));
+      Keytab keytab = Keytab.read(new File(keytabFileName));
+      Set<String> principals = new HashSet<String>();
+      List<KeytabEntry> entries = keytab.getEntries();
+      for (KeytabEntry entry: entries){
+        principals.add(entry.getPrincipalName().replace("\\", "/"));
+      }
+      return principals.toArray(new String[0]);
     }
-    return principals.toArray(new String[0]);
-  }
 
   /**
    * Get all the unique principals from keytabfile which matches a pattern.
@@ -462,6 +449,11 @@ public class KerberosUtil {
     @Override
     public String toString() {
       return "[tag=0x"+Integer.toHexString(tag)+" bb="+bb+"]";
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
     }
   }
 }

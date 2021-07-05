@@ -35,8 +35,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class Trash extends Configured {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(Trash.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Trash.class);
 
   private TrashPolicy trashPolicy; // configured trash policy instance
 
@@ -118,12 +117,6 @@ public class Trash extends Configured {
   /** Delete old checkpoint(s). */
   public void expunge() throws IOException {
     trashPolicy.deleteCheckpoint();
-  }
-
-  /** Delete all trash immediately. */
-  public void expungeImmediately() throws IOException {
-    trashPolicy.createCheckpoint();
-    trashPolicy.deleteCheckpointsImmediately();
   }
 
   /** get the current working directory */

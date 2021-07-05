@@ -20,18 +20,18 @@ package org.apache.hadoop.util.curator;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.curator.framework.AuthInfo;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.api.transaction.CuratorOp;
+import org.apache.curator.framework.api.transaction.CuratorTransaction;
+import org.apache.curator.framework.api.transaction.CuratorTransactionFinal;
 import org.apache.curator.retry.RetryNTimes;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.ACL;
@@ -39,7 +39,7 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 
 /**
  * Helper class that provides utility methods specific to ZK operations.
@@ -100,11 +100,22 @@ public final class ZKCuratorManager {
    * Utility method to fetch ZK auth info from the configuration.
    * @throws java.io.IOException if the Zookeeper ACLs configuration file
    * cannot be read
-   * @throws ZKUtil.BadAuthFormatException if the auth format is invalid
    */
   public static List<ZKUtil.ZKAuthInfo> getZKAuths(Configuration conf)
       throws IOException {
-    return SecurityUtil.getZKAuthInfos(conf, CommonConfigurationKeys.ZK_AUTH);
+    String zkAuthConf = conf.get(CommonConfigurationKeys.ZK_AUTH);
+    try {
+      zkAuthConf = ZKUtil.resolveConfIndirection(zkAuthConf);
+      if (zkAuthConf != null) {
+        return ZKUtil.parseAuth(zkAuthConf);
+      } else {
+        return Collections.emptyList();
+      }
+    } catch (IOException | ZKUtil.BadAuthFormatException e) {
+      LOG.error("Couldn't read Auth based on {}",
+          CommonConfigurationKeys.ZK_AUTH);
+      throw e;
+    }
   }
 
   /**
@@ -112,7 +123,7 @@ public final class ZKCuratorManager {
    * @throws IOException If the connection cannot be started.
    */
   public void start() throws IOException {
-    this.start(new ArrayList<>());
+    this.start(new ArrayList<AuthInfo>());
   }
 
   /**
@@ -387,45 +398,43 @@ public final class ZKCuratorManager {
   /**
    * Use curator transactions to ensure zk-operations are performed in an all
    * or nothing fashion. This is equivalent to using ZooKeeper#multi.
+   *
+   * TODO (YARN-3774): Curator 3.0 introduces CuratorOp similar to Op. We ll
+   * have to rewrite this inner class when we adopt that.
    */
   public class SafeTransaction {
+    private CuratorTransactionFinal transactionFinal;
     private String fencingNodePath;
-    private List<CuratorOp> curatorOperations = new LinkedList<>();
 
     SafeTransaction(List<ACL> fencingACL, String fencingNodePath)
         throws Exception {
       this.fencingNodePath = fencingNodePath;
-      curatorOperations.add(curator.transactionOp().create()
-                              .withMode(CreateMode.PERSISTENT)
-                              .withACL(fencingACL)
-                              .forPath(fencingNodePath, new byte[0]));
+      CuratorTransaction transaction = curator.inTransaction();
+      transactionFinal = transaction.create()
+          .withMode(CreateMode.PERSISTENT).withACL(fencingACL)
+          .forPath(fencingNodePath, new byte[0]).and();
     }
 
     public void commit() throws Exception {
-      curatorOperations.add(curator.transactionOp().delete()
-                              .forPath(fencingNodePath));
-      curator.transaction().forOperations(curatorOperations);
-      curatorOperations.clear();
+      transactionFinal = transactionFinal.delete()
+          .forPath(fencingNodePath).and();
+      transactionFinal.commit();
     }
 
     public void create(String path, byte[] data, List<ACL> acl, CreateMode mode)
         throws Exception {
-      curatorOperations.add(curator.transactionOp().create()
-                              .withMode(mode)
-                              .withACL(acl)
-                              .forPath(path, data));
+      transactionFinal = transactionFinal.create()
+          .withMode(mode).withACL(acl).forPath(path, data).and();
     }
 
     public void delete(String path) throws Exception {
-      curatorOperations.add(curator.transactionOp().delete()
-                              .forPath(path));
+      transactionFinal = transactionFinal.delete().forPath(path).and();
     }
 
     public void setData(String path, byte[] data, int version)
         throws Exception {
-      curatorOperations.add(curator.transactionOp().setData()
-                              .withVersion(version)
-                              .forPath(path, data));
+      transactionFinal = transactionFinal.setData()
+          .withVersion(version).forPath(path, data).and();
     }
   }
 }

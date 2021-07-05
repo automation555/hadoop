@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.fs;
 
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Options.ChecksumOpt;
-import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
 
@@ -28,7 +29,6 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.EnumSet;
 
-import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 
@@ -43,49 +43,13 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_
  * Progressable)}.
  *
  * To create missing parent directory, use {@link #recursive()}.
- *
- * To be more generic, {@link #opt(String, int)} and {@link #must(String, int)}
- * variants provide implementation-agnostic way to customize the builder.
- * Each FS-specific builder implementation can interpret the FS-specific
- * options accordingly, for example:
- *
- * <code>
- *
- * // Don't
- * if (fs instanceof FooFileSystem) {
- *   FooFileSystem fs = (FooFileSystem) fs;
- *   OutputStream out = dfs.createFile(path)
- *     .optionA()
- *     .optionB("value")
- *     .cache()
- *   .build()
- * } else if (fs instanceof BarFileSystem) {
- *   ...
- * }
- *
- * // Do
- * OutputStream out = fs.createFile(path)
- *   .permission(perm)
- *   .bufferSize(bufSize)
- *   .opt("foofs:option.a", true)
- *   .opt("foofs:option.b", "value")
- *   .opt("barfs:cache", true)
- *   .must("foofs:cache", true)
- *   .must("barfs:cache-size", 256 * 1024 * 1024)
- *   .build();
- * </code>
- *
- * If the option is not related to the file system, the option will be ignored.
- * If the option is must, but not supported by the file system, a
- * {@link IllegalArgumentException} will be thrown.
- *
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public abstract class FSDataOutputStreamBuilder
-    <S extends FSDataOutputStream, B extends FSDataOutputStreamBuilder<S, B>>
-    extends AbstractFSBuilderImpl<S, B> {
+    <S extends FSDataOutputStream, B extends FSDataOutputStreamBuilder<S, B>> {
   private final FileSystem fs;
+  private final Path path;
   private FsPermission permission = null;
   private int bufferSize;
   private short replication;
@@ -99,45 +63,29 @@ public abstract class FSDataOutputStreamBuilder
   /**
    * Return the concrete implementation of the builder instance.
    */
-  public abstract B getThisBuilder();
-
-  /**
-   * Construct from a {@link FileContext}.
-   *
-   * @param fc FileContext
-   * @param p path.
-   * @throws IOException failure
-   */
-  FSDataOutputStreamBuilder(@Nonnull FileContext fc,
-      @Nonnull Path p) throws IOException {
-    super(checkNotNull(p));
-    checkNotNull(fc);
-    this.fs = null;
-
-    AbstractFileSystem afs = fc.getFSofPath(p);
-    FsServerDefaults defaults = afs.getServerDefaults(p);
-    bufferSize = defaults.getFileBufferSize();
-    replication = defaults.getReplication();
-    blockSize = defaults.getBlockSize();
-  }
+  protected abstract B getThisBuilder();
 
   /**
    * Constructor.
    */
   protected FSDataOutputStreamBuilder(@Nonnull FileSystem fileSystem,
       @Nonnull Path p) {
-    super(checkNotNull(p));
-    checkNotNull(fileSystem);
+    Preconditions.checkNotNull(fileSystem);
+    Preconditions.checkNotNull(p);
     fs = fileSystem;
+    path = p;
     bufferSize = fs.getConf().getInt(IO_FILE_BUFFER_SIZE_KEY,
         IO_FILE_BUFFER_SIZE_DEFAULT);
-    replication = fs.getDefaultReplication(p);
+    replication = fs.getDefaultReplication(path);
     blockSize = fs.getDefaultBlockSize(p);
   }
 
   protected FileSystem getFS() {
-    checkNotNull(fs);
     return fs;
+  }
+
+  protected Path getPath() {
+    return path;
   }
 
   protected FsPermission getPermission() {
@@ -151,7 +99,7 @@ public abstract class FSDataOutputStreamBuilder
    * Set permission for the file.
    */
   public B permission(@Nonnull final FsPermission perm) {
-    checkNotNull(perm);
+    Preconditions.checkNotNull(perm);
     permission = perm;
     return getThisBuilder();
   }
@@ -215,7 +163,7 @@ public abstract class FSDataOutputStreamBuilder
    * Set the facility of reporting progress.
    */
   public B progress(@Nonnull final Progressable prog) {
-    checkNotNull(prog);
+    Preconditions.checkNotNull(prog);
     progress = prog;
     return getThisBuilder();
   }
@@ -262,7 +210,7 @@ public abstract class FSDataOutputStreamBuilder
    * Set checksum opt.
    */
   public B checksumOpt(@Nonnull final ChecksumOpt chksumOpt) {
-    checkNotNull(chksumOpt);
+    Preconditions.checkNotNull(chksumOpt);
     checksumOpt = chksumOpt;
     return getThisBuilder();
   }
@@ -270,8 +218,8 @@ public abstract class FSDataOutputStreamBuilder
   /**
    * Create the FSDataOutputStream to write on the file system.
    *
-   * @throws IllegalArgumentException if the parameters are not valid.
+   * @throws HadoopIllegalArgumentException if the parameters are not valid.
    * @throws IOException on errors when file system creates or appends the file.
    */
-  public abstract S build() throws IllegalArgumentException, IOException;
+  public abstract S build() throws IOException;
 }

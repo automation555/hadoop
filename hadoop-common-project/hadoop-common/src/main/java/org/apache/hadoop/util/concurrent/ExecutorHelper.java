@@ -29,8 +29,8 @@ import java.util.concurrent.Future;
 /** Helper functions for Executors. */
 public final class ExecutorHelper {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(ExecutorHelper.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ExecutorHelper.class);
 
   static void logThrowableFromAfterExecute(Runnable r, Throwable t) {
     if (LOG.isDebugEnabled()) {

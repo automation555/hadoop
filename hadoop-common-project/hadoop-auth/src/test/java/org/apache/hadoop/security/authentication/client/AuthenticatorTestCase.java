@@ -13,28 +13,27 @@
  */
 package org.apache.hadoop.security.authentication.client;
 
+import org.apache.catalina.deploy.FilterDef;
+import org.apache.catalina.deploy.FilterMap;
+import org.apache.catalina.startup.Tomcat;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
-import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.params.AuthPolicy;
 import org.apache.http.entity.InputStreamEntity;
-import org.apache.http.impl.auth.SPNegoScheme;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.auth.SPNegoSchemeFactory;
+import org.apache.http.impl.client.SystemDefaultHttpClient;
 import org.apache.http.util.EntityUtils;
-import org.eclipse.jetty.server.Connector;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.mortbay.jetty.Server;
+import org.mortbay.jetty.servlet.Context;
+import org.mortbay.jetty.servlet.FilterHolder;
+import org.mortbay.jetty.servlet.ServletHolder;
 
-import javax.servlet.DispatcherType;
 import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -42,6 +41,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -52,20 +52,24 @@ import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.security.Principal;
-import java.util.EnumSet;
 import java.util.Properties;
-
 import org.junit.Assert;
 
 public class AuthenticatorTestCase {
   private Server server;
   private String host = null;
   private int port = -1;
-  ServletContextHandler context;
+  private boolean useTomcat = false;
+  private Tomcat tomcat = null;
+  Context context;
 
   private static Properties authenticatorConfig;
 
   public AuthenticatorTestCase() {}
+
+  public AuthenticatorTestCase(boolean useTomcat) {
+    this.useTomcat = useTomcat;
+  }
 
   protected static void setAuthenticationHandlerConfig(Properties config) {
     authenticatorConfig = config;
@@ -110,29 +114,51 @@ public class AuthenticatorTestCase {
   }
 
   protected void start() throws Exception {
-    startJetty();
+    if (useTomcat) startTomcat();
+    else startJetty();
   }
 
   protected void startJetty() throws Exception {
-    server = new Server();
-    context = new ServletContextHandler();
+    server = new Server(0);
+    context = new Context();
     context.setContextPath("/foo");
     server.setHandler(context);
-    context.addFilter(new FilterHolder(TestFilter.class), "/*",
-        EnumSet.of(DispatcherType.REQUEST));
+    context.addFilter(new FilterHolder(TestFilter.class), "/*", 0);
     context.addServlet(new ServletHolder(TestServlet.class), "/bar");
     host = "localhost";
     port = getLocalPort();
-    ServerConnector connector = new ServerConnector(server);
-    connector.setHost(host);
-    connector.setPort(port);
-    server.setConnectors(new Connector[] {connector});
+    server.getConnectors()[0].setHost(host);
+    server.getConnectors()[0].setPort(port);
     server.start();
     System.out.println("Running embedded servlet container at: http://" + host + ":" + port);
   }
 
+  protected void startTomcat() throws Exception {
+    tomcat = new Tomcat();
+    File base = new File(System.getProperty("java.io.tmpdir"));
+    org.apache.catalina.Context ctx =
+      tomcat.addContext("/foo",base.getAbsolutePath());
+    FilterDef fd = new FilterDef();
+    fd.setFilterClass(TestFilter.class.getName());
+    fd.setFilterName("TestFilter");
+    FilterMap fm = new FilterMap();
+    fm.setFilterName("TestFilter");
+    fm.addURLPattern("/*");
+    fm.addServletName("/bar");
+    ctx.addFilterDef(fd);
+    ctx.addFilterMap(fm);
+    tomcat.addServlet(ctx, "/bar", TestServlet.class.getName());
+    ctx.addServletMapping("/bar", "/bar");
+    host = "localhost";
+    port = getLocalPort();
+    tomcat.setHostname(host);
+    tomcat.setPort(port);
+    tomcat.start();
+  }
+
   protected void stop() throws Exception {
-    stopJetty();
+    if (useTomcat) stopTomcat();
+    else stopJetty();
   }
 
   protected void stopJetty() throws Exception {
@@ -143,6 +169,18 @@ public class AuthenticatorTestCase {
 
     try {
       server.destroy();
+    } catch (Exception e) {
+    }
+  }
+
+  protected void stopTomcat() throws Exception {
+    try {
+      tomcat.stop();
+    } catch (Exception e) {
+    }
+
+    try {
+      tomcat.destroy();
     } catch (Exception e) {
     }
   }
@@ -203,29 +241,22 @@ public class AuthenticatorTestCase {
     }
   }
 
-  private HttpClient getHttpClient() {
-    HttpClientBuilder builder = HttpClientBuilder.create();
-    // Register auth schema
-    builder.setDefaultAuthSchemeRegistry(
-        s-> httpContext -> new SPNegoScheme(true, true)
-    );
+  private SystemDefaultHttpClient getHttpClient() {
+    final SystemDefaultHttpClient httpClient = new SystemDefaultHttpClient();
+    httpClient.getAuthSchemes().register(AuthPolicy.SPNEGO, new SPNegoSchemeFactory(true));
+     Credentials use_jaas_creds = new Credentials() {
+       public String getPassword() {
+         return null;
+       }
 
-    Credentials useJaasCreds = new Credentials() {
-      public String getPassword() {
-        return null;
-      }
-      public Principal getUserPrincipal() {
-        return null;
-      }
-    };
+       public Principal getUserPrincipal() {
+         return null;
+       }
+     };
 
-    CredentialsProvider jaasCredentialProvider
-        = new BasicCredentialsProvider();
-    jaasCredentialProvider.setCredentials(AuthScope.ANY, useJaasCreds);
-    // Set credential provider
-    builder.setDefaultCredentialsProvider(jaasCredentialProvider);
-
-    return builder.build();
+     httpClient.getCredentialsProvider().setCredentials(
+       AuthScope.ANY, use_jaas_creds);
+     return httpClient;
   }
 
   private void doHttpClientRequest(HttpClient httpClient, HttpUriRequest request) throws Exception {
@@ -242,7 +273,7 @@ public class AuthenticatorTestCase {
   protected void _testAuthenticationHttpClient(Authenticator authenticator, boolean doPost) throws Exception {
     start();
     try {
-      HttpClient httpClient = getHttpClient();
+      SystemDefaultHttpClient httpClient = getHttpClient();
       doHttpClientRequest(httpClient, new HttpGet(getBaseURL()));
 
       // Always do a GET before POST to trigger the SPNego negotiation

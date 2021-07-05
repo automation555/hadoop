@@ -30,9 +30,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -47,14 +44,12 @@ import org.apache.hadoop.fs.PathOperationException;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclUtil;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.viewfs.NotInMountpointException;
 import org.apache.hadoop.io.IOUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.fs.CreateFlag.CREATE;
 import static org.apache.hadoop.fs.CreateFlag.LAZY_PERSIST;
-import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
 
 /**
  * Provides: argument processing to ensure the destination is valid
@@ -62,11 +57,7 @@ import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
  * a source and resolved target.  Sources are resolved as children of
  * a destination directory.
  */
-abstract class CommandWithDestination extends FsCommand {
-
-  protected static final Logger LOG = LoggerFactory.getLogger(
-      CommandWithDestination.class);
-
+abstract class CommandWithDestination extends FsCommand {  
   protected PathData dst;
   private boolean overwrite = false;
   private boolean verifyChecksum = true;
@@ -127,7 +118,7 @@ abstract class CommandWithDestination extends FsCommand {
     }
   }
   
-  protected enum FileAttribute {
+  protected static enum FileAttribute {
     TIMESTAMPS, OWNERSHIP, PERMISSION, ACL, XATTR;
 
     public static FileAttribute getAttribute(char symbol) {
@@ -228,7 +219,6 @@ abstract class CommandWithDestination extends FsCommand {
       }
     } else if (dst.exists) {
       if (!dst.stat.isDirectory() && !overwrite) {
-        LOG.debug("Destination file exists: {}", dst.stat);
         throw new PathExistsException(dst.toString());
       }
     } else if (!dst.parentExists()) {
@@ -454,8 +444,8 @@ abstract class CommandWithDestination extends FsCommand {
           src.stat.getPermission());
     }
     if (shouldPreserve(FileAttribute.ACL)) {
-      if (src.stat.hasAcl()) {
-        FsPermission perm = src.stat.getPermission();
+      FsPermission perm = src.stat.getPermission();
+      if (perm.getAclBit()) {
         List<AclEntry> srcEntries =
             src.fs.getAclStatus(src.path).getEntries();
         List<AclEntry> srcFullEntries =
@@ -491,45 +481,37 @@ abstract class CommandWithDestination extends FsCommand {
         throws IOException {
       FSDataOutputStream out = null;
       try {
-        out = create(target, lazyPersist);
+        out = create(target, lazyPersist, direct);
         IOUtils.copyBytes(in, out, getConf(), true);
       } finally {
-        if (!direct) {
-          deleteOnExit(target.path);
-        }
         IOUtils.closeStream(out); // just in case copyBytes didn't
       }
     }
     
     // tag created files as temp files
-    FSDataOutputStream create(PathData item, boolean lazyPersist)
+    FSDataOutputStream create(PathData item, boolean lazyPersist,
+        boolean direct)
         throws IOException {
-      if (lazyPersist) {
-        long defaultBlockSize;
-        try {
-          defaultBlockSize = getDefaultBlockSize();
-        } catch (NotInMountpointException ex) {
-          // ViewFileSystem#getDefaultBlockSize() throws an exception as it
-          // needs a target FS to retrive the default block size from.
-          // Hence, for ViewFs, we should call getDefaultBlockSize with the
-          // target path.
-          defaultBlockSize = getDefaultBlockSize(item.path);
+      try {
+        if (lazyPersist) {
+          EnumSet<CreateFlag> createFlags = EnumSet.of(CREATE, LAZY_PERSIST);
+          return create(item.path,
+                        FsPermission.getFileDefault().applyUMask(
+                            FsPermission.getUMask(getConf())),
+                        createFlags,
+                        getConf().getInt(IO_FILE_BUFFER_SIZE_KEY,
+                            IO_FILE_BUFFER_SIZE_DEFAULT),
+                        (short) 1,
+                        getDefaultBlockSize(),
+                        null,
+                        null);
+        } else {
+          return create(item.path, true);
         }
-
-        EnumSet<CreateFlag> createFlags =
-            EnumSet.of(CREATE, LAZY_PERSIST, OVERWRITE);
-        return create(item.path,
-                      FsPermission.getFileDefault().applyUMask(
-                          FsPermission.getUMask(getConf())),
-                      createFlags,
-                      getConf().getInt(IO_FILE_BUFFER_SIZE_KEY,
-                          IO_FILE_BUFFER_SIZE_DEFAULT),
-                      (short) 1,
-                      defaultBlockSize,
-                      null,
-                      null);
-      } else {
-        return create(item.path, true);
+      } finally { // might have been created but stream was interrupted
+        if (!direct) {
+          deleteOnExit(item.path);
+        }
       }
     }
 

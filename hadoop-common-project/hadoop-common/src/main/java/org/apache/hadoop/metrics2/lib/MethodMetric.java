@@ -20,8 +20,8 @@ package org.apache.hadoop.metrics2.lib;
 
 import java.lang.reflect.Method;
 
-import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.*;
-import org.apache.commons.lang3.StringUtils;
+import static com.google.common.base.Preconditions.*;
+import org.apache.commons.lang.StringUtils;
 
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -77,7 +77,8 @@ class MethodMetric extends MutableMetric {
             Object ret = method.invoke(obj, (Object[])null);
             if (isInt(type)) rb.addCounter(info, ((Integer) ret).intValue());
             else rb.addCounter(info, ((Long) ret).longValue());
-          } catch (Exception ex) {
+          }
+          catch (Exception ex) {
             LOG.error("Error invoking method "+ method.getName(), ex);
           }
         }
@@ -113,7 +114,8 @@ class MethodMetric extends MutableMetric {
             else if (isLong(t)) rb.addGauge(info, ((Long) ret).longValue());
             else if (isFloat(t)) rb.addGauge(info, ((Float) ret).floatValue());
             else rb.addGauge(info, ((Double) ret).doubleValue());
-          } catch (Exception ex) {
+          }
+          catch (Exception ex) {
             LOG.error("Error invoking method "+ method.getName(), ex);
           }
         }
@@ -129,7 +131,8 @@ class MethodMetric extends MutableMetric {
           try {
             Object ret = method.invoke(obj, (Object[]) null);
             rb.tag(info, (String) ret);
-          } catch (Exception ex) {
+          }
+          catch (Exception ex) {
             LOG.error("Error invoking method "+ method.getName(), ex);
           }
         }

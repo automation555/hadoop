@@ -19,6 +19,7 @@ package org.apache.hadoop.fs.shell;
 
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -48,10 +49,15 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
+import org.codehaus.jackson.JsonEncoding;
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.util.MinimalPrettyPrinter;
 
 /**
  * Display contents or checksums of files 
@@ -175,7 +181,7 @@ class Display extends FsCommand {
   
   public static class Checksum extends Display {
     public static final String NAME = "checksum";
-    public static final String USAGE = "[-v] <src> ...";
+    public static final String USAGE = "<src> ...";
     public static final String DESCRIPTION =
       "Dump checksum information for files that match the file " +
       "pattern <src> to stdout. Note that this requires a round-trip " +
@@ -184,16 +190,6 @@ class Display extends FsCommand {
       "file depends on its content, block size and the checksum " +
       "algorithm and parameters used for creating the file.";
 
-    private boolean displayBlockSize;
-
-    @Override
-    protected void processOptions(LinkedList<String> args)
-        throws IOException {
-      CommandFormat cf = new CommandFormat(1, Integer.MAX_VALUE, "v");
-      cf.parse(args);
-      displayBlockSize = cf.getOpt("v");
-    }
-
     @Override
     protected void processPath(PathData item) throws IOException {
       if (item.stat.isDirectory()) {
@@ -201,22 +197,21 @@ class Display extends FsCommand {
       }
 
       FileChecksum checksum = item.fs.getFileChecksum(item.path);
-      String outputChecksum = checksum == null ? "NONE" :
-          String.format("%s\t%s", checksum.getAlgorithmName(), StringUtils
-              .byteToHexString(checksum.getBytes(), 0, checksum.getLength()));
-      if (displayBlockSize) {
-        FileStatus fileStatus = item.fs.getFileStatus(item.path);
-        out.printf("%s\t%s\tBlockSize=%s%n", item.toString(), outputChecksum,
-            fileStatus != null ? fileStatus.getBlockSize() : "NONE");
+      if (checksum == null) {
+        out.printf("%s\tNONE\t%n", item.toString());
       } else {
-        out.printf("%s\t%s%n", item.toString(), outputChecksum);
+        String checksumString = StringUtils.byteToHexString(
+            checksum.getBytes(), 0, checksum.getLength());
+        out.printf("%s\t%s\t%s%n",
+            item.toString(), checksum.getAlgorithmName(),
+            checksumString);
       }
     }
   }
 
   protected class TextRecordInputStream extends InputStream {
     SequenceFile.Reader r;
-    Writable key;
+    WritableComparable<?> key;
     Writable val;
 
     DataInputBuffer inbuf;
@@ -228,7 +223,7 @@ class Display extends FsCommand {
       r = new SequenceFile.Reader(lconf, 
           SequenceFile.Reader.file(fpath));
       key = ReflectionUtils.newInstance(
-          r.getKeyClass().asSubclass(Writable.class), lconf);
+          r.getKeyClass().asSubclass(WritableComparable.class), lconf);
       val = ReflectionUtils.newInstance(
           r.getValueClass().asSubclass(Writable.class), lconf);
       inbuf = new DataInputBuffer();
@@ -284,7 +279,12 @@ class Display extends FsCommand {
       Schema schema = fileReader.getSchema();
       writer = new GenericDatumWriter<Object>(schema);
       output = new ByteArrayOutputStream();
-      encoder = EncoderFactory.get().jsonEncoder(schema, output);
+      JsonGenerator generator =
+        new JsonFactory().createJsonGenerator(output, JsonEncoding.UTF8);
+      MinimalPrettyPrinter prettyPrinter = new MinimalPrettyPrinter();
+      prettyPrinter.setRootValueSeparator(System.getProperty("line.separator"));
+      generator.setPrettyPrinter(prettyPrinter);
+      encoder = EncoderFactory.get().jsonEncoder(schema, generator);
     }
 
     /**

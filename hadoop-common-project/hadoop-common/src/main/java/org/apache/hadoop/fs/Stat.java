@@ -20,7 +20,8 @@ package org.apache.hadoop.fs;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 
@@ -29,7 +30,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Shell;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Wrapper for the Unix stat(1) command. Used to workaround the lack of 
@@ -64,7 +65,9 @@ public class Stat extends Shell {
     this.blockSize = blockSize;
     this.dereference = deref;
     // LANG = C setting
-    setEnvironment(Collections.singletonMap("LANG", "C"));
+    Map<String, String> env = new HashMap<String, String>();
+    env.put("LANG", "C");
+    setEnvironment(env);
   }
 
   public FileStatus getFileStatus() throws IOException {

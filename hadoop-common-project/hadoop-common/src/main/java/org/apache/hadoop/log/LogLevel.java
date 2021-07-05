@@ -32,8 +32,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Jdk14Logger;
@@ -336,7 +336,7 @@ public class LogLevel {
       if (logName != null) {
         out.println("<br /><hr /><h3>Results</h3>");
         out.println(MARKER
-            + "Submitted Class Name: <b>" + logName + "</b><br />");
+            + "Submitted Log Name: <b>" + logName + "</b><br />");
 
         Log log = LogFactory.getLog(logName);
         out.println(MARKER
@@ -361,10 +361,10 @@ public class LogLevel {
     }
 
     static final String FORMS = "\n<br /><hr /><h3>Get / Set</h3>"
-        + "\n<form>Class Name: <input type='text' size='50' name='log' /> "
+        + "\n<form>Log: <input type='text' size='50' name='log' /> "
         + "<input type='submit' value='Get Log Level' />"
         + "</form>"
-        + "\n<form>Class Name: <input type='text' size='50' name='log' /> "
+        + "\n<form>Log: <input type='text' size='50' name='log' /> "
         + "Level: <input type='text' name='level' /> "
         + "<input type='submit' value='Set Log Level' />"
         + "</form>";

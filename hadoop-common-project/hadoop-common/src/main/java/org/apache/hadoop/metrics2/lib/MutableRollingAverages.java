@@ -24,23 +24,23 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang3.StringUtils;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.util.Time;
 
 import javax.annotation.Nullable;
@@ -122,7 +122,7 @@ public class MutableRollingAverages extends MutableMetric implements Closeable {
    * maintained.
    * </p>
    */
-  private Map<String, LinkedBlockingDeque<SumAndCount>> averages =
+  private ConcurrentMap<String, LinkedBlockingDeque<SumAndCount>> averages =
       new ConcurrentHashMap<>();
 
   private static final long WINDOW_SIZE_MS_DEFAULT = 300_000;
@@ -241,6 +241,9 @@ public class MutableRollingAverages extends MutableMetric implements Closeable {
   /**
    * Iterates over snapshot to capture all Avg metrics into rolling structure
    * {@link MutableRollingAverages#averages}.
+   * <p>
+   * This function is not thread safe, callers should ensure thread safety.
+   * </p>
    */
   private synchronized void rollOverAvgs() {
     if (currentSnapshot == null) {
@@ -249,14 +252,13 @@ public class MutableRollingAverages extends MutableMetric implements Closeable {
 
     for (Map.Entry<String, MutableRate> entry : currentSnapshot.entrySet()) {
       final MutableRate rate = entry.getValue();
-      final LinkedBlockingDeque<SumAndCount> deque = averages.computeIfAbsent(
-          entry.getKey(),
-          new Function<String, LinkedBlockingDeque<SumAndCount>>() {
-            @Override
-            public LinkedBlockingDeque<SumAndCount> apply(String k) {
-              return new LinkedBlockingDeque<>(numWindows);
-            }
-          });
+
+      LinkedBlockingDeque<SumAndCount> deque = averages.get(entry.getKey());
+      if (deque == null) {
+        deque = new LinkedBlockingDeque<>(numWindows);
+        averages.put(entry.getKey(), deque);
+      }
+
       final SumAndCount sumAndCount = new SumAndCount(
           rate.lastStat().total(),
           rate.lastStat().numSamples(),
@@ -280,7 +282,7 @@ public class MutableRollingAverages extends MutableMetric implements Closeable {
   }
 
   /**
-   * Retrieve a map of metric name {@literal ->} (aggregate).
+   * Retrieve a map of metric name -> (aggregate).
    * Filter out entries that don't have at least minSamples.
    *
    * @return a map of peer DataNode Id to the average latency to that

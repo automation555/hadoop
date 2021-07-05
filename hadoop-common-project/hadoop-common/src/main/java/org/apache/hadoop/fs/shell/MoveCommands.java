@@ -43,20 +43,10 @@ class MoveCommands {
    */
   public static class MoveFromLocal extends CopyFromLocal {
     public static final String NAME = "moveFromLocal";
-    public static final String USAGE =
-        "[-f] [-p] [-l] [-d] <localsrc> ... <dst>";
+    public static final String USAGE = "<localsrc> ... <dst>";
     public static final String DESCRIPTION = 
-        "Same as -put, except that the source is " +
-        "deleted after it's copied\n" +
-        "and -t option has not yet implemented.";
-
-    @Override
-    protected void processOptions(LinkedList<String> args) throws IOException {
-      if(args.contains("-t")) {
-        throw new CommandFormat.UnknownOptionException("-t");
-      }
-      super.processOptions(args);
-    }
+      "Same as -put, except that the source is " +
+      "deleted after it's copied.";
 
     @Override
     protected void processPath(PathData src, PathData target) throws IOException {
@@ -92,7 +82,7 @@ class MoveCommands {
     }
   }
 
-  /** move/rename paths on the same filesystem */
+  /** move/rename paths on the same fileystem */
   public static class Rename extends CommandWithDestination {
     public static final String NAME = "mv";
     public static final String USAGE = "<src> ... <dst>";

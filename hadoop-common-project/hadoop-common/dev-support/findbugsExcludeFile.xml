@@ -16,6 +16,9 @@
 -->
 <FindBugsFilter>
      <Match>
+       <Package name="org.apache.hadoop.record.compiler.generated" />
+     </Match>
+     <Match>
        <Package name="org.apache.hadoop.security.proto" />
      </Match>
      <Match>
@@ -47,19 +50,6 @@
        <Field name="ipcStreams" />
        <Bug pattern="IS2_INCONSISTENT_SYNC" />
      </Match>
-    <!--
-       The nativeCoder field is get/set and used by native codes.
-    -->
-    <Match>
-        <Class name="org.apache.hadoop.io.erasurecode.rawcoder.AbstractNativeRawEncoder" />
-        <Field name="nativeCoder" />
-        <Bug pattern="UUF_UNUSED_FIELD" />
-    </Match>
-    <Match>
-        <Class name="org.apache.hadoop.io.erasurecode.rawcoder.AbstractNativeRawDecoder" />
-        <Field name="nativeCoder" />
-        <Bug pattern="UUF_UNUSED_FIELD" />
-    </Match>
      <!-- 
        Further SaslException should be ignored during cleanup and
        original exception should be re-thrown.
@@ -212,6 +202,27 @@
      </Match>
 
      <Match>
+       <Class name="org.apache.hadoop.record.meta.Utils" />
+       <Method name="skip" />
+       <Bug pattern="BC_UNCONFIRMED_CAST" />
+     </Match>
+
+     <Match>
+       <Class name="org.apache.hadoop.fs.GlobalStorageStatistics" />
+       <Field name="map" />
+       <Bug pattern="SE_BAD_FIELD" />
+     </Match>
+
+     <!--
+        The compareTo method is actually a dummy method that just
+        throws excpetions. So, no need to override equals. Ignore
+     -->
+     <Match>
+       <Class name="org.apache.hadoop.record.meta.RecordTypeInfo" />
+       <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
+     </Match>
+
+     <Match>
        <Class name="org.apache.hadoop.util.ProcfsBasedProcessTree" />
        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
      </Match>
@@ -284,10 +295,6 @@
       <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.ProtobufRpcEngineProtos.*"/>
     </Match>
     <Match>
-        <!-- protobuf generated code -->
-        <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.ProtobufRpcEngine2Protos.*"/>
-    </Match>
-    <Match>
       <!-- protobuf generated code -->
       <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.ProtocolInfoProtos.*"/>
     </Match>
@@ -326,10 +333,6 @@
     <Match>
       <!-- protobuf generated code -->
       <Class name="~org\.apache\.hadoop\.tracing\.TraceAdminPB.*"/>
-    </Match>
-    <Match>
-      <!-- protobuf generated code -->
-      <Class name="~org\.apache\.hadoop\.fs\.FSProto.*"/>
     </Match>
 
     <!--
@@ -413,13 +416,6 @@
     <Bug pattern="NP_NULL_PARAM_DEREF"/>
   </Match>
 
-  <!-- Parameter is checked with Strings.isNullOrEmpty before accessing -->
-  <Match>
-    <Class name="org.apache.hadoop.conf.Configuration"/>
-    <Method name="asXmlDocument"/>
-    <Bug pattern="NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE"/>
-  </Match>
-
   <Match>
     <Class name="org.apache.hadoop.ipc.ExternalCall"/>
     <Filed name="done"/>
@@ -456,18 +452,5 @@
     <Class name="org.apache.hadoop.metrics2.lib.DefaultMetricsFactory"/>
     <Method name="setInstance"/>
     <Bug pattern="ME_ENUM_FIELD_SETTER"/>
-  </Match>
-
-  <!-- findbugs is complaining that a stream isn't closed. It will be. -->
-  <Match>
-    <Class name="org.apache.hadoop.util.JsonSerialization"/>
-    <Method name="save"/>
-    <Bug pattern="OBL_UNSATISFIED_OBLIGATION"/>
-  </Match>
-
-  <Match>
-    <Class name="org.apache.hadoop.ipc.ProtobufHelper" />
-    <Method name="getFixedByteString" />
-    <Bug pattern="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION" />
   </Match>
 </FindBugsFilter>

@@ -24,9 +24,9 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.compress.DirectDecompressor;
+import org.apache.hadoop.util.NativeCodeLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xerial.snappy.Snappy;
 
 /**
  * A {@link Decompressor} based on the snappy compression algorithm.
@@ -45,6 +45,24 @@ public class SnappyDecompressor implements Decompressor {
   private int userBufOff = 0, userBufLen = 0;
   private boolean finished;
 
+  private static boolean nativeSnappyLoaded = false;
+
+  static {
+    if (NativeCodeLoader.isNativeCodeLoaded() &&
+        NativeCodeLoader.buildSupportsSnappy()) {
+      try {
+        initIDs();
+        nativeSnappyLoaded = true;
+      } catch (Throwable t) {
+        LOG.error("failed to load SnappyDecompressor", t);
+      }
+    }
+  }
+  
+  public static boolean isNativeCodeLoaded() {
+    return nativeSnappyLoaded;
+  }
+  
   /**
    * Creates a new compressor.
    *
@@ -183,7 +201,7 @@ public class SnappyDecompressor implements Decompressor {
    * {@link #needsInput()} should be called in order to determine if more
    * input data is required.
    *
-   * @param b   Buffer for the uncompressed data
+   * @param b   Buffer for the compressed data
    * @param off Start offset of the data
    * @param len Size of the buffer
    * @return The actual number of bytes of compressed data.
@@ -214,7 +232,7 @@ public class SnappyDecompressor implements Decompressor {
       uncompressedDirectBuf.limit(directBufferSize);
 
       // Decompress data
-      n = decompressDirectBuf();
+      n = decompressBytesDirect();
       uncompressedDirectBuf.limit(n);
 
       if (userBufLen <= 0) {
@@ -258,20 +276,10 @@ public class SnappyDecompressor implements Decompressor {
     // do nothing
   }
 
-  private int decompressDirectBuf() throws IOException {
-    if (compressedDirectBufLen == 0) {
-      return 0;
-    } else {
-      // Set the position and limit of `compressedDirectBuf` for reading
-      compressedDirectBuf.limit(compressedDirectBufLen).position(0);
-      int size = Snappy.uncompress((ByteBuffer) compressedDirectBuf,
-              (ByteBuffer) uncompressedDirectBuf);
-      compressedDirectBufLen = 0;
-      compressedDirectBuf.clear();
-      return size;
-    }
-  }
+  private native static void initIDs();
 
+  private native int decompressBytesDirect();
+  
   int decompressDirect(ByteBuffer src, ByteBuffer dst) throws IOException {
     assert (this instanceof SnappyDirectDecompressor);
     
@@ -290,7 +298,7 @@ public class SnappyDecompressor implements Decompressor {
     directBufferSize = dst.remaining();
     int n = 0;
     try {
-      n = decompressDirectBuf();
+      n = decompressBytesDirect();
       presliced.position(presliced.position() + n);
       // SNAPPY always consumes the whole buffer or throws an exception
       src.position(src.limit());

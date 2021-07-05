@@ -21,7 +21,7 @@ package org.apache.hadoop.fs;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.tracing.TraceScope;
+import org.apache.htrace.core.TraceScope;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -33,8 +33,7 @@ import java.util.zip.Checksum;
  */
 @InterfaceAudience.LimitedPrivate({"HDFS"})
 @InterfaceStability.Unstable
-abstract public class FSOutputSummer extends OutputStream implements
-    StreamCapabilities {
+abstract public class FSOutputSummer extends OutputStream {
   // data checksum
   private final DataChecksum sum;
   // internal buffer for storing data before it is checksumed
@@ -92,7 +91,7 @@ abstract public class FSOutputSummer extends OutputStream implements
    * in a checksum chunk are in the buffer.  If the buffer is empty and
    * requested length is at least as large as the size of next checksum chunk
    * size, this method will checksum and write the chunk directly 
-   * to the underlying output stream.  Thus it avoids unnecessary data copy.
+   * to the underlying output stream.  Thus it avoids uneccessary data copy.
    *
    * @param      b     the data.
    * @param      off   the start offset in the data.
@@ -196,10 +195,6 @@ abstract public class FSOutputSummer extends OutputStream implements
     return sum.getChecksumSize();
   }
 
-  protected DataChecksum getDataChecksum() {
-    return sum;
-  }
-
   protected TraceScope createWriteTraceScope() {
     return null;
   }
@@ -254,10 +249,5 @@ abstract public class FSOutputSummer extends OutputStream implements
 
   protected synchronized void resetChecksumBufSize() {
     setChecksumBufSize(sum.getBytesPerChecksum() * BUFFER_NUM_CHUNKS);
-  }
-
-  @Override
-  public boolean hasCapability(String capability) {
-    return false;
   }
 }

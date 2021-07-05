@@ -50,7 +50,6 @@ function hadoop_abs
   declare obj=$1
   declare dir
   declare fn
-  declare ret
 
   if [[ ! -e ${obj} ]]; then
     return 1
@@ -63,8 +62,7 @@ function hadoop_abs
   fi
 
   dir=$(cd -P -- "${dir}" >/dev/null 2>/dev/null && pwd -P)
-  ret=$?
-  if [[ ${ret} = 0 ]]; then
+  if [[ $? = 0 ]]; then
     echo "${dir}${fn}"
     return 0
   fi
@@ -169,6 +167,15 @@ function run()
   fi
 }
 
+## @description  set JAVA_HOME properly
+## @audience     public
+## @stability    unstable
+function locate_jvm()
+{
+  JAVA_HOME="$(ls -d /usr/lib/jvm/*${JVM_VERSION}* | grep "${JVM_HINT}" | head -1 )"
+  export JAVA_HOME
+}
+
 function header()
 {
   echo
@@ -182,6 +189,7 @@ function header()
   echo "Version to create      : ${HADOOP_VERSION}"
   echo "Release Candidate Label: ${RC_LABEL##-}"
   echo "Source Version         : ${DEFAULT_HADOOP_VERSION}"
+  echo "Using JDK              : ${JAVA_HOME}"
   printf "\n\n"
 }
 
@@ -197,17 +205,10 @@ function set_defaults
     | head -1 \
     | sed  -e 's|^ *<version>||' -e 's|</version>.*$||')
 
-  DEPLOY=false
-
   DOCKER=false
   DOCKERCACHE=false
   DOCKERFILE="${BASEDIR}/dev-support/docker/Dockerfile"
   DOCKERRAN=false
-
-  CPU_ARCH=$(echo "$MACHTYPE" | cut -d- -f1)
-  if [ "$CPU_ARCH" = "aarch64" ]; then
-    DOCKERFILE="${BASEDIR}/dev-support/docker/Dockerfile_aarch64"
-  fi
 
   # Extract Java version from ${BASEDIR}/pom.xml
   # doing this outside of maven means we can do this before
@@ -254,9 +255,7 @@ function startgpgagent
       eval $("${GPGAGENT}" --daemon \
         --options "${LOGDIR}/gpgagent.conf" \
         --log-file="${LOGDIR}/create-release-gpgagent.log")
-      GPGAGENTPID=$(pgrep "${GPGAGENT}")
-      GPG_AGENT_INFO="$HOME/.gnupg/S.gpg-agent:$GPGAGENTPID:1"
-      export GPG_AGENT_INFO
+      GPGAGENTPID=$(echo "${GPG_AGENT_INFO}" | cut -f 2 -d:)
     fi
 
     if [[ -n "${GPG_AGENT_INFO}" ]]; then
@@ -283,14 +282,13 @@ function usage
 {
   echo "--artifactsdir=[path]   Path to use to store release bits"
   echo "--asfrelease            Make an ASF release"
-  echo "--deploy                Deploy Maven artifacts using ~/.m2/settings.xml"
   echo "--docker                Use Hadoop's Dockerfile for guaranteed environment"
   echo "--dockercache           Use a Docker-private maven cache"
+  echo "--jvmhint=[filter]      Simple filter to pick a JVM to use"
   echo "--logdir=[path]         Path to store logs"
   echo "--mvncache=[path]       Path to the maven cache to use"
   echo "--native                Also build the native components"
   echo "--rc-label=[label]      Add this label to the builds"
-  echo "--security              Emergency security release"
   echo "--sign                  Use .gnupg dir to sign the artifacts and jars"
   echo "--version=[version]     Use an alternative version string"
 }
@@ -305,13 +303,9 @@ function option_parse
         ASFRELEASE=true
         NATIVE=true
         SIGN=true
-        DEPLOY=true
       ;;
       --artifactsdir=*)
         ARTIFACTS_DIR=${i#*=}
-      ;;
-      --deploy)
-        DEPLOY=true
       ;;
       --docker)
         DOCKER=true
@@ -326,6 +320,9 @@ function option_parse
       --indocker)
         INDOCKER=true
       ;;
+      --jvmhint=*)
+        JVM_HINT=${i#*=}
+      ;;
       --logdir=*)
         LOGDIR=${i#*=}
       ;;
@@ -337,9 +334,6 @@ function option_parse
       ;;
       --rc-label=*)
         RC_LABEL=${i#*=}
-      ;;
-      --security)
-        SECURITYRELEASE=true
       ;;
       --sign)
         SIGN=true
@@ -365,11 +359,6 @@ function option_parse
     fi
   fi
 
-  if [[ "${DEPLOY}" = true && ! -f "${HOME}/.m2/settings.xml" ]]; then
-    hadoop_error "ERROR: No ~/.m2/settings.xml file, cannot deploy Maven artifacts."
-    exit 1
-  fi
-
   DOCKERCMD=$(command -v docker)
   if [[ "${DOCKER}" = true && -z "${DOCKERCMD}" ]]; then
       hadoop_error "ERROR: docker binary not found. Disabling docker mode."
@@ -387,7 +376,7 @@ function option_parse
     hadoop_error "ERROR: Cannot set --mvncache and --dockercache simultaneously."
     exit 1
   else
-    MVNCACHE=${MVNCACHE:-"${HOME}/.m2/repository"}
+    MVNCACHE=${MVNCACHE:-"${HOME}/.m2"}
   fi
 
   if [[ "${ASFRELEASE}" = true ]]; then
@@ -411,14 +400,6 @@ function option_parse
     mkdir -p "${MVNCACHE}"
     if [[ -d "${MVNCACHE}" ]]; then
       MVN_ARGS=("-Dmaven.repo.local=${MVNCACHE}")
-    fi
-  fi
-
-  if [[ "${SECURITYRELEASE}" = true ]]; then
-    if [[ ! -d "${BASEDIR}/hadoop-common-project/hadoop-common/src/site/markdown/release/${HADOOP_VERSION}" ]]; then
-      hadoop_error "ERROR: ${BASEDIR}/hadoop-common-project/hadoop-common/src/site/markdown/release/${HADOOP_VERSION} does not exist."
-      hadoop_error "ERROR: This directory and its contents are required to be manually created for a security release."
-      exit 1
     fi
   fi
 }
@@ -462,11 +443,6 @@ function dockermode
     extrad+=("-v" "${lines}:${lines}")
   fi
 
-  if [[ "${DEPLOY}" = true ]]; then
-    modp+=("--deploy")
-    extrad+=("-v" "${HOME}/.m2/settings.xml:/home/${user_name}/.m2/settings.xml")
-  fi
-
   if [[ "${DOCKERCACHE}" = true ]]; then
     modp+=("--mvncache=/maven")
   else
@@ -504,17 +480,9 @@ function dockermode
     echo "RUN mkdir -p /maven"
     echo "RUN chown -R ${user_name} /maven"
 
-    # we always force build with the OpenJDK JDK
-    # but with the correct version
-    if [ "$CPU_ARCH" = "aarch64" ]; then
-      echo "ENV JAVA_HOME /usr/lib/jvm/java-${JVM_VERSION}-openjdk-arm64"
-    else
-      echo "ENV JAVA_HOME /usr/lib/jvm/java-${JVM_VERSION}-openjdk-amd64"
-    fi
-
     echo "USER ${user_name}"
     printf "\n\n"
-  ) | docker build -t "${imgname}" -f - "${BASEDIR}"/dev-support/docker/
+  ) | docker build -t "${imgname}" -
 
   run docker run -i -t \
     --privileged \
@@ -557,23 +525,51 @@ function makearelease
   big_console_header "Maven Build and Install"
 
   if [[ "${SIGN}" = true ]]; then
-    signflags=("-Psign" "-Dgpg.useagent=true" "-Dgpg.executable=${GPG}")
-  fi
-
-  local target="install"
-  if [[ "${DEPLOY}" = true ]]; then
-    target="deploy"
+    signflags=("-Psign" "-Dgpg.useagent=true" -Dgpg.executable="${GPG}")
   fi
 
   # Create SRC and BIN tarballs for release,
   # shellcheck disable=SC2046
-  run_and_redirect "${LOGDIR}/mvn_${target}.log" \
-    "${MVN}" "${MVN_ARGS[@]}" ${target} \
+  run_and_redirect "${LOGDIR}/mvn_install.log" \
+    "${MVN}" "${MVN_ARGS[@]}" install \
       -Pdist,src,yarn-ui \
       "${signflags[@]}" \
       -DskipTests -Dtar $(hadoop_native_flags)
 
-  # Stage BIN tarball
+  # Create site for release
+  # we need to do install again so that jdiff and
+  # a few other things get registered in the maven
+  # universe correctly
+  run_and_redirect "${LOGDIR}/mvn_site.log" \
+    "${MVN}" "${MVN_ARGS[@]}" install \
+      site site:stage \
+      -DskipTests \
+      -Pdist,src,releasedocs,docs
+
+  big_console_header "Staging the release"
+
+  run mv "${BASEDIR}/target/staging/hadoop-project" "${BASEDIR}/target/r${HADOOP_VERSION}/"
+  run cd "${BASEDIR}/target/"
+  run tar czpf "hadoop-site-${HADOOP_VERSION}.tar.gz" "r${HADOOP_VERSION}"/*
+  run cd "${BASEDIR}"
+
+  # Stage RAT report
+  #shellcheck disable=SC2038
+  find . -name rat.txt | xargs -I% cat % > "${ARTIFACTS_DIR}/hadoop-${HADOOP_VERSION}${RC_LABEL}-rat.txt"
+
+  # Stage CHANGES and RELEASENOTES files
+  for i in CHANGES RELEASENOTES; do
+    run cp -p \
+        "${BASEDIR}/hadoop-common-project/hadoop-common/src/site/markdown/release/${HADOOP_VERSION}"/${i}*.md \
+        "${ARTIFACTS_DIR}/${i}.md"
+  done
+
+  # Prepare and stage BIN tarball
+  run cd "${BASEDIR}/hadoop-dist/target/"
+  run tar -xzpf "hadoop-${HADOOP_VERSION}.tar.gz"
+  run mkdir -p "hadoop-${HADOOP_VERSION}/share/doc/hadoop/"
+  run cp -r "${BASEDIR}/target/r${HADOOP_VERSION}"/* "hadoop-${HADOOP_VERSION}/share/doc/hadoop/"
+  run tar -czpf "hadoop-${HADOOP_VERSION}.tar.gz" "hadoop-${HADOOP_VERSION}"
   run cd "${BASEDIR}"
   run mv \
     "${BASEDIR}/hadoop-dist/target/hadoop-${HADOOP_VERSION}.tar.gz" \
@@ -584,63 +580,15 @@ function makearelease
     "${BASEDIR}/hadoop-dist/target/hadoop-${HADOOP_VERSION}-src.tar.gz" \
     "${ARTIFACTS_DIR}/hadoop-${HADOOP_VERSION}${RC_LABEL}-src.tar.gz"
 
-  big_console_header "Maven Site"
-
-  if [[ "${SECURITYRELEASE}" = true ]]; then
-    DOCFLAGS="-Pdocs"
-    hadoop_error "WARNING: Skipping automatic changelog and release notes generation due to --security"
-  else
-    DOCFLAGS="-Preleasedocs,docs"
-  fi
-
-  # Create site for release
-  # we need to do install again so that jdiff and
-  # a few other things get registered in the maven
-  # universe correctly
-  run_and_redirect "${LOGDIR}/mvn_site.log" \
-    "${MVN}" "${MVN_ARGS[@]}" install \
-      site site:stage \
-      -DskipTests \
-      -DskipShade \
-      -Pdist,src \
-      "${DOCFLAGS}"
-
-  # Create the site tarball
-  run mv "${BASEDIR}/target/staging/hadoop-project" "${BASEDIR}/target/r${HADOOP_VERSION}/"
-  run cd "${BASEDIR}/target/"
-  run tar czpf "hadoop-site-${HADOOP_VERSION}.tar.gz" "r${HADOOP_VERSION}"/*
-  run cd "${BASEDIR}"
-
   # Stage SITE tarball
   run mv \
      "${BASEDIR}/target/hadoop-site-${HADOOP_VERSION}.tar.gz" \
     "${ARTIFACTS_DIR}/hadoop-${HADOOP_VERSION}${RC_LABEL}-site.tar.gz"
-
-  # Stage RAT report
-  #shellcheck disable=SC2038
-  find . -name rat.txt | xargs -I% cat % > "${ARTIFACTS_DIR}/hadoop-${HADOOP_VERSION}${RC_LABEL}-rat.txt"
-
-  # Stage CHANGELOG and RELEASENOTES files
-  for i in CHANGELOG RELEASENOTES; do
-    run cp -p \
-        "${BASEDIR}/hadoop-common-project/hadoop-common/src/site/markdown/release/${HADOOP_VERSION}"/${i}*.md \
-        "${ARTIFACTS_DIR}/${i}.md"
-  done
-
-  # We need to fixup the BIN tarball at the end to contain the site docs.
-  run cd "${ARTIFACTS_DIR}"
-  run tar -xzpf "hadoop-${HADOOP_VERSION}${RC_LABEL}.tar.gz"
-  run mkdir -p "hadoop-${HADOOP_VERSION}/share/doc/hadoop/"
-  run cp -r "${BASEDIR}/target/r${HADOOP_VERSION}"/* "hadoop-${HADOOP_VERSION}/share/doc/hadoop/"
-  run tar -czpf "hadoop-${HADOOP_VERSION}${RC_LABEL}.tar.gz" "hadoop-${HADOOP_VERSION}"
-  run rm -rf "hadoop-${HADOOP_VERSION}"
-
 }
 
 function signartifacts
 {
   declare i
-  declare ret
 
   if [[ "${SIGN}" = false ]]; then
     echo ""
@@ -651,12 +599,10 @@ function signartifacts
 
   big_console_header "Signing the release"
 
-  run cd "${ARTIFACTS_DIR}"
-  for i in *; do
+  for i in ${ARTIFACTS_DIR}/*; do
     ${GPG} --use-agent --armor --output "${i}.asc" --detach-sig "${i}"
     sha512sum --tag "${i}" > "${i}.sha512"
   done
-  run cd "${BASEDIR}"
 
   if [[ "${ASFRELEASE}" = true ]]; then
     echo "Fetching the Apache Hadoop KEYS file..."
@@ -665,8 +611,7 @@ function signartifacts
     ${GPG} --verify --trustdb "${BASEDIR}/target/testkeysdb" \
       "${ARTIFACTS_DIR}/hadoop-${HADOOP_VERSION}${RC_LABEL}.tar.gz.asc" \
         "${ARTIFACTS_DIR}/hadoop-${HADOOP_VERSION}${RC_LABEL}.tar.gz"
-    ret=$?
-    if [[ ${ret} != 0 ]]; then
+    if [[ $? != 0 ]]; then
       hadoop_error "ERROR: GPG key is not present in ${PUBKEYFILE}."
       hadoop_error "ERROR: This MUST be fixed. Exiting."
       exit 1
@@ -684,6 +629,8 @@ option_parse "${PARAMS[@]}"
 
 dockermode
 
+locate_jvm
+
 header
 
 if [[ -n ${RC_LABEL} ]]; then
@@ -695,7 +642,6 @@ if [[ "${INDOCKER}" = true || "${DOCKERRAN}" = false ]]; then
   startgpgagent
 
   makearelease
-  releaseret=$?
 
   signartifacts
 
@@ -706,7 +652,7 @@ if [[ "${INDOCKER}" = true ]]; then
   exit $?
 fi
 
-if [[ ${releaseret} == 0 ]]; then
+if [[ $? == 0 ]]; then
   echo
   echo "Congratulations, you have successfully built the release"
   echo "artifacts for Apache Hadoop ${HADOOP_VERSION}${RC_LABEL}"

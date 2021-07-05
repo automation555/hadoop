@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.util.*;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -76,25 +78,11 @@ public class LocalDirAllocator {
   /** Used when size of file to be allocated is unknown. */
   public static final int SIZE_UNKNOWN = -1;
 
-  private final DiskValidator diskValidator;
-
   /**Create an allocator object
    * @param contextCfgItemName
    */
   public LocalDirAllocator(String contextCfgItemName) {
     this.contextCfgItemName = contextCfgItemName;
-    try {
-      this.diskValidator = DiskValidatorFactory.getInstance(
-              BasicDiskValidator.NAME);
-    } catch (DiskErrorException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public LocalDirAllocator(String contextCfgItemName,
-          DiskValidator diskValidator) {
-    this.contextCfgItemName = contextCfgItemName;
-    this.diskValidator = diskValidator;
   }
   
   /** This method must be used to obtain the dir allocation context for a 
@@ -108,8 +96,7 @@ public class LocalDirAllocator {
       AllocatorPerContext l = contexts.get(contextCfgItemName);
       if (l == null) {
         contexts.put(contextCfgItemName, 
-                    (l = new AllocatorPerContext(contextCfgItemName,
-                            diskValidator)));
+                    (l = new AllocatorPerContext(contextCfgItemName)));
       }
       return l;
     }
@@ -241,8 +228,9 @@ public class LocalDirAllocator {
    *  @param pathStr the requested file (this will be searched)
    *  @param conf the Configuration object
    *  @return true if files exist. false otherwise
+   *  @throws IOException
    */
-  public boolean ifExists(String pathStr, Configuration conf) {
+  public boolean ifExists(String pathStr,Configuration conf) {
     AllocatorPerContext context = obtainContext(contextCfgItemName);
     return context.ifExists(pathStr, conf);
   }
@@ -267,7 +255,6 @@ public class LocalDirAllocator {
     // NOTE: the context must be accessed via a local reference as it
     //       may be updated at any time to reference a different context
     private AtomicReference<Context> currentContext;
-    private final DiskValidator diskValidator;
 
     private static class Context {
       private AtomicInteger dirNumLastAccessed = new AtomicInteger(0);
@@ -293,11 +280,9 @@ public class LocalDirAllocator {
       }
     }
 
-    public AllocatorPerContext(String contextCfgItemName,
-            DiskValidator diskValidator) {
+    public AllocatorPerContext(String contextCfgItemName) {
       this.contextCfgItemName = contextCfgItemName;
       this.currentContext = new AtomicReference<Context>(new Context());
-      this.diskValidator = diskValidator;
     }
 
     /** This method gets called everytime before any read/write to make sure
@@ -327,7 +312,7 @@ public class LocalDirAllocator {
                     ? new File(ctx.localFS.makeQualified(tmpDir).toUri())
                     : new File(dirStrings[i]);
 
-                diskValidator.checkStatus(tmpFile);
+                DiskChecker.checkDir(tmpFile);
                 dirs.add(new Path(tmpFile.getPath()));
                 dfList.add(new DF(tmpFile, 30000));
               } catch (DiskErrorException de) {
@@ -363,7 +348,7 @@ public class LocalDirAllocator {
         //check whether we are able to create a directory here. If the disk
         //happens to be RDONLY we will fail
         try {
-          diskValidator.checkStatus(new File(file.getParent().toUri().getPath()));
+          DiskChecker.checkDir(new File(file.getParent().toUri().getPath()));
           return file;
         } catch (DiskErrorException d) {
           LOG.warn("Disk Error Exception: ", d);

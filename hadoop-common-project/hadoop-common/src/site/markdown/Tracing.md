@@ -48,7 +48,7 @@ LocalFileSpanReceiver is included in the htrace-core4 jar which is bundled
 with Hadoop.)
 
 ```
-    $ cp htrace-htraced/target/htrace-htraced-4.1.0-incubating.jar $HADOOP_HOME/share/hadoop/common/lib/
+    $ cp htrace-htraced/target/htrace-htraced-4.0.1-incubating.jar $HADOOP_HOME/share/hadoop/common/lib/
 ```
 
 ### Dynamic update of tracing configuration
@@ -63,7 +63,7 @@ You need to run the command against all servers if you want to update the config
       ID  CLASS
       1   org.apache.htrace.core.LocalFileSpanReceiver
 
-      $ hadoop trace -list -host 192.168.56.2:9867
+      $ hadoop trace -list -host 192.168.56.2:50020
       ID  CLASS
       1   org.apache.htrace.core.LocalFileSpanReceiver
 

@@ -19,9 +19,15 @@
 package org.apache.hadoop.io.compress.bzip2;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.util.NativeCodeLoader;
+
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
-import org.apache.hadoop.util.NativeCodeLoader;
+import org.apache.hadoop.io.compress.bzip2.Bzip2Compressor;
+import org.apache.hadoop.io.compress.bzip2.Bzip2Decompressor;
+import org.apache.hadoop.io.compress.bzip2.BZip2DummyCompressor;
+import org.apache.hadoop.io.compress.bzip2.BZip2DummyDecompressor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,11 +43,11 @@ public class Bzip2Factory {
   private static boolean nativeBzip2Loaded;
   
   /**
-   * Check if native-bzip2 code is loaded &amp; initialized correctly and
+   * Check if native-bzip2 code is loaded & initialized correctly and 
    * can be loaded for this job.
    * 
    * @param conf configuration
-   * @return <code>true</code> if native-bzip2 is loaded &amp; initialized
+   * @return <code>true</code> if native-bzip2 is loaded & initialized 
    *         and can be loaded for this job, else <code>false</code>
    */
   public static synchronized boolean isNativeBzip2Loaded(Configuration conf) {
@@ -52,7 +58,10 @@ public class Bzip2Factory {
       bzip2LibraryName = libname;
       if (libname.equals("java-builtin")) {
         LOG.info("Using pure-Java version of bzip2 library");
-      } else if (NativeCodeLoader.isNativeCodeLoaded()) {
+      } else if (conf.getBoolean(
+                CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_KEY, 
+                CommonConfigurationKeys.IO_NATIVE_LIB_AVAILABLE_DEFAULT) &&
+          NativeCodeLoader.isNativeCodeLoaded()) {
         try {
           // Initialize the native library.
           Bzip2Compressor.initSymbols(libname);

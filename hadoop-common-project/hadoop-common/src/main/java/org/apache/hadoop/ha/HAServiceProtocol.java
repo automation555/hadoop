@@ -66,7 +66,7 @@ public interface HAServiceProtocol {
     }
   }
   
-  public enum RequestSource {
+  public static enum RequestSource {
     REQUEST_BY_USER,
     REQUEST_BY_USER_FORCED,
     REQUEST_BY_ZKFC;
@@ -170,7 +170,7 @@ public interface HAServiceProtocol {
    * Return the current status of the service. The status indicates
    * the current <em>state</em> (e.g ACTIVE/STANDBY) as well as
    * some additional information.
-   * 
+   *
    * @throws AccessControlException
    *           if access is denied.
    * @throws IOException

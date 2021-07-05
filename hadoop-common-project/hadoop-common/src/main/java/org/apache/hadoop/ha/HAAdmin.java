@@ -19,9 +19,9 @@ package org.apache.hadoop.ha;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 
 import org.apache.commons.cli.Options;
@@ -39,7 +39,7 @@ import org.apache.hadoop.ha.HAServiceProtocol.RequestSource;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,7 +107,8 @@ public abstract class HAAdmin extends Configured implements Tool {
   protected abstract HAServiceTarget resolveTarget(String string);
   
   protected Collection<String> getTargetIds(String targetNodeToActivate) {
-    return Collections.singleton(targetNodeToActivate);
+    return new ArrayList<String>(
+        Arrays.asList(new String[]{targetNodeToActivate}));
   }
 
   protected String getUsageString() {
@@ -187,10 +188,8 @@ public abstract class HAAdmin extends Configured implements Tool {
   private boolean isOtherTargetNodeActive(String targetNodeToActivate, boolean forceActive)
       throws IOException  {
     Collection<String> targetIds = getTargetIds(targetNodeToActivate);
-    for (String targetId : targetIds) {
-      if (targetNodeToActivate.equals(targetId)) {
-        continue;
-      }
+    targetIds.remove(targetNodeToActivate);
+    for(String targetId : targetIds) {
       HAServiceTarget target = resolveTarget(targetId);
       if (!checkManualStateManagementOK(target)) {
         return true;
@@ -325,7 +324,7 @@ public abstract class HAAdmin extends Configured implements Tool {
 
   /**
    * Return the serviceId as is, we are assuming it was
-   * given as a service address of form {@literal <}host:ipcport{@literal >}.
+   * given as a service address of form <host:ipcport>.
    */
   protected String getServiceAddr(String serviceId) {
     return serviceId;
@@ -532,11 +531,8 @@ public abstract class HAAdmin extends Configured implements Tool {
     }
     return 0;
   }
-
-  /**
-   * UsageInfo class holds args and help details.
-   */
-  public static class UsageInfo {
+  
+  protected static class UsageInfo {
     public final String args;
     public final String help;
     

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -15,8 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# SHELLDOC-IGNORE
 
 # -------------------------------------------------------
 function showWelcome {
@@ -82,10 +80,14 @@ End-of-message
 
 # -------------------------------------------------------
 
+# Configurable low water mark in GiB
+MINIMAL_MEMORY_GiB=2
+
 function warnIfLowMemory {
-    MINIMAL_MEMORY=2046755
-    INSTALLED_MEMORY=$(grep -F MemTotal /proc/meminfo | awk '{print $2}')
-    if [[ $((INSTALLED_MEMORY)) -lt $((MINIMAL_MEMORY)) ]]; then
+    MINIMAL_MEMORY=$((MINIMAL_MEMORY_GiB*1024*1024)) # Convert to KiB
+    INSTALLED_MEMORY=$(fgrep MemTotal /proc/meminfo | awk '{print $2}')
+    if [ $((INSTALLED_MEMORY)) -le $((MINIMAL_MEMORY)) ];
+    then
         cat <<End-of-message
 
  _                    ___  ___
@@ -101,8 +103,7 @@ Your system is running on very little memory.
 This means it may work but it wil most likely be slower than needed.
 
 If you are running this via boot2docker you can simply increase
-the available memory to at least ${MINIMAL_MEMORY}KiB
-(you have ${INSTALLED_MEMORY}KiB )
+the available memory to atleast ${MINIMAL_MEMORY_GiB} GiB (you have $((INSTALLED_MEMORY/(1024*1024))) GiB )
 
 End-of-message
     fi

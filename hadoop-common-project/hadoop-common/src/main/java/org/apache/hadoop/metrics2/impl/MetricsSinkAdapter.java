@@ -22,7 +22,7 @@ import java.io.Closeable;
 import java.util.Random;
 import java.util.concurrent.*;
 
-import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.*;
+import static com.google.common.base.Preconditions.*;
 
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
@@ -51,7 +51,7 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
   private final Thread sinkThread;
   private volatile boolean stopping = false;
   private volatile boolean inError = false;
-  private final int periodMs, firstRetryDelay, retryCount;
+  private final int period, firstRetryDelay, retryCount;
   private final long oobPutTimeout;
   private final float retryBackoff;
   private final MetricsRegistry registry = new MetricsRegistry("sinkadapter");
@@ -62,7 +62,7 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
   MetricsSinkAdapter(String name, String description, MetricsSink sink,
                      String context, MetricsFilter sourceFilter,
                      MetricsFilter recordFilter, MetricsFilter metricFilter,
-                     int periodMs, int queueCapacity, int retryDelay,
+                     int period, int queueCapacity, int retryDelay,
                      float retryBackoff, int retryCount) {
     this.name = checkNotNull(name, "name");
     this.description = description;
@@ -71,7 +71,7 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
     this.sourceFilter = sourceFilter;
     this.recordFilter = recordFilter;
     this.metricFilter = metricFilter;
-    this.periodMs = checkArg(periodMs, periodMs > 0, "period");
+    this.period = checkArg(period, period > 0, "period");
     firstRetryDelay = checkArg(retryDelay, retryDelay > 0, "retry delay");
     this.retryBackoff = checkArg(retryBackoff, retryBackoff>1, "retry backoff");
     oobPutTimeout = (long)
@@ -93,9 +93,9 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
     sinkThread.setDaemon(true);
   }
 
-  boolean putMetrics(MetricsBuffer buffer, long logicalTimeMs) {
-    if (logicalTimeMs % periodMs == 0) {
-      LOG.debug("enqueue, logicalTime="+ logicalTimeMs);
+  boolean putMetrics(MetricsBuffer buffer, long logicalTime) {
+    if (logicalTime % period == 0) {
+      LOG.debug("enqueue, logicalTime="+ logicalTime);
       if (queue.enqueue(buffer)) {
         refreshQueueSizeGauge();
         return true;
@@ -137,9 +137,11 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
         retryDelay = firstRetryDelay;
         n = retryCount;
         inError = false;
-      } catch (InterruptedException e) {
+      }
+      catch (InterruptedException e) {
         LOG.info(name +" thread interrupted.");
-      } catch (Exception e) {
+      }
+      catch (Exception e) {
         if (n > 0) {
           int retryWindow = Math.max(0, 1000 / 2 * retryDelay - minDelay);
           int awhile = rng.nextInt(retryWindow) + minDelay;
@@ -152,7 +154,8 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
             LOG.info(name +" thread interrupted while waiting for retry", e2);
           }
           --n;
-        } else {
+        }
+        else {
           if (!inError) {
             LOG.error("Got sink exception and over retry limit, "+
                       "suppressing further error messages", e);
@@ -212,7 +215,8 @@ class MetricsSinkAdapter implements SinkQueue.Consumer<MetricsBuffer> {
     }
     try {
       sinkThread.join();
-    } catch (InterruptedException e) {
+    }
+    catch (InterruptedException e) {
       LOG.warn("Stop interrupted", e);
     }
   }

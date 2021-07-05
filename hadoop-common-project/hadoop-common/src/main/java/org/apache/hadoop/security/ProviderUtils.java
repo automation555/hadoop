@@ -24,7 +24,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -81,8 +81,8 @@ public final class ProviderUtils {
     String authority = nestedUri.getAuthority();
     if (authority != null) {
       String[] parts = nestedUri.getAuthority().split("@", 2);
-      result.append(parts[0])
-          .append("://");
+      result.append(parts[0]);
+      result.append("://");
       if (parts.length == 2) {
         result.append(parts[1]);
       }
@@ -167,8 +167,9 @@ public final class ProviderUtils {
         }
         if (clazz != null) {
           if (fileSystemClass.isAssignableFrom(clazz)) {
-            LOG.debug("Filesystem based provider excluded from provider " +
-                "path due to recursive dependency: {}", provider);
+            LOG.debug("Filesystem based provider" +
+                " excluded from provider path due to recursive dependency: "
+                + provider);
           } else {
             if (newProviderPath.length() > 0) {
               newProviderPath.append(",");

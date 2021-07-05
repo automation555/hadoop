@@ -27,7 +27,7 @@ This document does not cover advanced topics such as [Security](./SecureMode.htm
 Prerequisites
 -------------
 
-* Install Java. See the [Hadoop Wiki](https://cwiki.apache.org/confluence/display/HADOOP/Hadoop+Java+Versions) for known good versions.
+* Install Java. See the [Hadoop Wiki](http://wiki.apache.org/hadoop/HadoopJavaVersions) for known good versions.
 * Download a stable version of Hadoop from Apache mirrors.
 
 Installation
@@ -37,7 +37,7 @@ Installing a Hadoop cluster typically involves unpacking the software on all the
 
 Typically one machine in the cluster is designated as the NameNode and another machine as the ResourceManager, exclusively. These are the masters. Other services (such as Web App Proxy Server and MapReduce Job History server) are usually run either on dedicated hardware or on shared infrastructure, depending upon the load.
 
-The rest of the machines in the cluster act as both DataNode and NodeManager. These are the workers.
+The rest of the machines in the cluster act as both DataNode and NodeManager. These are the slaves.
 
 Configuring Hadoop in Non-Secure Mode
 -------------------------------------
@@ -64,17 +64,17 @@ Administrators can configure individual daemons using the configuration options 
 
 | Daemon | Environment Variable |
 |:---- |:---- |
-| NameNode | HDFS\_NAMENODE\_OPTS |
-| DataNode | HDFS\_DATANODE\_OPTS |
-| Secondary NameNode | HDFS\_SECONDARYNAMENODE\_OPTS |
+| NameNode | HADOOP\_NAMENODE\_OPTS |
+| DataNode | HADOOP\_DATANODE\_OPTS |
+| Secondary NameNode | HADOOP\_SECONDARYNAMENODE\_OPTS |
 | ResourceManager | YARN\_RESOURCEMANAGER\_OPTS |
 | NodeManager | YARN\_NODEMANAGER\_OPTS |
 | WebAppProxy | YARN\_PROXYSERVER\_OPTS |
-| Map Reduce Job History Server | MAPRED\_HISTORYSERVER\_OPTS |
+| Map Reduce Job History Server | HADOOP\_JOB\_HISTORYSERVER\_OPTS |
 
-For example, To configure Namenode to use parallelGC and a 4GB Java Heap, the following statement should be added in hadoop-env.sh :
+For example, To configure Namenode to use parallelGC, the following statement should be added in hadoop-env.sh :
 
-      export HDFS_NAMENODE_OPTS="-XX:+UseParallelGC -Xmx4g"
+      export HADOOP_NAMENODE_OPTS="-XX:+UseParallelGC"
 
 See `etc/hadoop/hadoop-env.sh` for other examples.
 
@@ -82,14 +82,21 @@ Other useful configuration parameters that you can customize include:
 
 * `HADOOP_PID_DIR` - The directory where the daemons' process id files are stored.
 * `HADOOP_LOG_DIR` - The directory where the daemons' log files are stored. Log files are automatically created if they don't exist.
-* `HADOOP_HEAPSIZE_MAX` - The maximum amount of memory to use for the Java heapsize. Units supported by the JVM are also supported here. If no unit is present, it will be assumed the number is in megabytes. By default, Hadoop will let the JVM determine how much to use. This value can be overriden on a per-daemon basis using the appropriate `_OPTS` variable listed above. For example, setting `HADOOP_HEAPSIZE_MAX=1g` and `HADOOP_NAMENODE_OPTS="-Xmx5g"` will configure the NameNode with 5GB heap.
+* `HADOOP_HEAPSIZE` / `YARN_HEAPSIZE` - The maximum amount of heapsize to use, in MB e.g. if the varibale is set to 1000 the heap will be set to 1000MB. This is used to configure the heap size for the daemon. By default, the value is 1000. If you want to configure the values separately for each deamon you can use.
 
 In most cases, you should specify the `HADOOP_PID_DIR` and `HADOOP_LOG_DIR` directories such that they can only be written to by the users that are going to run the hadoop daemons. Otherwise there is the potential for a symlink attack.
 
-It is also traditional to configure `HADOOP_HOME` in the system-wide shell environment configuration. For example, a simple script inside `/etc/profile.d`:
+It is also traditional to configure `HADOOP_PREFIX` in the system-wide shell environment configuration. For example, a simple script inside `/etc/profile.d`:
 
-      HADOOP_HOME=/path/to/hadoop
-      export HADOOP_HOME
+      HADOOP_PREFIX=/path/to/hadoop
+      export HADOOP_PREFIX
+
+| Daemon | Environment Variable |
+|:---- |:---- |
+| ResourceManager | YARN\_RESOURCEMANAGER\_HEAPSIZE |
+| NodeManager | YARN\_NODEMANAGER\_HEAPSIZE |
+| WebAppProxy | YARN\_PROXYSERVER\_HEAPSIZE |
+| Map Reduce Job History Server | HADOOP\_JOB\_HISTORYSERVER\_HEAPSIZE |
 
 ### Configuring the Hadoop Daemons
 
@@ -156,7 +163,6 @@ This section deals with important parameters to be specified in the given config
 | `yarn.nodemanager.remote-app-log-dir` | */logs* | HDFS directory where the application logs are moved on application completion. Need to set appropriate permissions. Only applicable if log-aggregation is enabled. |
 | `yarn.nodemanager.remote-app-log-dir-suffix` | *logs* | Suffix appended to the remote log dir. Logs will be aggregated to ${yarn.nodemanager.remote-app-log-dir}/${user}/${thisParam} Only applicable if log-aggregation is enabled. |
 | `yarn.nodemanager.aux-services` | mapreduce\_shuffle | Shuffle service that needs to be set for Map Reduce applications. |
-| `yarn.nodemanager.env-whitelist` | Environment properties to be inherited by containers from NodeManagers | For mapreduce application in addition to the default values HADOOP\_MAPRED_HOME should to be added. Property value should JAVA\_HOME,HADOOP\_COMMON\_HOME,HADOOP\_HDFS\_HOME,HADOOP\_CONF\_DIR,CLASSPATH\_PREPEND\_DISTCACHE,HADOOP\_YARN\_HOME,HADOOP\_HOME,PATH,LANG,TZ,HADOOP\_MAPRED\_HOME |
 
   * Configurations for History Server (Needs to be moved elsewhere):
 
@@ -210,12 +216,12 @@ The health checker script is not supposed to give ERROR if only some of the loca
 Slaves File
 -----------
 
-List all worker hostnames or IP addresses in your `etc/hadoop/workers` file, one per line. Helper scripts (described below) will use the `etc/hadoop/workers` file to run commands on many hosts at once. It is not used for any of the Java-based Hadoop configuration. In order to use this functionality, ssh trusts (via either passphraseless ssh or some other means, such as Kerberos) must be established for the accounts used to run Hadoop.
+List all slave hostnames or IP addresses in your `etc/hadoop/slaves` file, one per line. Helper scripts (described below) will use the `etc/hadoop/slaves` file to run commands on many hosts at once. It is not used for any of the Java-based Hadoop configuration. In order to use this functionality, ssh trusts (via either passphraseless ssh or some other means, such as Kerberos) must be established for the accounts used to run Hadoop.
 
 Hadoop Rack Awareness
 ---------------------
 
-Many Hadoop components are rack-aware and take advantage of the network topology for performance and safety. Hadoop daemons obtain the rack information of the workers in the cluster by invoking an administrator configured module. See the [Rack Awareness](./RackAwareness.html) documentation for more specific information.
+Many Hadoop components are rack-aware and take advantage of the network topology for performance and safety. Hadoop daemons obtain the rack information of the slaves in the cluster by invoking an administrator configured module. See the [Rack Awareness](./RackAwareness.html) documentation for more specific information.
 
 It is highly recommended configuring rack awareness prior to starting HDFS.
 
@@ -237,73 +243,73 @@ To start a Hadoop cluster you will need to start both the HDFS and YARN cluster.
 
 The first time you bring up HDFS, it must be formatted. Format a new distributed filesystem as *hdfs*:
 
-    [hdfs]$ $HADOOP_HOME/bin/hdfs namenode -format <cluster_name>
+    [hdfs]$ $HADOOP_PREFIX/bin/hdfs namenode -format <cluster_name>
 
 Start the HDFS NameNode with the following command on the designated node as *hdfs*:
 
-    [hdfs]$ $HADOOP_HOME/bin/hdfs --daemon start namenode
+    [hdfs]$ $HADOOP_PREFIX/sbin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start namenode
 
 Start a HDFS DataNode with the following command on each designated node as *hdfs*:
 
-    [hdfs]$ $HADOOP_HOME/bin/hdfs --daemon start datanode
+    [hdfs]$ $HADOOP_PREFIX/sbin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script hdfs start datanode
 
-If `etc/hadoop/workers` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the HDFS processes can be started with a utility script. As *hdfs*:
+If `etc/hadoop/slaves` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the HDFS processes can be started with a utility script. As *hdfs*:
 
-    [hdfs]$ $HADOOP_HOME/sbin/start-dfs.sh
+    [hdfs]$ $HADOOP_PREFIX/sbin/start-dfs.sh
 
 Start the YARN with the following command, run on the designated ResourceManager as *yarn*:
 
-    [yarn]$ $HADOOP_HOME/bin/yarn --daemon start resourcemanager
+    [yarn]$ $HADOOP_YARN_HOME/sbin/yarn-daemon.sh --config $HADOOP_CONF_DIR start resourcemanager
 
 Run a script to start a NodeManager on each designated host as *yarn*:
 
-    [yarn]$ $HADOOP_HOME/bin/yarn --daemon start nodemanager
+    [yarn]$ $HADOOP_YARN_HOME/sbin/yarn-daemons.sh --config $HADOOP_CONF_DIR start nodemanager
 
 Start a standalone WebAppProxy server. Run on the WebAppProxy server as *yarn*. If multiple servers are used with load balancing it should be run on each of them:
 
-    [yarn]$ $HADOOP_HOME/bin/yarn --daemon start proxyserver
+    [yarn]$ $HADOOP_YARN_HOME/sbin/yarn-daemon.sh --config $HADOOP_CONF_DIR start proxyserver
 
-If `etc/hadoop/workers` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the YARN processes can be started with a utility script. As *yarn*:
+If `etc/hadoop/slaves` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the YARN processes can be started with a utility script. As *yarn*:
 
-    [yarn]$ $HADOOP_HOME/sbin/start-yarn.sh
+    [yarn]$ $HADOOP_PREFIX/sbin/start-yarn.sh
 
 Start the MapReduce JobHistory Server with the following command, run on the designated server as *mapred*:
 
-    [mapred]$ $HADOOP_HOME/bin/mapred --daemon start historyserver
+    [mapred]$ $HADOOP_PREFIX/sbin/mr-jobhistory-daemon.sh --config $HADOOP_CONF_DIR start historyserver
 
 ### Hadoop Shutdown
 
 Stop the NameNode with the following command, run on the designated NameNode as *hdfs*:
 
-    [hdfs]$ $HADOOP_HOME/bin/hdfs --daemon stop namenode
+    [hdfs]$ $HADOOP_PREFIX/sbin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs stop namenode
 
 Run a script to stop a DataNode as *hdfs*:
 
-    [hdfs]$ $HADOOP_HOME/bin/hdfs --daemon stop datanode
+    [hdfs]$ $HADOOP_PREFIX/sbin/hadoop-daemons.sh --config $HADOOP_CONF_DIR --script hdfs stop datanode
 
-If `etc/hadoop/workers` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the HDFS processes may be stopped with a utility script. As *hdfs*:
+If `etc/hadoop/slaves` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the HDFS processes may be stopped with a utility script. As *hdfs*:
 
-    [hdfs]$ $HADOOP_HOME/sbin/stop-dfs.sh
+    [hdfs]$ $HADOOP_PREFIX/sbin/stop-dfs.sh
 
 Stop the ResourceManager with the following command, run on the designated ResourceManager as *yarn*:
 
-    [yarn]$ $HADOOP_HOME/bin/yarn --daemon stop resourcemanager
+    [yarn]$ $HADOOP_YARN_HOME/sbin/yarn-daemon.sh --config $HADOOP_CONF_DIR stop resourcemanager
 
-Run a script to stop a NodeManager on a worker as *yarn*:
+Run a script to stop a NodeManager on a slave as *yarn*:
 
-    [yarn]$ $HADOOP_HOME/bin/yarn --daemon stop nodemanager
+    [yarn]$ $HADOOP_YARN_HOME/sbin/yarn-daemons.sh --config $HADOOP_CONF_DIR stop nodemanager
 
-If `etc/hadoop/workers` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the YARN processes can be stopped with a utility script. As *yarn*:
+If `etc/hadoop/slaves` and ssh trusted access is configured (see [Single Node Setup](./SingleCluster.html)), all of the YARN processes can be stopped with a utility script. As *yarn*:
 
-    [yarn]$ $HADOOP_HOME/sbin/stop-yarn.sh
+    [yarn]$ $HADOOP_PREFIX/sbin/stop-yarn.sh
 
 Stop the WebAppProxy server. Run on the WebAppProxy server as *yarn*. If multiple servers are used with load balancing it should be run on each of them:
 
-    [yarn]$ $HADOOP_HOME/bin/yarn stop proxyserver
+    [yarn]$ $HADOOP_YARN_HOME/sbin/yarn-daemon.sh --config $HADOOP_CONF_DIR stop proxyserver
 
 Stop the MapReduce JobHistory Server with the following command, run on the designated server as *mapred*:
 
-    [mapred]$ $HADOOP_HOME/bin/mapred --daemon stop historyserver
+    [mapred]$ $HADOOP_PREFIX/sbin/mr-jobhistory-daemon.sh --config $HADOOP_CONF_DIR stop historyserver
 
 Web Interfaces
 --------------
@@ -312,8 +318,6 @@ Once the Hadoop cluster is up and running check the web-ui of the components as 
 
 | Daemon | Web Interface | Notes |
 |:---- |:---- |:---- |
-| NameNode | http://nn_host:port/ | Default HTTP port is 9870. |
+| NameNode | http://nn_host:port/ | Default HTTP port is 50070. |
 | ResourceManager | http://rm_host:port/ | Default HTTP port is 8088. |
 | MapReduce JobHistory Server | http://jhs_host:port/ | Default HTTP port is 19888. |
-
-

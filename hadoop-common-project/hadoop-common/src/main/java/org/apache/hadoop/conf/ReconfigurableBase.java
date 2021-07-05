@@ -18,9 +18,10 @@
 
 package org.apache.hadoop.conf;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
 import org.slf4j.Logger;
@@ -30,7 +31,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Utility base class for implementing the Reconfigurable interface.
@@ -146,10 +146,9 @@ public abstract class ReconfigurableBase
             oldConf.unset(change.prop);
           }
         } catch (ReconfigurationException e) {
-          Throwable cause = e.getCause();
-          errorMessage = cause == null ? e.getMessage() : cause.getMessage();
+          errorMessage = e.getCause().getMessage();
         }
-        results.put(change, Optional.ofNullable(errorMessage));
+        results.put(change, Optional.fromNullable(errorMessage));
       }
 
       synchronized (parent.reconfigLock) {
@@ -215,7 +214,7 @@ public abstract class ReconfigurableBase
    * This method makes the change to this objects {@link Configuration}
    * and calls reconfigurePropertyImpl to update internal data structures.
    * This method cannot be overridden, subclasses should instead override
-   * reconfigurePropertyImpl.
+   * reconfigureProperty.
    */
   @Override
   public final void reconfigureProperty(String property, String newVal)
@@ -263,7 +262,7 @@ public abstract class ReconfigurableBase
    * all internal data structures derived from the configuration property
    * that is being changed. If this object owns other Reconfigurable objects
    * reconfigureProperty should be called recursively to make sure that
-   * the configuration of these objects are updated.
+   * to make sure that the configuration of these objects is updated.
    *
    * @param property Name of the property that is being reconfigured.
    * @param newVal Proposed new value of the property.

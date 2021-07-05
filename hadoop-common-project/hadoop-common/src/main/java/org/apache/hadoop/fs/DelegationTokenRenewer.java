@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.fs;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -97,7 +97,7 @@ public class DelegationTokenRenewer
     public boolean equals(final Object that) {
       if (this == that) {
         return true;
-      } else if (!(that instanceof RenewAction)) {
+      } else if (that == null || !(that instanceof RenewAction)) {
         return false;
       }
       return token.equals(((RenewAction<?>)that).token);
@@ -107,7 +107,7 @@ public class DelegationTokenRenewer
      * Set a new time for the renewal.
      * It can only be called when the action is not in the queue or any
      * collection because the hashCode may change
-     * @param delay the renewal time
+     * @param newTime the new time
      */
     private void updateRenewalTime(long delay) {
       renewalTime = Time.now() + delay - delay/10;
@@ -223,7 +223,7 @@ public class DelegationTokenRenewer
     if (action.token != null) {
       queue.add(action);
     } else {
-      FileSystem.LOG.error("does not have a token for renewal");
+      fs.LOG.error("does not have a token for renewal");
     }
     return action;
   }
@@ -242,11 +242,14 @@ public class DelegationTokenRenewer
       } catch (InterruptedException ie) {
         LOG.error("Interrupted while canceling token for " + fs.getUri()
             + "filesystem");
-        LOG.debug("Exception in removeRenewAction: {}", ie);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Exception in removeRenewAction: ", ie);
+        }
       }
     }
   }
 
+  @SuppressWarnings("static-access")
   @Override
   public void run() {
     for(;;) {
@@ -259,7 +262,8 @@ public class DelegationTokenRenewer
       } catch (InterruptedException ie) {
         return;
       } catch (Exception ie) {
-        FileSystem.LOG.warn("Failed to renew token, action=" + action, ie);
+        action.weakFs.get().LOG.warn("Failed to renew token, action=" + action,
+            ie);
       }
     }
   }

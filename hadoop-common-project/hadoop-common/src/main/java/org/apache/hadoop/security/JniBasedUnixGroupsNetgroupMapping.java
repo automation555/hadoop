@@ -20,7 +20,6 @@ package org.apache.hadoop.security;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.LinkedList;
 
@@ -43,8 +42,8 @@ import org.slf4j.LoggerFactory;
 public class JniBasedUnixGroupsNetgroupMapping
   extends JniBasedUnixGroupsMapping {
   
-  private static final Logger LOG = LoggerFactory.getLogger(
-    JniBasedUnixGroupsNetgroupMapping.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(JniBasedUnixGroupsNetgroupMapping.class);
 
   native String[] getUsersForNetgroupJNI(String group);
 
@@ -126,6 +125,6 @@ public class JniBasedUnixGroupsNetgroupMapping
     if (users != null && users.length != 0) {
       return Arrays.asList(users);
     }
-    return Collections.emptyList();
+    return new LinkedList<String>();
   }
 }

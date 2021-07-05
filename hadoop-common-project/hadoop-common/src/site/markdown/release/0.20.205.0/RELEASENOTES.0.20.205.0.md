@@ -23,95 +23,16 @@ These release notes cover new developer and user-facing incompatibilities, impor
 
 ---
 
-* [HDFS-630](https://issues.apache.org/jira/browse/HDFS-630) | *Major* | **In DFSOutputStream.nextBlockOutputStream(), the client can exclude specific datanodes when locating the next block.**
+* [HADOOP-7724](https://issues.apache.org/jira/browse/HADOOP-7724) | *Major* | **hadoop-setup-conf.sh should put proxy user info into the core-site.xml**
 
-**WARNING: No release note provided for this change.**
-
-
----
-
-* [HDFS-1554](https://issues.apache.org/jira/browse/HDFS-1554) | *Major* | **Append 0.20: New semantics for recoverLease**
-
-Change recoverLease API to return if the file is closed or not. It also change the semantics of recoverLease to start lease recovery immediately.
+Fixed hadoop-setup-conf.sh to put proxy user in core-site.xml.  (Arpit Gupta via Eric Yang)
 
 
 ---
 
-* [HDFS-2202](https://issues.apache.org/jira/browse/HDFS-2202) | *Major* | **Changes to balancer bandwidth should not require datanode restart.**
+* [HADOOP-7720](https://issues.apache.org/jira/browse/HADOOP-7720) | *Major* | **improve the hadoop-setup-conf.sh to read in the hbase user and setup the configs**
 
-New dfsadmin command added: [-setBalancerBandwidth \<bandwidth\>] where bandwidth is max network bandwidth in bytes per second that the balancer is allowed to use on each datanode during balacing.
-
-This is an incompatible change in 0.23.  The versions of ClientProtocol and DatanodeProtocol are changed.
-
-
----
-
-* [MAPREDUCE-2494](https://issues.apache.org/jira/browse/MAPREDUCE-2494) | *Major* | **Make the distributed cache delete entires using LRU priority**
-
-Added config option mapreduce.tasktracker.cache.local.keep.pct to the TaskTracker.  It is the target percentage of the local distributed cache that should be kept in between garbage collection runs.  In practice it will delete unused distributed cache entries in LRU order until the size of the cache is less than mapreduce.tasktracker.cache.local.keep.pct of the maximum cache size.  This is a floating point value between 0.0 and 1.0.  The default is 0.95.
-
-
----
-
-* [MAPREDUCE-2187](https://issues.apache.org/jira/browse/MAPREDUCE-2187) | *Major* | **map tasks timeout during sorting**
-
-I just committed this. Thanks Anupam!
-
-
----
-
-* [HADOOP-7119](https://issues.apache.org/jira/browse/HADOOP-7119) | *Major* | **add Kerberos HTTP SPNEGO authentication support to Hadoop JT/NN/DN/TT web-consoles**
-
-Adding support for Kerberos HTTP SPNEGO authentication to the Hadoop web-consoles
-
-
----
-
-* [HDFS-2338](https://issues.apache.org/jira/browse/HDFS-2338) | *Major* | **Configuration option to enable/disable webhdfs.**
-
-Added a conf property dfs.webhdfs.enabled for enabling/disabling webhdfs.
-
-
----
-
-* [HDFS-2318](https://issues.apache.org/jira/browse/HDFS-2318) | *Major* | **Provide authentication to webhdfs using SPNEGO**
-
-Added two new conf properties dfs.web.authentication.kerberos.principal and dfs.web.authentication.kerberos.keytab for the SPNEGO servlet filter.
-
-
----
-
-* [MAPREDUCE-3081](https://issues.apache.org/jira/browse/MAPREDUCE-3081) | *Major* | **Change the name format for hadoop core and vaidya jar to be hadoop-{core/vaidya}-{version}.jar in vaidya.sh**
-
-contrib/vaidya/bin/vaidya.sh script fixed to use appropriate jars and classpath
-
-
----
-
-* [HADOOP-7691](https://issues.apache.org/jira/browse/HADOOP-7691) | *Major* | **hadoop deb pkg should take a diff group id**
-
-Fixed conflict uid for install packages. (Eric Yang)
-
-
----
-
-* [HADOOP-7603](https://issues.apache.org/jira/browse/HADOOP-7603) | *Major* | **Set default hdfs, mapred uid, and hadoop group gid for RPM packages**
-
-Set hdfs uid, mapred uid, and hadoop gid to fixed numbers (201, 202, and 123, respectively).
-
-
----
-
-* [HADOOP-7684](https://issues.apache.org/jira/browse/HADOOP-7684) | *Major* | **jobhistory server and secondarynamenode should have init.d script**
-
-Added init.d script for jobhistory server and secondary namenode. (Eric Yang)
-
-
----
-
-* [MAPREDUCE-3112](https://issues.apache.org/jira/browse/MAPREDUCE-3112) | *Major* | **Calling hadoop cli inside mapreduce job leads to errors**
-
-Removed inheritance of certain server environment variables (HADOOP\_OPTS and HADOOP\_ROOT\_LOGGER) in task attempt process.
+Added parameter for HBase user to setup config script. (Arpit Gupta via Eric Yang)
 
 
 ---
@@ -130,14 +51,6 @@ Fixed recursive sourcing of HADOOP\_OPTS environment variables (Arpit Gupta via 
 
 ---
 
-* [HADOOP-7681](https://issues.apache.org/jira/browse/HADOOP-7681) | *Minor* | **log4j.properties is missing properties for security audit and hdfs audit should be changed to info**
-
-HADOOP-7681. Fixed security and hdfs audit log4j properties
-(Arpit Gupta via Eric Yang)
-
-
----
-
 * [HADOOP-7708](https://issues.apache.org/jira/browse/HADOOP-7708) | *Critical* | **config generator does not update the properties file if on exists already**
 
 Fixed hadoop-setup-conf.sh to handle config file consistently.  (Eric Yang)
@@ -152,16 +65,45 @@ Added toggle for dfs.support.append, webhdfs and hadoop proxy user to setup conf
 
 ---
 
-* [HADOOP-7720](https://issues.apache.org/jira/browse/HADOOP-7720) | *Major* | **improve the hadoop-setup-conf.sh to read in the hbase user and setup the configs**
+* [HADOOP-7691](https://issues.apache.org/jira/browse/HADOOP-7691) | *Major* | **hadoop deb pkg should take a diff group id**
 
-Added parameter for HBase user to setup config script. (Arpit Gupta via Eric Yang)
+Fixed conflict uid for install packages. (Eric Yang)
 
 
 ---
 
-* [MAPREDUCE-2777](https://issues.apache.org/jira/browse/MAPREDUCE-2777) | *Major* | **Backport MAPREDUCE-220 to Hadoop 20 security branch**
+* [HADOOP-7684](https://issues.apache.org/jira/browse/HADOOP-7684) | *Major* | **jobhistory server and secondarynamenode should have init.d script**
 
-Adds cumulative cpu usage and total heap usage to task counters. This is a backport of MAPREDUCE-220 and MAPREDUCE-2469.
+Added init.d script for jobhistory server and secondary namenode. (Eric Yang)
+
+
+---
+
+* [HADOOP-7681](https://issues.apache.org/jira/browse/HADOOP-7681) | *Minor* | **log4j.properties is missing properties for security audit and hdfs audit should be changed to info**
+
+HADOOP-7681. Fixed security and hdfs audit log4j properties
+(Arpit Gupta via Eric Yang)
+
+
+---
+
+* [HADOOP-7655](https://issues.apache.org/jira/browse/HADOOP-7655) | *Major* | **provide a small validation script that smoke tests the installed cluster**
+
+Committed to trunk and v23, since code reviewed by Eric.
+
+
+---
+
+* [HADOOP-7603](https://issues.apache.org/jira/browse/HADOOP-7603) | *Major* | **Set default hdfs, mapred uid, and hadoop group gid for RPM packages**
+
+Set hdfs uid, mapred uid, and hadoop gid to fixed numbers (201, 202, and 123, respectively).
+
+
+---
+
+* [HADOOP-7119](https://issues.apache.org/jira/browse/HADOOP-7119) | *Major* | **add Kerberos HTTP SPNEGO authentication support to Hadoop JT/NN/DN/TT web-consoles**
+
+Adding support for Kerberos HTTP SPNEGO authentication to the Hadoop web-consoles
 
 
 ---
@@ -173,9 +115,60 @@ Give meaningful error message instead of NPE.
 
 ---
 
-* [HADOOP-7724](https://issues.apache.org/jira/browse/HADOOP-7724) | *Major* | **hadoop-setup-conf.sh should put proxy user info into the core-site.xml**
+* [HDFS-2338](https://issues.apache.org/jira/browse/HDFS-2338) | *Major* | **Configuration option to enable/disable webhdfs.**
 
-Fixed hadoop-setup-conf.sh to put proxy user in core-site.xml.  (Arpit Gupta via Eric Yang)
+Added a conf property dfs.webhdfs.enabled for enabling/disabling webhdfs.
+
+
+---
+
+* [HDFS-2318](https://issues.apache.org/jira/browse/HDFS-2318) | *Major* | **Provide authentication to webhdfs using SPNEGO**
+
+Added two new conf properties dfs.web.authentication.kerberos.principal and dfs.web.authentication.kerberos.keytab for the SPNEGO servlet filter.
+
+
+---
+
+* [HDFS-2202](https://issues.apache.org/jira/browse/HDFS-2202) | *Major* | **Changes to balancer bandwidth should not require datanode restart.**
+
+New dfsadmin command added: [-setBalancerBandwidth \<bandwidth\>] where bandwidth is max network bandwidth in bytes per second that the balancer is allowed to use on each datanode during balacing.
+
+This is an incompatible change in 0.23.  The versions of ClientProtocol and DatanodeProtocol are changed.
+
+
+---
+
+* [HDFS-1554](https://issues.apache.org/jira/browse/HDFS-1554) | *Major* | **Append 0.20: New semantics for recoverLease**
+
+Change recoverLease API to return if the file is closed or not. It also change the semantics of recoverLease to start lease recovery immediately.
+
+
+---
+
+* [HDFS-630](https://issues.apache.org/jira/browse/HDFS-630) | *Major* | **In DFSOutputStream.nextBlockOutputStream(), the client can exclude specific datanodes when locating the next block.**
+
+**WARNING: No release note provided for this incompatible change.**
+
+
+---
+
+* [MAPREDUCE-3112](https://issues.apache.org/jira/browse/MAPREDUCE-3112) | *Major* | **Calling hadoop cli inside mapreduce job leads to errors**
+
+Removed inheritance of certain server environment variables (HADOOP\_OPTS and HADOOP\_ROOT\_LOGGER) in task attempt process.
+
+
+---
+
+* [MAPREDUCE-3081](https://issues.apache.org/jira/browse/MAPREDUCE-3081) | *Major* | **Change the name format for hadoop core and vaidya jar to be hadoop-{core/vaidya}-{version}.jar in vaidya.sh**
+
+contrib/vaidya/bin/vaidya.sh script fixed to use appropriate jars and classpath
+
+
+---
+
+* [MAPREDUCE-2777](https://issues.apache.org/jira/browse/MAPREDUCE-2777) | *Major* | **Backport MAPREDUCE-220 to Hadoop 20 security branch**
+
+Adds cumulative cpu usage and total heap usage to task counters. This is a backport of MAPREDUCE-220 and MAPREDUCE-2469.
 
 
 ---
@@ -187,9 +180,16 @@ Generalizes token renewal and canceling to a common interface and provides a plu
 
 ---
 
-* [HADOOP-7655](https://issues.apache.org/jira/browse/HADOOP-7655) | *Major* | **provide a small validation script that smoke tests the installed cluster**
+* [MAPREDUCE-2494](https://issues.apache.org/jira/browse/MAPREDUCE-2494) | *Major* | **Make the distributed cache delete entires using LRU priority**
 
-Committed to trunk and v23, since code reviewed by Eric.
+Added config option mapreduce.tasktracker.cache.local.keep.pct to the TaskTracker.  It is the target percentage of the local distributed cache that should be kept in between garbage collection runs.  In practice it will delete unused distributed cache entries in LRU order until the size of the cache is less than mapreduce.tasktracker.cache.local.keep.pct of the maximum cache size.  This is a floating point value between 0.0 and 1.0.  The default is 0.95.
+
+
+---
+
+* [MAPREDUCE-2187](https://issues.apache.org/jira/browse/MAPREDUCE-2187) | *Major* | **map tasks timeout during sorting**
+
+I just committed this. Thanks Anupam!
 
 
 

@@ -22,7 +22,6 @@ import static org.apache.hadoop.ipc.ProcessingDetails.Timing;
 import static org.apache.hadoop.ipc.RpcConstants.AUTHORIZATION_FAILED_CALL_ID;
 import static org.apache.hadoop.ipc.RpcConstants.CONNECTION_CONTEXT_CALL_ID;
 import static org.apache.hadoop.ipc.RpcConstants.CURRENT_VERSION;
-import static org.apache.hadoop.ipc.RpcConstants.HEADER_LEN_AFTER_HRPC_PART;
 import static org.apache.hadoop.ipc.RpcConstants.PING_CALL_ID;
 
 import java.io.ByteArrayInputStream;
@@ -36,7 +35,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.net.StandardSocketOptions;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
@@ -81,7 +79,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.ha.HealthCheckFailedException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
@@ -99,7 +96,6 @@ import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.Rpc
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslAuth;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcSaslProto.SaslState;
-import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RPCTraceInfoProto;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SaslPropertiesResolver;
@@ -119,16 +115,15 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.tracing.Span;
-import org.apache.hadoop.tracing.SpanContext;
-import org.apache.hadoop.tracing.TraceScope;
-import org.apache.hadoop.tracing.Tracer;
-import org.apache.hadoop.tracing.TraceUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
-import org.apache.hadoop.thirdparty.protobuf.CodedOutputStream;
-import org.apache.hadoop.thirdparty.protobuf.Message;
+import org.apache.htrace.core.SpanId;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.Tracer;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedOutputStream;
+import com.google.protobuf.Message;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,10 +142,6 @@ public abstract class Server {
   private ExceptionsHandler exceptionsHandler = new ExceptionsHandler();
   private Tracer tracer;
   private AlignmentContext alignmentContext;
-  /**
-   * Logical name of the server used in metrics and monitor.
-   */
-  private final String serverName;
 
   /**
    * Add exception classes for which server won't log stack traces.
@@ -261,14 +252,14 @@ public abstract class Server {
   static class RpcKindMapValue {
     final Class<? extends Writable> rpcRequestWrapperClass;
     final RpcInvoker rpcInvoker;
-
     RpcKindMapValue (Class<? extends Writable> rpcRequestWrapperClass,
           RpcInvoker rpcInvoker) {
       this.rpcInvoker = rpcInvoker;
       this.rpcRequestWrapperClass = rpcRequestWrapperClass;
     }   
   }
-  static Map<RPC.RpcKind, RpcKindMapValue> rpcKindMap = new HashMap<>(4);
+  static Map<RPC.RpcKind, RpcKindMapValue> rpcKindMap = new
+      HashMap<RPC.RpcKind, RpcKindMapValue>(4);
   
   
 
@@ -306,11 +297,7 @@ public abstract class Server {
     RpcKindMapValue val = rpcKindMap.get(ProtoUtil.convert(rpcKind));
     return (val == null) ? null : val.rpcRequestWrapperClass; 
   }
-
-  protected RpcInvoker getServerRpcInvoker(RPC.RpcKind rpcKind) {
-    return getRpcInvoker(rpcKind);
-  }
-
+  
   public static RpcInvoker  getRpcInvoker(RPC.RpcKind rpcKind) {
     RpcKindMapValue val = rpcKindMap.get(rpcKind);
     return (val == null) ? null : val.rpcInvoker; 
@@ -522,7 +509,7 @@ public abstract class Server {
    * Logs a Slow RPC Request.
    *
    * @param methodName - RPC Request method name
-   * @param details - Processing Detail.
+   * @param processingTime - Processing Time.
    *
    * if this request took too much time relative to other requests
    * we consider that as a slow RPC. 3 is a magic number that comes
@@ -531,8 +518,7 @@ public abstract class Server {
    * if and only if it falls above 99.7% of requests. We start this logic
    * only once we have enough sample size.
    */
-  void logSlowRpcCalls(String methodName, Call call,
-      ProcessingDetails details) {
+  void logSlowRpcCalls(String methodName, Call call, long processingTime) {
     final int deviation = 3;
 
     // 1024 for minSampleSize just a guess -- not a number computed based on
@@ -543,15 +529,10 @@ public abstract class Server {
     final double threeSigma = rpcMetrics.getProcessingMean() +
         (rpcMetrics.getProcessingStdDev() * deviation);
 
-    long processingTime =
-            details.get(Timing.PROCESSING, RpcMetrics.TIMEUNIT);
     if ((rpcMetrics.getProcessingSampleCount() > minSampleSize) &&
         (processingTime > threeSigma)) {
-      LOG.warn(
-          "Slow RPC : {} took {} {} to process from client {},"
-              + " the processing detail is {}",
-          methodName, processingTime, RpcMetrics.TIMEUNIT, call,
-          details.toString());
+      LOG.warn("Slow RPC : {} took {} {} to process from client {}",
+          methodName, processingTime, RpcMetrics.TIMEUNIT, call);
       rpcMetrics.incrSlowRpc();
     }
   }
@@ -590,7 +571,7 @@ public abstract class Server {
     rpcDetailedMetrics.addProcessingTime(name, processingTime);
     callQueue.addResponseTime(name, call, details);
     if (isLogSlowRPC()) {
-      logSlowRpcCalls(name, call, details);
+      logSlowRpcCalls(name, call, processingTime);
     }
   }
 
@@ -645,22 +626,7 @@ public abstract class Server {
           address.getPort(), e);
     }
   }
-
-  @org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting
-  int getPriorityLevel(Schedulable e) {
-    return callQueue.getPriorityLevel(e);
-  }
-
-  @org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting
-  int getPriorityLevel(UserGroupInformation ugi) {
-    return callQueue.getPriorityLevel(ugi);
-  }
-
-  @org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting
-  void setPriorityLevel(UserGroupInformation ugi, int priority) {
-    callQueue.setPriorityLevel(ugi, priority);
-  }
-
+  
   /**
    * Returns a handle to the rpcMetrics (required in tests)
    * @return rpc metrics
@@ -785,7 +751,7 @@ public abstract class Server {
     private AtomicInteger responseWaitCount = new AtomicInteger(1);
     final RPC.RpcKind rpcKind;
     final byte[] clientId;
-    private final Span span; // the trace span on the server side
+    private final TraceScope traceScope; // the HTrace scope on the server side
     private final CallerContext callerContext; // the call context
     private boolean deferredResponse = false;
     private int priorityLevel;
@@ -800,7 +766,7 @@ public abstract class Server {
 
     Call(Call call) {
       this(call.callId, call.retryCount, call.rpcKind, call.clientId,
-          call.span, call.callerContext);
+          call.traceScope, call.callerContext);
     }
 
     Call(int id, int retryCount, RPC.RpcKind kind, byte[] clientId) {
@@ -814,14 +780,14 @@ public abstract class Server {
     }
 
     Call(int id, int retryCount, RPC.RpcKind kind, byte[] clientId,
-        Span span, CallerContext callerContext) {
+        TraceScope traceScope, CallerContext callerContext) {
       this.callId = id;
       this.retryCount = retryCount;
       this.timestampNanos = Time.monotonicNowNanos();
       this.responseTimestampNanos = timestampNanos;
       this.rpcKind = kind;
       this.clientId = clientId;
-      this.span = span;
+      this.traceScope = traceScope;
       this.callerContext = callerContext;
       this.clientStateId = Long.MIN_VALUE;
       this.isCallCoordinated = false;
@@ -990,8 +956,8 @@ public abstract class Server {
 
     RpcCall(Connection connection, int id, int retryCount,
         Writable param, RPC.RpcKind kind, byte[] clientId,
-        Span span, CallerContext context) {
-      super(id, retryCount, kind, clientId, span, context);
+        TraceScope traceScope, CallerContext context) {
+      super(id, retryCount, kind, clientId, traceScope, context);
       this.connection = connection;
       this.rpcRequest = param;
     }
@@ -1211,9 +1177,6 @@ public abstract class Server {
     private int backlogLength = conf.getInt(
         CommonConfigurationKeysPublic.IPC_SERVER_LISTEN_QUEUE_SIZE_KEY,
         CommonConfigurationKeysPublic.IPC_SERVER_LISTEN_QUEUE_SIZE_DEFAULT);
-    private boolean reuseAddr = conf.getBoolean(
-        CommonConfigurationKeysPublic.IPC_SERVER_REUSEADDR_KEY,
-        CommonConfigurationKeysPublic.IPC_SERVER_REUSEADDR_DEFAULT);
     private boolean isOnAuxiliaryPort;
 
     Listener(int port) throws IOException {
@@ -1221,7 +1184,6 @@ public abstract class Server {
       // Create a new server socket and set to non blocking mode
       acceptChannel = ServerSocketChannel.open();
       acceptChannel.configureBlocking(false);
-      acceptChannel.setOption(StandardSocketOptions.SO_REUSEADDR, reuseAddr);
 
       // Bind the server socket to the local host and port
       bind(acceptChannel.socket(), address, backlogLength, conf, portRangeConfig);
@@ -1421,7 +1383,7 @@ public abstract class Server {
         // If the connectionManager can't take it, close the connection.
         if (c == null) {
           if (channel.isOpen()) {
-            IOUtils.cleanupWithLogger(LOG, channel);
+            IOUtils.cleanup(null, channel);
           }
           connectionManager.droppedConnections.getAndIncrement();
           continue;
@@ -1758,7 +1720,7 @@ public abstract class Server {
   }
 
   @InterfaceAudience.Private
-  public enum AuthProtocol {
+  public static enum AuthProtocol {
     NONE(0),
     SASL(-33);
     
@@ -1858,9 +1820,6 @@ public abstract class Server {
       this.channel = channel;
       this.lastContact = lastContact;
       this.data = null;
-      
-      // the buffer is initialized to read the "hrpc" and after that to read
-      // the length of the Rpc-packet (i.e 4 bytes)
       this.dataLengthBuffer = ByteBuffer.allocate(4);
       this.unwrappedData = null;
       this.unwrappedDataLengthBuffer = ByteBuffer.allocate(4);
@@ -1982,16 +1941,7 @@ public abstract class Server {
       }
     }
 
-    /**
-     * Some exceptions ({@link RetriableException} and {@link StandbyException})
-     * that are wrapped as a cause of parameter e are unwrapped so that they can
-     * be sent as the true cause to the client side. In case of
-     * {@link InvalidToken} we go one level deeper to get the true cause.
-     * 
-     * @param e the exception that may have a cause we want to unwrap.
-     * @return the true cause for some exceptions.
-     */
-    private Throwable getTrueCause(IOException e) {
+    private Throwable getCauseForInvalidToken(IOException e) {
       Throwable cause = e;
       while (cause != null) {
         if (cause instanceof RetriableException) {
@@ -2013,19 +1963,7 @@ public abstract class Server {
       }
       return e;
     }
-    
-    /**
-     * Process saslMessage and send saslResponse back
-     * @param saslMessage received SASL message
-     * @throws RpcServerException setup failed due to SASL negotiation
-     *         failure, premature or invalid connection context, or other state 
-     *         errors. This exception needs to be sent to the client. This 
-     *         exception will wrap {@link RetriableException}, 
-     *         {@link InvalidToken}, {@link StandbyException} or 
-     *         {@link SaslException}.
-     * @throws IOException if sending reply fails
-     * @throws InterruptedException
-     */
+
     private void saslProcess(RpcSaslProto saslMessage)
         throws RpcServerException, IOException, InterruptedException {
       if (saslContextEstablished) {
@@ -2043,7 +1981,7 @@ public abstract class Server {
             LOG.debug(StringUtils.stringifyException(e));
           }
           // attempting user could be null
-          IOException tce = (IOException) getTrueCause(e);
+          IOException tce = (IOException) getCauseForInvalidToken(e);
           AUDITLOG.warn(AUTH_FAILED_FOR + this.toString() + ":"
               + attemptingUser + " (" + e.getLocalizedMessage()
               + ") with true cause: (" + tce.getLocalizedMessage() + ")");
@@ -2060,7 +1998,7 @@ public abstract class Server {
             LOG.debug("SASL server successfully authenticated client: " + user);
           }
           rpcMetrics.incrAuthenticationSuccesses();
-          AUDITLOG.info(AUTH_SUCCESSFUL_FOR + user + " from " + toString());
+          AUDITLOG.info(AUTH_SUCCESSFUL_FOR + user);
           saslContextEstablished = true;
         }
       } catch (RpcServerException rse) { // don't re-wrap
@@ -2086,26 +2024,13 @@ public abstract class Server {
       }
     }
     
-    /**
-     * Process a saslMessge.
-     * @param saslMessage received SASL message
-     * @return the sasl response to send back to client
-     * @throws SaslException if authentication or generating response fails, 
-     *                       or SASL protocol mixup
-     * @throws IOException if a SaslServer cannot be created
-     * @throws AccessControlException if the requested authentication type 
-     *         is not supported or trying to re-attempt negotiation.
-     * @throws InterruptedException
-     */
     private RpcSaslProto processSaslMessage(RpcSaslProto saslMessage)
-        throws SaslException, IOException, AccessControlException,
-        InterruptedException {
+        throws IOException, InterruptedException {
       final RpcSaslProto saslResponse;
       final SaslState state = saslMessage.getState(); // required      
       switch (state) {
         case NEGOTIATE: {
           if (sentNegotiate) {
-            // FIXME shouldn't this be SaslException?
             throw new AccessControlException(
                 "Client already attempted negotiation");
           }
@@ -2204,7 +2129,7 @@ public abstract class Server {
     private void doSaslReply(Exception ioe) throws IOException {
       setupResponse(authFailedCall,
           RpcStatusProto.FATAL, RpcErrorCodeProto.FATAL_UNAUTHORIZED,
-          null, ioe.getClass().getName(), ioe.getMessage());
+          null, ioe.getClass().getName(), ioe.toString());
       sendResponse(authFailedCall);
     }
 
@@ -2234,26 +2159,8 @@ public abstract class Server {
       }
     }
 
-    /**
-     * This method reads in a non-blocking fashion from the channel: 
-     * this method is called repeatedly when data is present in the channel; 
-     * when it has enough data to process one rpc it processes that rpc.
-     * 
-     * On the first pass, it processes the connectionHeader, 
-     * connectionContext (an outOfBand RPC) and at most one RPC request that 
-     * follows that. On future passes it will process at most one RPC request.
-     *  
-     * Quirky things: dataLengthBuffer (4 bytes) is used to read "hrpc" OR 
-     * rpc request length.
-     *    
-     * @return -1 in case of error, else num bytes read so far
-     * @throws IOException - internal error that should not be returned to
-     *         client, typically failure to respond to client
-     * @throws InterruptedException
-     */
     public int readAndProcess() throws IOException, InterruptedException {
       while (!shouldClose()) { // stop if a fatal response has been sent.
-        // dataLengthBuffer is used to read "hrpc" or the rpc-packet length
         int count = -1;
         if (dataLengthBuffer.remaining() > 0) {
           count = channelRead(channel, dataLengthBuffer);       
@@ -2262,11 +2169,9 @@ public abstract class Server {
         }
         
         if (!connectionHeaderRead) {
-          // Every connection is expected to send the header;
-          // so far we read "hrpc" of the connection header.
+          //Every connection is expected to send the header.
           if (connectionHeaderBuf == null) {
-            // for the bytes that follow "hrpc", in the connection header
-            connectionHeaderBuf = ByteBuffer.allocate(HEADER_LEN_AFTER_HRPC_PART);
+            connectionHeaderBuf = ByteBuffer.allocate(3);
           }
           count = channelRead(channel, connectionHeaderBuf);
           if (count < 0 || connectionHeaderBuf.remaining() > 0) {
@@ -2284,17 +2189,11 @@ public abstract class Server {
             setupHttpRequestOnIpcPortResponse();
             return -1;
           }
-
-          if(!RpcConstants.HEADER.equals(dataLengthBuffer)) {
-            LOG.warn("Incorrect RPC Header length from {}:{} "
-                + "expected length: {} got length: {}",
-                hostAddress, remotePort, RpcConstants.HEADER, dataLengthBuffer);
-            setupBadVersionResponse(version);
-            return -1;
-          }
-          if (version != CURRENT_VERSION) {
+          
+          if (!RpcConstants.HEADER.equals(dataLengthBuffer)
+              || version != CURRENT_VERSION) {
             //Warning is ok since this is not supposed to happen.
-            LOG.warn("Version mismatch from " +
+            LOG.warn("Incorrect header or version mismatch from " + 
                      hostAddress + ":" + remotePort +
                      " got version " + version + 
                      " expected version " + CURRENT_VERSION);
@@ -2305,31 +2204,28 @@ public abstract class Server {
           // this may switch us into SIMPLE
           authProtocol = initializeAuthContext(connectionHeaderBuf.get(2));          
           
-          dataLengthBuffer.clear(); // clear to next read rpc packet len
+          dataLengthBuffer.clear();
           connectionHeaderBuf = null;
           connectionHeaderRead = true;
-          continue; // connection header read, now read  4 bytes rpc packet len
+          continue;
         }
         
-        if (data == null) { // just read 4 bytes -  length of RPC packet
+        if (data == null) {
           dataLengthBuffer.flip();
           dataLength = dataLengthBuffer.getInt();
           checkDataLength(dataLength);
-          // Set buffer for reading EXACTLY the RPC-packet length and no more.
           data = ByteBuffer.allocate(dataLength);
         }
-        // Now read the RPC packet
+        
         count = channelRead(channel, data);
         
         if (data.remaining() == 0) {
-          dataLengthBuffer.clear(); // to read length of future rpc packets
+          dataLengthBuffer.clear();
           data.flip();
           ByteBuffer requestData = data;
           data = null; // null out in case processOneRpc throws.
           boolean isHeaderRead = connectionContextRead;
           processOneRpc(requestData);
-          // the last rpc-request we processed could have simply been the
-          // connectionContext; if so continue to read the first RPC.
           if (!isHeaderRead) {
             continue;
           }
@@ -2367,16 +2263,8 @@ public abstract class Server {
       return authProtocol;
     }
 
-    /**
-     * Process the Sasl's Negotiate request, including the optimization of 
-     * accelerating token negotiation.
-     * @return the response to Negotiate request - the list of enabled 
-     *         authMethods and challenge if the TOKENS are supported. 
-     * @throws SaslException - if attempt to generate challenge fails.
-     * @throws IOException - if it fails to create the SASL server for Tokens
-     */
     private RpcSaslProto buildSaslNegotiateResponse()
-        throws InterruptedException, SaslException, IOException {
+        throws IOException, InterruptedException {
       RpcSaslProto negotiateMessage = negotiateResponse;
       // accelerate token negotiation by sending initial challenge
       // in the negotiation response
@@ -2447,6 +2335,7 @@ public abstract class Server {
     }
 
     /** Reads the connection context following the connection header
+     * @param buffer - DataInputStream from which to read the header
      * @throws RpcServerException - if the header cannot be
      *         deserialized, or the user is not authorized
      */ 
@@ -2599,7 +2488,8 @@ public abstract class Server {
         final RpcCall call = new RpcCall(this, callId, retry);
         setupResponse(call,
             rse.getRpcStatusProto(), rse.getRpcErrorCodeProto(), null,
-            t.getClass().getName(), t.getMessage());
+            t.getClass().getName(),
+            t.getMessage() != null ? t.getMessage() : t.toString());
         sendResponse(call);
       }
     }
@@ -2634,18 +2524,13 @@ public abstract class Server {
     }
 
     /**
-     * Process an RPC Request 
-     *   - the connection headers and context must have been already read.
-     *   - Based on the rpcKind, decode the rpcRequest.
-     *   - A successfully decoded RpcCall will be deposited in RPC-Q and
-     *     its response will be sent later when the request is processed.
+     * Process an RPC Request - the connection headers and context must
+     * have been already read
      * @param header - RPC request header
      * @param buffer - stream to request payload
      * @throws RpcServerException - generally due to fatal rpc layer issues
      *   such as invalid header or deserialization error.  The call queue
      *   may also throw a fatal or non-fatal exception on overflow.
-     * @throws IOException - fatal internal error that should/could not
-     *   be sent to client.
      * @throws InterruptedException
      */
     private void processRpcRequest(RpcRequestHeaderProto header,
@@ -2674,24 +2559,19 @@ public abstract class Server {
         throw new FatalRpcServerException(
             RpcErrorCodeProto.FATAL_DESERIALIZING_REQUEST, err);
       }
-
-      Span span = null;
+        
+      TraceScope traceScope = null;
       if (header.hasTraceInfo()) {
-        RPCTraceInfoProto traceInfoProto = header.getTraceInfo();
-        if (traceInfoProto.hasSpanContext()) {
-          if (tracer == null) {
-            setTracer(Tracer.curThreadTracer());
-          }
-          if (tracer != null) {
-            // If the incoming RPC included tracing info, always continue the
-            // trace
-            SpanContext spanCtx = TraceUtils.byteStringToSpanContext(
-                traceInfoProto.getSpanContext());
-            if (spanCtx != null) {
-              span = tracer.newSpan(
-                  RpcClientUtil.toTraceName(rpcRequest.toString()), spanCtx);
-            }
-          }
+        if (tracer != null) {
+          // If the incoming RPC included tracing info, always continue the
+          // trace
+          SpanId parentSpanId = new SpanId(
+              header.getTraceInfo().getTraceId(),
+              header.getTraceInfo().getParentId());
+          traceScope = tracer.newScope(
+              RpcClientUtil.toTraceName(rpcRequest.toString()),
+              parentSpanId);
+          traceScope.detach();
         }
       }
 
@@ -2707,21 +2587,21 @@ public abstract class Server {
       RpcCall call = new RpcCall(this, header.getCallId(),
           header.getRetryCount(), rpcRequest,
           ProtoUtil.convert(header.getRpcKind()),
-          header.getClientId().toByteArray(), span, callerContext);
+          header.getClientId().toByteArray(), traceScope, callerContext);
 
       // Save the priority level assignment by the scheduler
       call.setPriorityLevel(callQueue.getPriorityLevel(call));
       call.markCallCoordinated(false);
       if(alignmentContext != null && call.rpcRequest != null &&
-          (call.rpcRequest instanceof ProtobufRpcEngine2.RpcProtobufRequest)) {
+          (call.rpcRequest instanceof ProtobufRpcEngine.RpcProtobufRequest)) {
         // if call.rpcRequest is not RpcProtobufRequest, will skip the following
         // step and treat the call as uncoordinated. As currently only certain
         // ClientProtocol methods request made through RPC protobuf needs to be
         // coordinated.
         String methodName;
         String protoName;
-        ProtobufRpcEngine2.RpcProtobufRequest req =
-            (ProtobufRpcEngine2.RpcProtobufRequest) call.rpcRequest;
+        ProtobufRpcEngine.RpcProtobufRequest req =
+            (ProtobufRpcEngine.RpcProtobufRequest) call.rpcRequest;
         try {
           methodName = req.getRequestHeader().getMethodName();
           protoName = req.getRequestHeader().getDeclaringClassProtocolName();
@@ -2755,8 +2635,7 @@ public abstract class Server {
      * @param buffer - stream to request payload
      * @throws RpcServerException - setup failed due to SASL
      *         negotiation failure, premature or invalid connection context,
-     *         or other state errors. This exception needs to be sent to the 
-     *         client.
+     *         or other state errors 
      * @throws IOException - failed to send a response back to the client
      * @throws InterruptedException
      */
@@ -2821,6 +2700,8 @@ public abstract class Server {
     
     /**
      * Decode the a protobuf from the given input stream 
+     * @param message - Representation of the type of message
+     * @param buffer - a buffer to read the protobuf
      * @return Message - decoded protobuf
      * @throws RpcServerException - deserialization failed
      */
@@ -2869,9 +2750,9 @@ public abstract class Server {
         LOG.debug("Ignoring socket shutdown exception", e);
       }
       if (channel.isOpen()) {
-        IOUtils.cleanupWithLogger(LOG, channel);
+        IOUtils.cleanup(null, channel);
       }
-      IOUtils.cleanupWithLogger(LOG, socket);
+      IOUtils.cleanup(null, socket);
     }
   }
 
@@ -2954,16 +2835,16 @@ public abstract class Server {
              */
             // Re-queue the call and continue
             requeueCall(call);
-            call = null;
             continue;
           }
           if (LOG.isDebugEnabled()) {
             LOG.debug(Thread.currentThread().getName() + ": " + call + " for RpcKind " + call.rpcKind);
           }
           CurCall.set(call);
-          if (call.span != null) {
-            traceScope = tracer.activateSpan(call.span);
-            call.span.addTimelineAnnotation("called");
+          if (call.traceScope != null) {
+            call.traceScope.reattach();
+            traceScope = call.traceScope;
+            traceScope.getSpan().addTimelineAnnotation("called");
           }
           // always update the current call context
           CallerContext.setCurrent(call.callerContext);
@@ -2978,14 +2859,14 @@ public abstract class Server {
           if (running) {                          // unexpected -- log it
             LOG.info(Thread.currentThread().getName() + " unexpectedly interrupted", e);
             if (traceScope != null) {
-              traceScope.addTimelineAnnotation("unexpectedly interrupted: " +
+              traceScope.getSpan().addTimelineAnnotation("unexpectedly interrupted: " +
                   StringUtils.stringifyException(e));
             }
           }
         } catch (Exception e) {
           LOG.info(Thread.currentThread().getName() + " caught an exception", e);
           if (traceScope != null) {
-            traceScope.addTimelineAnnotation("Exception: " +
+            traceScope.getSpan().addTimelineAnnotation("Exception: " +
                 StringUtils.stringifyException(e));
           }
         } finally {
@@ -3055,14 +2936,14 @@ public abstract class Server {
   
   /** 
    * Constructs a server listening on the named port and address.  Parameters passed must
-   * be of the named class.  The <code>handlerCount</code> determines
+   * be of the named class.  The <code>handlerCount</handlerCount> determines
    * the number of handler threads that will be used to process calls.
    * If queueSizePerHandler or numReaders are not -1 they will be used instead of parameters
    * from configuration. Otherwise the configuration will be picked up.
    * 
    * If rpcRequestClass is null then the rpcRequestClass must have been 
-   * registered via {@link #registerProtocolEngine(RPC.RpcKind,
-   *  Class, RPC.RpcInvoker)}
+   * registered via {@link #registerProtocolEngine(RPC.RpcKind, Class,
+   * RPC.RpcInvoker)}.
    * This parameter has been retained for compatibility with existing tests
    * and usage.
    */
@@ -3080,7 +2961,6 @@ public abstract class Server {
     this.rpcRequestClass = rpcRequestClass; 
     this.handlerCount = handlerCount;
     this.socketSendBufferSize = 0;
-    this.serverName = serverName;
     this.auxiliaryListenerMap = null;
     this.maxDataLength = conf.getInt(CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
         CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
@@ -3144,8 +3024,6 @@ public abstract class Server {
     }
     
     this.exceptionsHandler.addTerseLoggingExceptions(StandbyException.class);
-    this.exceptionsHandler.addTerseLoggingExceptions(
-        HealthCheckFailedException.class);
   }
 
   public synchronized void addAuxiliaryListener(int auxiliaryPort)
@@ -3322,10 +3200,10 @@ public abstract class Server {
     cos.writeRawByte((byte)((length >>> 16) & 0xFF));
     cos.writeRawByte((byte)((length >>>  8) & 0xFF));
     cos.writeRawByte((byte)((length >>>  0) & 0xFF));
-    cos.writeUInt32NoTag(header.getSerializedSize());
+    cos.writeRawVarint32(header.getSerializedSize());
     header.writeTo(cos);
     if (payload != null) {
-      cos.writeUInt32NoTag(payload.getSerializedSize());
+      cos.writeRawVarint32(payload.getSerializedSize());
       payload.writeTo(cos);
     }
     return buf;
@@ -3333,7 +3211,7 @@ public abstract class Server {
 
   private static int getDelimitedLength(Message message) {
     int length = message.getSerializedSize();
-    return length + CodedOutputStream.computeUInt32SizeNoTag(length);
+    return length + CodedOutputStream.computeRawVarint32Size(length);
   }
 
   /**
@@ -3478,8 +3356,8 @@ public abstract class Server {
   
   /** 
    * Called for each call. 
-   * @deprecated Use  {@link #call(RPC.RpcKind, String,
-   *  Writable, long)} instead
+   * @deprecated Use  {@link Server#call(RPC.RpcKind, String, Writable, long)}
+   * instead.
    */
   @Deprecated
   public Writable call(Writable param, long receiveTime) throws Exception {
@@ -3735,7 +3613,7 @@ public abstract class Server {
         if (count == null) {
           count = 1;
         } else {
-          count = count + 1;
+          count++;
         }
         userToConnectionsMap.put(user, count);
       }
@@ -3747,7 +3625,7 @@ public abstract class Server {
         if (count == null) {
           return;
         } else {
-          count = count - 1;
+          count--;
         }
         if (count == 0) {
           userToConnectionsMap.remove(user);
@@ -3881,9 +3759,5 @@ public abstract class Server {
 
   protected int getMaxIdleTime() {
     return connectionManager.maxIdleTime;
-  }
-
-  public String getServerName() {
-    return serverName;
   }
 }

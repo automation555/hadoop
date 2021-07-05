@@ -24,9 +24,9 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.Compressor;
+import org.apache.hadoop.util.NativeCodeLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xerial.snappy.Snappy;
 
 /**
  * A {@link Compressor} based on the snappy compression algorithm.
@@ -48,6 +48,24 @@ public class SnappyCompressor implements Compressor {
   private long bytesRead = 0L;
   private long bytesWritten = 0L;
 
+  private static boolean nativeSnappyLoaded = false;
+  
+  static {
+    if (NativeCodeLoader.isNativeCodeLoaded() &&
+        NativeCodeLoader.buildSupportsSnappy()) {
+      try {
+        initIDs();
+        nativeSnappyLoaded = true;
+      } catch (Throwable t) {
+        LOG.error("failed to load SnappyCompressor", t);
+      }
+    }
+  }
+  
+  public static boolean isNativeCodeLoaded() {
+    return nativeSnappyLoaded;
+  }
+  
   /**
    * Creates a new compressor.
    *
@@ -207,7 +225,7 @@ public class SnappyCompressor implements Compressor {
     }
 
     // Compress data
-    n = compressDirectBuf();
+    n = compressBytesDirect();
     compressedDirectBuf.limit(n);
     uncompressedDirectBuf.clear(); // snappy consumes all buffer input
 
@@ -273,16 +291,9 @@ public class SnappyCompressor implements Compressor {
   public void end() {
   }
 
-  private int compressDirectBuf() throws IOException {
-    if (uncompressedDirectBufLen == 0) {
-      return 0;
-    } else {
-      // Set the position and limit of `uncompressedDirectBuf` for reading
-      uncompressedDirectBuf.limit(uncompressedDirectBufLen).position(0);
-      int size = Snappy.compress((ByteBuffer) uncompressedDirectBuf,
-              (ByteBuffer) compressedDirectBuf);
-      uncompressedDirectBufLen = 0;
-      return size;
-    }
-  }
+  private native static void initIDs();
+
+  private native int compressBytesDirect();
+
+  public native static String getLibraryName();
 }

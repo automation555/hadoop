@@ -223,7 +223,7 @@ public final class WritableUtils  {
   }
 
   /**
-   * Make a copy of the writable object using serialization to a buffer
+   * Make a copy of the writable object using serialiation to a buffer
    * @param dst the object to copy from
    * @param src the object to copy into, which is destroyed
    * @throws IOException
@@ -236,8 +236,7 @@ public final class WritableUtils  {
 
   /**
    * Serializes an integer to a binary stream with zero-compressed encoding.
-   * For -112 {@literal <=} i {@literal <=} 127, only one byte is used with the
-   * actual value.
+   * For -112 <= i <= 127, only one byte is used with the actual value.
    * For other values of i, the first byte value indicates whether the
    * integer is positive or negative, and the number of bytes that follow.
    * If the first byte value v is between -113 and -116, the following integer
@@ -256,8 +255,7 @@ public final class WritableUtils  {
   
   /**
    * Serializes a long to a binary stream with zero-compressed encoding.
-   * For -112 {@literal <=} i {@literal <=} 127, only one byte is used with the
-   * actual value.
+   * For -112 <= i <= 127, only one byte is used with the actual value.
    * For other values of i, the first byte value indicates whether the
    * long is positive or negative, and the number of bytes that follow.
    * If the first byte value v is between -113 and -120, the following long

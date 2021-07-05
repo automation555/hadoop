@@ -29,10 +29,10 @@ import javax.management.MBeanInfo;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
 
-import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.*;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import static com.google.common.base.Preconditions.*;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricsFilter;
@@ -198,7 +198,8 @@ class MetricsSourceAdapter implements DynamicMBean {
     builder.setRecordFilter(recordFilter).setMetricFilter(metricFilter);
     try {
       source.getMetrics(builder, all);
-    } catch (Exception e) {
+    }
+    catch (Exception e) {
       LOG.error("Error getting metrics from source "+ name, e);
     }
     for (MetricsRecordBuilderImpl rb : builder) {

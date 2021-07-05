@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -30,16 +30,33 @@ import re
 import shutil
 import subprocess
 import sys
-import urllib.request
-import argparse
+import urllib2
+try:
+  import argparse
+except ImportError:
+  sys.stderr.write("Please install argparse, e.g. via `pip install argparse`.")
+  sys.exit(2)
 
 # Various relative paths
 REPO_DIR = os.getcwd()
 
 def check_output(*popenargs, **kwargs):
-  """ Run command with arguments and return its output as a string. """
-  return subprocess.check_output(*popenargs, **kwargs, encoding='utf-8')
-
+  r"""Run command with arguments and return its output as a byte string.
+  Backported from Python 2.7 as it's implemented as pure python on stdlib.
+  >>> check_output(['/usr/bin/python', '--version'])
+  Python 2.6.2
+  """
+  process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+  output, _ = process.communicate()
+  retcode = process.poll()
+  if retcode:
+    cmd = kwargs.get("args")
+    if cmd is None:
+      cmd = popenargs[0]
+    error = subprocess.CalledProcessError(retcode, cmd)
+    error.output = output
+    raise error
+  return output
 
 def get_repo_dir():
   """ Return the path to the top of the repo. """
@@ -122,7 +139,7 @@ def checkout_java_acc(force):
   url = "https://github.com/lvc/japi-compliance-checker/archive/1.8.tar.gz"
   scratch_dir = get_scratch_dir()
   path = os.path.join(scratch_dir, os.path.basename(url))
-  jacc = urllib.request.urlopen(url)
+  jacc = urllib2.urlopen(url)
   with open(path, 'wb') as w:
     w.write(jacc.read())
 
@@ -175,9 +192,9 @@ def run_java_acc(src_name, src_jars, dst_name, dst_jars, annotations):
 
   if annotations is not None:
     annotations_path = os.path.join(get_scratch_dir(), "annotations.txt")
-    with open(annotations_path, "w") as f:
+    with file(annotations_path, "w") as f:
       for ann in annotations:
-        print(ann, file=f)
+        print >>f, ann
     args += ["-annotations-list", annotations_path]
 
   subprocess.check_call(args)
@@ -247,8 +264,8 @@ def main():
   parser.add_argument("--skip-build",
                       action="store_true",
                       help="Skip building the projects.")
-  parser.add_argument("src_rev", nargs=1, type=str, help="Source revision.")
-  parser.add_argument("dst_rev", nargs="?", type=str, default="HEAD",
+  parser.add_argument("src_rev", nargs=1, help="Source revision.")
+  parser.add_argument("dst_rev", nargs="?", default="HEAD",
                       help="Destination revision. " +
                       "If not specified, will use HEAD.")
 

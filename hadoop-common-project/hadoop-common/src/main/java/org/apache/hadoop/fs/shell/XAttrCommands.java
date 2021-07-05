@@ -20,10 +20,13 @@ package org.apache.hadoop.fs.shell;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Enums;
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -63,6 +66,8 @@ class XAttrCommands extends FsCommand {
       " and values encoded as hexadecimal and base64 are prefixed with " +
       "0x and 0s, respectively.\n" +
       "<path>: The file or directory.\n";
+    private final static Function<String, XAttrCodec> enValueOfFunc =
+        Enums.valueOfFunction(XAttrCodec.class);
 
     private String name = null;
     private boolean dump = false;
@@ -74,7 +79,7 @@ class XAttrCommands extends FsCommand {
       String en = StringUtils.popOptionWithArgument("-e", args);
       if (en != null) {
         try {
-          encoding = XAttrCodec.valueOf(StringUtils.toUpperCase(en));
+          encoding = enValueOfFunc.apply(StringUtils.toUpperCase(en));
         } catch (IllegalArgumentException e) {
           throw new IllegalArgumentException(
               "Invalid/unsupported encoding option specified: " + en);

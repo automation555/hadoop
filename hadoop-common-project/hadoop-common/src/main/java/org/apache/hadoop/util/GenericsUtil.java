@@ -25,6 +25,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.impl.Log4jLoggerAdapter;
 
 /**
  * Contains utility methods for dealing with Java Generics. 
@@ -84,11 +85,6 @@ public class GenericsUtil {
       return false;
     }
     Logger log = LoggerFactory.getLogger(clazz);
-    try {
-      Class log4jClass = Class.forName("org.slf4j.impl.Log4jLoggerAdapter");
-      return log4jClass.isInstance(log);
-    } catch (ClassNotFoundException e) {
-      return false;
-    }
+    return log instanceof Log4jLoggerAdapter;
   }
 }

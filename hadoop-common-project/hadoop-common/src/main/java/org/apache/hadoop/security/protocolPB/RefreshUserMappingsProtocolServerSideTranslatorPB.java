@@ -26,8 +26,8 @@ import org.apache.hadoop.security.proto.RefreshUserMappingsProtocolProtos.Refres
 import org.apache.hadoop.security.proto.RefreshUserMappingsProtocolProtos.RefreshUserToGroupsMappingsRequestProto;
 import org.apache.hadoop.security.proto.RefreshUserMappingsProtocolProtos.RefreshUserToGroupsMappingsResponseProto;
 
-import org.apache.hadoop.thirdparty.protobuf.RpcController;
-import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 
 public class RefreshUserMappingsProtocolServerSideTranslatorPB implements RefreshUserMappingsProtocolPB {
 

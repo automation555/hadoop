@@ -20,17 +20,15 @@ package org.apache.hadoop.net;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -102,8 +100,7 @@ public class TableMapping extends CachedDNSToSwitchMapping {
 
       try (BufferedReader reader =
                new BufferedReader(new InputStreamReader(
-              Files.newInputStream(Paths.get(filename)),
-              StandardCharsets.UTF_8))) {
+                   new FileInputStream(filename), StandardCharsets.UTF_8))) {
         String line = reader.readLine();
         while (line != null) {
           line = line.trim();
@@ -131,7 +128,7 @@ public class TableMapping extends CachedDNSToSwitchMapping {
         if (map == null) {
           LOG.warn("Failed to read topology table. " +
             NetworkTopology.DEFAULT_RACK + " will be used for all nodes.");
-          map = Collections.emptyMap();
+          map = new HashMap<String, String>();
         }
       }
       List<String> results = new ArrayList<String>(names.size());

@@ -19,7 +19,6 @@ package org.apache.hadoop.security.token.delegation.web;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
@@ -29,8 +28,9 @@ import org.apache.hadoop.security.authentication.client.ConnectionConfigurator;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 import org.apache.hadoop.util.HttpExceptionUtils;
-import org.apache.hadoop.util.JsonSerialization;
 import org.apache.hadoop.util.StringUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.ObjectReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +55,9 @@ public abstract class DelegationTokenAuthenticator implements Authenticator {
   private static final String CONTENT_TYPE = "Content-Type";
   private static final String APPLICATION_JSON_MIME = "application/json";
 
+  private static final ObjectReader READER =
+      new ObjectMapper().reader(Map.class);
+
   private static final String HTTP_GET = "GET";
   private static final String HTTP_PUT = "PUT";
 
@@ -76,7 +79,7 @@ public abstract class DelegationTokenAuthenticator implements Authenticator {
    * DelegationToken operations.
    */
   @InterfaceAudience.Private
-  public enum DelegationTokenOperation {
+  public static enum DelegationTokenOperation {
     GETDELEGATIONTOKEN(HTTP_GET, true),
     RENEWDELEGATIONTOKEN(HTTP_PUT, true),
     CANCELDELEGATIONTOKEN(HTTP_PUT, false);
@@ -135,17 +138,11 @@ public abstract class DelegationTokenAuthenticator implements Authenticator {
   public void authenticate(URL url, AuthenticatedURL.Token token)
       throws IOException, AuthenticationException {
     if (!hasDelegationToken(url, token)) {
-      try {
-        // check and renew TGT to handle potential expiration
-        UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
-        LOG.debug("No delegation token found for url={}, "
-            + "authenticating with {}", url, authenticator.getClass());
-        authenticator.authenticate(url, token);
-      } catch (IOException ex) {
-        throw NetUtils.wrapException(url.getHost(), url.getPort(),
-            null, 0, ex);
-      }
-
+      // check and renew TGT to handle potential expiration
+      UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
+      LOG.debug("No delegation token found for url={}, token={}, authenticating"
+          + " with {}", url, token, authenticator.getClass());
+      authenticator.authenticate(url, token);
     } else {
       LOG.debug("Authenticated from delegation token. url={}, token={}",
           url, token);
@@ -292,7 +289,8 @@ public abstract class DelegationTokenAuthenticator implements Authenticator {
     }
     // proxyuser
     if (doAsUser != null) {
-      params.put(DelegationTokenAuthenticatedURL.DO_AS, doAsUser);
+      params.put(DelegationTokenAuthenticatedURL.DO_AS,
+          URLEncoder.encode(doAsUser, "UTF-8"));
     }
     String urlStr = url.toExternalForm();
     StringBuilder sb = new StringBuilder(urlStr);
@@ -312,9 +310,8 @@ public abstract class DelegationTokenAuthenticator implements Authenticator {
       dt = ((DelegationTokenAuthenticatedURL.Token) token).getDelegationToken();
       ((DelegationTokenAuthenticatedURL.Token) token).setDelegationToken(null);
     }
-    HttpURLConnection conn = null;
     try {
-      conn = aUrl.openConnection(url, token);
+      HttpURLConnection conn = aUrl.openConnection(url, token);
       conn.setRequestMethod(operation.getHttpMethod());
       HttpExceptionUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
       if (hasResponse) {
@@ -324,7 +321,7 @@ public abstract class DelegationTokenAuthenticator implements Authenticator {
         if (contentType != null &&
             contentType.contains(APPLICATION_JSON_MIME)) {
           try {
-            ret = JsonSerialization.mapReader().readValue(conn.getInputStream());
+            ret = READER.readValue(conn.getInputStream());
           } catch (Exception ex) {
             throw new AuthenticationException(String.format(
                 "'%s' did not handle the '%s' delegation token operation: %s",
@@ -339,9 +336,6 @@ public abstract class DelegationTokenAuthenticator implements Authenticator {
     } finally {
       if (dt != null) {
         ((DelegationTokenAuthenticatedURL.Token) token).setDelegationToken(dt);
-      }
-      if (conn != null) {
-        conn.disconnect();
       }
     }
     return ret;

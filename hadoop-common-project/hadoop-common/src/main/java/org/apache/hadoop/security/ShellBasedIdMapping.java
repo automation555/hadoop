@@ -19,12 +19,11 @@ package org.apache.hadoop.security;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -33,9 +32,9 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.Time;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.collect.BiMap;
-import org.apache.hadoop.thirdparty.com.google.common.collect.HashBiMap;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,7 +179,7 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
       + "The host system with duplicated user/group name or id might work fine most of the time by itself.\n"
       + "However when NFS gateway talks to HDFS, HDFS accepts only user and group name.\n"
       + "Therefore, same name means the same user or same group. To find the duplicated names/ids, one can do:\n"
-      + "<getent passwd | cut -d: -f1,3> and <getent group | cut -d: -f1,3> on Linux, BSD and Solaris systems,\n"
+      + "<getent passwd | cut -d: -f1,3> and <getent group | cut -d: -f1,3> on Linux systems,\n"
       + "<dscl . -list /Users UniqueID> and <dscl . -list /Groups PrimaryGroupID> on MacOS.";
   
   private static void reportDuplicateEntry(final String header,
@@ -274,8 +273,7 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
   }
 
   private boolean checkSupportedPlatform() {
-    if (!OS.startsWith("Linux") && !OS.startsWith("Mac")
-        && !OS.equals("SunOS") && !OS.contains("BSD")) {
+    if (!OS.startsWith("Linux") && !OS.startsWith("Mac")) {
       LOG.error("Platform is not supported:" + OS
           + ". Can't update user map and group map and"
           + " 'nobody' will be used for any user and group.");
@@ -387,7 +385,7 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
   // OR
   //     id -u <name> | awk '{print "<name>:"$1 }'
   //
-  private String getName2IdCmdNIX(final String name, final boolean isGrp) {
+  private String getName2IdCmdLinux(final String name, final boolean isGrp) {
     String cmd;
     if (isGrp) {
       cmd = "getent group " + name + " | cut -d: -f1,3";   
@@ -398,7 +396,7 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
   }
   
   // search for name with given id, return "<name>:<id>"
-  private String getId2NameCmdNIX(final int id, final boolean isGrp) {
+  private String getId2NameCmdLinux(final int id, final boolean isGrp) {
     String cmd = "getent ";
     cmd += isGrp? "group " : "passwd ";
     cmd += String.valueOf(id) + " | cut -d: -f1,3";
@@ -468,14 +466,14 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
     boolean updated = false;
     updateStaticMapping();
 
-    if (OS.startsWith("Linux") || OS.equals("SunOS") || OS.contains("BSD")) {
+    if (OS.startsWith("Linux")) {
       if (isGrp) {
         updated = updateMapInternal(gidNameMap, "group",
-            getName2IdCmdNIX(name, true), ":",
+            getName2IdCmdLinux(name, true), ":",
             staticMapping.gidMapping);
       } else {
         updated = updateMapInternal(uidNameMap, "user",
-            getName2IdCmdNIX(name, false), ":",
+            getName2IdCmdLinux(name, false), ":",
             staticMapping.uidMapping);
       }
     } else {
@@ -504,14 +502,14 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
     boolean updated = false;
     updateStaticMapping();
 
-    if (OS.startsWith("Linux") || OS.equals("SunOS") || OS.contains("BSD")) {
+    if (OS.startsWith("Linux")) {
       if (isGrp) {
         updated = updateMapInternal(gidNameMap, "group",
-            getId2NameCmdNIX(id, true), ":",
+            getId2NameCmdLinux(id, true), ":",
             staticMapping.gidMapping);
       } else {
         updated = updateMapInternal(uidNameMap, "user",
-            getId2NameCmdNIX(id, false), ":",
+            getId2NameCmdLinux(id, false), ":",
             staticMapping.uidMapping);
       }
     } else {
@@ -535,7 +533,7 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
   static final class PassThroughMap<K> extends HashMap<K, K> {
     
     public PassThroughMap() {
-      this(Collections.emptyMap());
+      this(new HashMap<K, K>());
     }
     
     public PassThroughMap(Map<K, K> mapping) {
@@ -584,7 +582,7 @@ public class ShellBasedIdMapping implements IdMappingServiceProvider {
     Map<Integer, Integer> gidMapping = new HashMap<Integer, Integer>();
     
     BufferedReader in = new BufferedReader(new InputStreamReader(
-        Files.newInputStream(staticMapFile.toPath()), StandardCharsets.UTF_8));
+        new FileInputStream(staticMapFile), StandardCharsets.UTF_8));
     
     try {
       String line = null;

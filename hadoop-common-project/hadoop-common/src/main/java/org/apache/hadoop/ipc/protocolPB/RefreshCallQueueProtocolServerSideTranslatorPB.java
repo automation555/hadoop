@@ -24,8 +24,8 @@ import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
 import org.apache.hadoop.ipc.proto.RefreshCallQueueProtocolProtos.RefreshCallQueueRequestProto;
 import org.apache.hadoop.ipc.proto.RefreshCallQueueProtocolProtos.RefreshCallQueueResponseProto;
 
-import org.apache.hadoop.thirdparty.protobuf.RpcController;
-import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 
 public class RefreshCallQueueProtocolServerSideTranslatorPB implements
     RefreshCallQueueProtocolPB {

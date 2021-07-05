@@ -20,7 +20,7 @@ package org.apache.hadoop.service.launcher;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.misc.Signal;
@@ -86,7 +86,7 @@ public final class IrqHandler implements SignalHandler {
    * Bind to the interrupt handler.
    * @throws IllegalArgumentException if the exception could not be set
    */
-  public void bind() {
+  void bind() {
     Preconditions.checkState(signal == null, "Handler already bound");
     try {
       signal = new Signal(name);

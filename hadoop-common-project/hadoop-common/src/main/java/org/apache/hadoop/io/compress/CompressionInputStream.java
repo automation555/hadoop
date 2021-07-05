@@ -25,10 +25,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
-import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
-
 /**
  * A compression input stream.
  *
@@ -38,8 +34,7 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public abstract class CompressionInputStream extends InputStream
-    implements Seekable, IOStatisticsSource {
+public abstract class CompressionInputStream extends InputStream implements Seekable {
   /**
    * The input stream to be compressed. 
    */
@@ -73,16 +68,7 @@ public abstract class CompressionInputStream extends InputStream
       }
     }
   }
-
-  /**
-   * Return any IOStatistics provided by the underlying stream.
-   * @return IO stats from the inner stream.
-   */
-  @Override
-  public IOStatistics getIOStatistics() {
-    return IOStatisticsSupport.retrieveIOStatistics(in);
-  }
-
+  
   /**
    * Read bytes from the stream.
    * Made abstract to prevent leakage to underlying stream.

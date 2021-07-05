@@ -31,7 +31,7 @@ import org.apache.hadoop.ha.protocolPB.HAServiceProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ha.protocolPB.ZKFCProtocolClientSideTranslatorPB;
 import org.apache.hadoop.net.NetUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import com.google.common.collect.Maps;
 
 /**
  * Represents a target of the client side HA administration commands.
@@ -122,30 +122,19 @@ public abstract class HAServiceTarget {
    */
   public HAServiceProtocol getHealthMonitorProxy(Configuration conf,
       int timeoutMs) throws IOException {
-    return getHealthMonitorProxy(conf, timeoutMs, 1);
-  }
-
-  public HAServiceProtocol getHealthMonitorProxy(Configuration conf,
-      int timeoutMs, int retries) throws IOException {
     InetSocketAddress addr = getHealthMonitorAddress();
     if (addr == null) {
       addr = getAddress();
     }
-    return getProxyForAddress(conf, timeoutMs, retries, addr);
+    return getProxyForAddress(conf, timeoutMs, addr);
   }
 
   private HAServiceProtocol getProxyForAddress(Configuration conf,
       int timeoutMs, InetSocketAddress addr) throws IOException {
-    // Lower the timeout by setting retries to 1, so we quickly fail to connect
-    return getProxyForAddress(conf, timeoutMs, 1, addr);
-  }
-
-  private HAServiceProtocol getProxyForAddress(Configuration conf,
-      int timeoutMs, int retries, InetSocketAddress addr) throws IOException {
     Configuration confCopy = new Configuration(conf);
+    // Lower the timeout so we quickly fail to connect
     confCopy.setInt(
-        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
-        retries);
+        CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 1);
     SocketFactory factory = NetUtils.getDefaultSocketFactory(confCopy);
     return new HAServiceProtocolClientSideTranslatorPB(
         addr,

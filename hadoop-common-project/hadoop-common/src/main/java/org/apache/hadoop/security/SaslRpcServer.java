@@ -26,6 +26,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.security.Security;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.security.auth.callback.Callback;
@@ -35,6 +39,7 @@ import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.sasl.AuthorizeCallback;
 import javax.security.sasl.RealmCallback;
+import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 import javax.security.sasl.SaslServerFactory;
@@ -63,7 +68,7 @@ public class SaslRpcServer {
   public static final String SASL_DEFAULT_REALM = "default";
   private static SaslServerFactory saslFactory;
 
-  public enum QualityOfProtection {
+  public static enum QualityOfProtection {
     AUTHENTICATION("auth"),
     INTEGRITY("auth-int"),
     PRIVACY("auth-conf");
@@ -173,12 +178,10 @@ public class SaslRpcServer {
   }
 
   public static void init(Configuration conf) {
-    if (saslFactory == null) {
-      Security.addProvider(new SaslPlainServer.SecurityProvider());
-      // passing null so factory is populated with all possibilities. the
-      // properties passed when instantiating a server are what really matter
-      saslFactory = new FastSaslServerFactory(null);
-    }
+    Security.addProvider(new SaslPlainServer.SecurityProvider());
+    // passing null so factory is populated with all possibilities.  the
+    // properties passed when instantiating a server are what really matter
+    saslFactory = new FastSaslServerFactory(null);
   }
   
   static String encodeIdentifier(byte[] identifier) {
@@ -215,7 +218,7 @@ public class SaslRpcServer {
 
   /** Authentication method */
   @InterfaceStability.Evolving
-  public enum AuthMethod {
+  public static enum AuthMethod {
     SIMPLE((byte) 80, ""),
     KERBEROS((byte) 81, "GSSAPI"),
     @Deprecated
@@ -362,6 +365,49 @@ public class SaslRpcServer {
           ac.setAuthorizedID(authzid);
         }
       }
+    }
+  }
+  
+  // Sasl.createSaslServer is 100-200X slower than caching the factories!
+  private static class FastSaslServerFactory implements SaslServerFactory {
+    private final Map<String,List<SaslServerFactory>> factoryCache =
+        new HashMap<String,List<SaslServerFactory>>();
+
+    FastSaslServerFactory(Map<String,?> props) {
+      final Enumeration<SaslServerFactory> factories =
+          Sasl.getSaslServerFactories();
+      while (factories.hasMoreElements()) {
+        SaslServerFactory factory = factories.nextElement();
+        for (String mech : factory.getMechanismNames(props)) {
+          if (!factoryCache.containsKey(mech)) {
+            factoryCache.put(mech, new ArrayList<SaslServerFactory>());
+          }
+          factoryCache.get(mech).add(factory);
+        }
+      }
+    }
+
+    @Override
+    public SaslServer createSaslServer(String mechanism, String protocol,
+        String serverName, Map<String,?> props, CallbackHandler cbh)
+        throws SaslException {
+      SaslServer saslServer = null;
+      List<SaslServerFactory> factories = factoryCache.get(mechanism);
+      if (factories != null) {
+        for (SaslServerFactory factory : factories) {
+          saslServer = factory.createSaslServer(
+              mechanism, protocol, serverName, props, cbh);
+          if (saslServer != null) {
+            break;
+          }
+        }
+      }
+      return saslServer;
+    }
+
+    @Override
+    public String[] getMechanismNames(Map<String, ?> props) {
+      return factoryCache.keySet().toArray(new String[0]);
     }
   }
 }

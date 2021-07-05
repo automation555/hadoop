@@ -22,20 +22,20 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.alias.AbstractJavaKeyStoreProvider;
@@ -89,21 +89,6 @@ public abstract class Shell {
     return true;
   }
 
-  // "1.8"->8, "9"->9, "10"->10
-  private static final int JAVA_SPEC_VER = Math.max(8, Integer.parseInt(
-      System.getProperty("java.specification.version").split("\\.")[0]));
-
-  /**
-   * Query to see if major version of Java specification of the system
-   * is equal or greater than the parameter.
-   *
-   * @param version 8, 9, 10 etc.
-   * @return comparison with system property, always true for 8
-   */
-  public static boolean isJavaVersionAtLeast(int version) {
-    return JAVA_SPEC_VER >= version;
-  }
-
   /**
    * Maximum command line length in Windows
    * KB830473 documents this as 8191
@@ -148,9 +133,9 @@ public abstract class Shell {
    */
   static String bashQuote(String arg) {
     StringBuilder buffer = new StringBuilder(arg.length() + 2);
-    buffer.append('\'')
-        .append(arg.replace("'", "'\\''"))
-        .append('\'');
+    buffer.append('\'');
+    buffer.append(arg.replace("'", "'\\''"));
+    buffer.append('\'');
     return buffer.toString();
   }
 
@@ -872,7 +857,6 @@ public abstract class Shell {
     this.interval = interval;
     this.lastTime = (interval < 0) ? 0 : -interval;
     this.redirectErrorStream = redirectErrorStream;
-    this.environment = Collections.emptyMap();
   }
 
   /**
@@ -880,7 +864,7 @@ public abstract class Shell {
    * @param env Mapping of environment variables
    */
   protected void setEnvironment(Map<String, String> env) {
-    this.environment = Objects.requireNonNull(env);
+    this.environment = env;
   }
 
   /**
@@ -897,9 +881,6 @@ public abstract class Shell {
       return;
     }
     exitCode = 0; // reset for next run
-    if (Shell.MAC) {
-      System.setProperty("jdk.lang.Process.launchMechanism", "POSIX_SPAWN");
-    }
     runCommand();
   }
 
@@ -911,13 +892,22 @@ public abstract class Shell {
     timedOut.set(false);
     completed.set(false);
 
+    if (environment != null) {
+      builder.environment().putAll(this.environment);
+    }
+
     // Remove all env vars from the Builder to prevent leaking of env vars from
     // the parent process.
     if (!inheritParentEnv) {
-      builder.environment().clear();
+      // branch-2: Only do this for HADOOP_CREDSTORE_PASSWORD
+      // Sometimes daemons are configured to use the CredentialProvider feature
+      // and given their jceks password via an environment variable.  We need to
+      // make sure to remove it so it doesn't leak to child processes, which
+      // might be owned by a different user.  For example, the NodeManager
+      // running a User's container.
+      builder.environment().remove(
+          AbstractJavaKeyStoreProvider.CREDENTIAL_PASSWORD_ENV_VAR);
     }
-
-    builder.environment().putAll(this.environment);
 
     if (dir != null) {
       builder.directory(this.dir);
@@ -964,8 +954,8 @@ public abstract class Shell {
         try {
           String line = errReader.readLine();
           while((line != null) && !isInterrupted()) {
-            errMsg.append(line)
-                .append(System.getProperty("line.separator"));
+            errMsg.append(line);
+            errMsg.append(System.getProperty("line.separator"));
             line = errReader.readLine();
           }
         } catch(IOException ioe) {
@@ -1017,7 +1007,17 @@ public abstract class Shell {
       }
       // close the input stream
       try {
-        inReader.close();
+        // JDK 7 tries to automatically drain the input streams for us
+        // when the process exits, but since close is not synchronized,
+        // it creates a race if we close the stream first and the same
+        // fd is recycled.  the stream draining thread will attempt to
+        // drain that fd!!  it may block, OOM, or cause bizarre behavior
+        // see: https://bugs.openjdk.java.net/browse/JDK-8024521
+        //      issue is fixed in build 7u60
+        InputStream stdout = process.getInputStream();
+        synchronized (stdout) {
+          inReader.close();
+        }
       } catch (IOException ioe) {
         LOG.warn("Error while closing the input stream", ioe);
       }
@@ -1026,7 +1026,10 @@ public abstract class Shell {
         joinThread(errThread);
       }
       try {
-        errReader.close();
+        InputStream stderr = process.getErrorStream();
+        synchronized (stderr) {
+          errReader.close();
+        }
       } catch (IOException ioe) {
         LOG.warn("Error while closing the error stream", ioe);
       }
@@ -1109,8 +1112,8 @@ public abstract class Shell {
       final StringBuilder sb =
           new StringBuilder("ExitCodeException ");
       sb.append("exitCode=").append(exitCode)
-          .append(": ")
-          .append(super.getMessage());
+        .append(": ");
+      sb.append(super.getMessage());
       return sb.toString();
     }
   }

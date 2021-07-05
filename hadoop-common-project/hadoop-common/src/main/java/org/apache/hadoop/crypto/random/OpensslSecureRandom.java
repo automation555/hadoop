@@ -22,24 +22,23 @@ import java.util.Random;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.NativeCodeLoader;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.util.PerformanceAdvisory;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * OpenSSL secure random using JNI.
  * This implementation is thread-safe.
- * <p>
+ * <p/>
  * 
  * If using an Intel chipset with RDRAND, the high-performance hardware 
  * random number generator will be used and it's much faster than
  * {@link java.security.SecureRandom}. If RDRAND is unavailable, default
  * OpenSSL secure random generator will be used. It's still faster
  * and can generate strong random bytes.
- * <p>
- * See https://wiki.openssl.org/index.php/Random_Numbers
- * See http://en.wikipedia.org/wiki/RdRand
+ * <p/>
+ * @see https://wiki.openssl.org/index.php/Random_Numbers
+ * @see http://en.wikipedia.org/wiki/RdRand
  */
 @InterfaceAudience.Private
 public class OpensslSecureRandom extends Random {
@@ -68,8 +67,6 @@ public class OpensslSecureRandom extends Random {
   
   public OpensslSecureRandom() {
     if (!nativeEnabled) {
-      PerformanceAdvisory.LOG.debug("Build does not support openssl, " +
-          "falling back to Java SecureRandom.");
       fallback = new java.security.SecureRandom();
     }
   }
@@ -97,7 +94,7 @@ public class OpensslSecureRandom extends Random {
    * random bits (right justified, with leading zeros).
    *
    * @param numBits number of random bits to be generated, where
-   * 0 {@literal <=} <code>numBits</code> {@literal <=} 32.
+   * 0 <= <code>numBits</code> <= 32.
    *
    * @return int an <code>int</code> containing the user-specified number
    * of random bits (right justified, with leading zeros).

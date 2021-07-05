@@ -21,6 +21,8 @@ package org.apache.hadoop.metrics2.impl;
 import java.util.Collections;
 import java.util.List;
 
+import com.google.common.collect.Lists;
+
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -28,17 +30,8 @@ import org.apache.hadoop.metrics2.MetricsFilter;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.Interns;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Time;
 
-/**
- * {@link MetricsRecordBuilder} implementation used for building metrics records
- * by the {@link MetricsCollector}. It provides the following functionality:
- * <ul>
- * <li>Allows configuring filters for metrics.
- * </ul>
- *
- */
 class MetricsRecordBuilderImpl extends MetricsRecordBuilder {
   private final MetricsCollector parent;
   private final long timestamp;
@@ -48,15 +41,9 @@ class MetricsRecordBuilderImpl extends MetricsRecordBuilder {
   private final MetricsFilter recordFilter, metricFilter;
   private final boolean acceptable;
 
-  /**
-   * @param parent {@link MetricsCollector} using this record builder
-   * @param info metrics information
-   * @param rf
-   * @param mf
-   * @param acceptable
-   */
   MetricsRecordBuilderImpl(MetricsCollector parent, MetricsInfo info,
-      MetricsFilter rf, MetricsFilter mf, boolean acceptable) {
+                           MetricsFilter rf, MetricsFilter mf,
+                           boolean acceptable) {
     this.parent = parent;
     timestamp = Time.now();
     recInfo = info;

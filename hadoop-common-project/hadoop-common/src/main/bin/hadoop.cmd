@@ -29,26 +29,6 @@
 @rem                                    by doing
 @rem                                    export HADOOP_USER_CLASSPATH_FIRST=true
 @rem
-@rem   HADOOP_USE_CLIENT_CLASSLOADER    When defined, HADOOP_CLASSPATH and the
-@rem                                    jar as the hadoop jar argument are
-@rem                                    handled by a separate isolated client
-@rem                                    classloader. If it is set,
-@rem                                    HADOOP_USER_CLASSPATH_FIRST is
-@rem                                    ignored. Can be defined by doing
-@rem                                    export HADOOP_USE_CLIENT_CLASSLOADER=true
-@rem
-@rem   HADOOP_CLIENT_CLASSLOADER_SYSTEM_CLASSES
-@rem                                    When defined, it overrides the default
-@rem                                    definition of system classes for the
-@rem                                    client classloader when
-@rem                                    HADOOP_USE_CLIENT_CLASSLOADER is
-@rem                                    enabled. Names ending in '.' (period)
-@rem                                    are treated as package names, and names
-@rem                                    starting with a '-' are treated as
-@rem                                    negative matches. For example,
-@rem                                    export HADOOP_CLIENT_CLASSLOADER_SYSTEM_CLASSES="-org.apache.hadoop.UserClass,java.,javax.,org.apache.hadoop."
-
-@rem
 @rem   HADOOP_HEAPSIZE  The maximum amount of heap to use, in MB.
 @rem                    Default is 1000.
 @rem
@@ -144,12 +124,9 @@ call :updatepath %HADOOP_BIN_PATH%
       @echo %CLASSPATH%
       exit /b
     )
-  ) else if %hadoop-command% == jnipath (
-    echo !PATH!
-    exit /b
   )
-
-  set corecommands=fs version jar checknative conftest distch distcp daemonlog archive classpath credential kerbname key kdiag
+  
+  set corecommands=fs version jar checknative distcp daemonlog archive classpath credential key
   for %%i in ( %corecommands% ) do (
     if %hadoop-command% == %%i set corecommand=true  
   )
@@ -185,29 +162,15 @@ call :updatepath %HADOOP_BIN_PATH%
 
 :jar
   if defined YARN_OPTS (
-    @echo WARNING: Use "yarn jar" to launch YARN applications.
+    @echo WARNING: Use "yarn jar" to launch YARN applications. 1>&2
   ) else if defined YARN_CLIENT_OPTS (
-    @echo WARNING: Use "yarn jar" to launch YARN applications.
-  )
-  @rem if --help option is used, no need to call command
-  if [!hadoop-command-arguments[%1%]!]==["--help"] (
-    @echo Usage: hadoop jar <jar> [mainClass] args...
-    goto :eof
+    @echo WARNING: Use "yarn jar" to launch YARN applications. 1>&2
   )
   set CLASS=org.apache.hadoop.util.RunJar
   goto :eof
 
 :checknative
   set CLASS=org.apache.hadoop.util.NativeLibraryChecker
-  goto :eof
-
-:conftest
-  set CLASS=org.apache.hadoop.util.ConfTest
-  goto :eof
-
-:distch
-  set CLASS=org.apache.hadoop.tools.DistCh
-  set CLASSPATH=%CLASSPATH%;%TOOL_PATH%
   goto :eof
 
 :distcp
@@ -230,14 +193,6 @@ call :updatepath %HADOOP_BIN_PATH%
 
 :credential
   set CLASS=org.apache.hadoop.security.alias.CredentialShell
-  goto :eof
-
-:kerbname
-  set CLASS=org.apache.hadoop.security.HadoopKerberosName
-  goto :eof
-
-:kdiag
-  set CLASS=org.apache.hadoop.security.KDiag
   goto :eof
 
 :key
@@ -302,17 +257,11 @@ call :updatepath %HADOOP_BIN_PATH%
   @echo                        note: please use "yarn jar" to launch
   @echo                              YARN applications, not this command.
   @echo   checknative [-a^|-h]  check native hadoop and compression libraries availability
-  @echo   conftest             validate configuration XML files
-  @echo   distch path:owner:group:permisson
-  @echo                        distributed metadata changer
   @echo   distcp ^<srcurl^> ^<desturl^> copy file or directories recursively
   @echo   archive -archiveName NAME -p ^<parent path^> ^<src^>* ^<dest^> create a hadoop archive
   @echo   classpath            prints the class path needed to get the
   @echo                        Hadoop jar and the required libraries
   @echo   credential           interact with credential providers
-  @echo   jnipath              prints the java.library.path
-  @echo   kerbname             show auth_to_local principal conversion
-  @echo   kdiag                diagnose kerberos problems
   @echo   key                  manage keys via the KeyProvider
   @echo   daemonlog            get/set the log level for each daemon
   @echo  or

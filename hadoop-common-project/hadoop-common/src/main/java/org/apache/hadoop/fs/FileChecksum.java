@@ -47,7 +47,7 @@ public abstract class FileChecksum implements Writable {
     if (other == this) {
       return true;
     }
-    if (!(other instanceof FileChecksum)) {
+    if (other == null || !(other instanceof FileChecksum)) {
       return false;
     }
 
