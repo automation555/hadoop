@@ -29,16 +29,16 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public abstract class AzureBlobFileSystemException extends IOException {
+  public AzureBlobFileSystemException(final Throwable cause) {
+    super(cause);
+  }
+
   public AzureBlobFileSystemException(final String message) {
     super(message);
   }
 
   public AzureBlobFileSystemException(final String message, final Exception innerException) {
     super(message, innerException);
-  }
-
-  public AzureBlobFileSystemException(final String message, final Throwable innerThrowable) {
-    super(message, innerThrowable);
   }
 
   @Override

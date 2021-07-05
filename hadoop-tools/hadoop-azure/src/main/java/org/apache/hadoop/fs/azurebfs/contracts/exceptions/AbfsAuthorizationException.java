@@ -15,15 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.azurebfs.services;
+
+package org.apache.hadoop.fs.azurebfs.contracts.exceptions;
+
+import java.io.IOException;
 
 /**
- * Auth Type Enum.
+ * Exception raised on ABFS Authorization failures.
  */
-public enum AuthType {
-    None,
-    SharedKey,
-    OAuth,
-    Custom,
-    SAS
+public class AbfsAuthorizationException extends AzureBlobFileSystemException {
+
+  private static final long serialVersionUID = 1L;
+
+  public AbfsAuthorizationException(String message, Exception e) {
+    super(message, e);
+  }
 }

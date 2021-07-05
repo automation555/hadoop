@@ -18,6 +18,16 @@
 
 package org.apache.hadoop.fs.azurebfs.utils;
 
+import org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants;
+import org.apache.hadoop.fs.azurebfs.constants.FileSystemUriSchemes;
+import org.apache.hadoop.fs.azurebfs.contracts.exceptions.InvalidUriAuthorityException;
+import org.apache.hadoop.fs.azurebfs.contracts.exceptions.InvalidUriException;
+import org.apache.http.client.utils.URIBuilder;
+
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.regex.Pattern;
 
 /**
@@ -74,5 +84,46 @@ public final class UriUtils {
   }
 
   private UriUtils() {
+  }
+
+  public static URL addSASToRequestUrl(URL requestUrl, String sasToken)
+      throws URISyntaxException, MalformedURLException {
+    URIBuilder uriBuilder = new URIBuilder(requestUrl.toURI());
+    String[] sasQueryParamKVPairs = sasToken.split("&");
+    for(String sasQueryParam : sasQueryParamKVPairs)
+    {
+      String[] queryParam = sasQueryParam.split("=");
+      String key = queryParam[0];
+      String value = queryParam[1];
+
+      uriBuilder.addParameter(key, value);
+    }
+
+    return uriBuilder.build().toURL();
+  }
+
+  public static String[] authorityParts(URI uri) throws
+      InvalidUriAuthorityException, InvalidUriException {
+    final String authority = uri.getRawAuthority();
+    if (null == authority) {
+      throw new InvalidUriAuthorityException(uri.toString());
+    }
+
+    if (!authority.contains(AbfsHttpConstants.AZURE_DISTRIBUTED_FILE_SYSTEM_AUTHORITY_DELIMITER)) {
+      throw new InvalidUriAuthorityException(uri.toString());
+    }
+
+    final String[] authorityParts = authority.split(AbfsHttpConstants.AZURE_DISTRIBUTED_FILE_SYSTEM_AUTHORITY_DELIMITER, 2);
+
+    if (authorityParts.length < 2 || authorityParts[0] != null
+        && authorityParts[0].isEmpty()) {
+      final String errMsg = String
+          .format("'%s' has a malformed authority, expected container name. "
+                  + "Authority takes the form "
+                  + FileSystemUriSchemes.ABFS_SCHEME + "://[<container name>@]<account name>",
+              uri.toString());
+      throw new InvalidUriException(errMsg);
+    }
+    return authorityParts;
   }
 }
