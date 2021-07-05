@@ -162,10 +162,6 @@ public class TimelineWebServices {
           parseStr(entityId),
           parseFieldsStr(fields, ","),
           getUser(req));
-    } catch (YarnException e) {
-      // The user doesn't have the access to override the existing domain.
-      LOG.info(e.getMessage(), e);
-      throw new ForbiddenException(e);
     } catch (IllegalArgumentException e) {
       throw new BadRequestException(e);
     } catch (Exception e) {
@@ -242,7 +238,7 @@ public class TimelineWebServices {
     } catch (BadRequestException bre) {
       throw bre;
     } catch (Exception e) {
-      LOG.error("Error putting entities", e);
+      LOG.error("Error posting entities", e);
       throw new WebApplicationException(e,
           Response.Status.INTERNAL_SERVER_ERROR);
     }

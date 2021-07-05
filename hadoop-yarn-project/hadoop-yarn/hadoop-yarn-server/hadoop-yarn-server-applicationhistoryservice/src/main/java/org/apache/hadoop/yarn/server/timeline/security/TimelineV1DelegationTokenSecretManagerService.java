@@ -139,7 +139,9 @@ public class TimelineV1DelegationTokenSecretManagerService extends
 
     @Override
     protected void storeNewMasterKey(DelegationKey key) throws IOException {
-      LOG.debug("Storing master key {}", key.getKeyId());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Storing master key " + key.getKeyId());
+      }
       try {
         if (stateStore != null) {
           stateStore.storeTokenMasterKey(key);
@@ -151,7 +153,9 @@ public class TimelineV1DelegationTokenSecretManagerService extends
 
     @Override
     protected void removeStoredMasterKey(DelegationKey key) {
-      LOG.debug("Removing master key {}", key.getKeyId());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Removing master key " + key.getKeyId());
+      }
       try {
         if (stateStore != null) {
           stateStore.removeTokenMasterKey(key);
@@ -164,7 +168,9 @@ public class TimelineV1DelegationTokenSecretManagerService extends
     @Override
     protected void storeNewToken(TimelineDelegationTokenIdentifier tokenId,
         long renewDate) {
-      LOG.debug("Storing token {}", tokenId.getSequenceNumber());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Storing token " + tokenId.getSequenceNumber());
+      }
       try {
         if (stateStore != null) {
           stateStore.storeToken(tokenId, renewDate);
@@ -177,7 +183,9 @@ public class TimelineV1DelegationTokenSecretManagerService extends
     @Override
     protected void removeStoredToken(TimelineDelegationTokenIdentifier tokenId)
         throws IOException {
-      LOG.debug("Storing token {}", tokenId.getSequenceNumber());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("removing token " + tokenId.getSequenceNumber());
+      }
       try {
         if (stateStore != null) {
           stateStore.removeToken(tokenId);
@@ -190,7 +198,9 @@ public class TimelineV1DelegationTokenSecretManagerService extends
     @Override
     protected void updateStoredToken(TimelineDelegationTokenIdentifier tokenId,
         long renewDate) {
-      LOG.debug("Updating token {}", tokenId.getSequenceNumber());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Updating token " + tokenId.getSequenceNumber());
+      }
       try {
         if (stateStore != null) {
           stateStore.updateToken(tokenId, renewDate);

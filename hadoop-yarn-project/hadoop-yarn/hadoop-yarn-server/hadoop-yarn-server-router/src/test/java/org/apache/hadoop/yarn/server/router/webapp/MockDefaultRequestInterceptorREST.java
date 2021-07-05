@@ -31,7 +31,6 @@ import javax.ws.rs.core.Response.Status;
 
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
@@ -44,7 +43,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NewApplication;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ResourceInfo;
-import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ResourceOptionInfo;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +61,6 @@ public class MockDefaultRequestInterceptorREST
   // down e.g. network issue, failover.
   private boolean isRunning = true;
   private HashSet<ApplicationId> applicationMap = new HashSet<>();
-  public static final String APP_STATE_RUNNING = "RUNNING";
 
   private void validateRunning() throws ConnectException {
     if (!isRunning) {
@@ -117,7 +114,7 @@ public class MockDefaultRequestInterceptorREST
       Set<String> statesQuery, String finalStatusQuery, String userQuery,
       String queueQuery, String count, String startedBegin, String startedEnd,
       String finishBegin, String finishEnd, Set<String> applicationTypes,
-      Set<String> applicationTags, String name, Set<String> unselectedFields) {
+      Set<String> applicationTags, Set<String> unselectedFields) {
     if (!isRunning) {
       throw new RuntimeException("RM is stopped");
     }
@@ -142,14 +139,14 @@ public class MockDefaultRequestInterceptorREST
     ApplicationId applicationId = ApplicationId.fromString(appId);
     if (!applicationMap.remove(applicationId)) {
       throw new ApplicationNotFoundException(
-          "Trying to kill an absent application: " + appId);
+          "Can not find Application: " + appId);
     }
 
     if (targetState == null) {
       return Response.status(Status.BAD_REQUEST).build();
     }
 
-    LOG.info("Force killing application: " + appId);
+    LOG.info("Update the status of application: " + appId);
     AppState ret = new AppState();
     ret.setState(targetState.toString());
     return Response.status(Status.OK).entity(ret).build();
@@ -180,16 +177,6 @@ public class MockDefaultRequestInterceptorREST
   }
 
   @Override
-  public ResourceInfo updateNodeResource(HttpServletRequest hsr,
-      String nodeId, ResourceOptionInfo resourceOption) {
-    if (!isRunning) {
-      throw new RuntimeException("RM is stopped");
-    }
-    Resource resource = resourceOption.getResourceOption().getResource();
-    return new ResourceInfo(resource);
-  }
-
-  @Override
   public ClusterMetricsInfo getClusterMetricsInfo() {
     if (!isRunning) {
       throw new RuntimeException("RM is stopped");
@@ -203,21 +190,6 @@ public class MockDefaultRequestInterceptorREST
     metrics.setAppsKilled(Integer.valueOf(getSubClusterId().getId()));
 
     return metrics;
-  }
-
-  @Override
-  public AppState getAppState(HttpServletRequest hsr, String appId)
-      throws AuthorizationException {
-    if (!isRunning) {
-      throw new RuntimeException("RM is stopped");
-    }
-
-    ApplicationId applicationId = ApplicationId.fromString(appId);
-    if (!applicationMap.contains(applicationId)) {
-      throw new NotFoundException("app with id: " + appId + " not found");
-    }
-
-    return new AppState(APP_STATE_RUNNING);
   }
 
   public void setSubClusterId(int subClusterId) {
