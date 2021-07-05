@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.resourcetracker;
 
-import static org.apache.hadoop.yarn.server.resourcemanager.MockNM.createMockNodeStatus;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +36,8 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerResponse;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
-import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.resourcemanager.HostsConfigManager;
+import org.apache.hadoop.yarn.server.resourcemanager.HostsFileManager;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.ParameterizedSchedulerTestBase;
@@ -73,6 +72,7 @@ public class TestNMReconnect extends ParameterizedSchedulerTestBase {
   private List<RMNodeEvent> rmNodeEvents = new ArrayList<RMNodeEvent>();
   private Dispatcher dispatcher;
   private RMContextImpl context;
+  private HostsConfigManager hostsConfigManager;
 
   public TestNMReconnect(SchedulerType type) throws IOException {
     super(type);
@@ -101,6 +101,7 @@ public class TestNMReconnect extends ParameterizedSchedulerTestBase {
 
     context = new RMContextImpl(dispatcher, null,
         null, null, null, null, null, null, null, null);
+    hostsConfigManager = new HostsFileManager();
     dispatcher.register(SchedulerEventType.class,
         new InlineDispatcher.EmptyEventHandler());
     dispatcher.register(RMNodeEventType.class,
@@ -109,7 +110,7 @@ public class TestNMReconnect extends ParameterizedSchedulerTestBase {
         dispatcher);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
-    NodesListManager nodesListManager = new NodesListManager(context);
+    NodesListManager nodesListManager = new NodesListManager(context, hostsConfigManager);
     nodesListManager.init(conf);
     RMContainerTokenSecretManager containerTokenSecretManager =
         new RMContainerTokenSecretManager(conf);
@@ -181,13 +182,9 @@ public class TestNMReconnect extends ParameterizedSchedulerTestBase {
     RegisterNodeManagerRequest request1 = recordFactory
         .newRecordInstance(RegisterNodeManagerRequest.class);
     NodeId nodeId1 = NodeId.newInstance(hostname1, 0);
-
-    NodeStatus mockNodeStatus = createMockNodeStatus();
-
     request1.setNodeId(nodeId1);
     request1.setHttpPort(0);
     request1.setResource(capability);
-    request1.setNodeStatus(mockNodeStatus);
     resourceTrackerService.registerNodeManager(request1);
     Assert.assertNotNull(context.getRMNodes().get(nodeId1));
     // verify Scheduler and RMContext use same RMNode reference.

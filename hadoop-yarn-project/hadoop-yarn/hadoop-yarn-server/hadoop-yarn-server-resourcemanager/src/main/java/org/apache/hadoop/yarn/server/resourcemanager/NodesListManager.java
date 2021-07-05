@@ -31,15 +31,14 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.HostsFileReader;
-import org.apache.hadoop.util.HostsFileReader.HostDetails;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -48,7 +47,6 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppNodeUpdateEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppNodeUpdateEvent.RMAppNodeUpdateType;
@@ -60,16 +58,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 @SuppressWarnings("unchecked")
 public class NodesListManager extends CompositeService implements
     EventHandler<NodesListManagerEvent> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(NodesListManager.class);
+  private static final Log LOG = LogFactory.getLog(NodesListManager.class);
 
-  private HostsFileReader hostsReader;
+  private HostsConfigManager hostsConfigManager;
   private Configuration conf;
   private final RMContext rmContext;
 
@@ -78,18 +75,14 @@ public class NodesListManager extends CompositeService implements
   private int defaultDecTimeoutSecs =
       YarnConfiguration.DEFAULT_RM_NODE_GRACEFUL_DECOMMISSION_TIMEOUT;
 
-  private String includesFile;
-  private String excludesFile;
-
   private Resolver resolver;
   private Timer removalTimer;
   private int nodeRemovalCheckInterval;
-  private Set<RMNode> gracefulDecommissionableNodes;
 
-  public NodesListManager(RMContext rmContext) {
+  public NodesListManager(RMContext rmContext, HostsConfigManager hostsConfigManager) {
     super(NodesListManager.class.getName());
     this.rmContext = rmContext;
-    this.gracefulDecommissionableNodes = ConcurrentHashMap.newKeySet();
+    this.hostsConfigManager = hostsConfigManager;
   }
 
   @Override
@@ -108,21 +101,10 @@ public class NodesListManager extends CompositeService implements
       addIfService(resolver);
     }
 
-    // Read the hosts/exclude files to restrict access to the RM
-    try {
-      this.includesFile = conf.get(YarnConfiguration.RM_NODES_INCLUDE_FILE_PATH,
-          YarnConfiguration.DEFAULT_RM_NODES_INCLUDE_FILE_PATH);
-      this.excludesFile = conf.get(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
-          YarnConfiguration.DEFAULT_RM_NODES_EXCLUDE_FILE_PATH);
-      this.hostsReader =
-          createHostsFileReader(this.includesFile, this.excludesFile);
-      setDecommissionedNMs();
-      printConfiguredHosts(false);
-    } catch (YarnException ex) {
-      disableHostsFileReader(ex);
-    } catch (IOException ioe) {
-      disableHostsFileReader(ioe);
-    }
+    // Read the node membership (included and excluded nodes) config to restrict access to the RM.
+    this.hostsConfigManager.refresh(rmContext.getConfigurationProvider(), conf);
+    setDecomissionedNMs();
+    printConfiguredHosts();
 
     final int nodeRemovalTimeout =
         conf.getInt(
@@ -189,7 +171,7 @@ public class NodesListManager extends CompositeService implements
     removalTimer.cancel();
   }
 
-  private void printConfiguredHosts(boolean graceful) {
+  private void printConfiguredHosts() {
     if (!LOG.isDebugEnabled()) {
       return;
     }
@@ -200,16 +182,10 @@ public class NodesListManager extends CompositeService implements
         conf.get(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
             YarnConfiguration.DEFAULT_RM_NODES_EXCLUDE_FILE_PATH));
 
-    HostDetails hostDetails;
-    if (graceful) {
-      hostDetails = hostsReader.getLazyLoadedHostDetails();
-    } else {
-      hostDetails = hostsReader.getHostDetails();
-    }
-    for (String include : hostDetails.getIncludedHosts()) {
+    for (String include : hostsConfigManager.getIncludedHosts()) {
       LOG.debug("include: " + include);
     }
-    for (String exclude : hostDetails.getExcludedHosts()) {
+    for (String exclude : hostsConfigManager.getExcludedHosts()) {
       LOG.debug("exclude: " + exclude);
     }
   }
@@ -235,33 +211,19 @@ public class NodesListManager extends CompositeService implements
     if (null == yarnConf) {
       yarnConf = new YarnConfiguration();
     }
-    includesFile =
-        yarnConf.get(YarnConfiguration.RM_NODES_INCLUDE_FILE_PATH,
-            YarnConfiguration.DEFAULT_RM_NODES_INCLUDE_FILE_PATH);
-    excludesFile =
-        yarnConf.get(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
-            YarnConfiguration.DEFAULT_RM_NODES_EXCLUDE_FILE_PATH);
-    LOG.info("refreshNodes excludesFile " + excludesFile);
-
-    if (graceful) {
-      // update hosts, but don't make it visible just yet
-      hostsReader.lazyRefresh(includesFile, excludesFile);
-    } else {
-      hostsReader.refresh(includesFile, excludesFile);
-    }
-
-    printConfiguredHosts(graceful);
+    hostsConfigManager.refresh(rmContext.getConfigurationProvider(), yarnConf);
+    printConfiguredHosts();
 
     LOG.info("hostsReader include:{" +
-        StringUtils.join(",", hostsReader.getHosts()) +
+        StringUtils.join(",", hostsConfigManager.getIncludedHosts()) +
         "} exclude:{" +
-        StringUtils.join(",", hostsReader.getExcludedHosts()) + "}");
+        StringUtils.join(",", hostsConfigManager.getExcludedHosts()) + "}");
 
     handleExcludeNodeList(graceful, timeout);
   }
 
-  private void setDecommissionedNMs() {
-    Set<String> excludeList = hostsReader.getExcludedHosts();
+  private void setDecomissionedNMs() {
+    Set<String> excludeList = hostsConfigManager.getExcludedHosts();
     for (final String host : excludeList) {
       NodeId nodeId = createUnknownNodeId(host);
       RMNodeImpl rmNode = new RMNodeImpl(nodeId,
@@ -284,16 +246,8 @@ public class NodesListManager extends CompositeService implements
     // Nodes need to be decommissioned (graceful or forceful);
     List<RMNode> nodesToDecom = new ArrayList<RMNode>();
 
-    HostDetails hostDetails;
-    gracefulDecommissionableNodes.clear();
-    if (graceful) {
-      hostDetails = hostsReader.getLazyLoadedHostDetails();
-    } else {
-      hostDetails = hostsReader.getHostDetails();
-    }
-
-    Set<String> includes = hostDetails.getIncludedHosts();
-    Map<String, Integer> excludes = hostDetails.getExcludedMap();
+    Set<String> includes = hostsConfigManager.getIncludedHosts();
+    Map<String, Integer> excludes = hostsConfigManager.getExcludedHostsMap();
 
     for (RMNode n : this.rmContext.getRMNodes().values()) {
       NodeState s = n.getState();
@@ -319,13 +273,11 @@ public class NodesListManager extends CompositeService implements
               s != NodeState.DECOMMISSIONING) {
             LOG.info("Gracefully decommission " + nodeStr);
             nodesToDecom.add(n);
-            gracefulDecommissionableNodes.add(n);
           } else if (s == NodeState.DECOMMISSIONING &&
                      !Objects.equals(n.getDecommissioningTimeout(),
                          timeoutToUse)) {
             LOG.info("Update " + nodeStr + " timeout to be " + timeoutToUse);
             nodesToDecom.add(n);
-            gracefulDecommissionableNodes.add(n);
           } else {
             LOG.info("No action for " + nodeStr);
           }
@@ -336,10 +288,6 @@ public class NodesListManager extends CompositeService implements
           }
         }
       }
-    }
-
-    if (graceful) {
-      hostsReader.finishRefresh();
     }
 
     for (RMNode n : nodesToRecom) {
@@ -488,13 +436,8 @@ public class NodesListManager extends CompositeService implements
   }
 
   public boolean isValidNode(String hostName) {
-    HostDetails hostDetails = hostsReader.getHostDetails();
-    return isValidNode(hostName, hostDetails.getIncludedHosts(),
-        hostDetails.getExcludedHosts());
-  }
-
-  boolean isGracefullyDecommissionableNode(RMNode node) {
-    return gracefulDecommissionableNodes.contains(node);
+    return isValidNode(hostName, hostsConfigManager.getIncludedHosts(),
+        hostsConfigManager.getExcludedHosts());
   }
 
   private boolean isValidNode(
@@ -509,8 +452,12 @@ public class NodesListManager extends CompositeService implements
       RMNode eventNode, RMAppNodeUpdateType appNodeUpdateType) {
     for(RMApp app : rmContext.getRMApps().values()) {
       if (!app.isAppFinalStateStored()) {
-        app.handle(new RMAppNodeUpdateEvent(app.getApplicationId(), eventNode,
-            appNodeUpdateType));
+        this.rmContext
+            .getDispatcher()
+            .getEventHandler()
+            .handle(
+                new RMAppNodeUpdateEvent(app.getApplicationId(), eventNode,
+                    appNodeUpdateType));
       }
     }
   }
@@ -520,17 +467,17 @@ public class NodesListManager extends CompositeService implements
     RMNode eventNode = event.getNode();
     switch (event.getType()) {
     case NODE_UNUSABLE:
-      LOG.debug("{} reported unusable", eventNode);
+      LOG.debug(eventNode + " reported unusable");
       sendRMAppNodeUpdateEventToNonFinalizedApps(eventNode,
           RMAppNodeUpdateType.NODE_UNUSABLE);
       break;
     case NODE_USABLE:
-      LOG.debug("{} reported usable", eventNode);
+      LOG.debug(eventNode + " reported usable");
       sendRMAppNodeUpdateEventToNonFinalizedApps(eventNode,
           RMAppNodeUpdateType.NODE_USABLE);
       break;
     case NODE_DECOMMISSIONING:
-      LOG.debug("{} reported decommissioning", eventNode);
+      LOG.debug(eventNode + " reported decommissioning");
       sendRMAppNodeUpdateEventToNonFinalizedApps(
           eventNode, RMAppNodeUpdateType.NODE_DECOMMISSIONING);
       break;
@@ -545,44 +492,9 @@ public class NodesListManager extends CompositeService implements
     }
   }
 
-  private void disableHostsFileReader(Exception ex) {
-    LOG.warn("Failed to init hostsReader, disabling", ex);
-    try {
-      this.includesFile =
-          conf.get(YarnConfiguration.DEFAULT_RM_NODES_INCLUDE_FILE_PATH);
-      this.excludesFile =
-          conf.get(YarnConfiguration.DEFAULT_RM_NODES_EXCLUDE_FILE_PATH);
-      this.hostsReader =
-          createHostsFileReader(this.includesFile, this.excludesFile);
-      setDecommissionedNMs();
-    } catch (IOException ioe2) {
-      // Should *never* happen
-      this.hostsReader = null;
-      throw new YarnRuntimeException(ioe2);
-    } catch (YarnException e) {
-      // Should *never* happen
-      this.hostsReader = null;
-      throw new YarnRuntimeException(e);
-    }
-  }
-
   @VisibleForTesting
-  public HostsFileReader getHostsReader() {
-    return this.hostsReader;
-  }
-
-  private HostsFileReader createHostsFileReader(String includesFile,
-      String excludesFile) throws IOException, YarnException {
-    HostsFileReader hostsReader =
-        new HostsFileReader(includesFile,
-            (includesFile == null || includesFile.isEmpty()) ? null
-                : this.rmContext.getConfigurationProvider()
-                    .getConfigurationInputStream(this.conf, includesFile),
-            excludesFile,
-            (excludesFile == null || excludesFile.isEmpty()) ? null
-                : this.rmContext.getConfigurationProvider()
-                    .getConfigurationInputStream(this.conf, excludesFile));
-    return hostsReader;
+  public HostsConfigManager getHostsConfigManager() {
+    return this.hostsConfigManager;
   }
 
   private void updateInactiveNodes() {
@@ -601,9 +513,8 @@ public class NodesListManager extends CompositeService implements
   public boolean isUntrackedNode(String hostName) {
     String ip = resolver.resolve(hostName);
 
-    HostDetails hostDetails = hostsReader.getHostDetails();
-    Set<String> hostsList = hostDetails.getIncludedHosts();
-    Set<String> excludeList = hostDetails.getExcludedHosts();
+    Set<String> hostsList = hostsConfigManager.getIncludedHosts();
+    Set<String> excludeList = hostsConfigManager.getExcludedHosts();
 
     return !hostsList.isEmpty() && !hostsList.contains(hostName)
         && !hostsList.contains(ip) && !excludeList.contains(hostName)

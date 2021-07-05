@@ -18,13 +18,11 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.resourcetracker;
 
-import static org.apache.hadoop.yarn.server.resourcemanager.MockNM.createMockNodeStatus;
-
-import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.resourcemanager.HostsFileManager;
 import org.junit.Assert;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -52,8 +50,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class TestNMExpiry {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestNMExpiry.class);
+  private static final Log LOG = LogFactory.getLog(TestNMExpiry.class);
   private static final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
   
   ResourceTrackerService resourceTrackerService;
@@ -85,7 +82,7 @@ public class TestNMExpiry {
         dispatcher);
     nmLivelinessMonitor.init(conf);
     nmLivelinessMonitor.start();
-    NodesListManager nodesListManager = new NodesListManager(context);
+    NodesListManager nodesListManager = new NodesListManager(context, new HostsFileManager());
     nodesListManager.init(conf);
     RMContainerTokenSecretManager containerTokenSecretManager =
         new RMContainerTokenSecretManager(conf);
@@ -138,15 +135,12 @@ public class TestNMExpiry {
     String hostname3 = "localhost3";
     Resource capability = BuilderUtils.newResource(1024, 1);
 
-    NodeStatus mockNodeStatus = createMockNodeStatus();
-
     RegisterNodeManagerRequest request1 = recordFactory
         .newRecordInstance(RegisterNodeManagerRequest.class);
     NodeId nodeId1 = NodeId.newInstance(hostname1, 0);
     request1.setNodeId(nodeId1);
     request1.setHttpPort(0);
     request1.setResource(capability);
-    request1.setNodeStatus(mockNodeStatus);
     resourceTrackerService.registerNodeManager(request1);
 
     RegisterNodeManagerRequest request2 = recordFactory
@@ -155,7 +149,6 @@ public class TestNMExpiry {
     request2.setNodeId(nodeId2);
     request2.setHttpPort(0);
     request2.setResource(capability);
-    request2.setNodeStatus(mockNodeStatus);
     resourceTrackerService.registerNodeManager(request2);
     
     int waitCount = 0;
