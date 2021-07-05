@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.fs;
 
-import org.apache.hadoop.classification.InterfaceStability;
-
 /**
  * Common path capabilities.
  */
@@ -54,6 +52,13 @@ public final class CommonPathCapabilities {
    * Value: {@value}.
    */
   public static final String FS_CONCAT = "fs.capability.paths.concat";
+
+  /**
+   * Does the store support native file copy.
+   * {@code FileSystem.copyFile(URI, URI)}
+   * Value: {@value}.
+   */
+  public static final String FS_NATIVE_COPY = "fs.capability.paths.native.copy";
 
   /**
    * Does the store support {@code FileSystem.listCorruptFileBlocks(Path)} ()}?
@@ -125,25 +130,4 @@ public final class CommonPathCapabilities {
    */
   public static final String FS_XATTRS = "fs.capability.paths.xattrs";
 
-  /**
-   * Probe for support for {@link BatchListingOperations}.
-   */
-  @InterfaceStability.Unstable
-  public static final String FS_EXPERIMENTAL_BATCH_LISTING =
-      "fs.capability.batch.listing";
-
-  /**
-   * Does the store support multipart uploading?
-   * Value: {@value}.
-   */
-  public static final String FS_MULTIPART_UPLOADER =
-      "fs.capability.multipart.uploader";
-
-
-  /**
-   * Stream abort() capability implemented by {@link Abortable#abort()}.
-   * Value: {@value}.
-   */
-  public static final String ABORTABLE_STREAM =
-      "fs.capability.outputstream.abortable";
 }

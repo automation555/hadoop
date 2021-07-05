@@ -43,15 +43,6 @@ The implementations of `FileSystem` shipped with Apache Hadoop
 All the requirements of a valid FileSystem are considered implicit preconditions and postconditions:
 all operations on a valid FileSystem MUST result in a new FileSystem that is also valid.
 
-## Feasible features
-
-### <a name="ProtectedDirectories"></a>Protected directories
-
-HDFS has the notion of *Protected Directories*, which are declared in
-the option `fs.protected.directories`. Any attempt to delete or rename
-such a directory or a parent thereof raises an `AccessControlException`.
-Accordingly, any attempt to delete the root directory SHALL, if there is
-a protected directory, result in such an exception being raised.
 
 ## Predicates and other state access operations
 
@@ -115,36 +106,6 @@ are used, filesystems and object stores which not implement POSIX access permiss
 for both files and directories, MUST always return `true` to the `isEncrypted()`
 predicate. This can be done by setting the `encrypted` flag to true when creating
 the `FileStatus` instance.
-
-
-### `msync()`
-
-Synchronize metadata state of the client with the latest state of the metadata
-service of the FileSystem.
-
-In highly available FileSystems standby service can be used as a read-only
-metadata replica. This call is essential to guarantee consistency of
-reads from the standby replica and to avoid stale reads.
-
-It is currently only implemented for HDFS and others will just throw
-`UnsupportedOperationException`.
-
-#### Preconditions
-
-
-#### Postconditions
-
-This call internally records the state of the metadata service at the time of
-the call. This guarantees consistency of subsequent reads from any metadata
-replica. It assures the client will never access the state of the metadata that
-preceded the recorded state.
-
-#### HDFS implementation notes
-
-HDFS supports `msync()` in HA mode by calling the Active NameNode and requesting
-its latest journal transaction ID. For more details see HDFS documentation
-[Consistent Reads from HDFS Observer NameNode](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/ObserverNameNode.html)
-
 
 ### `Path getHomeDirectory()`
 
@@ -324,24 +285,6 @@ any optimizations.
 The atomicity and consistency constraints are as for
 `listStatus(Path, PathFilter)`.
 
-### `RemoteIterator<FileStatus> listStatusIterator(Path p)`
-
-Return an iterator enumerating the `FileStatus` entries under
-a path. This is similar to `listStatus(Path)` except the fact that
-rather than returning an entire list, an iterator is returned.
-The result is exactly the same as `listStatus(Path)`, provided no other
-caller updates the directory during the listing. Having said that, this does
-not guarantee atomicity if other callers are adding/deleting the files
-inside the directory while listing is being performed. Different filesystems
-may provide a more efficient implementation, for example S3A does the
-listing in pages and fetches the next pages asynchronously while a
-page is getting processed.
-
-Note that now since the initial listing is async, bucket/path existence
-exception may show up later during next() call.
-
-Callers should prefer using listStatusIterator over listStatus as it
-is incremental in nature.
 
 ### `FileStatus[] listStatus(Path[] paths)`
 
@@ -534,11 +477,11 @@ running out of memory as it calculates the partitions.
 
 Any FileSystem that does not actually break files into blocks SHOULD
 return a number for this that results in efficient processing.
-A FileSystem MAY make this user-configurable (the object store connectors usually do this).
+A FileSystem MAY make this user-configurable (the S3 and Swift filesystem clients do this).
 
 ###  `long getDefaultBlockSize(Path p)`
 
-Get the "default" block size for a path --that is, the block size to be used
+Get the "default" block size for a path —that is, the block size to be used
 when writing objects to a path in the filesystem.
 
 #### Preconditions
@@ -587,21 +530,14 @@ on the filesystem.
 
 ### `boolean mkdirs(Path p, FsPermission permission)`
 
-Create a directory and all its parents.
+Create a directory and all its parents
 
 #### Preconditions
 
 
-The path must either be a directory or not exist
- 
      if exists(FS, p) and not isDir(FS, p) :
          raise [ParentNotDirectoryException, FileAlreadyExistsException, IOException]
 
-No ancestor may be a file
-
-    forall d = ancestors(FS, p) : 
-        if exists(FS, d) and not isDir(FS, d) :
-            raise [ParentNotDirectoryException, FileAlreadyExistsException, IOException]
 
 #### Postconditions
 
@@ -641,11 +577,6 @@ Writing to or overwriting a directory must fail.
 
     if isDir(FS, p) : raise {FileAlreadyExistsException, FileNotFoundException, IOException}
 
-No ancestor may be a file
-
-    forall d = ancestors(FS, p) : 
-        if exists(FS, d) and not isDir(FS, d) :
-            raise [ParentNotDirectoryException, FileAlreadyExistsException, IOException]
 
 FileSystems may reject the request for other
 reasons, such as the FS being read-only  (HDFS),
@@ -653,8 +584,7 @@ the block size being below the minimum permitted (HDFS),
 the replication count being out of range (HDFS),
 quotas on namespace or filesystem being exceeded, reserved
 names, etc. All rejections SHOULD be `IOException` or a subclass thereof
-and MAY be a `RuntimeException` or subclass.
-For instance, HDFS may raise an `InvalidPathException`.
+and MAY be a `RuntimeException` or subclass. For instance, HDFS may raise a `InvalidPathException`.
 
 #### Postconditions
 
@@ -664,14 +594,10 @@ For instance, HDFS may raise an `InvalidPathException`.
 
     result = FSDataOutputStream
 
-A zero byte file MUST exist at the end of the specified path, visible to all.
-
-The updated (valid) FileSystem MUST contain all the parent directories of the path, as created by `mkdirs(parent(p))`.
+The updated (valid) FileSystem must contains all the parent directories of the path, as created by `mkdirs(parent(p))`.
 
 The result is `FSDataOutputStream`, which through its operations may generate new filesystem states with updated values of
 `FS.Files[p]`
-
-The behavior of the returned stream is covered in [Output](outputstream.html).
 
 #### Implementation Notes
 
@@ -681,18 +607,10 @@ The behavior of the returned stream is covered in [Output](outputstream.html).
  clients creating files with `overwrite==true` to fail if the file is created
  by another client between the two tests.
 
-* S3A, Swift and potentially other Object Stores do not currently change the `FS` state
+* S3A, Swift and potentially other Object Stores do not currently change the FS state
 until the output stream `close()` operation is completed.
-This is a significant difference between the behavior of object stores
-and that of filesystems, as it allows &gt;1 client to create a file with `overwrite=false`,
-and potentially confuse file/directory logic. In particular, using `create()` to acquire
-an exclusive lock on a file (whoever creates the file without an error is considered
-the holder of the lock) may not not a safe algorithm to use when working with object stores.
-
-* Object stores may create an empty file as a marker when a file is created.
-However, object stores with `overwrite=true` semantics may not implement this atomically,
-so creating files with `overwrite=false` cannot be used as an implicit exclusion
-mechanism between processes.
+This MAY be a bug, as it allows >1 client to create a file with `overwrite==false`,
+ and potentially confuse file/directory logic
 
 * The Local FileSystem raises a `FileNotFoundException` when trying to create a file over
 a directory, hence it is listed as an exception that MAY be raised when
@@ -703,8 +621,6 @@ this precondition fails.
 ### `FSDataOutputStreamBuilder createFile(Path p)`
 
 Make a `FSDataOutputStreamBuilder` to specify the parameters to create a file.
-
-The behavior of the returned stream is covered in [Output](outputstream.html).
 
 #### Implementation Notes
 
@@ -731,20 +647,16 @@ Implementations without a compliant call SHOULD throw `UnsupportedOperationExcep
 
 #### Postconditions
 
-    FS' = FS
+    FS
     result = FSDataOutputStream
 
 Return: `FSDataOutputStream`, which can update the entry `FS.Files[p]`
 by appending data to the existing list.
 
-The behavior of the returned stream is covered in [Output](outputstream.html).
-
 ### `FSDataOutputStreamBuilder appendFile(Path p)`
 
 Make a `FSDataOutputStreamBuilder` to specify the parameters to append to an
 existing file.
-
-The behavior of the returned stream is covered in [Output](outputstream.html).
 
 #### Implementation Notes
 
@@ -797,29 +709,24 @@ exists in the metadata, but no copies of any its blocks can be located;
 Creates a [`FSDataInputStreamBuilder`](fsdatainputstreambuilder.html)
 to construct a operation to open the file at `path` for reading.
 
+
 When `build()` is invoked on the returned `FSDataInputStreamBuilder` instance,
 the builder parameters are verified and
-`openFileWithOptions(Path, OpenFileParameters)` invoked.
+`openFileWithOptions(Path, Set<String>, Configuration, int)` invoked.
 
 This (protected) operation returns a `CompletableFuture<FSDataInputStream>`
 which, when its `get()` method is called, either returns an input
 stream of the contents of opened file, or raises an exception.
 
-The base implementation of the `openFileWithOptions(PathHandle, OpenFileParameters)`
+The base implementation of the `openFileWithOptions(PathHandle, Set<String>, Configuration, int)`
 ultimately invokes `open(Path, int)`.
 
 Thus the chain `openFile(path).build().get()` has the same preconditions
 and postconditions as `open(Path p, int bufferSize)`
 
-However, there is one difference which implementations are free to
-take advantage of: 
 
-The returned stream MAY implement a lazy open where file non-existence or
-access permission failures may not surface until the first `read()` of the
-actual data.
-
-The `openFile()` operation may check the state of the filesystem during its
-invocation, but as the state of the filesystem may change betwen this call and
+The `openFile()` operation may check the state of the filesystem during this
+call, but as the state of the filesystem may change betwen this call and
 the actual `build()` and `get()` operations, this file-specific
 preconditions (file exists, file is readable, etc) MUST NOT be checked here.
 
@@ -850,10 +757,6 @@ It SHOULD be possible to always open a file without specifying any options,
 so as to present a consistent model to users. However, an implementation MAY
 opt to require one or more mandatory options to be set.
 
-The returned stream may perform "lazy" evaluation of file access. This is
-relevant for object stores where the probes for existence are expensive, and,
-even with an asynchronous open, may be considered needless.
- 
 ### `FSDataInputStreamBuilder openFile(PathHandle)`
 
 Creates a `FSDataInputStreamBuilder` to build an operation to open a file.
@@ -862,13 +765,13 @@ to construct a operation to open the file identified by the given `PathHandle` f
 
 When `build()` is invoked on the returned `FSDataInputStreamBuilder` instance,
 the builder parameters are verified and
-`openFileWithOptions(PathHandle, OpenFileParameters)` invoked.
+`openFileWithOptions(PathHandle, Set<String>, Configuration, int)` invoked.
 
 This (protected) operation returns a `CompletableFuture<FSDataInputStream>`
 which, when its `get()` method is called, either returns an input
 stream of the contents of opened file, or raises an exception.
 
-The base implementation of the `openFileWithOptions(PathHandle, OpenFileParameters)` method
+The base implementation of the `openFileWithOptions(Path,PathHandle, Set<String>, Configuration, int)` method
 returns a future which invokes `open(Path, int)`.
 
 Thus the chain `openFile(pathhandle).build().get()` has the same preconditions
@@ -1002,6 +905,28 @@ the file, then verify the invariants in the `PathHandle` using
 `getFileStatus(Path)` to implement `CONTENT`. This could yield false
 positives and it requires additional RPC traffic.
 
+
+### `copyFile(URI srcFile, URI dstFile)`
+
+Copies a file `srcFile` to another file `dstFile`.
+
+Implementations without a compliant call MUST throw
+`UnsupportedOperationException`.
+
+#### Preconditions
+
+    if not exists(FS, srcFile) : raise FileNotFoundException
+
+    if not exists(parentFolder(dstFile)) : raise [IllegalArguementException]
+
+    if isDirectory(srcFile) : raise [IllegalArguementException]
+
+
+#### Postconditions
+
+`dstFile` is available in the filesystem. `dstFile` matches that of `srcFile`.
+Overwrites `dstFile` if already present.
+
 ### `boolean delete(Path p, boolean recursive)`
 
 Delete a path, be it a file, symbolic link or directory. The
@@ -1106,6 +1031,12 @@ filesystem is desired.
 
 1. Object Stores: see [Object Stores: root directory deletion](#object-stores-rm-root).
 
+HDFS has the notion of *Protected Directories*, which are declared in
+the option `fs.protected.directories`. Any attempt to delete such a directory
+or a parent thereof raises an `AccessControlException`. Accordingly, any
+attempt to delete the root directory SHALL, if there is a protected directory,
+result in such an exception being raised.
+
 This specification does not recommend any specific action. Do note, however,
 that the POSIX model assumes that there is a permissions model such that normal
 users do not have the permission to delete that root directory; it is an action
@@ -1164,7 +1095,7 @@ deletion, preventing the stores' use as drop-in replacements for HDFS.
 
 ### `boolean rename(Path src, Path d)`
 
-In terms of its specification, `rename()` is one of the most complex operations within a filesystem.
+In terms of its specification, `rename()` is one of the most complex operations within a filesystem .
 
 In terms of its implementation, it is the one with the most ambiguity regarding when to return false
 versus raising an exception.
@@ -1173,7 +1104,7 @@ Rename includes the calculation of the destination path.
 If the destination exists and is a directory, the final destination
 of the rename becomes the destination + the filename of the source path.
 
-    let dest = if (isDir(FS, d) and d != src) :
+    let dest = if (isDir(FS, src) and d != src) :
             d + [filename(src)]
         else :
             d
@@ -1186,6 +1117,7 @@ has been calculated.
 Source `src` must exist:
 
     exists(FS, src) else raise FileNotFoundException
+
 
 `dest` cannot be a descendant of `src`:
 
@@ -1251,10 +1183,10 @@ If `src` is a directory then all its children will then exist under `dest`, whil
 `src` and its descendants will no longer exist. The names of the paths under
 `dest` will match those under `src`, as will the contents:
 
-    if isDir(FS, src) and isDir(FS, dest) and src != dest :
+    if isDir(FS, src) isDir(FS, dest) and src != dest :
         FS' where:
             not exists(FS', src)
-            and dest in FS'.Directories
+            and dest in FS'.Directories]
             and forall c in descendants(FS, src) :
                 not exists(FS', c))
             and forall c in descendants(FS, src) where isDir(FS, c):
@@ -1281,15 +1213,6 @@ The outcome is as a normal rename, with the additional (implicit) feature
 that the parent directories of the destination also exist.
 
     exists(FS', parent(dest))
-
-*S3A FileSystem*
-
-The outcome is as a normal rename, with the additional (implicit) feature that
-the parent directories of the destination then exist:
-`exists(FS', parent(dest))`
-
-There is a check for and rejection if the `parent(dest)` is a file, but
-no checks for any other ancestors.
 
 *Other Filesystems (including Swift) *
 
