@@ -57,6 +57,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonPathCapabilities;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -79,6 +80,7 @@ import org.apache.hadoop.fs.azurebfs.contracts.exceptions.SASTokenProviderExcept
 import org.apache.hadoop.fs.azurebfs.contracts.services.AzureServiceErrorCode;
 import org.apache.hadoop.fs.azurebfs.security.AbfsDelegationTokenManager;
 import org.apache.hadoop.fs.azurebfs.services.AbfsCounters;
+import org.apache.hadoop.fs.azurebfs.services.ContentSummaryProcessor;
 import org.apache.hadoop.fs.azurebfs.utils.Listener;
 import org.apache.hadoop.fs.azurebfs.utils.TracingContext;
 import org.apache.hadoop.fs.azurebfs.utils.TracingHeaderFormat;
@@ -431,6 +433,31 @@ public class AzureBlobFileSystem extends FileSystem
       return false;
     }
 
+  }
+
+  /**
+   * Returns a ContentSummary instance containing the count of directories,
+   * files and total number of bytes under a given path
+   * @param path The given path
+   * @return ContentSummary
+   * @throws IOException if an error is encountered during listStatus calls
+   * or if there is any issue with the thread pool used while processing
+   */
+  @Override
+  public ContentSummary getContentSummary(Path path) throws IOException {
+    try {
+      TracingContext tracingContext = new TracingContext(clientCorrelationId,
+          fileSystemId, FSOperationType.GET_CONTENT_SUMMARY, true,
+          tracingHeaderFormat, listener);
+      return (new ContentSummaryProcessor(abfsStore)).getContentSummary(path,
+          tracingContext);
+    } catch (InterruptedException e) {
+      LOG.debug("Thread interrupted");
+      throw new IOException(e);
+    } catch(ExecutionException ex) {
+      LOG.debug("GetContentSummary failed with error: {}", ex.getMessage());
+      throw new IOException(ex);
+    }
   }
 
   @Override
@@ -1435,7 +1462,7 @@ public class AzureBlobFileSystem extends FileSystem
   }
 
   @VisibleForTesting
-  String getFileSystemId() {
+  public String getFileSystemId() {
     return fileSystemId;
   }
 
