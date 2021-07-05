@@ -122,8 +122,9 @@ public final class InternalConstants {
   public static final int DEFAULT_UPLOAD_PART_COUNT_LIMIT = 10000;
 
   /**
-   * The system property used by the AWS SDK to identify the region.
+   * Flag to enable AWS Statistics binding. As this is triggering
+   * problems related to region/endpoint setup, it is currently
+   * disabled.
    */
-  public static final String AWS_REGION_SYSPROP = "aws.region";
-
+  public static final boolean AWS_SDK_METRICS_ENABLED = true;
 }

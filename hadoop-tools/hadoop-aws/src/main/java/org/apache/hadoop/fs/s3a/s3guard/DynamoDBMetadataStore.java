@@ -63,13 +63,10 @@ import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughputDescription;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
-
-import org.apache.hadoop.fs.s3a.impl.InternalConstants;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListeningExecutorService;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.MoreExecutors;;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +94,7 @@ import org.apache.hadoop.fs.s3a.Tristate;
 import org.apache.hadoop.fs.s3a.auth.RoleModel;
 import org.apache.hadoop.fs.s3a.auth.RolePolicies;
 import org.apache.hadoop.fs.s3a.auth.delegation.AWSPolicyProvider;
+import org.apache.hadoop.fs.s3a.impl.InternalConstants;
 import org.apache.hadoop.fs.s3a.impl.StoreContext;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -457,8 +455,7 @@ public class DynamoDBMetadataStore implements MetadataStore,
     instrumentation = context.getInstrumentation()
         .getS3GuardInstrumentation();
     username = context.getUsername();
-    executor = MoreExecutors.listeningDecorator(
-        context.createThrottledExecutor());
+    executor = context.createThrottledExecutor();
     ttlTimeProvider = Preconditions.checkNotNull(
         context.getTimeProvider(),
         "ttlTimeProvider must not be null");
@@ -513,14 +510,13 @@ public class DynamoDBMetadataStore implements MetadataStore,
     // the executor capacity for work.
     int executorCapacity = intOption(conf,
         EXECUTOR_CAPACITY, DEFAULT_EXECUTOR_CAPACITY, 1);
-    executor = MoreExecutors.listeningDecorator(
-        BlockingThreadPoolExecutorService.newInstance(
-            executorCapacity,
-            executorCapacity * 2,
-              longOption(conf, KEEPALIVE_TIME,
-                  DEFAULT_KEEPALIVE_TIME, 0),
-                  TimeUnit.SECONDS,
-                  "s3a-ddb-" + tableName));
+    executor = BlockingThreadPoolExecutorService.newInstance(
+        executorCapacity,
+        executorCapacity * 2,
+        longOption(conf, KEEPALIVE_TIME,
+            DEFAULT_KEEPALIVE_TIME, 0),
+        TimeUnit.SECONDS,
+        "s3a-ddb-" + tableName);
     initDataAccessRetries(conf);
     this.ttlTimeProvider = ttlTp;
 
