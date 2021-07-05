@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.HashMultiset;
+import com.google.common.collect.HashMultiset;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.net.unix.DomainSocket;
@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.nio.channels.ReadableByteChannel;
 
 import static org.junit.Assert.assertEquals;
@@ -94,6 +95,16 @@ public class TestPeerCache {
     @Override
     public String getLocalAddressString() {
       return "127.0.0.1:123";
+    }
+
+    @Override
+    public URI getRemoteURI() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public URI getLocalURI() {
+      throw new UnsupportedOperationException();
     }
 
     @Override
