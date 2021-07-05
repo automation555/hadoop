@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
+import org.apache.commons.collections.map.LRUMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStoragePolicySpi;
@@ -60,7 +61,6 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.assertj.core.api.Assertions;
 import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
@@ -75,6 +75,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.junit.Assert.*;
 
 /**
@@ -485,13 +487,11 @@ abstract public class ViewFileSystemBaseTest {
     Assert.assertEquals(targetBL.length, viewBL.length);
     int i = 0;
     for (BlockLocation vbl : viewBL) {
-      Assertions.assertThat(vbl.toString()).isEqualTo(targetBL[i].toString());
-      Assertions.assertThat(vbl.getOffset())
-          .isEqualTo(targetBL[i].getOffset());
-      Assertions.assertThat(vbl.getLength())
-          .isEqualTo(targetBL[i].getLength());
+      assertThat(vbl.toString(), equalTo(targetBL[i].toString()));
+      assertThat(vbl.getOffset(), equalTo(targetBL[i].getOffset()));
+      assertThat(vbl.getLength(), equalTo(targetBL[i].getLength()));
       i++;
-    }
+    } 
   }
 
   @Test
@@ -1026,7 +1026,7 @@ abstract public class ViewFileSystemBaseTest {
       if (e instanceof UnsupportedFileSystemException) {
         String msg = " Use " + Constants.CONFIG_VIEWFS_LINK_MERGE_SLASH +
             " instead";
-        GenericTestUtils.assertExceptionContains(msg, e);
+        assertThat(e.getMessage(), containsString(msg));
       } else {
         fail("Unexpected exception: " + e.getMessage());
       }
@@ -1263,7 +1263,8 @@ abstract public class ViewFileSystemBaseTest {
       fail("Resolving link target for a ViewFs mount link should fail!");
     } catch (Exception e) {
       LOG.info("Expected exception: " + e);
-      GenericTestUtils.assertExceptionContains("not a symbolic link", e);
+      assertThat(e.getMessage(),
+          containsString("not a symbolic link"));
     }
 
     try {
@@ -1272,7 +1273,8 @@ abstract public class ViewFileSystemBaseTest {
       fail("Resolving link target for a non sym link should fail!");
     } catch (Exception e) {
       LOG.info("Expected exception: " + e);
-      GenericTestUtils.assertExceptionContains("not a symbolic link", e);
+      assertThat(e.getMessage(),
+          containsString("not a symbolic link"));
     }
 
     try {
@@ -1280,7 +1282,8 @@ abstract public class ViewFileSystemBaseTest {
       fail("Resolving link target for a non existing link should fail!");
     } catch (Exception e) {
       LOG.info("Expected exception: " + e);
-      GenericTestUtils.assertExceptionContains("File does not exist:", e);
+      assertThat(e.getMessage(),
+          containsString("File does not exist:"));
     }
   }
 
@@ -1427,5 +1430,49 @@ abstract public class ViewFileSystemBaseTest {
           summaryBefore.getLength() + expected.length(),
           summaryAfter.getLength());
     }
+  }
+
+  @Test
+  public void testMountPointCache() throws Exception {
+    conf.setInt(Constants.CONFIG_VIEWFS_PATH_RESOLUTION_CACHE_CAPACITY, 1);
+    FileSystem fileSystem = FileSystem.get(FsConstants.VIEWFS_URI, conf);
+    ViewFileSystem viewfs = (ViewFileSystem) fileSystem;
+    Path resolvedPath1 = new Path(targetTestRoot, "dir3/file1");
+    Path srcPath1 = new Path("/internalDir/internalDir2/linkToDir3/file1");
+    LRUMap cacheMap = viewfs.fsState.getPathResolutionCache();
+    FileSystemTestHelper.createFile(fsTarget, resolvedPath1);
+    Assert.assertEquals(
+        resolvedPath1.toString(),
+            fileSystem.resolvePath(srcPath1).toString());
+    Assert.assertEquals(1, viewfs.fsState.getPathResolutionCacheCapacity());
+    Assert.assertEquals(1, viewfs.fsState.getPathResolutionCache().size());
+    Assert.assertTrue(viewfs.fsState.getPathResolutionCache().isFull());
+    InodeTree.ResolveResult resolveResult1 =
+        viewfs.fsState.resolve(viewfs.getUriPath(srcPath1), true);
+    LOG.info("Resolve result resolve path:" + resolveResult1.resolvedPath +
+        ", remaining path:" + resolveResult1.remainingPath
+        + ", file kind:" + resolveResult1.kind);
+    Assert.assertEquals("/internalDir/internalDir2/linkToDir3",
+        resolveResult1.resolvedPath);
+    Assert.assertEquals("/file1", resolveResult1.remainingPath.toString());
+    Assert.assertEquals(resolveResult1,
+        cacheMap.get(
+            InodeTree.getResolveCacheKeyStr(
+                viewfs.getUriPath(srcPath1), true)));
+
+    Path srcPath2 = new Path("/internalDir/internalDir2/linkToDir3/file2");
+    InodeTree.ResolveResult resolveResult2 =
+        viewfs.fsState.resolve(viewfs.getUriPath(srcPath2), true);
+    Assert.assertEquals(
+        "/internalDir/internalDir2/linkToDir3",
+        resolveResult2.resolvedPath);
+    Assert.assertEquals("/file2",
+        resolveResult2.remainingPath.toString());
+    Assert.assertEquals(1, viewfs.fsState.getPathResolutionCache().size());
+    Assert.assertTrue(viewfs.fsState.getPathResolutionCache().isFull());
+    Assert.assertEquals(resolveResult2,
+        cacheMap.get(
+            InodeTree.getResolveCacheKeyStr(
+                viewfs.getUriPath(srcPath2), true)));
   }
 }
