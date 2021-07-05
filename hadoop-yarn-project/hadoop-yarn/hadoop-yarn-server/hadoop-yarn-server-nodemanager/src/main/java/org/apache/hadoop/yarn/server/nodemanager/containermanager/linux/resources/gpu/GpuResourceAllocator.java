@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.gpu;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
-import org.apache.hadoop.util.Sets;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -33,8 +35,6 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourceHandlerException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.AssignedGpuDevice;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.GpuDevice;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -53,12 +53,11 @@ import static org.apache.hadoop.yarn.api.records.ResourceInformation.GPU_URI;
  * Allocate GPU resources according to requirements.
  */
 public class GpuResourceAllocator {
-  final static Logger LOG = LoggerFactory.
-      getLogger(GpuResourceAllocator.class);
-
+  final static Log LOG = LogFactory.getLog(GpuResourceAllocator.class);
   private static final int WAIT_MS_PER_LOOP = 1000;
 
   private Set<GpuDevice> allowedGpuDevices = new TreeSet<>();
+  private Set<GpuDevice> deniedGpuDevices = new TreeSet<>();
   private Map<GpuDevice, ContainerId> usedDevices = new TreeMap<>();
   private Context nmContext;
   private final int waitPeriodForResource;
@@ -110,6 +109,14 @@ public class GpuResourceAllocator {
     allowedGpuDevices.add(gpuDevice);
   }
 
+  /**
+   * Add GPU to the denied list of GPUs.
+   * @param gpuDevice gpu device
+   */
+  public synchronized void addDeniedGpu(GpuDevice gpuDevice) {
+    deniedGpuDevices.add(gpuDevice);
+  }
+
   @VisibleForTesting
   public synchronized int getAvailableGpus() {
     return allowedGpuDevices.size() - usedDevices.size();
@@ -124,7 +131,6 @@ public class GpuResourceAllocator {
               ", this should not occur under normal circumstances!");
     }
 
-    LOG.info("Starting recovery of GpuDevice for {}.", containerId);
     for (Serializable gpuDeviceSerializable : c.getResourceMappings()
         .getAssignedResources(GPU_URI)) {
       if (!(gpuDeviceSerializable instanceof GpuDevice)) {
@@ -153,10 +159,7 @@ public class GpuResourceAllocator {
       }
 
       usedDevices.put(gpuDevice, containerId);
-      LOG.info("ContainerId {} is assigned to GpuDevice {} on recovery.",
-          containerId, gpuDevice);
     }
-    LOG.info("Finished recovery of GpuDevice for {}.", containerId);
   }
 
   /**
@@ -269,9 +272,11 @@ public class GpuResourceAllocator {
           throw new ResourceHandlerException(e);
         }
       }
+      Set<GpuDevice> deniedGPUs=Sets.difference(allowedGpuDevices, assignedGpus);
+      deniedGPUs=Sets.union(deniedGpuDevices,deniedGPUs);
 
-      return new GpuAllocation(assignedGpus,
-          Sets.differenceInTreeSets(allowedGpuDevices, assignedGpus));
+
+      return new GpuAllocation(assignedGpus,deniedGPUs);
     }
     return new GpuAllocation(null, allowedGpuDevices);
   }
@@ -309,6 +314,9 @@ public class GpuResourceAllocator {
 
   public synchronized List<GpuDevice> getAllowedGpus() {
     return ImmutableList.copyOf(allowedGpuDevices);
+  }
+  public synchronized List<GpuDevice> getDeniedGpuDevices() {
+    return ImmutableList.copyOf(deniedGpuDevices);
   }
 
   public synchronized List<AssignedGpuDevice> getAssignedGpus() {
