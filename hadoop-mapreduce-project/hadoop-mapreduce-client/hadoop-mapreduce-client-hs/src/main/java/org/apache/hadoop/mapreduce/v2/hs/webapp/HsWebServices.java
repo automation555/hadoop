@@ -19,12 +19,12 @@
 package org.apache.hadoop.mapreduce.v2.hs.webapp;
 
 import java.io.IOException;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -33,16 +33,20 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.JettyUtils;
 import org.apache.hadoop.mapreduce.JobACL;
+import org.apache.hadoop.mapreduce.task.TaskAttemptDescription;
+import org.apache.hadoop.mapreduce.task.TaskDescription;
+import org.apache.hadoop.mapreduce.task.TaskDescriptionComparator;
+import org.apache.hadoop.mapreduce.task.TaskDescriptions;
 import org.apache.hadoop.mapreduce.v2.api.records.AMInfo;
+import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.mapreduce.v2.api.records.JobState;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskType;
@@ -54,7 +58,6 @@ import org.apache.hadoop.mapreduce.v2.app.webapp.dao.ConfInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.JobCounterInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.JobTaskAttemptCounterInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.JobTaskCounterInfo;
-import org.apache.hadoop.mapreduce.v2.app.webapp.dao.MapTaskAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.ReduceTaskAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskAttemptsInfo;
@@ -68,38 +71,37 @@ import org.apache.hadoop.mapreduce.v2.hs.webapp.dao.JobInfo;
 import org.apache.hadoop.mapreduce.v2.hs.webapp.dao.JobsInfo;
 import org.apache.hadoop.mapreduce.v2.util.MRApps;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
-import org.apache.hadoop.yarn.logaggregation.ExtendedLogMetaRequest;
-import org.apache.hadoop.yarn.server.webapp.WrappedLogMetaRequest;
-import org.apache.hadoop.yarn.server.webapp.YarnWebServiceParams;
-import org.apache.hadoop.yarn.server.webapp.LogServlet;
-import org.apache.hadoop.yarn.server.webapp.WebServices;
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
 import org.apache.hadoop.yarn.webapp.WebApp;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 
 @Path("/ws/v1/history")
-public class HsWebServices extends WebServices {
+public class HsWebServices {
+  private static final Log LOG = LogFactory.getLog(HsWebServices.class);
+
   private final HistoryContext ctx;
   private WebApp webapp;
-  private LogServlet logServlet;
 
   private @Context HttpServletResponse response;
-  @Context UriInfo uriInfo;
+  @Context
+  UriInfo uriInfo;
+
+  private TaskDescriptionsFetcher taskDescriptionsFetcher;
+
+  private TaskDescriptionComparator taskDescriptionComparator;
 
   @Inject
-  public HsWebServices(final HistoryContext ctx,
-      final Configuration conf,
-      final WebApp webapp,
-      @Nullable ApplicationClientProtocol appBaseProto) {
-    super(appBaseProto);
+  public HsWebServices(final HistoryContext ctx, final Configuration conf,
+      final WebApp webapp) {
     this.ctx = ctx;
     this.webapp = webapp;
-    this.logServlet = new LogServlet(conf, this);
+    JerseyClient jerseyClient = new JerseyClient();
+    this.taskDescriptionsFetcher = new TaskDescriptionsFetcher(ctx, jerseyClient);
+    this.taskDescriptionComparator = new TaskDescriptionComparator();
   }
 
   private boolean hasAccess(Job job, HttpServletRequest request) {
@@ -378,9 +380,9 @@ public class HsWebServices extends WebServices {
     for (TaskAttempt ta : task.getAttempts().values()) {
       if (ta != null) {
         if (task.getType() == TaskType.REDUCE) {
-          attempts.add(new ReduceTaskAttemptInfo(ta));
+          attempts.add(new ReduceTaskAttemptInfo(ta, task.getType()));
         } else {
-          attempts.add(new MapTaskAttemptInfo(ta, false));
+          attempts.add(new TaskAttemptInfo(ta, task.getType(), false));
         }
       }
     }
@@ -402,9 +404,9 @@ public class HsWebServices extends WebServices {
     TaskAttempt ta = AMWebServices.getTaskAttemptFromTaskAttemptString(attId,
         task);
     if (task.getType() == TaskType.REDUCE) {
-      return new ReduceTaskAttemptInfo(ta);
+      return new ReduceTaskAttemptInfo(ta, task.getType());
     } else {
-      return new MapTaskAttemptInfo(ta, false);
+      return new TaskAttemptInfo(ta, task.getType(), false);
     }
   }
 
@@ -425,119 +427,113 @@ public class HsWebServices extends WebServices {
     return new JobTaskAttemptCounterInfo(ta);
   }
 
-  /**
-   * Returns the user qualified path name of the remote log directory for
-   * each pre-configured log aggregation file controller.
-   *
-   * @param req                HttpServletRequest
-   * @return Path names grouped by file controller name
-   */
   @GET
-  @Path("/remote-log-dir")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  public Response getRemoteLogDirPath(@Context HttpServletRequest req,
-      @QueryParam(YarnWebServiceParams.REMOTE_USER) String user,
-      @QueryParam(YarnWebServiceParams.APP_ID) String appIdStr)
-      throws IOException {
+  @Path("/mapreduce/jobs/{jobid}/describeTasks")
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public TaskDescriptions getTaskAttempts(@Context HttpServletRequest hsr, @PathParam("jobid") String jid) {
+
     init();
-    return logServlet.getRemoteLogDirPath(user, appIdStr);
+    TaskDescriptions taskDescriptions = null;
+    Job job = null;
+
+    try {
+      job = AMWebServices.getJobFromJobIdString(jid, ctx);
+      checkAccess(job, hsr);
+    } catch (Exception e) {
+      // Cannot find the job from local, which is normal if a job is still running. Ignore the exception
+    }
+
+    try {
+      if (job != null) {
+        // Found the job from local, i.e., JHS
+        taskDescriptions = getTaskDescriptionsFromJHS(job, jid);
+      } else {
+        JobId jobId = MRApps.toJobID(jid);
+        if (jobId != null) {
+          // Fetch the job from remote AM
+          taskDescriptions = taskDescriptionsFetcher.fetch(jobId);
+        }
+      }
+
+      if (taskDescriptions == null) {
+        taskDescriptions = new TaskDescriptions();
+        taskDescriptions.setFound(false);
+      } else {
+        List<TaskDescription> records = taskDescriptions.getTaskDescriptionList();
+        if (records != null && !records.isEmpty()) {
+          // sort output task attempts, map tasks first
+          Collections.sort(records, this.taskDescriptionComparator);
+          taskDescriptions.setTaskDescriptionList(records);
+        }
+      }
+
+      taskDescriptions.setSuccessful(true);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      if (taskDescriptions == null){
+        taskDescriptions = new TaskDescriptions();
+      }
+      taskDescriptions.setSuccessful(false);
+      taskDescriptions.setErrorMsg(e.getMessage());
+    }
+
+    return taskDescriptions;
   }
 
-  @GET
-  @Path("/extended-log-query")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getAggregatedLogsMeta(@Context HttpServletRequest hsr,
-      @QueryParam(YarnWebServiceParams.CONTAINER_LOG_FILE_NAME) String fileName,
-      @QueryParam(YarnWebServiceParams.FILESIZE) Set<String> fileSize,
-      @QueryParam(YarnWebServiceParams.MODIFICATION_TIME) Set<String>
-                                              modificationTime,
-      @QueryParam(YarnWebServiceParams.APP_ID) String appIdStr,
-      @QueryParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId) throws IOException {
-    init();
-    ExtendedLogMetaRequest.ExtendedLogMetaRequestBuilder logsRequest =
-        new ExtendedLogMetaRequest.ExtendedLogMetaRequestBuilder();
-    logsRequest.setAppId(appIdStr);
-    logsRequest.setFileName(fileName);
-    logsRequest.setContainerId(containerIdStr);
-    logsRequest.setFileSize(fileSize);
-    logsRequest.setModificationTime(modificationTime);
-    logsRequest.setNodeId(nmId);
-    return logServlet.getContainerLogsInfo(hsr, logsRequest);
+  private TaskDescriptions getTaskDescriptionsFromJHS(Job job, String jid) {
+    TaskDescriptions taskDescriptions = null;
+    taskDescriptions = new TaskDescriptions();
+    taskDescriptions.setFound(true);
+    long startTime, finishTime;
+    if (job.getTasks() != null && !job.getTasks().isEmpty()) {
+      List<TaskDescription> taskDescriptionList = new ArrayList<TaskDescription>();
+      for (Task task : job.getTasks().values()) {
+        TaskDescription taskDescription = new TaskDescription();
+        taskDescription.setJobId(jid);
+        taskDescription.setTaskId(task.getID().toString());
+        taskDescription.setProgress(Float.toString(task.getProgress() * 100));
+        taskDescription.setTaskType(task.getType().name());
+
+        startTime = Long.MAX_VALUE;
+        finishTime = 0;
+
+        if (task.getAttempts() != null && !task.getAttempts().isEmpty()) {
+          List<TaskAttemptDescription> taskAttemptDescriptionList = new ArrayList<TaskAttemptDescription>();
+
+          for (TaskAttempt ta : task.getAttempts().values()) {
+            if (ta != null) {
+              TaskAttemptDescription taskAttemptDescription = new TaskAttemptDescription();
+              taskAttemptDescription.setTaskAttemptId(ta.getID().toString() + ":" + ta.getAssignedContainerID().toString());
+              taskAttemptDescription.setTaskAttemptState(ta.getState().name());
+              taskAttemptDescription.setStartTime(ta.getLaunchTime());
+              if (ta.getLaunchTime() < startTime) {
+                startTime = ta.getLaunchTime();
+              }
+              if (task.isFinished() && ta.isFinished() && ta.getFinishTime() > finishTime) {
+                finishTime = ta.getFinishTime();
+              }
+              taskAttemptDescription.setFinishTime(ta.getFinishTime());
+              taskAttemptDescription.setPhase(ta.getPhase().name());
+              taskAttemptDescription.setProgress(ta.getProgress() * 100);
+              taskAttemptDescription.setTaskAttemptState(ta.getState().name());
+              if (task.getType() == TaskType.REDUCE) {
+                taskAttemptDescription.setShuffleFinishTime(ta.getShuffleFinishTime());
+                taskAttemptDescription.setSortFinishTime(ta.getSortFinishTime());
+              }
+              taskAttemptDescriptionList.add(taskAttemptDescription);
+            }
+          }
+
+          taskDescription.setTaskAttempts(taskAttemptDescriptionList);
+          taskDescription.setStartTime(startTime);
+          taskDescription.setFinishTime(finishTime);
+        }
+        taskDescriptionList.add(taskDescription);
+      }
+      taskDescriptions.setTaskDescriptionList(taskDescriptionList);
+    }
+
+    return taskDescriptions;
   }
 
-  @GET
-  @Path("/aggregatedlogs")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getAggregatedLogsMeta(@Context HttpServletRequest hsr,
-      @QueryParam(YarnWebServiceParams.APP_ID) String appIdStr,
-      @QueryParam(YarnWebServiceParams.APPATTEMPT_ID) String appAttemptIdStr,
-      @QueryParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
-      @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirectedFromNode,
-      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
-      @DefaultValue("false") boolean manualRedirection) {
-    init();
-    return logServlet.getLogsInfo(hsr, appIdStr, appAttemptIdStr,
-        containerIdStr, nmId, redirectedFromNode, manualRedirection);
-  }
-
-  @GET
-  @Path("/containers/{containerid}/logs")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getContainerLogs(@Context HttpServletRequest hsr,
-      @PathParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
-      @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirectedFromNode,
-      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
-      @DefaultValue("false") boolean manualRedirection) {
-    init();
-
-    WrappedLogMetaRequest.Builder logMetaRequestBuilder =
-        LogServlet.createRequestFromContainerId(containerIdStr);
-
-    return logServlet.getContainerLogsInfo(hsr, logMetaRequestBuilder, nmId,
-        redirectedFromNode, null, manualRedirection);
-  }
-
-  @GET
-  @Path("/containerlogs/{containerid}/{filename}")
-  @Produces({ MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8 })
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getContainerLogFile(@Context HttpServletRequest req,
-      @PathParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @PathParam(YarnWebServiceParams.CONTAINER_LOG_FILE_NAME)
-          String filename,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_FORMAT)
-          String format,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_SIZE)
-          String size,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
-      @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirectedFromNode,
-      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
-      @DefaultValue("false") boolean manualRedirection) {
-    init();
-    return logServlet.getLogFile(req, containerIdStr, filename, format, size,
-        nmId, redirectedFromNode, null, manualRedirection);
-  }
-
-  @VisibleForTesting
-  LogServlet getLogServlet() {
-    return this.logServlet;
-  }
-
-  @VisibleForTesting
-  void setLogServlet(LogServlet logServlet) {
-    this.logServlet = logServlet;
-  }
 }

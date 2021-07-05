@@ -30,14 +30,15 @@ import javax.ws.rs.ext.ContextResolver;
 import javax.ws.rs.ext.Provider;
 import javax.xml.bind.JAXBContext;
 
+import org.apache.hadoop.mapreduce.task.TaskDescriptions;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.ConfInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.CounterGroupInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.CounterInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.JobCounterInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.JobTaskAttemptCounterInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.JobTaskCounterInfo;
-import org.apache.hadoop.mapreduce.v2.app.webapp.dao.MapTaskAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.ReduceTaskAttemptInfo;
+import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskAttemptInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskAttemptsInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskCounterGroupInfo;
 import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TaskCounterInfo;
@@ -63,10 +64,10 @@ public class JAXBContextResolver implements ContextResolver<JAXBContext> {
       JobsInfo.class, TaskInfo.class, TasksInfo.class, TaskAttemptsInfo.class,
       ConfInfo.class, CounterInfo.class, JobTaskCounterInfo.class,
       JobTaskAttemptCounterInfo.class, TaskCounterInfo.class,
-      JobCounterInfo.class, MapTaskAttemptInfo.class, ReduceTaskAttemptInfo.class,
+      JobCounterInfo.class, ReduceTaskAttemptInfo.class, TaskAttemptInfo.class,
       TaskAttemptsInfo.class, CounterGroupInfo.class,
       TaskCounterGroupInfo.class, AMAttemptInfo.class, AMAttemptsInfo.class,
-      RemoteExceptionData.class };
+      RemoteExceptionData.class, TaskDescriptions.class};
 
   public JAXBContextResolver() throws Exception {
     this.types = new HashSet<Class>(Arrays.asList(cTypes));
