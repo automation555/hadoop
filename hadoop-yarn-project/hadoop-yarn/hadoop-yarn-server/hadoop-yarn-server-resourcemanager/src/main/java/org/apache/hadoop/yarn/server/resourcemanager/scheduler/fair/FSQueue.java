@@ -23,8 +23,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.ipc.Server;
@@ -42,16 +42,18 @@ import org.apache.hadoop.yarn.security.AccessRequest;
 import org.apache.hadoop.yarn.security.PrivilegedEntity;
 import org.apache.hadoop.yarn.security.PrivilegedEntity.EntityType;
 import org.apache.hadoop.yarn.security.YarnAuthorizationProvider;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 
 @Private
 @Unstable
 public abstract class FSQueue implements Queue, Schedulable {
-  private static final Logger LOG = LoggerFactory.getLogger(
+  private static final Log LOG = LogFactory.getLog(
       FSQueue.class.getName());
 
   private Resource fairShare = Resources.createResource(0, 0);
@@ -184,10 +186,6 @@ public abstract class FSQueue implements Queue, Schedulable {
     return result;
   }
 
-  public ConfigurableResource getRawMaxShare() {
-    return maxShare;
-  }
-
   public Resource getReservedResource() {
     reservedResource.setMemorySize(metrics.getReservedMB());
     reservedResource.setVirtualCores(metrics.getReservedVirtualCores());
@@ -211,7 +209,7 @@ public abstract class FSQueue implements Queue, Schedulable {
   }
 
   @VisibleForTesting
-  public float getMaxAMShare() {
+  protected float getMaxAMShare() {
     return maxAMShare;
   }
 
@@ -260,6 +258,7 @@ public abstract class FSQueue implements Queue, Schedulable {
     queueInfo.setChildQueues(childQueueInfos);
     queueInfo.setQueueState(QueueState.RUNNING);
     queueInfo.setQueueStatistics(getQueueStatistics());
+    queueInfo.setAccessibleNodeLabels(getAccessibleNodeLabels());
     return queueInfo;
   }
 
@@ -301,7 +300,9 @@ public abstract class FSQueue implements Queue, Schedulable {
   public void setFairShare(Resource fairShare) {
     this.fairShare = fairShare;
     metrics.setFairShare(fairShare);
-    LOG.debug("The updated fairShare for {} is {}", getName(), fairShare);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("The updated fairShare for " + getName() + " is " + fairShare);
+    }
   }
 
   /** Get the steady fair share assigned to this Schedulable. */
@@ -430,8 +431,10 @@ public abstract class FSQueue implements Queue, Schedulable {
    */
   boolean assignContainerPreCheck(FSSchedulerNode node) {
     if (node.getReservedContainer() != null) {
-      LOG.debug("Assigning container failed on node '{}' because it has"
-          + " reserved containers.", node.getNodeName());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Assigning container failed on node '" + node.getNodeName()
+            + " because it has reserved containers.");
+      }
       return false;
     } else if (!Resources.fitsIn(getResourceUsage(), getMaxShare())) {
       if (LOG.isDebugEnabled()) {
@@ -461,14 +464,14 @@ public abstract class FSQueue implements Queue, Schedulable {
   
   @Override
   public Set<String> getAccessibleNodeLabels() {
-    // TODO, add implementation for FS
-    return null;
+    // Allow queue access to all node labels
+    return ImmutableSet.of(RMNodeLabelsManager.ANY);
   }
   
   @Override
   public String getDefaultNodeLabelExpression() {
-    // TODO, add implementation for FS
-    return null;
+    // Allow queue access to all node labels
+    return RMNodeLabelsManager.ANY;
   }
   
   @Override
@@ -601,6 +604,4 @@ public abstract class FSQueue implements Queue, Schedulable {
   public void setDynamic(boolean dynamic) {
     this.isDynamic = dynamic;
   }
-
-  public abstract boolean isEmpty();
 }
