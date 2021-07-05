@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.client.cli;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
@@ -79,7 +79,6 @@ public class SchedConfCLI extends Configured implements Tool {
   private static final String GET_SCHEDULER_CONF = "getConf";
   private static final String FORMAT_CONF = "formatConfig";
   private static final String HELP_CMD = "help";
-  private static final String SPLIT_BY_SLASH_COMMA = "(?<!\\\\)\\,";
 
   private static final String CONF_ERR_MSG = "Specify configuration key " +
       "value as confKey=confVal.";
@@ -129,59 +128,42 @@ public class SchedConfCLI extends Configured implements Tool {
     if (parsedCli.hasOption(HELP_CMD)) {
       printUsage();
       return 0;
-    }
-
-    boolean hasOption = false;
-    boolean format = false;
-    boolean getConf = false;
-    SchedConfUpdateInfo updateInfo = new SchedConfUpdateInfo();
-    try {
-      if (parsedCli.hasOption(ADD_QUEUES_OPTION)) {
-        hasOption = true;
-        addQueues(parsedCli.getOptionValue(ADD_QUEUES_OPTION), updateInfo);
+    } else if (parsedCli.hasOption(FORMAT_CONF)) {
+      return WebAppUtils.execOnActiveRM(getConf(), this::formatSchedulerConf,
+          null);
+    } else if (parsedCli.hasOption(GET_SCHEDULER_CONF)) {
+      return WebAppUtils.execOnActiveRM(getConf(), this::getSchedulerConf,
+          null);
+    } else if (parsedCli.hasOption(ADD_QUEUES_OPTION)
+        || parsedCli.hasOption(REMOVE_QUEUES_OPTION)
+        || parsedCli.hasOption(UPDATE_QUEUES_OPTION)
+        || parsedCli.hasOption(GLOBAL_OPTIONS)) {
+      SchedConfUpdateInfo updateInfo = new SchedConfUpdateInfo();
+      try {
+        if (parsedCli.hasOption(ADD_QUEUES_OPTION)) {
+          addQueues(parsedCli.getOptionValue(ADD_QUEUES_OPTION), updateInfo);
+        }
+        if (parsedCli.hasOption(REMOVE_QUEUES_OPTION)) {
+          removeQueues(parsedCli.getOptionValue(REMOVE_QUEUES_OPTION),
+              updateInfo);
+        }
+        if (parsedCli.hasOption(UPDATE_QUEUES_OPTION)) {
+          updateQueues(parsedCli.getOptionValue(UPDATE_QUEUES_OPTION),
+              updateInfo);
+        }
+        if (parsedCli.hasOption(GLOBAL_OPTIONS)) {
+          globalUpdates(parsedCli.getOptionValue(GLOBAL_OPTIONS), updateInfo);
+        }
+        return WebAppUtils.execOnActiveRM(getConf(),
+            this::updateSchedulerConfOnRMNode, updateInfo);
+      } catch (IllegalArgumentException e) {
+        System.err.println(e.getMessage());
+        return -1;
       }
-      if (parsedCli.hasOption(REMOVE_QUEUES_OPTION)) {
-        hasOption = true;
-        removeQueues(parsedCli.getOptionValue(REMOVE_QUEUES_OPTION),
-            updateInfo);
-      }
-      if (parsedCli.hasOption(UPDATE_QUEUES_OPTION)) {
-        hasOption = true;
-        updateQueues(parsedCli.getOptionValue(UPDATE_QUEUES_OPTION),
-            updateInfo);
-      }
-      if (parsedCli.hasOption(GLOBAL_OPTIONS)) {
-        hasOption = true;
-        globalUpdates(parsedCli.getOptionValue(GLOBAL_OPTIONS), updateInfo);
-      }
-      if (parsedCli.hasOption((FORMAT_CONF))) {
-        hasOption = true;
-        format = true;
-      }
-      if (parsedCli.hasOption(GET_SCHEDULER_CONF)) {
-        hasOption = true;
-        getConf = true;
-      }
-
-    } catch (IllegalArgumentException e) {
-      System.err.println(e.getMessage());
-      return -1;
-    }
-
-    if (!hasOption) {
+    } else {
       System.err.println("Invalid Command Usage: ");
       printUsage();
       return -1;
-    }
-
-    Configuration conf = getConf();
-    if (format) {
-      return WebAppUtils.execOnActiveRM(conf, this::formatSchedulerConf, null);
-    } else if (getConf) {
-      return WebAppUtils.execOnActiveRM(conf, this::getSchedulerConf, null);
-    } else {
-      return WebAppUtils.execOnActiveRM(conf,
-          this::updateSchedulerConfOnRMNode, updateInfo);
     }
   }
 
@@ -411,8 +393,7 @@ public class SchedConfCLI extends Configured implements Tool {
       return;
     }
     HashMap<String, String> globalUpdates = new HashMap<>();
-    for (String globalUpdate : args.split(SPLIT_BY_SLASH_COMMA)) {
-      globalUpdate = globalUpdate.replace("\\", "");
+    for (String globalUpdate : args.split(",")) {
       putKeyValuePair(globalUpdates, globalUpdate);
     }
     updateInfo.setGlobalParams(globalUpdates);
@@ -423,9 +404,8 @@ public class SchedConfCLI extends Configured implements Tool {
     String queuePath = args[0];
     Map<String, String> queueConfigs = new HashMap<>();
     if (args.length > 1) {
-      String[] queueArgs = args[1].split(SPLIT_BY_SLASH_COMMA);
+      String[] queueArgs = args[1].split(",");
       for (int i = 0; i < queueArgs.length; ++i) {
-        queueArgs[i] = queueArgs[i].replace("\\", "");
         putKeyValuePair(queueConfigs, queueArgs[i]);
       }
     }
@@ -464,22 +444,13 @@ public class SchedConfCLI extends Configured implements Tool {
         + "Example (adding queues): yarn schedulerconf -add "
         + "\"root.a.a1:capacity=100,maximum-capacity=100;root.a.a2:capacity=0,"
         + "maximum-capacity=0\"\n"
-        + "Example (adding queues with comma in value): yarn schedulerconf "
-        + "-add \"root.default:acl_administer_queue=user1\\,user2 group1\\,"
-        + "group2,maximum-capacity=100;root.a.a2:capacity=0\"\n"
         + "Example (removing queues): yarn schedulerconf -remove \"root.a.a1;"
         + "root.a.a2\"\n"
         + "Example (updating queues): yarn schedulerconf -update \"root.a.a1"
         + ":capacity=25,maximum-capacity=25;root.a.a2:capacity=75,"
         + "maximum-capacity=75\"\n"
-        + "Example (updating queues with comma in value): yarn schedulerconf "
-        + "-update \"root.default:acl_administer_queue=user1\\,user2 group1\\,"
-        + "group2,maximum-capacity=25;root.a.a2:capacity=75\"\n"
         + "Example (global scheduler update): yarn schedulerconf "
         + "-global yarn.scheduler.capacity.maximum-applications=10000\n"
-        + "Example (global scheduler update with comma in value): yarn "
-        + "schedulerconf "
-        + "-global \"acl_administer_queue=user1\\,user2 group1\\,group2\"\n"
         + "Example (format scheduler configuration): yarn schedulerconf "
         + "-format\n"
         + "Example (get scheduler configuration): yarn schedulerconf "
