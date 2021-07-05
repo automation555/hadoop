@@ -77,6 +77,28 @@ public class TestAuditLogDirectParser {
   }
 
   @Test
+  public void testInputWithCreateOptions() throws Exception {
+    Text in = getAuditString("1970-01-01 00:00:11,000",
+             "fakeUser (auth:TOKEN)", "create (options=[CREATE, OVERWRITE])",
+             "sourcePath", "null");
+    AuditReplayCommand expected = new AuditReplayCommand(1000,
+            "fakeUser", "create (options=[CREATE, OVERWRITE])",
+            "sourcePath", "null", "0.0.0.0");
+    assertEquals(expected, parser.parse(in, Function.identity()));
+  }
+
+  @Test
+  public void testInputWithAppendOptions() throws Exception {
+    Text in = getAuditString("1970-01-01 00:00:11,000",
+             "fakeUser (auth:TOKEN)", "append (options=[APPEND])",
+             "sourcePath", "null");
+    AuditReplayCommand expected = new AuditReplayCommand(1000,
+            "fakeUser", "append (options=[APPEND])", "sourcePath",
+            "null", "0.0.0.0");
+    assertEquals(expected, parser.parse(in, Function.identity()));
+  }
+
+  @Test
   public void testInputWithTokenAuth() throws Exception {
     Text in = getAuditString("1970-01-01 00:00:11,000", "fakeUser (auth:TOKEN)",
         "create", "sourcePath", "null");
