@@ -34,8 +34,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,14 +66,13 @@ import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 import org.slf4j.Logger;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 
 /**
  * A thread per active or standby namenode to perform:
@@ -97,8 +94,6 @@ class BPServiceActor implements Runnable {
   
   volatile long lastCacheReport = 0;
   private final Scheduler scheduler;
-  private final Object sendIBRLock;
-  private final ExecutorService ibrExecutorService;
 
   Thread bpThread;
   DatanodeProtocolClientSideTranslatorPB bpNamenode;
@@ -154,10 +149,6 @@ class BPServiceActor implements Runnable {
     }
     commandProcessingThread = new CommandProcessingThread(this);
     commandProcessingThread.start();
-    sendIBRLock = new Object();
-    ibrExecutorService = Executors.newSingleThreadExecutor(
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("ibr-executor-%d").build());
   }
 
   public DatanodeRegistration getBpRegistration() {
@@ -377,10 +368,8 @@ class BPServiceActor implements Runnable {
     // we have a chance that we will miss the delHint information
     // or we will report an RBW replica after the BlockReport already reports
     // a FINALIZED one.
-    synchronized (sendIBRLock) {
-      ibrManager.sendIBRs(bpNamenode, bpRegistration,
-          bpos.getBlockPoolId(), getRpcMetricSuffix());
-    }
+    ibrManager.sendIBRs(bpNamenode, bpRegistration,
+        bpos.getBlockPoolId(), getRpcMetricSuffix());
 
     long brCreateStartTime = monotonicNow();
     Map<DatanodeStorage, BlockListAsLongs> perVolumeBlockLists =
@@ -413,7 +402,7 @@ class BPServiceActor implements Runnable {
         // Below split threshold, send all reports in a single message.
         DatanodeCommand cmd = bpNamenode.blockReport(
             bpRegistration, bpos.getBlockPoolId(), reports,
-            new BlockReportContext(1, 0, reportId, fullBrLeaseId));
+              new BlockReportContext(1, 0, reportId, fullBrLeaseId, true));
         blockReportSizes.add(
             calculateBlockReportPBSize(useBlocksBuffer, reports));
         numRPCs = 1;
@@ -428,7 +417,7 @@ class BPServiceActor implements Runnable {
           DatanodeCommand cmd = bpNamenode.blockReport(
               bpRegistration, bpos.getBlockPoolId(), singleReport,
               new BlockReportContext(reports.length, r, reportId,
-                  fullBrLeaseId));
+                  fullBrLeaseId, true));
           blockReportSizes.add(
               calculateBlockReportPBSize(useBlocksBuffer, singleReport));
           numReportsSent++;
@@ -447,8 +436,7 @@ class BPServiceActor implements Runnable {
       final int nCmds = cmds.size();
       LOG.info((success ? "S" : "Uns") +
           "uccessfully sent block report 0x" +
-          Long.toHexString(reportId) + " to namenode: " + nnAddr +
-          ",  containing " + reports.length +
+          Long.toHexString(reportId) + ",  containing " + reports.length +
           " storage report(s), of which we sent " + numReportsSent + "." +
           " The reports had " + totalBlockCount +
           " total blocks and used " + numRPCs +
@@ -584,11 +572,11 @@ class BPServiceActor implements Runnable {
     }
     bpThread = new Thread(this);
     bpThread.setDaemon(true); // needed for JUnit testing
+    bpThread.start();
 
     if (lifelineSender != null) {
       lifelineSender.start();
     }
-    bpThread.start();
   }
 
   private String formatThreadName(
@@ -611,9 +599,6 @@ class BPServiceActor implements Runnable {
     if (commandProcessingThread != null) {
       commandProcessingThread.interrupt();
     }
-    if (ibrExecutorService != null && !ibrExecutorService.isShutdown()) {
-      ibrExecutorService.shutdownNow();
-    }
   }
   
   //This must be called only by blockPoolManager
@@ -628,18 +613,13 @@ class BPServiceActor implements Runnable {
     } catch (InterruptedException ie) { }
   }
   
-  // Cleanup method to be called by current thread before exiting.
-  // Any Thread / ExecutorService started by BPServiceActor can be shutdown
-  // here.
+  //Cleanup method to be called by current thread before exiting.
   private synchronized void cleanUp() {
     
     shouldServiceRun = false;
-    IOUtils.cleanupWithLogger(null, bpNamenode);
-    IOUtils.cleanupWithLogger(null, lifelineSender);
+    IOUtils.cleanup(null, bpNamenode);
+    IOUtils.cleanup(null, lifelineSender);
     bpos.shutdownActor(this);
-    if (!ibrExecutorService.isShutdown()) {
-      ibrExecutorService.shutdownNow();
-    }
   }
 
   private void handleRollingUpgradeStatus(HeartbeatResponse resp) throws IOException {
@@ -724,6 +704,11 @@ class BPServiceActor implements Runnable {
             }
             commandProcessingThread.enqueue(resp.getCommands());
           }
+        }
+        if (!dn.areIBRDisabledForTests() &&
+            (ibrManager.sendImmediately()|| sendHeartbeat)) {
+          ibrManager.sendIBRs(bpNamenode, bpRegistration,
+              bpos.getBlockPoolId(), getRpcMetricSuffix());
         }
 
         List<DatanodeCommand> cmds = null;
@@ -888,10 +873,6 @@ class BPServiceActor implements Runnable {
         initialRegistrationComplete.countDown();
       }
 
-      // IBR tasks to be handled separately from offerService() in order to
-      // improve performance of offerService(), which can now focus only on
-      // FBR and heartbeat.
-      ibrExecutorService.submit(new IBRTaskHandler());
       while (shouldRun()) {
         try {
           offerService();
@@ -949,12 +930,10 @@ class BPServiceActor implements Runnable {
 
   void triggerBlockReport(BlockReportOptions options) {
     if (options.isIncremental()) {
-      LOG.info(bpos.toString() + ": scheduling an incremental block report " +
-         "to namenode: " + nnAddr + ".");
+      LOG.info(bpos.toString() + ": scheduling an incremental block report.");
       ibrManager.triggerIBR(true);
     } else {
-      LOG.info(bpos.toString() + ": scheduling a full block report " +
-         "to namenode: " + nnAddr + ".");
+      LOG.info(bpos.toString() + ": scheduling a full block report.");
       synchronized(ibrManager) {
         scheduler.forceFullBlockReportNow();
         ibrManager.notifyAll();
@@ -1010,7 +989,7 @@ class BPServiceActor implements Runnable {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }
-      IOUtils.cleanupWithLogger(null, lifelineNamenode);
+      IOUtils.cleanup(null, lifelineNamenode);
     }
 
     @Override
@@ -1120,34 +1099,6 @@ class BPServiceActor implements Runnable {
                                     numFailedVolumes,
                                     volumeFailureSummary);
     }
-  }
-
-  class IBRTaskHandler implements Runnable {
-
-    @Override
-    public void run() {
-      LOG.info("Starting IBR Task Handler.");
-      while (shouldRun()) {
-        try {
-          final long startTime = scheduler.monotonicNow();
-          final boolean sendHeartbeat = scheduler.isHeartbeatDue(startTime);
-          if (!dn.areIBRDisabledForTests() &&
-              (ibrManager.sendImmediately() || sendHeartbeat)) {
-            synchronized (sendIBRLock) {
-              ibrManager.sendIBRs(bpNamenode, bpRegistration,
-                  bpos.getBlockPoolId(), getRpcMetricSuffix());
-            }
-          }
-          // There is no work to do; sleep until heartbeat timer elapses,
-          // or work arrives, and then iterate again.
-          ibrManager.waitTillNextIBR(scheduler.getHeartbeatWaitTime());
-        } catch (Throwable t) {
-          LOG.error("Exception in IBRTaskHandler.", t);
-          sleepAndLogInterrupts(5000, "offering IBR service");
-        }
-      }
-    }
-
   }
 
   /**
@@ -1361,10 +1312,6 @@ class BPServiceActor implements Runnable {
         processQueue();
       } catch (Throwable t) {
         LOG.error("{} encountered fatal exception and exit.", getName(), t);
-        runningState = RunningState.FAILED;
-      } finally {
-        LOG.warn("Ending command processor service for: " + this);
-        shouldServiceRun = false;
       }
     }
 
@@ -1380,7 +1327,6 @@ class BPServiceActor implements Runnable {
           dn.getMetrics().incrNumProcessedCommands();
         } catch (InterruptedException e) {
           LOG.error("{} encountered interrupt and exit.", getName());
-          Thread.currentThread().interrupt();
           // ignore unless thread was specifically interrupted.
           if (Thread.interrupted()) {
             break;
@@ -1450,13 +1396,6 @@ class BPServiceActor implements Runnable {
     void enqueue(DatanodeCommand[] cmds) throws InterruptedException {
       queue.put(() -> processCommand(cmds));
       dn.getMetrics().incrActorCmdQueueLength(1);
-    }
-  }
-
-  @VisibleForTesting
-  void stopCommandProcessingThread() {
-    if (commandProcessingThread != null) {
-      commandProcessingThread.interrupt();
     }
   }
 }
