@@ -19,7 +19,10 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
@@ -31,9 +34,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.ObjectMapper;
 
 /**
  * The NetworkTagMapping JsonManager implementation.
@@ -86,7 +86,7 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
         container.getUser());
     List<Group> groups = this.networkTagMapping.getGroups();
     for(Group group : groups) {
-      if (userUGI.getGroupsSet().contains(group.getGroupName())) {
+      if (userUGI.getGroups().contains(group.getGroupName())) {
         return group.getNetworkTagID();
       }
     }
