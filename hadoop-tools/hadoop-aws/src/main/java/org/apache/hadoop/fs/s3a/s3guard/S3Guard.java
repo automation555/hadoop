@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.s3a.s3guard;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.AccessDeniedException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -116,7 +117,7 @@ public final class S3Guard {
     Preconditions.checkNotNull(fs);
     Configuration conf = fs.getConf();
     Preconditions.checkNotNull(conf);
-    MetadataStore msInstance;
+    MetadataStore msInstance = null;
     try {
       Class<? extends MetadataStore> msClass = getMetadataStoreClass(conf);
       msInstance = ReflectionUtils.newInstance(msClass, conf);
@@ -124,15 +125,16 @@ public final class S3Guard {
           msClass.getSimpleName(), fs.getScheme());
       msInstance.initialize(fs, ttlTimeProvider);
       return msInstance;
-    } catch (FileNotFoundException e) {
-      // Don't log this exception as it means the table doesn't exist yet;
-      // rely on callers to catch and treat specially
-      throw e;
+    } catch (FileNotFoundException | AccessDeniedException e) {
+      // Downgrade.
+      LOG.debug(createInstantiationFailureMessage(conf, e), e);
+      LOG.info("S3Guard binding unsuccessful; using S3 raw.");
+      // clean up
+      IOUtils.cleanupWithLogger(LOG, msInstance);
+      return new NullMetadataStore();
     } catch (RuntimeException | IOException e) {
-      String message = "Failed to instantiate metadata store " +
-          conf.get(S3_METADATA_STORE_IMPL)
-          + " defined in " + S3_METADATA_STORE_IMPL
-          + ": " + e;
+      IOUtils.cleanupWithLogger(LOG, msInstance);
+      String message = createInstantiationFailureMessage(conf, e);
       LOG.error(message, e);
       if (e instanceof IOException) {
         throw e;
@@ -140,6 +142,21 @@ public final class S3Guard {
         throw new IOException(message, e);
       }
     }
+  }
+
+  /**
+   * Message for logs/exceptions on failure to instantiate.
+   * @param conf configuration in use
+   * @param e exception
+   * @return a string.
+   */
+  private static String createInstantiationFailureMessage(
+      final Configuration conf,
+      final Exception e) {
+    return "Failed to instantiate metadata store " +
+        conf.get(S3_METADATA_STORE_IMPL)
+        + " defined in " + S3_METADATA_STORE_IMPL
+        + ": " + e;
   }
 
   static Class<? extends MetadataStore> getMetadataStoreClass(

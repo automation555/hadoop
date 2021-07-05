@@ -40,7 +40,6 @@ import org.apache.hadoop.fs.s3a.Tristate;
 import org.apache.hadoop.fs.s3a.impl.DirectoryPolicy;
 import org.apache.hadoop.fs.s3a.impl.StatusProbeEnum;
 import org.apache.hadoop.fs.s3a.statistics.StatisticTypeEnum;
-import org.apache.hadoop.fs.store.audit.AuditSpan;
 
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
@@ -54,7 +53,10 @@ import static org.apache.hadoop.test.AssertExtensions.dynamicDescription;
 /**
  * Abstract class for tests which make assertions about cost.
  * <p></p>
- * Factored out from {@code ITestS3AFileOperationCost}
+ * Factored out from {@code ITestS3AFileOperationCost}.
+ * When S3Guard is required, if the store falls back to
+ * being unguarded then the test will be skipped during
+ * setup.
  */
 public class AbstractS3ACostTest extends AbstractS3ATestBase {
 
@@ -107,18 +109,7 @@ public class AbstractS3ACostTest extends AbstractS3ATestBase {
     this.s3guard = s3guard;
     this.keepMarkers = keepMarkers;
     this.authoritative = authoritative;
-  }
-
-  /**
-   * Constructor for tests which don't include
-   * any for S3Guard.
-   * @param keepMarkers should markers be tested.
-   */
-  public AbstractS3ACostTest(
-      final boolean keepMarkers) {
-    this.s3guard = false;
-    this.keepMarkers = keepMarkers;
-    this.authoritative = false;
+    setS3GuardRequired(s3guard);
   }
 
   @Override
@@ -196,8 +187,6 @@ public class AbstractS3ACostTest extends AbstractS3ATestBase {
     deleteMarkerStatistic = isBulkDelete()
         ? OBJECT_BULK_DELETE_REQUEST
         : OBJECT_DELETE_REQUEST;
-
-    setSpanSource(fs);
   }
 
   public void assumeUnguarded() {
@@ -372,7 +361,6 @@ public class AbstractS3ACostTest extends AbstractS3ATestBase {
   protected <T> T verifyMetrics(
       Callable<T> eval,
       OperationCostValidator.ExpectedProbe... expected) throws Exception {
-    span();
     return costValidator.exec(eval, expected);
 
   }
@@ -395,7 +383,6 @@ public class AbstractS3ACostTest extends AbstractS3ATestBase {
       String text,
       Callable<T> eval,
       OperationCostValidator.ExpectedProbe... expected) throws Exception {
-    span();
     return costValidator.intercepting(clazz, text, eval, expected);
   }
 
@@ -493,8 +480,6 @@ public class AbstractS3ACostTest extends AbstractS3ATestBase {
   /**
    * Execute a closure expecting a specific number of HEAD/LIST calls
    * on <i>raw</i> S3 stores only. The operation is always evaluated.
-   * A span is always created prior to the invocation; saves trouble
-   * in tests that way.
    * @param cost expected cost
    * @param eval closure to evaluate
    * @param <T> return type of closure
@@ -544,14 +529,12 @@ public class AbstractS3ACostTest extends AbstractS3ATestBase {
       boolean needEmptyDirectoryFlag,
       Set<StatusProbeEnum> probes,
       OperationCost cost) throws Exception {
-    try (AuditSpan span = span()) {
-      interceptRaw(FileNotFoundException.class, "",
-          cost, () ->
-              innerGetFileStatus(getFileSystem(),
-                  path,
-                  needEmptyDirectoryFlag,
-                  probes));
-    }
+    interceptRaw(FileNotFoundException.class, "",
+        cost, () ->
+            innerGetFileStatus(getFileSystem(),
+                path,
+                needEmptyDirectoryFlag,
+                probes));
   }
 
   /**

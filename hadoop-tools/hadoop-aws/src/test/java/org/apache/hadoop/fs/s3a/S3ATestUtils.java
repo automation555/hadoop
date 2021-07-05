@@ -67,6 +67,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -90,6 +91,7 @@ import static org.apache.hadoop.fs.s3a.FailureInjectionPolicy.*;
 import static org.apache.hadoop.fs.s3a.S3ATestConstants.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3AUtils.propagateBucketOptions;
+import static org.apache.hadoop.test.LambdaTestUtils.eventually;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.junit.Assert.*;
 
@@ -515,7 +517,6 @@ public final class S3ATestUtils {
       conf.setBoolean(METADATASTORE_AUTHORITATIVE, authoritative);
       conf.set(AUTHORITATIVE_PATH, "");
       conf.set(S3_METADATA_STORE_IMPL, implClass);
-      conf.setBoolean(S3GUARD_DDB_TABLE_CREATE_KEY, true);
     }
   }
 
@@ -826,16 +827,6 @@ public final class S3ATestUtils {
   }
 
   /**
-   * Disable S3Guard from the test bucket in a configuration.
-   * @param conf configuration.
-   */
-  public static void disableS3GuardInTestBucket(Configuration conf) {
-    removeBaseAndBucketOverrides(getTestBucketName(conf), conf,
-        S3_METADATA_STORE_IMPL,
-        DIRECTORY_MARKER_POLICY);
-    conf.set(S3_METADATA_STORE_IMPL, S3GUARD_METASTORE_NULL);
-  }
-  /**
    * Call a function; any exception raised is logged at info.
    * This is for test teardowns.
    * @param log log to use.
@@ -846,6 +837,21 @@ public final class S3ATestUtils {
       final CallableRaisingIOE<T> operation) {
     try {
       operation.apply();
+    } catch (Exception e) {
+      log.info(e.toString(), e);
+    }
+  }
+
+  /**
+   * Call a void operation; any exception raised is logged at info.
+   * This is for test teardowns.
+   * @param log log to use.
+   * @param operation operation to invoke
+   */
+  public static void callQuietly(final Logger log,
+      final Invoker.VoidOperation operation) {
+    try {
+      operation.execute();
     } catch (Exception e) {
       log.info(e.toString(), e);
     }
@@ -1430,6 +1436,35 @@ public final class S3ATestUtils {
           listFilesHasIt);
     assertTrue("fs.listStatus didn't include " + filePath,
           listStatusHasIt);
+  }
+
+  /**
+   * Wait for a deleted file to no longer be visible.
+   * @param fs filesystem
+   * @param testFilePath path to query
+   * @throws Exception failure
+   */
+  public static void awaitDeletedFileDisappearance(final S3AFileSystem fs,
+      final Path testFilePath) throws Exception {
+    eventually(
+        STABILIZATION_TIME, PROBE_INTERVAL_MILLIS,
+        () -> intercept(FileNotFoundException.class,
+            () -> fs.getFileStatus(testFilePath)));
+  }
+
+  /**
+   * Wait for a file to be visible.
+   * @param fs filesystem
+   * @param testFilePath path to query
+   * @return the file status.
+   * @throws Exception failure
+   */
+  public static S3AFileStatus awaitFileStatus(S3AFileSystem fs,
+      final Path testFilePath)
+      throws Exception {
+    return (S3AFileStatus) eventually(
+        STABILIZATION_TIME, PROBE_INTERVAL_MILLIS,
+        () -> fs.getFileStatus(testFilePath));
   }
 
   /**

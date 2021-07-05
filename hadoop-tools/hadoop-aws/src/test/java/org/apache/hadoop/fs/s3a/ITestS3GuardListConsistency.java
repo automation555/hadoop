@@ -32,7 +32,7 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.contract.s3a.S3AContract;
 
 import com.amazonaws.services.s3.model.S3ObjectSummary;
-import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.assertj.core.api.Assertions;
 import org.junit.Assume;
 import org.junit.Test;
@@ -66,6 +66,7 @@ public class ITestS3GuardListConsistency extends AbstractS3ATestBase {
 
   @Override
   public void setup() throws Exception {
+    setS3GuardRequired(true);
     super.setup();
     invoker = new Invoker(new S3ARetryPolicy(getConfiguration()),
         Invoker.NO_OP
@@ -196,7 +197,7 @@ public class ITestS3GuardListConsistency extends AbstractS3ATestBase {
       }
 
       S3AFileSystem fs = getFileSystem();
-      intercept(FileNotFoundException.class, () ->
+      assertFalse("Renaming deleted file should have failed",
           fs.rename(dir2[0], dir1[0]));
       assertTrue("Renaming over existing file should have succeeded",
           fs.rename(dir1[0], dir0[0]));
