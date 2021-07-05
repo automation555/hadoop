@@ -160,6 +160,11 @@ public class UnparsedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job {
   }
 
   @Override
+  public String getResourceManagerHost() {
+    return jobIndexInfo.getResourceManagerHost();
+  }
+
+  @Override
   public Path getConfFile() {
     return jhfInfo.getConfFile();
   }
@@ -183,7 +188,7 @@ public class UnparsedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job {
   @Override
   public TaskCompletionEvent[] getMapAttemptCompletionEvents(
       int startIndex, int maxEvents) {
-    return TaskCompletionEvent.EMPTY_ARRAY;
+    return new TaskCompletionEvent[0];
   }
 
   @Override

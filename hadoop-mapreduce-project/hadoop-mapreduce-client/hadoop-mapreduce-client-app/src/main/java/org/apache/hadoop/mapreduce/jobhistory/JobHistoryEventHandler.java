@@ -79,7 +79,7 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.util.TimelineServiceHelper;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.api.client.ClientHandlerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -227,7 +227,7 @@ public class JobHistoryEventHandler extends AbstractService
       }
       }
     } catch (IOException e) {
-      LOG.error("Failed checking for the existence of history intermediate " +
+      LOG.error("Failed checking for the existance of history intermediate " +
       		"done directory: [" + doneDirPath + "]");
       throw new YarnRuntimeException(e);
     }
@@ -1588,6 +1588,19 @@ public class JobHistoryEventHandler extends AbstractService
       this.jobIndexInfo =
           new JobIndexInfo(-1, -1, user, jobName, jobId, -1, -1, null,
                            queueName);
+
+      if (getConfig().getBoolean(
+          JHAdminConfig.MR_HISTORY_APPEND_RM_HOST_TO_HISTORY_FILE_NAME_ENABLED,
+          JHAdminConfig.DEFAULT_MR_HISTORY_APPEND_RM_HOST_TO_HISTORY_FILE_NAME_ENABLED)) {
+
+        String hostName = getConfig().get(YarnConfiguration.RM_HOSTNAME, "");
+        if (!hostName.isEmpty()) {
+          this.jobIndexInfo.setResourceManagerHost(hostName);
+        } else {
+          LOG.warn("Could not retreive a valid YARN host name");
+        }
+      }
+
       this.jobSummary = new JobSummary();
       this.flushTimer = new Timer("FlushTimer", true);
       this.forcedJobStateOnShutDown = forcedJobStateOnShutDown;
