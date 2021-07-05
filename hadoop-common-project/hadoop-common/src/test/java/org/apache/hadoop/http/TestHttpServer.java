@@ -20,7 +20,6 @@ package org.apache.hadoop.http;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.http.HttpServer2.QuotingInputFilter.RequestQuoter;
 import org.apache.hadoop.http.resource.JerseyResource;
 import org.apache.hadoop.net.NetUtils;
@@ -29,17 +28,16 @@ import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
-import org.apache.hadoop.test.Whitebox;
-
-import org.assertj.core.api.Assertions;
-import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.StatisticsHandler;
-import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.mockito.Mockito;
+import org.mockito.internal.util.reflection.Whitebox;
+import org.mortbay.jetty.Connector;
+import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,10 +52,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -79,6 +75,9 @@ public class TestHttpServer extends HttpServerFunctionalTest {
   private static HttpServer2 server;
   private static final int MAX_THREADS = 10;
 
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
+  
   @SuppressWarnings("serial")
   public static class EchoMapServlet extends HttpServlet {
     @SuppressWarnings("unchecked")
@@ -86,7 +85,6 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     public void doGet(HttpServletRequest request, 
                       HttpServletResponse response
                       ) throws ServletException, IOException {
-      response.setContentType(MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8);
       PrintWriter out = response.getWriter();
       Map<String, String[]> params = request.getParameterMap();
       SortedSet<String> keys = new TreeSet<String>(params.keySet());
@@ -114,7 +112,6 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     public void doGet(HttpServletRequest request, 
                       HttpServletResponse response
                       ) throws ServletException, IOException {
-      response.setContentType(MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8);
       PrintWriter out = response.getWriter();
       SortedSet<String> sortedKeys = new TreeSet<String>();
       Enumeration<String> keys = request.getParameterNames();
@@ -137,7 +134,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     public void doGet(HttpServletRequest request, 
                       HttpServletResponse response
                       ) throws ServletException, IOException {
-      response.setContentType(MediaType.TEXT_HTML + "; " + JettyUtils.UTF_8);
+      response.setContentType("text/html");
       PrintWriter out = response.getWriter();
       out.print("hello world");
       out.close();
@@ -146,9 +143,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
 
   @BeforeClass public static void setup() throws Exception {
     Configuration conf = new Configuration();
-    conf.setInt(HttpServer2.HTTP_MAX_THREADS_KEY, MAX_THREADS);
-    conf.setBoolean(
-        CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED, true);
+    conf.setInt(HttpServer2.HTTP_MAX_THREADS, 10);
     server = createTestServer(conf);
     server.addServlet("echo", "/echo", EchoServlet.class);
     server.addServlet("echomap", "/echomap", EchoMapServlet.class);
@@ -196,27 +191,6 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     ready.await();
     start.countDown();
   }
-
-  /**
-   * Test that the number of acceptors and selectors can be configured by
-   * trying to configure more of them than would be allowed based on the
-   * maximum thread count.
-   */
-  @Test
-  public void testAcceptorSelectorConfigurability() throws Exception {
-    Configuration conf = new Configuration();
-    conf.setInt(HttpServer2.HTTP_MAX_THREADS_KEY, MAX_THREADS);
-    conf.setInt(HttpServer2.HTTP_ACCEPTOR_COUNT_KEY, MAX_THREADS - 2);
-    conf.setInt(HttpServer2.HTTP_SELECTOR_COUNT_KEY, MAX_THREADS - 2);
-    HttpServer2 badserver = createTestServer(conf);
-    try {
-      badserver.start();
-      // Should not succeed
-      fail();
-    } catch (IOException ioe) {
-      assertTrue(ioe.getCause() instanceof IllegalStateException);
-    }
-  }
   
   @Test public void testEcho() throws Exception {
     assertEquals("a:b\nc:d\n", 
@@ -252,8 +226,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     conn = (HttpURLConnection)servletUrl.openConnection();
     conn.connect();
     assertEquals(200, conn.getResponseCode());
-    assertEquals(MediaType.TEXT_PLAIN + ";" + JettyUtils.UTF_8,
-        conn.getContentType());
+    assertEquals("text/plain; charset=utf-8", conn.getContentType());
 
     // We should ignore parameters for mime types - ie a parameter
     // ending in .css should not change mime type
@@ -261,49 +234,14 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     conn = (HttpURLConnection)servletUrl.openConnection();
     conn.connect();
     assertEquals(200, conn.getResponseCode());
-    assertEquals(MediaType.TEXT_PLAIN + ";" + JettyUtils.UTF_8,
-        conn.getContentType());
+    assertEquals("text/plain; charset=utf-8", conn.getContentType());
 
     // Servlets that specify text/html should get that content type
     servletUrl = new URL(baseUrl, "/htmlcontent");
     conn = (HttpURLConnection)servletUrl.openConnection();
     conn.connect();
     assertEquals(200, conn.getResponseCode());
-    assertEquals(MediaType.TEXT_HTML + ";" + JettyUtils.UTF_8,
-        conn.getContentType());
-  }
-
-  @Test
-  public void testHttpServer2Metrics() throws Exception {
-    final HttpServer2Metrics metrics = server.getMetrics();
-    final int before = metrics.responses2xx();
-    final URL servletUrl = new URL(baseUrl, "/echo?echo");
-    final HttpURLConnection conn =
-        (HttpURLConnection)servletUrl.openConnection();
-    conn.connect();
-    Assertions.assertThat(conn.getResponseCode()).isEqualTo(200);
-    final int after = metrics.responses2xx();
-    Assertions.assertThat(after).isGreaterThan(before);
-  }
-
-  /**
-   * Jetty StatisticsHandler must be inserted via Server#insertHandler
-   * instead of Server#setHandler. The server fails to start if
-   * the handler is added by setHandler.
-   */
-  @Test
-  public void testSetStatisticsHandler() throws Exception {
-    final Configuration conf = new Configuration();
-    // skip insert
-    conf.setBoolean(
-        CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED, false);
-    final HttpServer2 testServer = createTestServer(conf);
-    testServer.webServer.setHandler(new StatisticsHandler());
-    try {
-      testServer.start();
-      fail("IOException should be thrown.");
-    } catch (IOException ignore) {
-    }
+    assertEquals("text/html; charset=utf-8", conn.getContentType());
   }
 
   @Test
@@ -363,11 +301,11 @@ public class TestHttpServer extends HttpServerFunctionalTest {
   }
 
   @Test
-  public void testHttpResonseInvalidValueType() {
+  public void testHttpResonseInvalidValueType() throws Exception {
     Configuration conf = new Configuration();
     boolean xFrameEnabled = true;
-    assertThrows(IllegalArgumentException.class, () ->
-        createServer(xFrameEnabled, "Hadoop", conf));
+    exception.expect(IllegalArgumentException.class);
+    createServer(xFrameEnabled, "Hadoop", conf);
   }
 
 
@@ -456,7 +394,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
   }
 
   /**
-   * Verify the access for /logs, /stacks, /conf, and /logLevel
+   * Verify the access for /logs, /stacks, /conf, /logLevel and /metrics
    * servlets, when authentication filters are set, but authorization is not
    * enabled.
    * @throws Exception 
@@ -482,7 +420,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     myServer.start();
     String serverURL = "http://" + NetUtils.getHostPortString(myServer.getConnectorAddress(0)) + "/";
     for (String servlet : new String[] { "conf", "logs", "stacks",
-        "logLevel" }) {
+        "logLevel", "metrics" }) {
       for (String user : new String[] { "userA", "userB" }) {
         assertEquals(HttpURLConnection.HTTP_OK, getHttpStatusCode(serverURL
             + servlet, user));
@@ -492,8 +430,8 @@ public class TestHttpServer extends HttpServerFunctionalTest {
   }
 
   /**
-   * Verify the administrator access for /logs, /stacks, /conf, and /logLevel
-   * servlets.
+   * Verify the administrator access for /logs, /stacks, /conf, /logLevel and
+   * /metrics servlets.
    * 
    * @throws Exception
    */
@@ -526,7 +464,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     String serverURL = "http://"
         + NetUtils.getHostPortString(myServer.getConnectorAddress(0)) + "/";
     for (String servlet : new String[] { "conf", "logs", "stacks",
-        "logLevel" }) {
+        "logLevel", "metrics" }) {
       for (String user : new String[] { "userA", "userB", "userC", "userD" }) {
         assertEquals(HttpURLConnection.HTTP_OK, getHttpStatusCode(serverURL
             + servlet, user));
@@ -561,7 +499,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
 
   @SuppressWarnings("unchecked")
   private static Map<String, Object> parse(String jsonString) {
-    return (Map<String, Object>) JSON.parse(jsonString);
+    return (Map<String, Object>)JSON.parse(jsonString);
   }
 
   @Test public void testJersey() throws Exception {
@@ -665,7 +603,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
       // not bound, ephemeral should return requested port (0 for ephemeral)
       List<?> listeners = (List<?>) Whitebox.getInternalState(server,
           "listeners");
-      ServerConnector listener = (ServerConnector)listeners.get(0);
+      Connector listener = (Connector) listeners.get(0);
 
       assertEquals(port, listener.getPort());
       // verify hostname is what was given
@@ -732,91 +670,4 @@ public class TestHttpServer extends HttpServerFunctionalTest {
       stopHttpServer(myServer2);
     }
   }
-
-  @Test
-  public void testBacklogSize() throws Exception
-  {
-    final int backlogSize = 2048;
-    Configuration conf = new Configuration();
-    conf.setInt(HttpServer2.HTTP_SOCKET_BACKLOG_SIZE_KEY, backlogSize);
-    HttpServer2 srv = createServer("test", conf);
-    List<?> listeners = (List<?>) Whitebox.getInternalState(srv,
-            "listeners");
-    ServerConnector listener = (ServerConnector)listeners.get(0);
-    assertEquals(backlogSize, listener.getAcceptQueueSize());
-  }
-
-  @Test
-  public void testIdleTimeout() throws Exception {
-    final int idleTimeout = 1000;
-    Configuration conf = new Configuration();
-    conf.setInt(HttpServer2.HTTP_IDLE_TIMEOUT_MS_KEY, idleTimeout);
-    HttpServer2 srv = createServer("test", conf);
-    Field f = HttpServer2.class.getDeclaredField("listeners");
-    f.setAccessible(true);
-    List<?> listeners = (List<?>) f.get(srv);
-    ServerConnector listener = (ServerConnector)listeners.get(0);
-    assertEquals(idleTimeout, listener.getIdleTimeout());
-  }
-
-  @Test
-  public void testHttpResponseDefaultHeaders() throws Exception {
-    Configuration conf = new Configuration();
-    HttpServer2  httpServer = createTestServer(conf);
-    try {
-      HttpURLConnection conn = getHttpURLConnection(httpServer);
-      assertEquals(HttpServer2.X_XSS_PROTECTION.split(":")[1],
-              conn.getHeaderField(
-              HttpServer2.X_XSS_PROTECTION.split(":")[0]));
-      assertEquals(HttpServer2.X_CONTENT_TYPE_OPTIONS.split(":")[1],
-              conn.getHeaderField(
-              HttpServer2.X_CONTENT_TYPE_OPTIONS.split(":")[0]));
-    } finally {
-      httpServer.stop();
-    }
-  }
-
-  @Test
-  public void testHttpResponseOverrideDefaultHeaders() throws Exception {
-    Configuration conf = new Configuration();
-    conf.set(HttpServer2.HTTP_HEADER_PREFIX+
-            HttpServer2.X_XSS_PROTECTION.split(":")[0], "customXssValue");
-    HttpServer2  httpServer = createTestServer(conf);
-    try {
-      HttpURLConnection conn = getHttpURLConnection(httpServer);
-      assertEquals("customXssValue",
-              conn.getHeaderField(
-              HttpServer2.X_XSS_PROTECTION.split(":")[0])
-      );
-      assertEquals(HttpServer2.X_CONTENT_TYPE_OPTIONS.split(":")[1],
-              conn.getHeaderField(
-              HttpServer2.X_CONTENT_TYPE_OPTIONS.split(":")[0])
-      );
-    } finally {
-      httpServer.stop();
-    }
-  }
-
-  @Test
-  public void testHttpResponseCustomHeaders() throws Exception {
-    Configuration conf = new Configuration();
-    String key = "customKey";
-    String value = "customValue";
-    conf.set(HttpServer2.HTTP_HEADER_PREFIX+key, value);
-    HttpServer2  httpServer = createTestServer(conf);
-    try {
-      HttpURLConnection conn = getHttpURLConnection(httpServer);
-      assertEquals(HttpServer2.X_XSS_PROTECTION.split(":")[1],
-              conn.getHeaderField(
-              HttpServer2.X_XSS_PROTECTION.split(":")[0]));
-      assertEquals(HttpServer2.X_CONTENT_TYPE_OPTIONS.split(":")[1],
-              conn.getHeaderField(
-              HttpServer2.X_CONTENT_TYPE_OPTIONS.split(":")[0]));
-      assertEquals(value, conn.getHeaderField(
-              key));
-    } finally {
-      httpServer.stop();
-    }
-  }
-
 }

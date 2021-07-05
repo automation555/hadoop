@@ -58,7 +58,6 @@ import static org.mockito.Mockito.verify;
 
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.yarn.logaggregation.AggregatedLogDeletionService;
-import org.mockito.internal.util.collections.Sets;
 
 @RunWith(Parameterized.class)
 public class TestHSAdminServer {
@@ -202,7 +201,7 @@ public class TestHSAdminServer {
     when(ugi.getGroups())
         .thenReturn(Arrays.asList(new String[] { "group3" }));
     when(ugi.getGroupsSet())
-        .thenReturn(Sets.newSet("group3"));
+        .thenReturn(new LinkedHashSet<String>(Arrays.asList("group3")));
 
     when(ugi.getUserName()).thenReturn("regularUser");
 

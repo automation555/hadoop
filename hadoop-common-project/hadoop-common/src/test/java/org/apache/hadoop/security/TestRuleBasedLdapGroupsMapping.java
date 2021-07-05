@@ -30,8 +30,8 @@ import java.util.Set;
 
 import static org.apache.hadoop.security.RuleBasedLdapGroupsMapping
     .CONVERSION_RULE_KEY;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.eq;
 
 /**
  * Test cases to verify the rules supported by RuleBasedLdapGroupsMapping.
