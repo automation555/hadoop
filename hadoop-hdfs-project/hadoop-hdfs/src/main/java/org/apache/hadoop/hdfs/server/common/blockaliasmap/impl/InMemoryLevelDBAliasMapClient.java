@@ -28,6 +28,7 @@ import org.apache.hadoop.hdfs.server.aliasmap.InMemoryAliasMapProtocol;
 import org.apache.hadoop.hdfs.server.common.blockaliasmap.BlockAliasMap;
 import org.apache.hadoop.hdfs.server.common.FileRegion;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,7 +130,7 @@ public class InMemoryLevelDBAliasMapClient extends BlockAliasMap<FileRegion>
     }
   }
 
-  static class LevelDbWriter extends BlockAliasMap.Writer<FileRegion> {
+  class LevelDbWriter extends BlockAliasMap.Writer<FileRegion> {
 
     private InMemoryAliasMapProtocol aliasMap;
 
@@ -144,11 +145,20 @@ public class InMemoryLevelDBAliasMapClient extends BlockAliasMap<FileRegion>
     }
 
     @Override
+    public void remove(Block block) throws IOException {
+      aliasMap.remove(block);
+    }
+
+    @Override
     public void close() throws IOException {
     }
   }
 
-  InMemoryLevelDBAliasMapClient() {
+  public InMemoryLevelDBAliasMapClient() {
+    if (UserGroupInformation.isSecurityEnabled()) {
+      throw new UnsupportedOperationException("Unable to start "
+          + "InMemoryLevelDBAliasMapClient as security is enabled");
+    }
     aliasMaps = new ArrayList<>();
   }
 

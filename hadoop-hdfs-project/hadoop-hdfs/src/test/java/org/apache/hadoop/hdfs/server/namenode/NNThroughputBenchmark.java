@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +85,8 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.util.VersionInfo;
-import org.slf4j.event.Level;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
 
 /**
  * Main class for a series of name-node benchmarks.
@@ -149,9 +150,9 @@ public class NNThroughputBenchmark implements Tool {
     LOG.info("Log level = " + logLevel.toString());
     // change log level to NameNode logs
     DFSTestUtil.setNameNodeLogLevel(logLevel);
-    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(
+    GenericTestUtils.setLogLevel(LogManager.getLogger(
             NetworkTopology.class.getName()), logLevel);
-    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(
+    GenericTestUtils.setLogLevel(LogManager.getLogger(
             Groups.class.getName()), logLevel);
   }
 
@@ -168,7 +169,6 @@ public class NNThroughputBenchmark implements Tool {
 
     protected final String baseDir;
     protected short replication;
-    protected int blockSize;
     protected int  numThreads = 0;        // number of threads
     protected int  numOpsRequired = 0;    // number of operations requested
     protected int  numOpsExecuted = 0;    // number of operations executed
@@ -230,7 +230,6 @@ public class NNThroughputBenchmark implements Tool {
     OperationStatsBase() {
       baseDir = BASE_DIR_NAME + "/" + getOpName();
       replication = (short) config.getInt(DFSConfigKeys.DFS_REPLICATION_KEY, 3);
-      blockSize = config.getInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, BLOCK_SIZE);
       numOpsRequired = 10;
       numThreads = 3;
       logLevel = Level.ERROR;
@@ -352,7 +351,7 @@ public class NNThroughputBenchmark implements Tool {
       if(llIndex >= 0) {
         if(args.size() <= llIndex + 1)
           printUsage();
-        logLevel = Level.valueOf(args.get(llIndex+1));
+        logLevel = Level.toLevel(args.get(llIndex+1), Level.ERROR);
         args.remove(llIndex+1);
         args.remove(llIndex);
       }
@@ -518,8 +517,7 @@ public class NNThroughputBenchmark implements Tool {
     // Operation types
     static final String OP_CREATE_NAME = "create";
     static final String OP_CREATE_USAGE = 
-        "-op create [-threads T] [-files N] [-blockSize S] [-filesPerDir P]"
-        + " [-close]";
+      "-op create [-threads T] [-files N] [-filesPerDir P] [-close]";
 
     protected FileNameGenerator nameGenerator;
     protected String[][] fileNames;
@@ -544,9 +542,6 @@ public class NNThroughputBenchmark implements Tool {
         if(args.get(i).equals("-files")) {
           if(i+1 == args.size())  printUsage();
           numOpsRequired = Integer.parseInt(args.get(++i));
-        } else if (args.get(i).equals("-blockSize")) {
-          if(i+1 == args.size())  printUsage();
-          blockSize = Integer.parseInt(args.get(++i));
         } else if(args.get(i).equals("-threads")) {
           if(i+1 == args.size())  printUsage();
           numThreads = Integer.parseInt(args.get(++i));
@@ -603,7 +598,7 @@ public class NNThroughputBenchmark implements Tool {
           FsPermission.getDefault(), clientName,
           new EnumSetWritable<CreateFlag>(EnumSet
               .of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true,
-          replication, blockSize, CryptoProtocolVersion.supported(), null,
+          replication, BLOCK_SIZE, CryptoProtocolVersion.supported(), null,
           null);
       long end = Time.now();
       for (boolean written = !closeUponCreate; !written;
@@ -725,8 +720,7 @@ public class NNThroughputBenchmark implements Tool {
     // Operation types
     static final String OP_OPEN_NAME = "open";
     static final String OP_USAGE_ARGS = 
-        " [-threads T] [-files N] [-blockSize S] [-filesPerDir P]"
-        + " [-useExisting]";
+      " [-threads T] [-files N] [-filesPerDir P] [-useExisting]";
     static final String OP_OPEN_USAGE = 
       "-op " + OP_OPEN_NAME + OP_USAGE_ARGS;
 
@@ -758,7 +752,6 @@ public class NNThroughputBenchmark implements Tool {
               "-op", "create", 
               "-threads", String.valueOf(this.numThreads), 
               "-files", String.valueOf(numOpsRequired),
-              "-blockSize", String.valueOf(blockSize),
               "-filesPerDir", 
               String.valueOf(nameGenerator.getFilesPerDirectory()),
               "-close"};
@@ -789,8 +782,7 @@ public class NNThroughputBenchmark implements Tool {
     long executeOp(int daemonId, int inputIdx, String ignore) 
     throws IOException {
       long start = Time.now();
-      clientProto.getBlockLocations(fileNames[daemonId][inputIdx], 0L,
-          blockSize);
+      clientProto.getBlockLocations(fileNames[daemonId][inputIdx], 0L, BLOCK_SIZE);
       long end = Time.now();
       return end-start;
     }
@@ -958,7 +950,7 @@ public class NNThroughputBenchmark implements Tool {
           new StorageBlockReport(storage, BlockListAsLongs.EMPTY)
       };
       dataNodeProto.blockReport(dnRegistration, bpid, reports,
-              new BlockReportContext(1, 0, System.nanoTime(), 0L));
+              new BlockReportContext(1, 0, System.nanoTime(), 0L, true));
     }
 
     /**
@@ -972,8 +964,8 @@ public class NNThroughputBenchmark implements Tool {
           DF_CAPACITY, DF_USED, DF_CAPACITY - DF_USED, DF_USED, 0L) };
       DatanodeCommand[] cmds = dataNodeProto.sendHeartbeat(dnRegistration, rep,
           0L, 0L, 0, 0, 0, null, true,
-          SlowPeerReports.EMPTY_REPORT, SlowDiskReports.EMPTY_REPORT)
-          .getCommands();
+          SlowPeerReports.EMPTY_REPORT, SlowDiskReports.EMPTY_REPORT,
+          null).getCommands();
       if(cmds != null) {
         for (DatanodeCommand cmd : cmds ) {
           if(LOG.isDebugEnabled()) {
@@ -1023,8 +1015,8 @@ public class NNThroughputBenchmark implements Tool {
           false, DF_CAPACITY, DF_USED, DF_CAPACITY - DF_USED, DF_USED, 0) };
       DatanodeCommand[] cmds = dataNodeProto.sendHeartbeat(dnRegistration,
           rep, 0L, 0L, 0, 0, 0, null, true,
-          SlowPeerReports.EMPTY_REPORT, SlowDiskReports.EMPTY_REPORT)
-          .getCommands();
+          SlowPeerReports.EMPTY_REPORT, SlowDiskReports.EMPTY_REPORT,
+          null).getCommands();
       if (cmds != null) {
         for (DatanodeCommand cmd : cmds) {
           if (cmd.getAction() == DatanodeProtocol.DNA_TRANSFER) {
@@ -1080,7 +1072,7 @@ public class NNThroughputBenchmark implements Tool {
     static final String OP_BLOCK_REPORT_NAME = "blockReport";
     static final String OP_BLOCK_REPORT_USAGE = 
       "-op blockReport [-datanodes T] [-reports N] " +
-      "[-blocksPerReport B] [-blocksPerFile F] [-blockSize S]";
+      "[-blocksPerReport B] [-blocksPerFile F]";
 
     private int blocksPerReport;
     private int blocksPerFile;
@@ -1127,9 +1119,6 @@ public class NNThroughputBenchmark implements Tool {
         } else if(args.get(i).equals("-blocksPerFile")) {
           if(i+1 == args.size())  printUsage();
           blocksPerFile = Integer.parseInt(args.get(++i));
-        } else if (args.get(i).equals("-blockSize")) {
-          if(i+1 == args.size())  printUsage();
-          blockSize = Integer.parseInt(args.get(++i));
         } else if(!ignoreUnrelatedOptions)
           printUsage();
       }
@@ -1160,7 +1149,7 @@ public class NNThroughputBenchmark implements Tool {
         String fileName = nameGenerator.getNextFileName("ThroughputBench");
         clientProto.create(fileName, FsPermission.getDefault(), clientName,
             new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE)), true, replication,
-            blockSize, CryptoProtocolVersion.supported(), null, null);
+            BLOCK_SIZE, CryptoProtocolVersion.supported(), null, null);
         ExtendedBlock lastBlock = addBlocks(fileName, clientName);
         clientProto.complete(fileName, clientName, lastBlock, HdfsConstants.GRANDFATHER_INODE_ID);
       }
@@ -1240,7 +1229,7 @@ public class NNThroughputBenchmark implements Tool {
       StorageBlockReport[] report = { new StorageBlockReport(
           dn.storage, dn.getBlockReportList()) };
       dataNodeProto.blockReport(dn.dnRegistration, bpid, report,
-          new BlockReportContext(1, 0, System.nanoTime(), 0L));
+          new BlockReportContext(1, 0, System.nanoTime(), 0L, true));
       long end = Time.now();
       return end-start;
     }
@@ -1271,9 +1260,8 @@ public class NNThroughputBenchmark implements Tool {
   class ReplicationStats extends OperationStatsBase {
     static final String OP_REPLICATION_NAME = "replication";
     static final String OP_REPLICATION_USAGE = 
-        "-op replication [-datanodes T] [-nodesToDecommission D] " +
-        "[-nodeReplicationLimit C] [-totalBlocks B] [-blockSize S] "
-        + "[-replication R]";
+      "-op replication [-datanodes T] [-nodesToDecommission D] " +
+      "[-nodeReplicationLimit C] [-totalBlocks B] [-replication R]";
 
     private final BlockReportStats blockReportObject;
     private int numDatanodes;
@@ -1298,11 +1286,10 @@ public class NNThroughputBenchmark implements Tool {
             / (numDatanodes*numDatanodes);
 
       String[] blkReportArgs = {
-          "-op", "blockReport",
-          "-datanodes", String.valueOf(numDatanodes),
-          "-blocksPerReport", String.valueOf(totalBlocks*replication/numDatanodes),
-          "-blocksPerFile", String.valueOf(numDatanodes),
-          "-blockSize", String.valueOf(blockSize)};
+        "-op", "blockReport",
+        "-datanodes", String.valueOf(numDatanodes),
+        "-blocksPerReport", String.valueOf(totalBlocks*replication/numDatanodes),
+        "-blocksPerFile", String.valueOf(numDatanodes)};
       blockReportObject = new BlockReportStats(Arrays.asList(blkReportArgs));
       numDecommissionedBlocks = 0;
       numPendingBlocks = 0;
@@ -1332,9 +1319,6 @@ public class NNThroughputBenchmark implements Tool {
         } else if(args.get(i).equals("-replication")) {
           if(i+1 == args.size())  printUsage();
           replication = Short.parseShort(args.get(++i));
-        } else if (args.get(i).equals("-blockSize")) {
-          if(i+1 == args.size())  printUsage();
-          blockSize = Integer.parseInt(args.get(++i));
         } else if(!ignoreUnrelatedOptions)
           printUsage();
       }

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -45,9 +45,9 @@ import org.apache.hadoop.hdfs.server.protocol.SlowDiskReports;
 import org.apache.hadoop.hdfs.server.protocol.SlowPeerReports;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
-import org.slf4j.event.Level;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -117,7 +117,7 @@ public class TestNameNodePrunesMissingStorages {
       cluster.stopDataNode(0);
       cluster.getNameNodeRpc().sendHeartbeat(dnReg, prunedReports, 0L, 0L, 0, 0,
           0, null, true, SlowPeerReports.EMPTY_REPORT,
-          SlowDiskReports.EMPTY_REPORT);
+          SlowDiskReports.EMPTY_REPORT, null);
 
       // Check that the missing storage was pruned.
       assertThat(dnDescriptor.getStorageInfos().length, is(expectedStoragesAfterTest));
@@ -319,7 +319,7 @@ public class TestNameNodePrunesMissingStorages {
         .Builder(conf).numDataNodes(1)
         .storagesPerDatanode(1)
         .build();
-    GenericTestUtils.setLogLevel(BlockManager.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(BlockManager.LOG, Level.ALL);
     try {
       cluster.waitActive();
       final Path TEST_PATH = new Path("/foo1");
