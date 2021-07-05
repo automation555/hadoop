@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,7 +29,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.namenode.snapshot.DirectoryWithSnapshotFeature;
 import org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdfs.server.namenode.visitor.NamespaceVisitor;
 import org.apache.hadoop.security.AccessControlException;
 
@@ -348,26 +347,6 @@ public abstract class INodeReference extends INode {
   public final void clear() {
     super.clear();
     referred = null;
-  }
-
-  @Override
-  public void dumpTreeRecursively(PrintWriter out, StringBuilder prefix,
-      final int snapshot) {
-    super.dumpTreeRecursively(out, prefix, snapshot);
-    if (this instanceof DstReference) {
-      out.print(", dstSnapshotId=" + ((DstReference) this).dstSnapshotId);
-    }
-    if (this instanceof WithCount) {
-      out.print(", " + ((WithCount)this).getCountDetails());
-    }
-    out.println();
-    
-    final StringBuilder b = new StringBuilder();
-    for(int i = 0; i < prefix.length(); i++) {
-      b.append(' ');
-    }
-    b.append("->");
-    getReferredINode().dumpTreeRecursively(out, b, snapshot);
   }
 
   @Override
