@@ -21,7 +21,7 @@ package org.apache.hadoop.yarn.server.nodemanager.amrmproxy;
 import java.io.IOException;
 import java.util.Map;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRequest;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -159,9 +159,9 @@ public abstract class AbstractRequestInterceptor implements
    * @return the NMSS instance
    */
   public NMStateStoreService getNMStateStore() {
-    if (this.appContext == null || this.appContext.getNMCotext() == null) {
+    if (this.appContext == null || this.appContext.getNMContext() == null) {
       return null;
     }
-    return this.appContext.getNMCotext().getNMStateStore();
+    return this.appContext.getNMContext().getNMStateStore();
   }
 }

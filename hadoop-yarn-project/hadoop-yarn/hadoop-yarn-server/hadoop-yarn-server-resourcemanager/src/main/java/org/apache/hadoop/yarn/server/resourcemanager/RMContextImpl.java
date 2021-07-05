@@ -66,7 +66,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.volume.csi.VolumeManager;
 import org.apache.hadoop.yarn.server.webproxy.ProxyUriUtils;
 import org.apache.hadoop.yarn.util.Clock;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 /**
@@ -74,7 +74,7 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
  * <ul>
  * <li>serviceContext : These services called as <b>Always On</b> services.
  * Services that need to run always irrespective of the HA state of the RM.</li>
- * <li>activeServiceCotext : Active services context. Services that need to run
+ * <li>activeServiceContext : Active services context. Services that need to run
  * only on the Active RM.</li>
  * </ul>
  * <p>
