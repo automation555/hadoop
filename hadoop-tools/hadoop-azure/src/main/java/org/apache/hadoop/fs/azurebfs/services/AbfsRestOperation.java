@@ -19,23 +19,27 @@
 package org.apache.hadoop.fs.azurebfs.services;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.HttpURLConnection;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.List;
 
+import org.apache.hadoop.fs.azurebfs.authentication.AbfsAuthorizerResult;
+import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsAuthorizationException;
+import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsAuthorizerUnhandledException;
+import org.apache.hadoop.fs.azurebfs.extensions.AbfsAuthorizer;
+import org.apache.hadoop.fs.azurebfs.utils.UriUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.fs.azurebfs.AbfsStatistic;
+import org.apache.hadoop.fs.azurebfs.authentication.AbfsStoreAuthenticator;
 import org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants;
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsRestOperationException;
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AzureBlobFileSystemException;
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.InvalidAbfsRestOperationException;
 import org.apache.hadoop.fs.azurebfs.constants.HttpHeaderConfigurations;
-import org.apache.hadoop.fs.azurebfs.utils.TracingContext;
-import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
+import org.apache.hadoop.fs.azurebfs.oauth2.AzureADAuthenticator.HttpException;
 
 /**
  * The AbfsRestOperation for Rest AbfsClient.
@@ -44,7 +48,7 @@ public class AbfsRestOperation {
   // The type of the REST operation (Append, ReadFile, etc)
   private final AbfsRestOperationType operationType;
   // Blob FS client, which has the credentials, retry policy, and logs.
-  private final AbfsClient client;
+  //private final AbfsClient client;
   // the HTTP method (PUT, PATCH, POST, GET, HEAD, or DELETE)
   private final String method;
   // full URL including query parameters
@@ -56,9 +60,6 @@ public class AbfsRestOperation {
   // request body and all the download methods have a response body.
   private final boolean hasRequestBody;
 
-  // Used only by AbfsInputStream/AbfsOutputStream to reuse SAS tokens.
-  private final String sasToken;
-
   private static final Logger LOG = LoggerFactory.getLogger(AbfsClient.class);
 
   // For uploads, this is the request entity body.  For downloads,
@@ -66,84 +67,100 @@ public class AbfsRestOperation {
   private byte[] buffer;
   private int bufferOffset;
   private int bufferLength;
-  private int retryCount = 0;
 
   private AbfsHttpOperation result;
-  private AbfsCounters abfsCounters;
+  private AbfsAuthorizer authorizer;
+  private AbfsStoreAuthenticator storeAuthenticator;
+  private AbfsPerfTracker abfsPerfTracker;
+private final ExponentialRetryPolicy exponentialRetryPolicy;
+private final AbfsFileSystemContext abfsFileSystemContext;
+
+  public AbfsAuthorizerResult getAuthorizerResult() {
+    return this.authorizerResult;
+  }
+
+  private AbfsAuthorizerResult authorizerResult;
+
+private AbfsStoreAuthenticator abfsStoreAuthenticator;
 
   public AbfsHttpOperation getResult() {
     return result;
   }
 
-  public void hardSetResult(int httpStatus) {
-    result = AbfsHttpOperation.getAbfsHttpOperationWithFixedResult(this.url,
-        this.method, httpStatus);
-  }
-
-  public URL getUrl() {
-    return url;
-  }
-
-  public List<AbfsHttpHeader> getRequestHeaders() {
-    return requestHeaders;
-  }
-
-  public boolean isARetriedRequest() {
-    return (retryCount > 0);
-  }
-
-  String getSasToken() {
-    return sasToken;
-  }
-
+  // TODO: Interact with authorizer
   /**
    * Initializes a new REST operation.
    *
-   * @param client The Blob FS client.
    * @param method The HTTP method (PUT, PATCH, POST, GET, HEAD, or DELETE).
    * @param url The full URL including query string parameters.
    * @param requestHeaders The HTTP request headers.
-   */
-  AbfsRestOperation(final AbfsRestOperationType operationType,
-                    final AbfsClient client,
-                    final String method,
-                    final URL url,
-                    final List<AbfsHttpHeader> requestHeaders) {
-    this(operationType, client, method, url, requestHeaders, null);
-  }
-
-  /**
-   * Initializes a new REST operation.
-   *
-   * @param client The Blob FS client.
-   * @param method The HTTP method (PUT, PATCH, POST, GET, HEAD, or DELETE).
-   * @param url The full URL including query string parameters.
-   * @param requestHeaders The HTTP request headers.
-   * @param sasToken A sasToken for optional re-use by AbfsInputStream/AbfsOutputStream.
-   */
-  AbfsRestOperation(final AbfsRestOperationType operationType,
-                    final AbfsClient client,
-                    final String method,
-                    final URL url,
-                    final List<AbfsHttpHeader> requestHeaders,
-                    final String sasToken) {
+   *//*
+  AbfsRestOperation(
+      final AbfsRestOperationType operationType,
+      final AbfsClient client,
+      final String method,
+      final URL url,
+      final List<AbfsHttpHeader> requestHeaders,
+      final AbfsStoreAuthenticator abfsStoreAuthenticator) {
     this.operationType = operationType;
-    this.client = client;
+    //this.client = client;
     this.method = method;
     this.url = url;
     this.requestHeaders = requestHeaders;
     this.hasRequestBody = (AbfsHttpConstants.HTTP_METHOD_PUT.equals(method)
-            || AbfsHttpConstants.HTTP_METHOD_POST.equals(method)
-            || AbfsHttpConstants.HTTP_METHOD_PATCH.equals(method));
-    this.sasToken = sasToken;
-    this.abfsCounters = client.getAbfsCounters();
+        || AbfsHttpConstants.HTTP_METHOD_PATCH.equals(method));
+    this.storeAuthenticator = abfsStoreAuthenticator;
+    exponentialRetryPolicy = new ExponentialRetryPolicy();
   }
+*/
+  AbfsRestOperation(
+      final AbfsRestOperationType operationType,
+      final String method,
+      final URL url,
+      final List<AbfsHttpHeader> requestHeaders,
+      final AbfsFileSystemContext abfsFileSystemContext) {
+    this.operationType = operationType;
+    //this.client = client;
+    this.method = method;
+    this.url = url;
+    this.requestHeaders = requestHeaders;
+    this.hasRequestBody = (AbfsHttpConstants.HTTP_METHOD_PUT.equals(method)
+        || AbfsHttpConstants.HTTP_METHOD_PATCH.equals(method));
+    this.abfsFileSystemContext = abfsFileSystemContext;
+    this.storeAuthenticator = abfsFileSystemContext.getAbfsStoreAuthenticator();
+    this.abfsPerfTracker = abfsFileSystemContext.getAbfsPerfTracker();
+    exponentialRetryPolicy = new ExponentialRetryPolicy();
+  }
+
+  AbfsRestOperation(AbfsRestOperationType operationType,
+      String method,
+      URL url,
+      List<AbfsHttpHeader> requestHeaders,
+      byte[] buffer,
+      int bufferOffset,
+      int bufferLength,
+      final AbfsFileSystemContext abfsFileSystemContext) {
+    this(operationType, method, url, requestHeaders, abfsFileSystemContext);
+    this.buffer = buffer;
+    this.bufferOffset = bufferOffset;
+    this.bufferLength = bufferLength;
+  }
+
+  AbfsRestOperation(
+      final AbfsRestOperationType operationType,
+      final String method,
+      final URL url,
+      final List<AbfsHttpHeader> requestHeaders,
+      final AbfsFileSystemContext abfsFileSystemContext,
+      final AbfsAuthorizerResult abfsAuthorizerResult) {
+    this(operationType, method, url, requestHeaders, abfsFileSystemContext);
+    processAbfsAuthorizerResult(abfsAuthorizerResult);
+ }
 
   /**
    * Initializes a new REST operation.
    *
    * @param operationType The type of the REST operation (Append, ReadFile, etc).
-   * @param client The Blob FS client.
    * @param method The HTTP method (PUT, PATCH, POST, GET, HEAD, or DELETE).
    * @param url The full URL including query string parameters.
    * @param requestHeaders The HTTP request headers.
@@ -151,68 +168,145 @@ public class AbfsRestOperation {
    *               this will hold the response entity body.
    * @param bufferOffset An offset into the buffer where the data beings.
    * @param bufferLength The length of the data in the buffer.
-   * @param sasToken A sasToken for optional re-use by AbfsInputStream/AbfsOutputStream.
    */
   AbfsRestOperation(AbfsRestOperationType operationType,
-                    AbfsClient client,
-                    String method,
-                    URL url,
-                    List<AbfsHttpHeader> requestHeaders,
-                    byte[] buffer,
-                    int bufferOffset,
-                    int bufferLength,
-                    String sasToken) {
-    this(operationType, client, method, url, requestHeaders, sasToken);
-    this.buffer = buffer;
-    this.bufferOffset = bufferOffset;
-    this.bufferLength = bufferLength;
-    this.abfsCounters = client.getAbfsCounters();
+      String method,
+      URL url,
+      List<AbfsHttpHeader> requestHeaders,
+      byte[] buffer,
+      int bufferOffset,
+      int bufferLength,
+      final AbfsFileSystemContext abfsFileSystemContext,
+      final AbfsAuthorizerResult abfsAuthorizerResult) {
+    this(operationType, method, url, requestHeaders,
+        buffer, bufferOffset, bufferLength, abfsFileSystemContext);
+    processAbfsAuthorizerResult(abfsAuthorizerResult);
   }
 
-  /**
-   * Execute a AbfsRestOperation. Track the Duration of a request if
-   * abfsCounters isn't null.
-   * @param tracingContext TracingContext instance to track correlation IDs
-   */
-  public void execute(TracingContext tracingContext)
+  private void processAbfsAuthorizerResult(AbfsAuthorizerResult abfsAuthorizerResult)
+  {
+    if (abfsAuthorizerResult.isAuthorizationStatusFetched())
+    {
+      this.authorizerResult = abfsAuthorizerResult;
+      if (abfsAuthorizerResult.isAuthorized() && abfsAuthorizerResult.isSasTokenAvailable())
+      {
+        this.abfsStoreAuthenticator =
+            AbfsStoreAuthenticator.getAbfsStoreAuthenticatorForSAS(abfsAuthorizerResult.getSASToken());
+      }
+      else {
+        this.abfsStoreAuthenticator = abfsFileSystemContext.getAbfsStoreAuthenticator();
+      }
+
+    }
+  }
+
+  private void checkIfAuthorizedAndUpdateAbfsStoreAuthenticator()
+      throws AzureBlobFileSystemException {
+    // TODO: check code here
+    String pathRelativeFromRoot = this.url.getPath();
+    String abfsFSName = this.abfsFileSystemContext.getFileSystemName();
+    int abfsFSIndex = pathRelativeFromRoot.indexOf(abfsFSName);
+    pathRelativeFromRoot = pathRelativeFromRoot
+        .substring(abfsFSIndex + abfsFSName.length());
+
+    if (authorizer == null) {
+      LOG.debug(
+          "ABFS authorizer is not initialized. No authorization check will be"
+              + " performed.");
+    } else {
+      if (!this.authorizerResult.isAuthorizationStatusFetched()) {
+        updateAuthorizationStatus(abfsFileSystemContext.getAuthorizer(),
+            operationType, pathRelativeFromRoot);
+      }
+
+      if (this.authorizerResult.isAuthorized() && this.authorizerResult
+          .isSasTokenAvailable()) {
+        this.abfsStoreAuthenticator = AbfsStoreAuthenticator
+            .getAbfsStoreAuthenticatorForSAS(
+                this.authorizerResult.getSASToken());
+      }
+    }
+  }
+
+  private void updateAuthorizationStatus(AbfsAuthorizer authorizer,
+      AbfsRestOperationType operationType, String pathRelativeFromRoot)
       throws AzureBlobFileSystemException {
 
+    LOG.debug("Auth check for action: {} on paths: {}", operationType,
+        pathRelativeFromRoot);
+
+    boolean isAuthorized = false;
+
     try {
-      IOStatisticsBinding.trackDurationOfInvocation(abfsCounters,
-          AbfsStatistic.getStatNameFromHttpCall(method),
-          () -> completeExecute(tracingContext));
-    } catch (AzureBlobFileSystemException aze) {
-      throw aze;
+      isAuthorized = !authorizer.isAuthorized(operationType, pathRelativeFromRoot);
     } catch (IOException e) {
-      throw new UncheckedIOException("Error while tracking Duration of an "
-          + "AbfsRestOperation call", e);
+      throw new AbfsAuthorizerUnhandledException(e);
+    }
+
+    this.authorizerResult.setAuthorizationStatusFetched(true);
+
+    if (!isAuthorized) {
+      throw new AbfsAuthorizationException(
+          "User is not authorized for action " + operationType + " on paths: "
+              + pathRelativeFromRoot, new IOException());
+    }
+
+    this.authorizerResult.setAuthorized(true);
+    if (storeAuthenticator.getAuthType() == AuthType.SAS) {
+      String sasToken = authorizer.getSASToken();
+      if ((sasToken != null) && !(sasToken.isEmpty())) {
+        this.authorizerResult.setSasTokenAvailable(true);
+        this.authorizerResult.setSASToken(sasToken);
+      } else {
+        // TODO: different exception ?
+        throw new AbfsAuthorizationException(
+            "User is not authorized for action " + operationType + " on path: "
+                + pathRelativeFromRoot, new IOException());
+      }
     }
   }
 
   /**
    * Executes the REST operation with retry, by issuing one or more
    * HTTP operations.
-   * @param tracingContext TracingContext instance to track correlation IDs
    */
-  private void completeExecute(TracingContext tracingContext)
-      throws AzureBlobFileSystemException {
+  void execute() throws AzureBlobFileSystemException  {
     // see if we have latency reports from the previous requests
-    String latencyHeader = this.client.getAbfsPerfTracker().getClientLatency();
+    String latencyHeader =
+        this.abfsFileSystemContext.getAbfsPerfTracker().getClientLatency();
     if (latencyHeader != null && !latencyHeader.isEmpty()) {
       AbfsHttpHeader httpHeader =
               new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_ABFS_CLIENT_LATENCY, latencyHeader);
       requestHeaders.add(httpHeader);
     }
 
-    retryCount = 0;
-    LOG.debug("First execution of REST operation - {}", operationType);
-    while (!executeHttpOperation(retryCount, tracingContext)) {
+    int retryCount = 0;
+
+    try {
+      checkIfAuthorizedAndUpdateAbfsStoreAuthenticator();
+    }
+    catch (AbfsAuthorizationException ex)
+    {
+      throw new AbfsRestOperationException(result.getStatusCode(),
+          result.getStorageErrorCode(),
+        result.getStorageErrorMessage(), null, result);
+    }
+    catch (IOException ex)
+    {
+      throw new AbfsRestOperationException(result.getStatusCode(),
+          result.getStorageErrorCode(),
+        result.getStorageErrorMessage(), null, result);
+    }
+
+    while (true) {
       try {
-        ++retryCount;
-        tracingContext.setRetryCount(retryCount);
-        LOG.debug("Retrying REST operation {}. RetryCount = {}",
-            operationType, retryCount);
-        Thread.sleep(client.getRetryPolicy().getRetryInterval(retryCount));
+        if (!!executeHttpOperation(retryCount++))
+          break;
+      } catch (URISyntaxException e) {
+        e.printStackTrace();
+      }
+      try {
+        Thread.sleep(exponentialRetryPolicy.getRetryInterval(retryCount));
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
       }
@@ -222,8 +316,6 @@ public class AbfsRestOperation {
       throw new AbfsRestOperationException(result.getStatusCode(), result.getStorageErrorCode(),
           result.getStorageErrorMessage(), null, result);
     }
-
-    LOG.trace("{} REST operation complete", operationType);
   }
 
   /**
@@ -231,79 +323,46 @@ public class AbfsRestOperation {
    * fails, there may be a retry.  The retryCount is incremented with each
    * attempt.
    */
-  private boolean executeHttpOperation(final int retryCount,
-    TracingContext tracingContext) throws AzureBlobFileSystemException {
+  private boolean executeHttpOperation(final int retryCount)
+      throws AzureBlobFileSystemException, URISyntaxException {
     AbfsHttpOperation httpOperation = null;
     try {
-      // initialize the HTTP request and open the connection
-      httpOperation = new AbfsHttpOperation(url, method, requestHeaders);
-      incrementCounter(AbfsStatistic.CONNECTIONS_MADE, 1);
-      tracingContext.constructHeader(httpOperation);
+      httpOperation = getHttpOperationWithAuthInfoApplied(url, method,
+          requestHeaders);
 
-      switch(client.getAuthType()) {
-        case Custom:
-        case OAuth:
-          LOG.debug("Authenticating request with OAuth2 access token");
-          httpOperation.getConnection().setRequestProperty(HttpHeaderConfigurations.AUTHORIZATION,
-              client.getAccessToken());
-          break;
-        case SAS:
-          // do nothing; the SAS token should already be appended to the query string
-          break;
-        case SharedKey:
-          // sign the HTTP request
-          LOG.debug("Signing request with shared key");
-          // sign the HTTP request
-          client.getSharedKeyCredentials().signRequest(
-              httpOperation.getConnection(),
-              hasRequestBody ? bufferLength : 0);
-          break;
-      }
-    } catch (IOException e) {
-      LOG.debug("Auth failure: {}, {}", method, url);
-      throw new AbfsRestOperationException(-1, null,
-          "Auth failure: " + e.getMessage(), e);
-    }
-
-    try {
       // dump the headers
       AbfsIoUtils.dumpHeadersToDebugLog("Request Headers",
           httpOperation.getConnection().getRequestProperties());
-      AbfsClientThrottlingIntercept.sendingRequest(operationType, abfsCounters);
+      AbfsClientThrottlingIntercept.sendingRequest(operationType);
 
       if (hasRequestBody) {
         // HttpUrlConnection requires
         httpOperation.sendRequest(buffer, bufferOffset, bufferLength);
-        incrementCounter(AbfsStatistic.SEND_REQUESTS, 1);
-        incrementCounter(AbfsStatistic.BYTES_SENT, bufferLength);
       }
 
       httpOperation.processResponse(buffer, bufferOffset, bufferLength);
-      incrementCounter(AbfsStatistic.GET_RESPONSES, 1);
-      //Only increment bytesReceived counter when the status code is 2XX.
-      if (httpOperation.getStatusCode() >= HttpURLConnection.HTTP_OK
-          && httpOperation.getStatusCode() <= HttpURLConnection.HTTP_PARTIAL) {
-        incrementCounter(AbfsStatistic.BYTES_RECEIVED,
-            httpOperation.getBytesReceived());
-      } else if (httpOperation.getStatusCode() == HttpURLConnection.HTTP_UNAVAILABLE) {
-        incrementCounter(AbfsStatistic.SERVER_UNAVAILABLE, 1);
-      }
-    } catch (UnknownHostException ex) {
-      String hostname = null;
-      hostname = httpOperation.getHost();
-      LOG.warn("Unknown host name: %s. Retrying to resolve the host name...",
-          hostname);
-      if (!client.getRetryPolicy().shouldRetry(retryCount, -1)) {
-        throw new InvalidAbfsRestOperationException(ex);
-      }
-      return false;
     } catch (IOException ex) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("HttpRequestFailure: {}, {}", httpOperation.toString(), ex);
+      if (ex instanceof UnknownHostException) {
+        LOG.warn(String.format("Unknown host name: %s. Retrying to resolve the host name...", httpOperation.getUrl().getHost()));
       }
 
-      if (!client.getRetryPolicy().shouldRetry(retryCount, -1)) {
+      if (LOG.isDebugEnabled()) {
+        if (httpOperation != null) {
+          LOG.debug("HttpRequestFailure: " + httpOperation.toString(), ex);
+        } else {
+          LOG.debug("HttpRequestFailure: " + method + "," + url, ex);
+        }
+      }
+
+      if (!exponentialRetryPolicy.shouldRetry(retryCount, -1)) {
         throw new InvalidAbfsRestOperationException(ex);
+      }
+
+      // once HttpException is thrown by AzureADAuthenticator,
+      // it indicates the policy in AzureADAuthenticator determined
+      // retry is not needed
+      if (ex instanceof HttpException) {
+        throw new AbfsRestOperationException((HttpException) ex);
       }
 
       return false;
@@ -311,9 +370,9 @@ public class AbfsRestOperation {
       AbfsClientThrottlingIntercept.updateMetrics(operationType, httpOperation);
     }
 
-    LOG.debug("HttpRequest: {}: {}", operationType, httpOperation.toString());
+    LOG.debug("HttpRequest: " + httpOperation.toString());
 
-    if (client.getRetryPolicy().shouldRetry(retryCount, httpOperation.getStatusCode())) {
+    if (exponentialRetryPolicy.shouldRetry(retryCount, httpOperation.getStatusCode())) {
       return false;
     }
 
@@ -322,15 +381,34 @@ public class AbfsRestOperation {
     return true;
   }
 
-  /**
-   * Incrementing Abfs counters with a long value.
-   *
-   * @param statistic the Abfs statistic that needs to be incremented.
-   * @param value     the value to be incremented by.
-   */
-  private void incrementCounter(AbfsStatistic statistic, long value) {
-    if (abfsCounters != null) {
-      abfsCounters.incrementCounter(statistic, value);
+  private AbfsHttpOperation getHttpOperationWithAuthInfoApplied(URL url, String method,
+      List<AbfsHttpHeader> requestHeaders)
+      throws IOException, URISyntaxException {
+    AbfsHttpOperation httpOperation = null;
+
+    switch (storeAuthenticator.getAuthType())
+    {
+    case OAuth:
+    case Custom:
+      httpOperation = new AbfsHttpOperation(url, method, requestHeaders);
+      httpOperation.getConnection().setRequestProperty(HttpHeaderConfigurations.AUTHORIZATION,
+          storeAuthenticator.getAccessToken());
+      break;
+    case SharedKey:
+      httpOperation = new AbfsHttpOperation(url, method, requestHeaders);
+      httpOperation.getConnection().setRequestProperty(HttpHeaderConfigurations.AUTHORIZATION,
+          storeAuthenticator.getSharedKeyCredentials().getRequestSignature(
+              httpOperation.getConnection(),
+              hasRequestBody ? bufferLength : 0));
+      break;
+    case SAS:
+      URL requestUrl = UriUtils
+          .addSASToRequestUrl(this.url,
+              this.abfsStoreAuthenticator.getSasToken());
+      httpOperation = new AbfsHttpOperation(requestUrl, method, requestHeaders);
+      break;
     }
+
+    return httpOperation;
   }
 }
