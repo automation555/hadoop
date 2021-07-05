@@ -396,10 +396,9 @@ public class ITestAzureBlobFileSystemDelegationSAS extends AbstractAbfsIntegrati
   public void testSignatureMask() throws Exception {
     final AzureBlobFileSystem fs = getFileSystem();
     String src = "/testABC/test.xt";
-    fs.create(new Path(src));
+    fs.create(new Path(src)).close();
     AbfsRestOperation abfsHttpRestOperation = fs.getAbfsClient()
-        .renamePath(src, "/testABC" + "/abc.txt", null,
-            getTestTracingContext(fs, false));
+        .renamePath(src, "/testABC" + "/abc.txt", null);
     AbfsHttpOperation result = abfsHttpRestOperation.getResult();
     String url = result.getSignatureMaskedUrl();
     String encodedUrl = result.getSignatureMaskedEncodedUrl();
@@ -415,8 +414,7 @@ public class ITestAzureBlobFileSystemDelegationSAS extends AbstractAbfsIntegrati
   public void testSignatureMaskOnExceptionMessage() throws Exception {
     intercept(IOException.class, "sig=XXXX",
         () -> getFileSystem().getAbfsClient()
-            .renamePath("testABC/test.xt", "testABC/abc.txt", null,
-                getTestTracingContext(getFileSystem(), false)));
+            .renamePath("testABC/test.xt", "testABC/abc.txt", null));
   }
 
   @Test

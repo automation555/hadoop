@@ -61,7 +61,6 @@ import org.apache.hadoop.fs.azurebfs.services.AuthType;
 import org.apache.hadoop.fs.azurebfs.services.ExponentialRetryPolicy;
 import org.apache.hadoop.fs.azurebfs.services.KeyProvider;
 import org.apache.hadoop.fs.azurebfs.services.SimpleKeyProvider;
-import org.apache.hadoop.fs.azurebfs.utils.TracingHeaderFormat;
 import org.apache.hadoop.security.ssl.DelegatingSSLSocketFactory;
 import org.apache.hadoop.security.ProviderUtils;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -69,7 +68,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants.EMPTY_STRING;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.*;
 import static org.apache.hadoop.fs.azurebfs.constants.FileSystemConfigurations.*;
 
@@ -211,6 +209,16 @@ public class AbfsConfiguration{
       DefaultValue = DEFAULT_FS_AZURE_APPEND_BLOB_DIRECTORIES)
   private String azureAppendBlobDirs;
 
+  @BooleanConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_WRITE_ENFORCE_LEASE,
+      DefaultValue = DEFAULT_FS_AZURE_WRITE_ENFORCE_LEASE)
+  private boolean azureWriteEnforceLease;
+
+  @IntegerConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_WRITE_LEASE_DURATION,
+      MinValue = MIN_LEASE_DURATION,
+      MaxValue = MAX_LEASE_DURATION,
+      DefaultValue = DEFAULT_FS_AZURE_WRITE_LEASE_DURATION)
+  private int azureWriteLeaseDuration;
+
   @StringConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_INFINITE_LEASE_KEY,
       DefaultValue = DEFAULT_FS_AZURE_INFINITE_LEASE_DIRECTORIES)
   private String azureInfiniteLeaseDirs;
@@ -265,10 +273,6 @@ public class AbfsConfiguration{
   @StringConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_CLUSTER_TYPE,
       DefaultValue = DEFAULT_VALUE_UNKNOWN)
   private String clusterType;
-
-  @StringConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_CLIENT_CORRELATIONID,
-          DefaultValue = EMPTY_STRING)
-  private String clientCorrelationId;
 
   @BooleanConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_ENABLE_DELEGATION_TOKEN,
       DefaultValue = DEFAULT_ENABLE_DELEGATION_TOKEN)
@@ -339,14 +343,6 @@ public class AbfsConfiguration{
   }
 
   /**
-   * Gets client correlation ID provided in config.
-   * @return Client Correlation ID config
-   */
-  public String getClientCorrelationId() {
-    return clientCorrelationId;
-  }
-
-  /**
    * Appends an account name to a configuration key yielding the
    * account-specific form.
    * @param key Account-agnostic configuration key
@@ -414,24 +410,6 @@ public class AbfsConfiguration{
       return new String(passchars);
     }
     return null;
-  }
-
-  /**
-   * Returns a value for the key if the value exists and is not null.
-   * Otherwise, throws {@link ConfigurationPropertyNotFoundException} with
-   * key name.
-   *
-   * @param key Account-agnostic configuration key
-   * @return value if exists
-   * @throws IOException if error in fetching password or
-   *     ConfigurationPropertyNotFoundException for missing key
-   */
-  private String getMandatoryPasswordString(String key) throws IOException {
-    String value = getPasswordString(key);
-    if (value == null) {
-      throw new ConfigurationPropertyNotFoundException(key);
-    }
-    return value;
   }
 
   /**
@@ -678,6 +656,14 @@ public class AbfsConfiguration{
     return this.azureAppendBlobDirs;
   }
 
+  public boolean isLeaseEnforced() {
+    return this.azureWriteEnforceLease;
+  }
+
+  public int getWriteLeaseDuration() {
+    return this.azureWriteLeaseDuration;
+  }
+
   public String getAzureInfiniteLeaseDirs() {
     return this.azureInfiniteLeaseDirs;
   }
@@ -736,14 +722,6 @@ public class AbfsConfiguration{
     return getEnum(FS_AZURE_SSL_CHANNEL_MODE_KEY, DEFAULT_FS_AZURE_SSL_CHANNEL_MODE);
   }
 
-  /**
-   * Enum config to allow user to pick format of x-ms-client-request-id header
-   * @return tracingContextFormat config if valid, else default ALL_ID_FORMAT
-   */
-  public TracingHeaderFormat getTracingHeaderFormat() {
-    return getEnum(FS_AZURE_TRACINGHEADER_FORMAT, TracingHeaderFormat.ALL_ID_FORMAT);
-  }
-
   public AuthType getAuthType(String accountName) {
     return getEnum(FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME, AuthType.SharedKey);
   }
@@ -782,33 +760,25 @@ public class AbfsConfiguration{
             FS_AZURE_ACCOUNT_TOKEN_PROVIDER_TYPE_PROPERTY_NAME, null,
             AccessTokenProvider.class);
 
-        AccessTokenProvider tokenProvider;
+        AccessTokenProvider tokenProvider = null;
         if (tokenProviderClass == ClientCredsTokenProvider.class) {
-          String authEndpoint =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ENDPOINT);
-          String clientId =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
-          String clientSecret =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_SECRET);
+          String authEndpoint = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ENDPOINT);
+          String clientId = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
+          String clientSecret = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_SECRET);
           tokenProvider = new ClientCredsTokenProvider(authEndpoint, clientId, clientSecret);
           LOG.trace("ClientCredsTokenProvider initialized");
         } else if (tokenProviderClass == UserPasswordTokenProvider.class) {
-          String authEndpoint =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ENDPOINT);
-          String username =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_USER_NAME);
-          String password =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_USER_PASSWORD);
+          String authEndpoint = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ENDPOINT);
+          String username = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_USER_NAME);
+          String password = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_USER_PASSWORD);
           tokenProvider = new UserPasswordTokenProvider(authEndpoint, username, password);
           LOG.trace("UserPasswordTokenProvider initialized");
         } else if (tokenProviderClass == MsiTokenProvider.class) {
           String authEndpoint = getTrimmedPasswordString(
               FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT,
               AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_ENDPOINT);
-          String tenantGuid =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_MSI_TENANT);
-          String clientId =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
+          String tenantGuid = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_MSI_TENANT);
+          String clientId = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
           String authority = getTrimmedPasswordString(
               FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY,
               AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_MSI_AUTHORITY);
@@ -820,10 +790,8 @@ public class AbfsConfiguration{
           String authEndpoint = getTrimmedPasswordString(
               FS_AZURE_ACCOUNT_OAUTH_REFRESH_TOKEN_ENDPOINT,
               AuthConfigurations.DEFAULT_FS_AZURE_ACCOUNT_OAUTH_REFRESH_TOKEN_ENDPOINT);
-          String refreshToken =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_REFRESH_TOKEN);
-          String clientId =
-              getMandatoryPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
+          String refreshToken = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_REFRESH_TOKEN);
+          String clientId = getPasswordString(FS_AZURE_ACCOUNT_OAUTH_CLIENT_ID);
           tokenProvider = new RefreshTokenBasedTokenProvider(authEndpoint,
               clientId, refreshToken);
           LOG.trace("RefreshTokenBasedTokenProvider initialized");
