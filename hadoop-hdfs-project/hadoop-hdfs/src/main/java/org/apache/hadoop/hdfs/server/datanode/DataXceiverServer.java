@@ -35,8 +35,8 @@ import org.apache.hadoop.hdfs.net.PeerServer;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.util.Daemon;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 import org.slf4j.Logger;
 
@@ -61,7 +61,6 @@ class DataXceiverServer implements Runnable {
   private final Lock lock = new ReentrantLock();
   private final Condition noPeers = lock.newCondition();
   private boolean closed = false;
-  private int maxReconfigureWaitTime = DEFAULT_RECONFIGURE_WAIT;
 
   /**
    * Maximal number of concurrent xceivers per node.
@@ -169,10 +168,6 @@ class DataXceiverServer implements Runnable {
 
   final BlockBalanceThrottler balanceThrottler;
 
-  private final DataTransferThrottler transferThrottler;
-
-  private final DataTransferThrottler writeThrottler;
-
   /**
    * Stores an estimate for block size to check if the disk partition has enough
    * space. Newer clients pass the expected block size to the DataNode. For
@@ -188,9 +183,6 @@ class DataXceiverServer implements Runnable {
     this.maxXceiverCount =
       conf.getInt(DFSConfigKeys.DFS_DATANODE_MAX_RECEIVER_THREADS_KEY,
                   DFSConfigKeys.DFS_DATANODE_MAX_RECEIVER_THREADS_DEFAULT);
-    Preconditions.checkArgument(this.maxXceiverCount >= 1,
-        DFSConfigKeys.DFS_DATANODE_MAX_RECEIVER_THREADS_KEY +
-        " should not be less than 1.");
 
     this.estimateBlockSize = conf.getLongBytes(DFSConfigKeys.DFS_BLOCK_SIZE_KEY,
         DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT);
@@ -201,24 +193,6 @@ class DataXceiverServer implements Runnable {
             DFSConfigKeys.DFS_DATANODE_BALANCE_BANDWIDTHPERSEC_DEFAULT),
         conf.getInt(DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_KEY,
             DFSConfigKeys.DFS_DATANODE_BALANCE_MAX_NUM_CONCURRENT_MOVES_DEFAULT));
-
-    long bandwidthPerSec = conf.getLongBytes(
-        DFSConfigKeys.DFS_DATANODE_DATA_TRANSFER_BANDWIDTHPERSEC_KEY,
-        DFSConfigKeys.DFS_DATANODE_DATA_TRANSFER_BANDWIDTHPERSEC_DEFAULT);
-    if (bandwidthPerSec > 0) {
-      this.transferThrottler = new DataTransferThrottler(bandwidthPerSec);
-    } else {
-      this.transferThrottler = null;
-    }
-
-    bandwidthPerSec = conf.getLongBytes(
-        DFSConfigKeys.DFS_DATANODE_DATA_WRITE_BANDWIDTHPERSEC_KEY,
-        DFSConfigKeys.DFS_DATANODE_DATA_WRITE_BANDWIDTHPERSEC_DEFAULT);
-    if (bandwidthPerSec > 0) {
-      this.writeThrottler = new DataTransferThrottler(bandwidthPerSec);
-    } else {
-      this.writeThrottler = null;
-    }
   }
 
   @Override
@@ -232,7 +206,7 @@ class DataXceiverServer implements Runnable {
         int curXceiverCount = datanode.getXceiverCount();
         if (curXceiverCount > maxXceiverCount) {
           throw new IOException("Xceiver count " + curXceiverCount
-              + " exceeds the limit of concurrent xceivers: "
+              + " exceeds the limit of concurrent xcievers: "
               + maxXceiverCount);
         }
 
@@ -269,17 +243,12 @@ class DataXceiverServer implements Runnable {
     }
 
     // Close the server to stop reception of more requests.
-    lock.lock();
     try {
-      if (!closed) {
-        peerServer.close();
-        closed = true;
-      }
+      peerServer.close();
+      closed = true;
     } catch (IOException ie) {
       LOG.warn("{}:DataXceiverServer: close exception",
           datanode.getDisplayName(), ie);
-    } finally {
-      lock.unlock();
     }
 
     // if in restart prep stage, notify peers before closing them.
@@ -300,16 +269,11 @@ class DataXceiverServer implements Runnable {
     assert (datanode.shouldRun == false || datanode.shutdownForUpgrade) :
       "shoudRun should be set to false or restarting should be true"
       + " before killing";
-    lock.lock();
     try {
-      if (!closed) {
-        peerServer.close();
-        closed = true;
-      }
+      this.peerServer.close();
+      this.closed = true;
     } catch (IOException ie) {
       LOG.warn("{}:DataXceiverServer.kill()", datanode.getDisplayName(), ie);
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -468,14 +432,6 @@ class DataXceiverServer implements Runnable {
     return peerServer;
   }
 
-  public DataTransferThrottler getTransferThrottler() {
-    return transferThrottler;
-  }
-
-  public DataTransferThrottler getWriteThrottler() {
-    return writeThrottler;
-  }
-
   /**
    * Release a peer.
    *
@@ -500,18 +456,20 @@ class DataXceiverServer implements Runnable {
    * @return true if new maximum was successfully applied; false otherwise
    */
   public boolean updateBalancerMaxConcurrentMovers(final int movers) {
-    return balanceThrottler.setMaxConcurrentMovers(movers,
-        this.maxReconfigureWaitTime);
+    return updateBalancerMaxConcurrentMovers(movers, DEFAULT_RECONFIGURE_WAIT);
   }
 
   /**
-   * Update the maximum amount of time to wait for reconfiguration of the
-   * maximum number of block mover threads to complete.
+   * Update the number of threads which may be used concurrently for moving
+   * blocks.
    *
-   * @param max The new maximum number of threads for block moving, in seconds
+   * @param movers The new maximum number of threads for block moving
+   * @param duration The number of seconds to wait if decreasing threads
+   * @return true if new maximum was successfully applied; false otherwise
    */
   @VisibleForTesting
-  void setMaxReconfigureWaitTime(int max) {
-    this.maxReconfigureWaitTime = max;
+  boolean updateBalancerMaxConcurrentMovers(final int movers,
+      final int duration) {
+    return balanceThrottler.setMaxConcurrentMovers(movers, duration);
   }
 }
