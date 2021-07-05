@@ -96,6 +96,19 @@
 # section as to why....
 export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 
+
+# Under certain conditions, Java on OS X will throw SCDynamicStore errors
+# in the system logs.
+# See HADOOP-8719 for more information.  If one needs Kerberos
+# support on OS X, one will want to change/remove this extra bit.
+case ${HADOOP_OS_TYPE} in
+  Darwin*)
+    export HADOOP_OPTS="${HADOOP_OPTS} -Djava.security.krb5.realm= "
+    export HADOOP_OPTS="${HADOOP_OPTS} -Djava.security.krb5.kdc= "
+    export HADOOP_OPTS="${HADOOP_OPTS} -Djava.security.krb5.conf= "
+  ;;
+esac
+
 # Extra Java runtime options for some Hadoop commands
 # and clients (i.e., hdfs dfs -blah).  These get appended to HADOOP_OPTS for
 # such commands.  In most cases, # this should be left empty and
@@ -289,6 +302,9 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 # this is the default:
 # export HDFS_NAMENODE_OPTS="-Dhadoop.security.logger=INFO,RFAS"
 
+# Use NameNode specific heap size
+# export HDFS_NAMENODE_HEAPSIZE=
+
 ###
 # SecondaryNameNode specific parameters
 ###
@@ -298,6 +314,9 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 #
 # This is the default:
 # export HDFS_SECONDARYNAMENODE_OPTS="-Dhadoop.security.logger=INFO,RFAS"
+
+# Use secondary NameNode specific heap size
+# export HDFS_SECONDARYNAMENODE_HEAPSIZE=
 
 ###
 # DataNode specific parameters
@@ -321,6 +340,9 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 # By default, Hadoop uses jsvc which needs to know to launch a
 # server jvm.
 # export HDFS_DATANODE_SECURE_EXTRA_OPTS="-jvm server"
+
+# Use DataNode specific heap size
+# export HDFS_DATANODE_HEAPSIZE=
 
 ###
 # NFS3 Gateway specific parameters
@@ -364,6 +386,9 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 #
 # export HDFS_JOURNALNODE_OPTS=""
 
+# Use JournalNode specific heap size
+# export HDFS_JOURNALNODE_HEAPSIZE=
+
 ###
 # HDFS Balancer specific parameters
 ###
@@ -391,6 +416,15 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 # export HDFS_DFSROUTER_OPTS=""
 
 ###
+# Ozone Manager specific parameters
+###
+# Specify the JVM options to be used when starting the Ozone Manager.
+# These options will be appended to the options specified as HADOOP_OPTS
+# and therefore may override any similar flags set in HADOOP_OPTS
+#
+# export HDFS_OM_OPTS=""
+
+###
 # HDFS StorageContainerManager specific parameters
 ###
 # Specify the JVM options to be used when starting the HDFS Storage Container Manager.
@@ -415,16 +449,3 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 #
 # For example, to limit who can execute the namenode command,
 # export HDFS_NAMENODE_USER=hdfs
-
-
-###
-# Registry DNS specific parameters
-###
-# For privileged registry DNS, user to run as after dropping privileges
-# This will replace the hadoop.id.str Java property in secure mode.
-# export HADOOP_REGISTRYDNS_SECURE_USER=yarn
-
-# Supplemental options for privileged registry DNS
-# By default, Hadoop uses jsvc which needs to know to launch a
-# server jvm.
-# export HADOOP_REGISTRYDNS_SECURE_EXTRA_OPTS="-jvm server"

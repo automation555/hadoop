@@ -59,7 +59,7 @@ if "%1" == "--loglevel" (
     )
   )
 
-  set hdfscommands=dfs namenode secondarynamenode journalnode zkfc datanode dfsadmin haadmin fsck fsImageValidation balancer jmxget oiv oev fetchdt getconf groups snapshotDiff lsSnapshottableDir lsSnapshot cacheadmin mover storagepolicies classpath crypto dfsrouter dfsrouteradmin debug
+  set hdfscommands=dfs namenode secondarynamenode journalnode zkfc datanode dfsadmin haadmin fsck balancer jmxget oiv oev fetchdt getconf groups snapshotDiff lsSnapshottableDir cacheadmin mover storagepolicies classpath crypto dfsrouter dfsrouteradmin debug
   for %%i in ( %hdfscommands% ) do (
     if %hdfs-command% == %%i set hdfscommand=true
   )
@@ -78,11 +78,17 @@ goto :eof
 :namenode
   set CLASS=org.apache.hadoop.hdfs.server.namenode.NameNode
   set HADOOP_OPTS=%HADOOP_OPTS% %HADOOP_NAMENODE_OPTS%
+  if defined HDFS_NAMENODE_HEAPSIZE (
+    set JAVA_HEAP_MAX=-Xmx%HDFS_NAMENODE_HEAPSIZE%m
+  )
   goto :eof
 
 :journalnode
   set CLASS=org.apache.hadoop.hdfs.qjournal.server.JournalNode
   set HADOOP_OPTS=%HADOOP_OPTS% %HADOOP_JOURNALNODE_OPTS%
+  if defined HDFS_JOURNALNODE_HEAPSIZE (
+    set JAVA_HEAP_MAX=-Xmx%HDFS_JOURNALNODE_HEAPSIZE%m
+  )
   goto :eof
 
 :zkfc
@@ -93,11 +99,20 @@ goto :eof
 :secondarynamenode
   set CLASS=org.apache.hadoop.hdfs.server.namenode.SecondaryNameNode
   set HADOOP_OPTS=%HADOOP_OPTS% %HADOOP_SECONDARYNAMENODE_OPTS%
+  if defined HDFS_NAMENODE_HEAPSIZE (
+    set JAVA_HEAP_MAX=-Xmx%HDFS_NAMENODE_HEAPSIZE%m
+  )
+  if defined HDFS_SECONDARYNAMENODE_HEAPSIZE (
+    set JAVA_HEAP_MAX=-Xmx%HDFS_SECONDARYNAMENODE_HEAPSIZE%m
+  )
   goto :eof
 
 :datanode
   set CLASS=org.apache.hadoop.hdfs.server.datanode.DataNode
   set HADOOP_OPTS=%HADOOP_OPTS% -server %HADOOP_DATANODE_OPTS%
+  if defined HDFS_DATANODE_HEAPSIZE (
+    set JAVA_HEAP_MAX=-Xmx%HDFS_DATANODE_HEAPSIZE%m
+  )
   goto :eof
 
 :dfs
@@ -118,11 +133,6 @@ goto :eof
 
 :fsck
   set CLASS=org.apache.hadoop.hdfs.tools.DFSck
-  set HADOOP_OPTS=%HADOOP_OPTS% %HADOOP_CLIENT_OPTS%
-  goto :eof
-
-:fsImageValidation
-  set CLASS=org.apache.hadoop.hdfs.server.namenode.FsImageValidation
   set HADOOP_OPTS=%HADOOP_OPTS% %HADOOP_CLIENT_OPTS%
   goto :eof
 
@@ -165,10 +175,6 @@ goto :eof
 
 :lsSnapshottableDir
   set CLASS=org.apache.hadoop.hdfs.tools.snapshot.LsSnapshottableDir
-  goto :eof
-
-:lsSnapshot
-  set CLASS=org.apache.hadoop.hdfs.tools.snapshot.LsSnapshot
   goto :eof
 
 :cacheadmin
@@ -245,7 +251,6 @@ goto :eof
   @echo   dfsadmin             run a DFS admin client
   @echo   haadmin              run a DFS HA admin client
   @echo   fsck                 run a DFS filesystem checking utility
-  @echo   fsImageValidation    run FsImageValidation to check an fsimage
   @echo   balancer             run a cluster balancing utility
   @echo   jmxget               get JMX exported values from NameNode or DataNode.
   @echo   oiv                  apply the offline fsimage viewer to an fsimage
@@ -257,8 +262,6 @@ goto :eof
   @echo                        current directory contents with a snapshot
   @echo   lsSnapshottableDir   list all snapshottable dirs owned by the current user
   @echo 						Use -help to see options
-  @echo   lsSnapshot           list all snapshots for a snapshottable dir
-  @echo                         Use -help to see options
   @echo   cacheadmin           configure the HDFS cache
   @echo   crypto               configure HDFS encryption zones
   @echo   mover                run a utility to move block replicas across storage types
