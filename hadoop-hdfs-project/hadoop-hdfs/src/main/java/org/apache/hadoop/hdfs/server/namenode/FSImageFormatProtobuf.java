@@ -75,10 +75,10 @@ import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.LimitInputStream;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.Lists;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
-import org.apache.hadoop.thirdparty.protobuf.CodedOutputStream;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.protobuf.CodedOutputStream;
 
 /**
  * Utility class to read / write fsimage in protobuf format.
@@ -87,8 +87,6 @@ import org.apache.hadoop.thirdparty.protobuf.CodedOutputStream;
 public final class FSImageFormatProtobuf {
   private static final Logger LOG = LoggerFactory
       .getLogger(FSImageFormatProtobuf.class);
-
-  private static volatile boolean enableParallelLoad = false;
 
   public static final class LoaderContext {
     private SerialNumberManager.StringTable stringTable;
@@ -271,20 +269,14 @@ public final class FSImageFormatProtobuf {
                                                 String compressionCodec)
         throws IOException {
       FileInputStream fin = new FileInputStream(filename);
-      try {
+      FileChannel channel = fin.getChannel();
+      channel.position(section.getOffset());
+      InputStream in = new BufferedInputStream(new LimitInputStream(fin,
+          section.getLength()));
 
-          FileChannel channel = fin.getChannel();
-          channel.position(section.getOffset());
-          InputStream in = new BufferedInputStream(new LimitInputStream(fin,
-                  section.getLength()));
-
-          in = FSImageUtil.wrapInputStreamForCompression(conf,
-                  compressionCodec, in);
-          return in;
-      } catch (IOException e) {
-          fin.close();
-          throw e;
-      }
+      in = FSImageUtil.wrapInputStreamForCompression(conf,
+          compressionCodec, in);
+      return in;
     }
 
     /**
@@ -455,7 +447,6 @@ public final class FSImageFormatProtobuf {
           } else {
             inodeLoader.loadINodeDirectorySection(in);
           }
-          inodeLoader.waitBlocksMapAndNameCacheUpdateFinished();
           break;
         case FILES_UNDERCONSTRUCTION:
           inodeLoader.loadFilesUnderConstructionSection(in);
@@ -544,9 +535,10 @@ public final class FSImageFormatProtobuf {
       Counter counter = prog.getCounter(Phase.LOADING_FSIMAGE, currentStep);
       for (int i = 0; i < numTokens; ++i) {
         tokens.add(SecretManagerSection.PersistToken.parseDelimitedFrom(in));
+        counter.increment();
       }
 
-      fsn.loadSecretManagerState(s, keys, tokens, counter);
+      fsn.loadSecretManagerState(s, keys, tokens);
     }
 
     private void loadCacheManagerSection(InputStream in, StartupProgress prog,
@@ -583,7 +575,9 @@ public final class FSImageFormatProtobuf {
   }
 
   private static boolean enableParallelSaveAndLoad(Configuration conf) {
-    boolean loadInParallel = enableParallelLoad;
+    boolean loadInParallel =
+        conf.getBoolean(DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_KEY,
+            DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_DEFAULT);
     boolean compressionEnabled = conf.getBoolean(
         DFSConfigKeys.DFS_IMAGE_COMPRESS_KEY,
         DFSConfigKeys.DFS_IMAGE_COMPRESS_DEFAULT);
@@ -597,20 +591,6 @@ public final class FSImageFormatProtobuf {
       }
     }
     return loadInParallel;
-  }
-
-  public static void initParallelLoad(Configuration conf) {
-    enableParallelLoad =
-        conf.getBoolean(DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_KEY,
-            DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_DEFAULT);
-  }
-
-  public static void refreshParallelSaveAndLoad(boolean enable) {
-    enableParallelLoad = enable;
-  }
-
-  public static boolean getEnableParallelLoad() {
-    return enableParallelLoad;
   }
 
   public static final class Saver {
@@ -651,6 +631,10 @@ public final class FSImageFormatProtobuf {
 
     public int getInodesPerSubSection() {
       return inodesPerSubSection;
+    }
+
+    public boolean shouldWriteSubSections() {
+      return writeSubSections;
     }
 
     /**
@@ -1031,9 +1015,8 @@ public final class FSImageFormatProtobuf {
     }
   }
 
-  private static int getOndiskTrunkSize(
-      org.apache.hadoop.thirdparty.protobuf.GeneratedMessageV3 s) {
-    return CodedOutputStream.computeUInt32SizeNoTag(s.getSerializedSize())
+  private static int getOndiskTrunkSize(com.google.protobuf.GeneratedMessageV3 s) {
+    return CodedOutputStream.computeRawVarint32Size(s.getSerializedSize())
         + s.getSerializedSize();
   }
 
