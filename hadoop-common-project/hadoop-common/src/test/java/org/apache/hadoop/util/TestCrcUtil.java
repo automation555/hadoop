@@ -19,8 +19,8 @@ package org.apache.hadoop.util;
 
 import java.io.IOException;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
+import java.util.concurrent.Callable;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,7 +33,7 @@ import static org.junit.Assert.*;
  */
 public class TestCrcUtil {
   @Rule
-  public Timeout globalTimeout = new Timeout(10000, TimeUnit.MILLISECONDS);
+  public Timeout globalTimeout = new Timeout(10000);
 
   private Random rand = new Random(1234);
 
@@ -182,7 +182,11 @@ public class TestCrcUtil {
     LambdaTestUtils.intercept(
         IOException.class,
         "length",
-        () -> CrcUtil.toSingleCrcString(new byte[8]));
+        new Callable<String>() {
+          public String call() throws IOException {
+            return CrcUtil.toSingleCrcString(new byte[8]);
+          }
+        });
   }
 
   @Test
@@ -198,7 +202,11 @@ public class TestCrcUtil {
     LambdaTestUtils.intercept(
         IOException.class,
         "length",
-        () -> CrcUtil.toMultiCrcString(new byte[6]));
+        new Callable<String>() {
+          public String call() throws IOException {
+            return CrcUtil.toMultiCrcString(new byte[6]);
+          }
+        });
   }
 
   @Test

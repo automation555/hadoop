@@ -17,25 +17,19 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-
-import org.apache.hadoop.thirdparty.protobuf.UninitializedMessageException;
-import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
-import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.hdfs.server.protocol.SlowDiskReports;
-
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.AclEntryType;
@@ -45,11 +39,9 @@ import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
-import org.apache.hadoop.hdfs.StripedFileTestUtil;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.BlockChecksumType;
-import org.apache.hadoop.hdfs.protocol.BlockType;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo.DatanodeInfoBuilder;
@@ -57,12 +49,10 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo.AdminStates;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockCommandProto;
-import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockECReconstructionCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.BlockRecoveryCommandProto;
 import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeRegistrationProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlockProto;
-import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlockTypeProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeIDProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.DatanodeStorageProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.ExtendedBlockProto;
@@ -82,21 +72,15 @@ import org.apache.hadoop.hdfs.protocol.proto.HdfsServerProtos.StorageInfoProto;
 import org.apache.hadoop.hdfs.security.token.block.BlockKey;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.block.ExportedBlockKeys;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo;
-import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NodeType;
 import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.CheckpointSignature;
 import org.apache.hadoop.hdfs.server.protocol.BlockCommand;
-import org.apache.hadoop.hdfs.server.protocol.BlockECReconstructionCommand.BlockECReconstructionInfo;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand;
 import org.apache.hadoop.hdfs.server.protocol.BlockRecoveryCommand.RecoveringBlock;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
-import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.StripedBlockWithLocations;
-import org.apache.hadoop.hdfs.server.protocol.BlockECReconstructionCommand;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -106,19 +90,16 @@ import org.apache.hadoop.hdfs.server.protocol.RemoteEditLog;
 import org.apache.hadoop.hdfs.server.protocol.RemoteEditLogManifest;
 import org.apache.hadoop.hdfs.server.protocol.SlowPeerReports;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.io.erasurecode.ECSchema;
 import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.Lists;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 
 /**
  * Tests for {@link PBHelper}
@@ -192,7 +173,7 @@ public class TestPBHelper {
     DatanodeID dn2 = PBHelperClient.convert(dnProto);
     compare(dn, dn2);
   }
-  
+
   void compare(DatanodeID dn, DatanodeID dn2) {
     assertEquals(dn.getIpAddr(), dn2.getIpAddr());
     assertEquals(dn.getHostName(), dn2.getHostName());
@@ -216,72 +197,40 @@ public class TestPBHelper {
     assertEquals(b, b2);
   }
 
-  @Test
-  public void testConvertBlockType() {
-    BlockType bContiguous = BlockType.CONTIGUOUS;
-    BlockTypeProto bContiguousProto = PBHelperClient.convert(bContiguous);
-    BlockType bContiguous2 = PBHelperClient.convert(bContiguousProto);
-    assertEquals(bContiguous, bContiguous2);
-
-    BlockType bStriped = BlockType.STRIPED;
-    BlockTypeProto bStripedProto = PBHelperClient.convert(bStriped);
-    BlockType bStriped2 = PBHelperClient.convert(bStripedProto);
-    assertEquals(bStriped, bStriped2);
-  }
-
-  private static BlockWithLocations getBlockWithLocations(
-      int bid, boolean isStriped) {
+  private static BlockWithLocations getBlockWithLocations(int bid) {
     final String[] datanodeUuids = {"dn1", "dn2", "dn3"};
     final String[] storageIDs = {"s1", "s2", "s3"};
     final StorageType[] storageTypes = {
         StorageType.DISK, StorageType.DISK, StorageType.DISK};
-    final byte[] indices = {0, 1, 2};
-    final short dataBlkNum = 6;
-    BlockWithLocations blkLocs = new BlockWithLocations(new Block(bid, 0, 1),
+    return new BlockWithLocations(new Block(bid, 0, 1),
         datanodeUuids, storageIDs, storageTypes);
-    if (isStriped) {
-      blkLocs = new StripedBlockWithLocations(blkLocs, indices, dataBlkNum,
-          StripedFileTestUtil.getDefaultECPolicy().getCellSize());
-    }
-    return blkLocs;
   }
 
   private void compare(BlockWithLocations locs1, BlockWithLocations locs2) {
     assertEquals(locs1.getBlock(), locs2.getBlock());
     assertTrue(Arrays.equals(locs1.getStorageIDs(), locs2.getStorageIDs()));
-    if (locs1 instanceof StripedBlockWithLocations) {
-      assertTrue(Arrays.equals(((StripedBlockWithLocations) locs1).getIndices(),
-          ((StripedBlockWithLocations) locs2).getIndices()));
-    }
   }
 
   @Test
   public void testConvertBlockWithLocations() {
-    boolean[] testSuite = new boolean[]{false, true};
-    for (int i = 0; i < testSuite.length; i++) {
-      BlockWithLocations locs = getBlockWithLocations(1, testSuite[i]);
-      BlockWithLocationsProto locsProto = PBHelper.convert(locs);
-      BlockWithLocations locs2 = PBHelper.convert(locsProto);
-      compare(locs, locs2);
-    }
+    BlockWithLocations locs = getBlockWithLocations(1);
+    BlockWithLocationsProto locsProto = PBHelper.convert(locs);
+    BlockWithLocations locs2 = PBHelper.convert(locsProto);
+    compare(locs, locs2);
   }
 
   @Test
   public void testConvertBlocksWithLocations() {
-    boolean[] testSuite = new boolean[]{false, true};
-    for (int i = 0; i < testSuite.length; i++) {
-      BlockWithLocations[] list = new BlockWithLocations[]{
-          getBlockWithLocations(1, testSuite[i]),
-          getBlockWithLocations(2, testSuite[i])};
-      BlocksWithLocations locs = new BlocksWithLocations(list);
-      BlocksWithLocationsProto locsProto = PBHelper.convert(locs);
-      BlocksWithLocations locs2 = PBHelper.convert(locsProto);
-      BlockWithLocations[] blocks = locs.getBlocks();
-      BlockWithLocations[] blocks2 = locs2.getBlocks();
-      assertEquals(blocks.length, blocks2.length);
-      for (int j = 0; j < blocks.length; j++) {
-        compare(blocks[j], blocks2[j]);
-      }
+    BlockWithLocations[] list = new BlockWithLocations[] {
+        getBlockWithLocations(1), getBlockWithLocations(2) };
+    BlocksWithLocations locs = new BlocksWithLocations(list);
+    BlocksWithLocationsProto locsProto = PBHelper.convert(locs);
+    BlocksWithLocations locs2 = PBHelper.convert(locsProto);
+    BlockWithLocations[] blocks = locs.getBlocks();
+    BlockWithLocations[] blocks2 = locs2.getBlocks();
+    assertEquals(blocks.length, blocks2.length);
+    for (int i = 0; i < blocks.length; i++) {
+      compare(blocks[i], blocks2[i]);
     }
   }
 
@@ -312,7 +261,7 @@ public class TestPBHelper {
     ExportedBlockKeys expKeys1 = PBHelper.convert(expKeysProto);
     compare(expKeys, expKeys1);
   }
-  
+
   void compare(ExportedBlockKeys expKeys, ExportedBlockKeys expKeys1) {
     BlockKey[] allKeys = expKeys.getAllKeys();
     BlockKey[] allKeys1 = expKeys1.getAllKeys();
@@ -341,12 +290,12 @@ public class TestPBHelper {
         s1.getMostRecentCheckpointTxId());
     assertEquals(s.getNamespaceID(), s1.getNamespaceID());
   }
-  
+
   private static void compare(RemoteEditLog l1, RemoteEditLog l2) {
     assertEquals(l1.getEndTxId(), l2.getEndTxId());
     assertEquals(l1.getStartTxId(), l2.getStartTxId());
   }
-  
+
   @Test
   public void testConvertRemoteEditLog() {
     RemoteEditLog l = new RemoteEditLog(1, 100);
@@ -355,9 +304,12 @@ public class TestPBHelper {
     compare(l, l1);
   }
 
-  private void convertAndCheckRemoteEditLogManifest(RemoteEditLogManifest m,
-                                                    List<RemoteEditLog> logs,
-                                                    long committedTxnId) {
+  @Test
+  public void testConvertRemoteEditLogManifest() {
+    List<RemoteEditLog> logs = new ArrayList<RemoteEditLog>();
+    logs.add(new RemoteEditLog(1, 10));
+    logs.add(new RemoteEditLog(11, 20));
+    RemoteEditLogManifest m = new RemoteEditLogManifest(logs);
     RemoteEditLogManifestProto mProto = PBHelper.convert(m);
     RemoteEditLogManifest m1 = PBHelper.convert(mProto);
 
@@ -366,21 +318,7 @@ public class TestPBHelper {
     for (int i = 0; i < logs.size(); i++) {
       compare(logs.get(i), logs1.get(i));
     }
-    assertEquals(committedTxnId, m.getCommittedTxnId());
   }
-
-  @Test
-  public void testConvertRemoteEditLogManifest() {
-    List<RemoteEditLog> logs = new ArrayList<RemoteEditLog>();
-    logs.add(new RemoteEditLog(1, 10));
-    logs.add(new RemoteEditLog(11, 20));
-
-    convertAndCheckRemoteEditLogManifest(new RemoteEditLogManifest(logs, 20),
-        logs, 20);
-    convertAndCheckRemoteEditLogManifest(new RemoteEditLogManifest(logs),
-        logs, HdfsServerConstants.INVALID_TXID);
-  }
-
   public ExtendedBlock getExtendedBlock() {
     return getExtendedBlock(1);
   }
@@ -388,11 +326,11 @@ public class TestPBHelper {
   public ExtendedBlock getExtendedBlock(long blkid) {
     return new ExtendedBlock("bpid", blkid, 100, 2);
   }
-  
+
   private void compare(DatanodeInfo dn1, DatanodeInfo dn2) {
       assertEquals(dn1.getAdminState(), dn2.getAdminState());
       assertEquals(dn1.getBlockPoolUsed(), dn2.getBlockPoolUsed());
-      assertEquals(dn1.getBlockPoolUsedPercent(), 
+      assertEquals(dn1.getBlockPoolUsedPercent(),
           dn2.getBlockPoolUsedPercent(), DELTA);
       assertEquals(dn1.getCapacity(), dn2.getCapacity());
       assertEquals(dn1.getDatanodeReport(), dn2.getDatanodeReport());
@@ -406,20 +344,20 @@ public class TestPBHelper {
       assertEquals(dn1.getLevel(), dn2.getLevel());
       assertEquals(dn1.getNetworkLocation(), dn2.getNetworkLocation());
   }
-  
+
   @Test
   public void testConvertExtendedBlock() {
     ExtendedBlock b = getExtendedBlock();
     ExtendedBlockProto bProto = PBHelperClient.convert(b);
     ExtendedBlock b1 = PBHelperClient.convert(bProto);
     assertEquals(b, b1);
-    
+
     b.setBlockId(-1);
     bProto = PBHelperClient.convert(b);
     b1 = PBHelperClient.convert(bProto);
     assertEquals(b, b1);
   }
-  
+
   @Test
   public void testConvertRecoveringBlock() {
     DatanodeInfo di1 = DFSTestUtil.getLocalDatanodeInfo();
@@ -435,7 +373,7 @@ public class TestPBHelper {
       compare(dnInfo[0], dnInfo1[0]);
     }
   }
-  
+
   @Test
   public void testConvertBlockRecoveryCommand() {
     DatanodeInfo di1 = DFSTestUtil.getLocalDatanodeInfo();
@@ -446,14 +384,14 @@ public class TestPBHelper {
       new RecoveringBlock(getExtendedBlock(1), dnInfo, 3),
       new RecoveringBlock(getExtendedBlock(2), dnInfo, 3)
     );
-    
+
     BlockRecoveryCommand cmd = new BlockRecoveryCommand(blks);
     BlockRecoveryCommandProto proto = PBHelper.convert(cmd);
     assertEquals(1, proto.getBlocks(0).getBlock().getB().getBlockId());
     assertEquals(2, proto.getBlocks(1).getBlock().getB().getBlockId());
-    
+
     BlockRecoveryCommand cmd2 = PBHelper.convert(proto);
-    
+
     List<RecoveringBlock> cmd2Blks = Lists.newArrayList(
         cmd2.getRecoveringBlocks());
     assertEquals(blks.get(0).getBlock(), cmd2Blks.get(0).getBlock());
@@ -461,8 +399,36 @@ public class TestPBHelper {
     assertEquals(Joiner.on(",").join(blks), Joiner.on(",").join(cmd2Blks));
     assertEquals(cmd.toString(), cmd2.toString());
   }
-  
-  
+
+  /**
+   * Test case for old namenode where the namenode doesn't support returning
+   * keyProviderUri.
+   */
+  @Test
+  public void testFSServerDefaultsHelper() {
+    HdfsProtos.FsServerDefaultsProto.Builder b =
+        HdfsProtos.FsServerDefaultsProto
+        .newBuilder();
+    b.setBlockSize(DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT);
+    b.setBytesPerChecksum(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT);
+    b.setWritePacketSize(
+        HdfsClientConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT);
+    b.setReplication(DFSConfigKeys.DFS_REPLICATION_DEFAULT);
+    b.setFileBufferSize(DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT);
+    b.setEncryptDataTransfer(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_DEFAULT);
+    b.setTrashInterval(DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT);
+    b.setChecksumType(HdfsProtos.ChecksumTypeProto.valueOf(
+        DataChecksum.Type.valueOf(DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT).id));
+    HdfsProtos.FsServerDefaultsProto proto = b.build();
+
+    Assert.assertFalse("KeyProvider uri is not supported",
+        proto.hasKeyProviderUri());
+    FsServerDefaults fsServerDefaults = PBHelperClient.convert(proto);
+    Assert.assertNotNull("FsServerDefaults is null", fsServerDefaults);
+    Assert.assertNull("KeyProviderUri should be null",
+        fsServerDefaults.getKeyProviderUri());
+  }
+
   @Test
   public void testConvertText() {
     Text t = new Text("abc".getBytes());
@@ -470,7 +436,7 @@ public class TestPBHelper {
     Text t1 = new Text(s);
     assertEquals(t, t1);
   }
-  
+
   @Test
   public void testConvertBlockToken() {
     Token<BlockTokenIdentifier> token = new Token<BlockTokenIdentifier>(
@@ -480,7 +446,7 @@ public class TestPBHelper {
     Token<BlockTokenIdentifier> token2 = PBHelperClient.convert(tokenProto);
     compare(token, token2);
   }
-  
+
   @Test
   public void testConvertNamespaceInfo() {
     NamespaceInfo info = new NamespaceInfo(37, "clusterID", "bpID", 2300);
@@ -525,22 +491,18 @@ public class TestPBHelper {
             AdminStates.DECOMMISSION_INPROGRESS),
         DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h2",
             AdminStates.DECOMMISSIONED),
-        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h3", 
+        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h3",
             AdminStates.NORMAL),
         DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h4",
             AdminStates.NORMAL),
-        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h5",
-            AdminStates.NORMAL),
     };
-    String[] storageIDs = {"s1", "s2", "s3", "s4", "s5"};
+    String[] storageIDs = {"s1", "s2", "s3", "s4"};
     StorageType[] media = {
         StorageType.DISK,
         StorageType.SSD,
         StorageType.DISK,
-        StorageType.RAM_DISK,
-        StorageType.NVDIMM,
+        StorageType.RAM_DISK
     };
-
     LocatedBlock lb = new LocatedBlock(
         new ExtendedBlock("bp12", 12345, 10, 53),
         dnInfos, storageIDs, media, 5, false, new DatanodeInfo[]{});
@@ -571,16 +533,16 @@ public class TestPBHelper {
   @Test
   public void testConvertLocatedBlock() {
     LocatedBlock lb = createLocatedBlock();
-    LocatedBlockProto lbProto = PBHelperClient.convertLocatedBlock(lb);
-    LocatedBlock lb2 = PBHelperClient.convertLocatedBlockProto(lbProto);
+    LocatedBlockProto lbProto = PBHelperClient.convert(lb);
+    LocatedBlock lb2 = PBHelperClient.convert(lbProto);
     compare(lb,lb2);
   }
 
   @Test
   public void testConvertLocatedBlockNoStorageMedia() {
     LocatedBlock lb = createLocatedBlockNoStorageMedia();
-    LocatedBlockProto lbProto = PBHelperClient.convertLocatedBlock(lb);
-    LocatedBlock lb2 = PBHelperClient.convertLocatedBlockProto(lbProto);
+    LocatedBlockProto lbProto = PBHelperClient.convert(lb);
+    LocatedBlock lb2 = PBHelperClient.convert(lbProto);
     compare(lb,lb2);
   }
 
@@ -590,22 +552,22 @@ public class TestPBHelper {
     for (int i=0;i<3;i++) {
       lbl.add(createLocatedBlock());
     }
-    List<LocatedBlockProto> lbpl = PBHelperClient.convertLocatedBlocks2(lbl);
-    List<LocatedBlock> lbl2 = PBHelperClient.convertLocatedBlocks(lbpl);
+    List<LocatedBlockProto> lbpl = PBHelperClient.convertLocatedBlock2(lbl);
+    List<LocatedBlock> lbl2 = PBHelperClient.convertLocatedBlock(lbpl);
     assertEquals(lbl.size(), lbl2.size());
     for (int i=0;i<lbl.size();i++) {
       compare(lbl.get(i), lbl2.get(2));
     }
   }
-  
+
   @Test
   public void testConvertLocatedBlockArray() {
     LocatedBlock [] lbl = new LocatedBlock[3];
     for (int i=0;i<3;i++) {
       lbl[i] = createLocatedBlock();
     }
-    LocatedBlockProto [] lbpl = PBHelperClient.convertLocatedBlocks(lbl);
-    LocatedBlock [] lbl2 = PBHelperClient.convertLocatedBlocks(lbpl);
+    LocatedBlockProto [] lbpl = PBHelperClient.convertLocatedBlock(lbl);
+    LocatedBlock [] lbl2 = PBHelperClient.convertLocatedBlock(lbpl);
     assertEquals(lbl.length, lbl2.length);
     for (int i=0;i<lbl.length;i++) {
       compare(lbl[i], lbl2[i]);
@@ -637,7 +599,7 @@ public class TestPBHelper {
     DatanodeStorage dns2 = PBHelperClient.convert(proto);
     compare(dns1, dns2);
   }
-  
+
   @Test
   public void testConvertBlockCommand() {
     Block[] blocks = new Block[] { new Block(21), new Block(22) };
@@ -670,7 +632,7 @@ public class TestPBHelper {
       }
     }
   }
-  
+
   @Test
   public void testChecksumTypeProto() {
     assertEquals(DataChecksum.Type.NULL,
@@ -734,49 +696,13 @@ public class TestPBHelper {
         .build();
     Assert.assertEquals(s, PBHelperClient.convert(PBHelperClient.convert(s)));
   }
-  
-  @Test
-  public void testBlockECRecoveryCommand() {
-    DatanodeInfo[] dnInfos0 = new DatanodeInfo[] {
-        DFSTestUtil.getLocalDatanodeInfo(), DFSTestUtil.getLocalDatanodeInfo() };
-    DatanodeStorageInfo targetDnInfos_0 = BlockManagerTestUtil
-        .newDatanodeStorageInfo(DFSTestUtil.getLocalDatanodeDescriptor(),
-            new DatanodeStorage("s00"));
-    DatanodeStorageInfo targetDnInfos_1 = BlockManagerTestUtil
-        .newDatanodeStorageInfo(DFSTestUtil.getLocalDatanodeDescriptor(),
-            new DatanodeStorage("s01"));
-    DatanodeStorageInfo[] targetDnInfos0 = new DatanodeStorageInfo[] {
-        targetDnInfos_0, targetDnInfos_1 };
-    byte[] liveBlkIndices0 = new byte[2];
-    BlockECReconstructionInfo blkECRecoveryInfo0 = new BlockECReconstructionInfo(
-        new ExtendedBlock("bp1", 1234), dnInfos0, targetDnInfos0,
-        liveBlkIndices0, StripedFileTestUtil.getDefaultECPolicy());
-    DatanodeInfo[] dnInfos1 = new DatanodeInfo[] {
-        DFSTestUtil.getLocalDatanodeInfo(), DFSTestUtil.getLocalDatanodeInfo() };
-    DatanodeStorageInfo targetDnInfos_2 = BlockManagerTestUtil
-        .newDatanodeStorageInfo(DFSTestUtil.getLocalDatanodeDescriptor(),
-            new DatanodeStorage("s02"));
-    DatanodeStorageInfo targetDnInfos_3 = BlockManagerTestUtil
-        .newDatanodeStorageInfo(DFSTestUtil.getLocalDatanodeDescriptor(),
-            new DatanodeStorage("s03"));
-    DatanodeStorageInfo[] targetDnInfos1 = new DatanodeStorageInfo[] {
-        targetDnInfos_2, targetDnInfos_3 };
-    byte[] liveBlkIndices1 = new byte[2];
-    BlockECReconstructionInfo blkECRecoveryInfo1 = new BlockECReconstructionInfo(
-        new ExtendedBlock("bp2", 3256), dnInfos1, targetDnInfos1,
-        liveBlkIndices1, StripedFileTestUtil.getDefaultECPolicy());
-    List<BlockECReconstructionInfo> blkRecoveryInfosList = new ArrayList<BlockECReconstructionInfo>();
-    blkRecoveryInfosList.add(blkECRecoveryInfo0);
-    blkRecoveryInfosList.add(blkECRecoveryInfo1);
-    BlockECReconstructionCommand blkECReconstructionCmd = new BlockECReconstructionCommand(
-        DatanodeProtocol.DNA_ERASURE_CODING_RECONSTRUCTION, blkRecoveryInfosList);
-    BlockECReconstructionCommandProto blkECRecoveryCmdProto = PBHelper
-        .convert(blkECReconstructionCmd);
-    blkECReconstructionCmd = PBHelper.convert(blkECRecoveryCmdProto);
-    Iterator<BlockECReconstructionInfo> iterator = blkECReconstructionCmd.getECTasks()
-        .iterator();
-    assertBlockECRecoveryInfoEquals(blkECRecoveryInfo0, iterator.next());
-    assertBlockECRecoveryInfoEquals(blkECRecoveryInfo1, iterator.next());
+
+  private void assertDnInfosEqual(DatanodeInfo[] dnInfos1,
+      DatanodeInfo[] dnInfos2) {
+    assertEquals(dnInfos1.length, dnInfos2.length);
+    for (int i = 0; i < dnInfos1.length; i++) {
+      compare(dnInfos1[i], dnInfos2[i]);
+    }
   }
 
   @Test
@@ -826,7 +752,7 @@ public class TestPBHelper {
   public void testSlowDiskInfoPBHelper() {
     // Test with a map that has a few slow disk entries.
     final SlowDiskReports slowDisks = SlowDiskReports.create(
-        ImmutableMap.of(
+        ImmutableMap.<String, Map<SlowDiskReports.DiskOp, Double>>of(
             "disk1", ImmutableMap.of(SlowDiskReports.DiskOp.METADATA, 0.5),
             "disk2", ImmutableMap.of(SlowDiskReports.DiskOp.READ, 1.0,
                 SlowDiskReports.DiskOp.WRITE, 1.0),
@@ -846,196 +772,5 @@ public class TestPBHelper {
     assertTrue(
         "Expected empty map:" + ", got map:" + slowDisksConverted2,
         slowDisksConverted2.equals(SlowDiskReports.EMPTY_REPORT));
-  }
-
-  private void assertBlockECRecoveryInfoEquals(
-      BlockECReconstructionInfo blkECRecoveryInfo1,
-      BlockECReconstructionInfo blkECRecoveryInfo2) {
-    assertEquals(blkECRecoveryInfo1.getExtendedBlock(),
-        blkECRecoveryInfo2.getExtendedBlock());
-
-    DatanodeInfo[] sourceDnInfos1 = blkECRecoveryInfo1.getSourceDnInfos();
-    DatanodeInfo[] sourceDnInfos2 = blkECRecoveryInfo2.getSourceDnInfos();
-    assertDnInfosEqual(sourceDnInfos1, sourceDnInfos2);
-
-    DatanodeInfo[] targetDnInfos1 = blkECRecoveryInfo1.getTargetDnInfos();
-    DatanodeInfo[] targetDnInfos2 = blkECRecoveryInfo2.getTargetDnInfos();
-    assertDnInfosEqual(targetDnInfos1, targetDnInfos2);
-
-    String[] targetStorageIDs1 = blkECRecoveryInfo1.getTargetStorageIDs();
-    String[] targetStorageIDs2 = blkECRecoveryInfo2.getTargetStorageIDs();
-    assertEquals(targetStorageIDs1.length, targetStorageIDs2.length);
-    for (int i = 0; i < targetStorageIDs1.length; i++) {
-      assertEquals(targetStorageIDs1[i], targetStorageIDs2[i]);
-    }
-
-    byte[] liveBlockIndices1 = blkECRecoveryInfo1.getLiveBlockIndices();
-    byte[] liveBlockIndices2 = blkECRecoveryInfo2.getLiveBlockIndices();
-    for (int i = 0; i < liveBlockIndices1.length; i++) {
-      assertEquals(liveBlockIndices1[i], liveBlockIndices2[i]);
-    }
-    
-    ErasureCodingPolicy ecPolicy1 = blkECRecoveryInfo1.getErasureCodingPolicy();
-    ErasureCodingPolicy ecPolicy2 = blkECRecoveryInfo2.getErasureCodingPolicy();
-    // Compare ECPolicies same as default ECPolicy as we used system default
-    // ECPolicy used in this test
-    compareECPolicies(StripedFileTestUtil.getDefaultECPolicy(), ecPolicy1);
-    compareECPolicies(StripedFileTestUtil.getDefaultECPolicy(), ecPolicy2);
-  }
-
-  private void compareECPolicies(ErasureCodingPolicy ecPolicy1, ErasureCodingPolicy ecPolicy2) {
-    assertEquals(ecPolicy1.getName(), ecPolicy2.getName());
-    assertEquals(ecPolicy1.getNumDataUnits(), ecPolicy2.getNumDataUnits());
-    assertEquals(ecPolicy1.getNumParityUnits(), ecPolicy2.getNumParityUnits());
-  }
-
-  private void assertDnInfosEqual(DatanodeInfo[] dnInfos1,
-      DatanodeInfo[] dnInfos2) {
-    assertEquals(dnInfos1.length, dnInfos2.length);
-    for (int i = 0; i < dnInfos1.length; i++) {
-      compare(dnInfos1[i], dnInfos2[i]);
-    }
-  }
-
-  /**
-   * Test case for old namenode where the namenode doesn't support returning
-   * keyProviderUri.
-   */
-  @Test
-  public void testFSServerDefaultsHelper() {
-    HdfsProtos.FsServerDefaultsProto.Builder b =
-        HdfsProtos.FsServerDefaultsProto
-        .newBuilder();
-    b.setBlockSize(DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT);
-    b.setBytesPerChecksum(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT);
-    b.setWritePacketSize(
-        HdfsClientConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT);
-    b.setReplication(DFSConfigKeys.DFS_REPLICATION_DEFAULT);
-    b.setFileBufferSize(DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT);
-    b.setEncryptDataTransfer(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_DEFAULT);
-    b.setTrashInterval(DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT);
-    b.setChecksumType(HdfsProtos.ChecksumTypeProto.forNumber(
-        DataChecksum.Type.valueOf(DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT).id));
-    HdfsProtos.FsServerDefaultsProto proto = b.build();
-
-    assertFalse("KeyProvider uri is not supported",
-        proto.hasKeyProviderUri());
-    FsServerDefaults fsServerDefaults = PBHelperClient.convert(proto);
-    Assert.assertNotNull("FsServerDefaults is null", fsServerDefaults);
-    Assert.assertNull("KeyProviderUri should be null",
-        fsServerDefaults.getKeyProviderUri());
-  }
-
-  @Test
-  public void testConvertAddingECPolicyResponse() throws Exception {
-    // Check conversion of the built-in policies.
-    for (ErasureCodingPolicy policy :
-        SystemErasureCodingPolicies.getPolicies()) {
-      AddErasureCodingPolicyResponse response =
-          new AddErasureCodingPolicyResponse(policy);
-      HdfsProtos.AddErasureCodingPolicyResponseProto proto = PBHelperClient
-          .convertAddErasureCodingPolicyResponse(response);
-      // Optional fields should not be set.
-      assertFalse("Unnecessary field is set.", proto.hasErrorMsg());
-      // Convert proto back to an object and check for equality.
-      AddErasureCodingPolicyResponse convertedResponse = PBHelperClient
-          .convertAddErasureCodingPolicyResponse(proto);
-      assertEquals("Converted policy not equal", response.getPolicy(),
-          convertedResponse.getPolicy());
-      assertEquals("Converted policy not equal", response.isSucceed(),
-          convertedResponse.isSucceed());
-    }
-
-    ErasureCodingPolicy policy = SystemErasureCodingPolicies
-        .getPolicies().get(0);
-    AddErasureCodingPolicyResponse response =
-        new AddErasureCodingPolicyResponse(policy, "failed");
-    HdfsProtos.AddErasureCodingPolicyResponseProto proto = PBHelperClient
-        .convertAddErasureCodingPolicyResponse(response);
-    // Convert proto back to an object and check for equality.
-    AddErasureCodingPolicyResponse convertedResponse = PBHelperClient
-        .convertAddErasureCodingPolicyResponse(proto);
-    assertEquals("Converted policy not equal", response.getPolicy(),
-        convertedResponse.getPolicy());
-    assertEquals("Converted policy not equal", response.getErrorMsg(),
-        convertedResponse.getErrorMsg());
-  }
-
-  @Test
-  public void testConvertErasureCodingPolicy() throws Exception {
-    // Check conversion of the built-in policies.
-    for (ErasureCodingPolicy policy :
-        SystemErasureCodingPolicies.getPolicies()) {
-      HdfsProtos.ErasureCodingPolicyProto proto = PBHelperClient
-          .convertErasureCodingPolicy(policy);
-      // Optional fields should not be set.
-      assertFalse("Unnecessary field is set.", proto.hasName());
-      assertFalse("Unnecessary field is set.", proto.hasSchema());
-      assertFalse("Unnecessary field is set.", proto.hasCellSize());
-      // Convert proto back to an object and check for equality.
-      ErasureCodingPolicy convertedPolicy = PBHelperClient
-          .convertErasureCodingPolicy(proto);
-      assertEquals("Converted policy not equal", policy, convertedPolicy);
-    }
-    // Check conversion of a non-built-in policy.
-    ECSchema newSchema = new ECSchema("testcodec", 3, 2);
-    ErasureCodingPolicy newPolicy =
-        new ErasureCodingPolicy(newSchema, 128 * 1024);
-    HdfsProtos.ErasureCodingPolicyProto proto = PBHelperClient
-        .convertErasureCodingPolicy(newPolicy);
-    // Optional fields should be set.
-    assertTrue("Optional field not set", proto.hasName());
-    assertTrue("Optional field not set", proto.hasSchema());
-    assertTrue("Optional field not set", proto.hasCellSize());
-    ErasureCodingPolicy convertedPolicy = PBHelperClient
-        .convertErasureCodingPolicy(proto);
-    // Converted policy should be equal.
-    assertEquals("Converted policy not equal", newPolicy, convertedPolicy);
-  }
-
-  @Test(expected = UninitializedMessageException.class)
-  public void testErasureCodingPolicyMissingId() throws Exception {
-    HdfsProtos.ErasureCodingPolicyProto.Builder builder =
-        HdfsProtos.ErasureCodingPolicyProto.newBuilder();
-    PBHelperClient.convertErasureCodingPolicy(builder.build());
-  }
-
-  @Test
-  public void testErasureCodingPolicyMissingOptionalFields() throws Exception {
-    // For non-built-in policies, the optional fields are required
-    // when parsing an ErasureCodingPolicyProto.
-    HdfsProtos.ECSchemaProto schemaProto =
-        PBHelperClient.convertECSchema(
-            StripedFileTestUtil.getDefaultECPolicy().getSchema());
-    try {
-      PBHelperClient.convertErasureCodingPolicy(
-          HdfsProtos.ErasureCodingPolicyProto.newBuilder()
-              .setId(14)
-              .setSchema(schemaProto)
-              .setCellSize(123)
-              .build());
-    } catch (IllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains("Missing", e);
-    }
-    try {
-      PBHelperClient.convertErasureCodingPolicy(
-          HdfsProtos.ErasureCodingPolicyProto.newBuilder()
-              .setId(14)
-              .setName("testpolicy")
-              .setCellSize(123)
-              .build());
-    } catch (IllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains("Missing", e);
-    }
-    try {
-      PBHelperClient.convertErasureCodingPolicy(
-          HdfsProtos.ErasureCodingPolicyProto.newBuilder()
-              .setId(14)
-              .setName("testpolicy")
-              .setSchema(schemaProto)
-              .build());
-    } catch (IllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains("Missing", e);
-    }
   }
 }

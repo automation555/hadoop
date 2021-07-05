@@ -27,18 +27,14 @@ import org.apache.hadoop.hdfs.protocol.BlockChecksumOptions;
 import org.apache.hadoop.hdfs.protocol.BlockChecksumType;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.LocatedStripedBlock;
-import org.apache.hadoop.hdfs.protocol.StripedBlockInfo;
 import org.apache.hadoop.hdfs.protocol.datatransfer.DataTransferProtoUtil;
 import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Op;
 import org.apache.hadoop.hdfs.protocol.datatransfer.Sender;
-import org.apache.hadoop.hdfs.protocol.datatransfer.InvalidEncryptionKeyException;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.BlockOpResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpBlockChecksumResponseProto;
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
@@ -88,7 +84,7 @@ final class FileChecksumHelper {
     private int bytesPerCRC = -1;
     private DataChecksum.Type crcType = DataChecksum.Type.DEFAULT;
     private long crcPerBlock = 0;
-    private boolean isRefetchBlocks = false;
+    private boolean refetchBlocks = false;
     private int lastRetriedIndex = -1;
 
     /**
@@ -117,7 +113,6 @@ final class FileChecksumHelper {
       }
 
       this.remaining = length;
-
       if (blockLocations != null) {
         if (src.contains(HdfsConstants.SEPARATOR_DOT_SNAPSHOT_DIR_SEPARATOR)) {
           this.remaining = Math.min(length, blockLocations.getFileLength());
@@ -162,11 +157,8 @@ final class FileChecksumHelper {
       return blockLocations;
     }
 
-    void refetchBlocks() throws IOException {
-      this.blockLocations = getClient().getBlockLocations(getSrc(),
-          getLength());
-      this.locatedBlocks = getBlockLocations().getLocatedBlocks();
-      this.isRefetchBlocks = false;
+    void setBlockLocations(LocatedBlocks blockLocations) {
+      this.blockLocations = blockLocations;
     }
 
     int getTimeout() {
@@ -179,6 +171,10 @@ final class FileChecksumHelper {
 
     List<LocatedBlock> getLocatedBlocks() {
       return locatedBlocks;
+    }
+
+    void setLocatedBlocks(List<LocatedBlock> locatedBlocks) {
+      this.locatedBlocks = locatedBlocks;
     }
 
     long getRemaining() {
@@ -214,11 +210,11 @@ final class FileChecksumHelper {
     }
 
     boolean isRefetchBlocks() {
-      return isRefetchBlocks;
+      return refetchBlocks;
     }
 
     void setRefetchBlocks(boolean refetchBlocks) {
-      this.isRefetchBlocks = refetchBlocks;
+      this.refetchBlocks = refetchBlocks;
     }
 
     int getLastRetriedIndex() {
@@ -236,22 +232,22 @@ final class FileChecksumHelper {
      */
     void compute() throws IOException {
       /**
-       * request length is 0 or the file is empty, return one with the
-       * magic entry that matches what previous hdfs versions return.
-       */
-      if (locatedBlocks == null || locatedBlocks.isEmpty()) {
-        // Explicitly specified here in case the default DataOutputBuffer
-        // buffer length value is changed in future. This matters because the
-        // fixed value 32 has to be used to repeat the magic value for previous
-        // HDFS version.
-        final int lenOfZeroBytes = 32;
-        byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
-        MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
-        fileChecksum =  new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
-      } else {
-        checksumBlocks();
-        fileChecksum = makeFinalResult();
-      }
+      * request length is 0 or the file is empty, return one with the
+      * magic entry that matches what previous hdfs versions return.
+      */
+     if (locatedBlocks == null || locatedBlocks.isEmpty()) {
+       // Explicitly specified here in case the default DataOutputBuffer
+       // buffer length value is changed in future. This matters because the
+       // fixed value 32 has to be used to repeat the magic value for previous
+       // HDFS version.
+       final int lenOfZeroBytes = 32;
+       byte[] emptyBlockMd5 = new byte[lenOfZeroBytes];
+       MD5Hash fileMD5 = MD5Hash.digest(emptyBlockMd5);
+       fileChecksum =  new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+     } else {
+       checksumBlocks();
+       fileChecksum = makeFinalResult();
+     }
     }
 
     /**
@@ -288,7 +284,15 @@ final class FileChecksumHelper {
         return new MD5MD5CRC32CastagnoliFileChecksum(bytesPerCRC,
             crcPerBlock, fileMD5);
       default:
-        // we will get here when crcType is "NULL".
+        // If there is no block allocated for the file,
+        // return one with the magic entry that matches what previous
+        // hdfs versions return.
+        if (locatedBlocks.isEmpty()) {
+          return new MD5MD5CRC32GzipFileChecksum(0, 0, fileMD5);
+        }
+
+        // we should never get here since the validity was checked
+        // when getCrcType() was called above.
         return null;
       }
     }
@@ -497,7 +501,10 @@ final class FileChecksumHelper {
            blockIdx < getLocatedBlocks().size() && getRemaining() >= 0;
            blockIdx++) {
         if (isRefetchBlocks()) {  // refetch to get fresh tokens
-          refetchBlocks();
+          setBlockLocations(getClient().getBlockLocations(getSrc(),
+              getLength()));
+          setLocatedBlocks(getBlockLocations().getLocatedBlocks());
+          setRefetchBlocks(false);
         }
 
         LocatedBlock locatedBlock = getLocatedBlocks().get(blockIdx);
@@ -513,7 +520,8 @@ final class FileChecksumHelper {
      * Return true when sounds good to continue or retry, false when severe
      * condition or totally failed.
      */
-    private boolean checksumBlock(LocatedBlock locatedBlock) {
+    private boolean checksumBlock(
+        LocatedBlock locatedBlock) throws IOException {
       ExtendedBlock block = locatedBlock.getBlock();
       if (getRemaining() < block.getNumBytes()) {
         block.setNumBytes(getRemaining());
@@ -542,17 +550,6 @@ final class FileChecksumHelper {
             done = true; // actually it's not done; but we'll retry
             blockIdx--; // repeat at blockIdx-th block
             setRefetchBlocks(true);
-          }
-        } catch (InvalidEncryptionKeyException iee) {
-          if (blockIdx > getLastRetriedIndex()) {
-            LOG.debug("Got invalid encryption key error in response to "
-                    + "OP_BLOCK_CHECKSUM for file {} for block {} from "
-                    + "datanode {}. Will retry " + "the block once.",
-                  getSrc(), block, datanodes[j]);
-            setLastRetriedIndex(blockIdx);
-            done = true; // actually it's not done; but we'll retry
-            blockIdx--; // repeat at i-th block
-            getClient().clearDataEncryptionKey();
           }
         } catch (IOException ie) {
           LOG.warn("src={}" + ", datanodes[{}]={}",
@@ -594,126 +591,6 @@ final class FileChecksumHelper {
             reply.getChecksumResponse();
         extractChecksumProperties(
             checksumData, locatedBlock, datanode, blockIdx);
-        String blockChecksumForDebug = populateBlockChecksumBuf(checksumData);
-        LOG.debug("got reply from {}: blockChecksum={}, blockChecksumType={}",
-            datanode, blockChecksumForDebug, getBlockChecksumType());
-      }
-    }
-  }
-
-  /**
-   * Non-striped checksum computing for striped files.
-   */
-  static class StripedFileNonStripedChecksumComputer
-      extends FileChecksumComputer {
-    private final ErasureCodingPolicy ecPolicy;
-    private int bgIdx;
-
-    StripedFileNonStripedChecksumComputer(String src, long length,
-                                          LocatedBlocks blockLocations,
-                                          ClientProtocol namenode,
-                                          DFSClient client,
-                                          ErasureCodingPolicy ecPolicy,
-                                          ChecksumCombineMode combineMode)
-        throws IOException {
-      super(src, length, blockLocations, namenode, client, combineMode);
-
-      this.ecPolicy = ecPolicy;
-    }
-
-    @Override
-    void checksumBlocks() throws IOException {
-      int tmpTimeout = 3000 * 1 + getClient().getConf().getSocketTimeout();
-      setTimeout(tmpTimeout);
-
-      for (bgIdx = 0;
-           bgIdx < getLocatedBlocks().size() && getRemaining() >= 0; bgIdx++) {
-        if (isRefetchBlocks()) {  // refetch to get fresh tokens
-          refetchBlocks();
-        }
-
-        LocatedBlock locatedBlock = getLocatedBlocks().get(bgIdx);
-        LocatedStripedBlock blockGroup = (LocatedStripedBlock) locatedBlock;
-
-        if (!checksumBlockGroup(blockGroup)) {
-          throw new PathIOException(
-              getSrc(), "Fail to get block checksum for " + locatedBlock);
-        }
-      }
-    }
-
-
-    private boolean checksumBlockGroup(
-        LocatedStripedBlock blockGroup) throws IOException {
-      ExtendedBlock block = blockGroup.getBlock();
-      long requestedNumBytes = block.getNumBytes();
-      if (getRemaining() < block.getNumBytes()) {
-        requestedNumBytes = getRemaining();
-      }
-      setRemaining(getRemaining() - requestedNumBytes);
-
-      StripedBlockInfo stripedBlockInfo = new StripedBlockInfo(block,
-          blockGroup.getLocations(), blockGroup.getBlockTokens(),
-          blockGroup.getBlockIndices(), ecPolicy);
-      DatanodeInfo[] datanodes = blockGroup.getLocations();
-
-      //try each datanode in the block group.
-      boolean done = false;
-      for (int j = 0; !done && j < datanodes.length; j++) {
-        try {
-          tryDatanode(blockGroup, stripedBlockInfo, datanodes[j],
-              requestedNumBytes);
-          done = true;
-        } catch (InvalidBlockTokenException ibte) {
-          if (bgIdx > getLastRetriedIndex()) {
-            LOG.debug("Got access token error in response to OP_BLOCK_CHECKSUM "
-                    + "for file {} for block {} from datanode {}. Will retry "
-                    + "the block once.",
-                getSrc(), block, datanodes[j]);
-            setLastRetriedIndex(bgIdx);
-            done = true; // actually it's not done; but we'll retry
-            bgIdx--; // repeat at bgIdx-th block
-            setRefetchBlocks(true);
-          }
-        } catch (IOException ie) {
-          LOG.warn("src={}" + ", datanodes[{}]={}",
-              getSrc(), j, datanodes[j], ie);
-        }
-      }
-
-      return done;
-    }
-
-    /**
-     * Return true when sounds good to continue or retry, false when severe
-     * condition or totally failed.
-     */
-    private void tryDatanode(LocatedStripedBlock blockGroup,
-                             StripedBlockInfo stripedBlockInfo,
-                             DatanodeInfo datanode,
-                             long requestedNumBytes) throws IOException {
-      try (IOStreamPair pair = getClient().connectToDN(datanode,
-          getTimeout(), blockGroup.getBlockToken())) {
-
-        LOG.debug("write to {}: {}, blockGroup={}",
-            datanode, Op.BLOCK_GROUP_CHECKSUM, blockGroup);
-
-        // get block group checksum
-        createSender(pair).blockGroupChecksum(
-            stripedBlockInfo,
-            blockGroup.getBlockToken(),
-            requestedNumBytes,
-            new BlockChecksumOptions(getBlockChecksumType()));
-
-        BlockOpResponseProto reply = BlockOpResponseProto.parseFrom(
-            PBHelperClient.vintPrefixed(pair.in));
-
-        String logInfo = "for blockGroup " + blockGroup +
-            " from datanode " + datanode;
-        DataTransferProtoUtil.checkBlockOpStatus(reply, logInfo);
-
-        OpBlockChecksumResponseProto checksumData = reply.getChecksumResponse();
-        extractChecksumProperties(checksumData, blockGroup, datanode, bgIdx);
         String blockChecksumForDebug = populateBlockChecksumBuf(checksumData);
         LOG.debug("got reply from {}: blockChecksum={}, blockChecksumType={}",
             datanode, blockChecksumForDebug, getBlockChecksumType());
