@@ -17,20 +17,21 @@
  */
 package org.apache.hadoop.util;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
-import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.net.HttpURLConnection;
-import java.util.Collections;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * HTTP utility class to help propagate server side exception to the client
@@ -72,10 +73,11 @@ public class HttpExceptionUtils {
     json.put(ERROR_MESSAGE_JSON, getOneLineMessage(ex));
     json.put(ERROR_EXCEPTION_JSON, ex.getClass().getSimpleName());
     json.put(ERROR_CLASSNAME_JSON, ex.getClass().getName());
-    Map<String, Object> jsonResponse =
-        Collections.singletonMap(ERROR_JSON, json);
+    Map<String, Object> jsonResponse = new LinkedHashMap<String, Object>();
+    jsonResponse.put(ERROR_JSON, json);
     Writer writer = response.getWriter();
-    JsonSerialization.writer().writeValue(writer, jsonResponse);
+    Gson gson = GsonSerialization.prettyWriter();
+    gson.toJson(jsonResponse, jsonResponse.getClass(), writer);
     writer.flush();
   }
 
@@ -92,7 +94,8 @@ public class HttpExceptionUtils {
     json.put(ERROR_MESSAGE_JSON, getOneLineMessage(ex));
     json.put(ERROR_EXCEPTION_JSON, ex.getClass().getSimpleName());
     json.put(ERROR_CLASSNAME_JSON, ex.getClass().getName());
-    Map<String, Object> response = Collections.singletonMap(ERROR_JSON, json);
+    Map<String, Object> response = new LinkedHashMap<String, Object>();
+    response.put(ERROR_JSON, json);
     return Response.status(status).type(MediaType.APPLICATION_JSON).
         entity(response).build();
   }
@@ -142,15 +145,17 @@ public class HttpExceptionUtils {
       InputStream es = null;
       try {
         es = conn.getErrorStream();
-        Map json = JsonSerialization.mapReader().readValue(es);
-        json = (Map) json.get(ERROR_JSON);
+        Map<String, Object> json = (Map) GsonSerialization.reader()
+            .fromJson(new InputStreamReader(es, StandardCharsets.UTF_8),
+              Map.class)
+            .get(ERROR_JSON);
         String exClass = (String) json.get(ERROR_CLASSNAME_JSON);
         String exMsg = (String) json.get(ERROR_MESSAGE_JSON);
         if (exClass != null) {
           try {
             ClassLoader cl = HttpExceptionUtils.class.getClassLoader();
-            Class klass = cl.loadClass(exClass);
-            Constructor constr = klass.getConstructor(String.class);
+            Class<?> klass = cl.loadClass(exClass);
+            Constructor<?> constr = klass.getConstructor(String.class);
             toThrow = (Exception) constr.newInstance(exMsg);
           } catch (Exception ex) {
             toThrow = new IOException(String.format(

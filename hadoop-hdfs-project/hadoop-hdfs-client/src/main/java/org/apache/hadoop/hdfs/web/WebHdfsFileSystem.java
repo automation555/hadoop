@@ -25,12 +25,17 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_WEBHDFS_RES
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_WEBHDFS_REST_CSRF_METHODS_TO_IGNORE_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_WEBHDFS_REST_CSRF_METHODS_TO_IGNORE_KEY;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
@@ -46,16 +51,12 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
-
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.hadoop.conf.Configuration;
@@ -63,7 +64,6 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.DelegationTokenRenewer;
@@ -76,28 +76,23 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.GlobalStorageStatistics.StorageStatisticsProvider;
-import org.apache.hadoop.fs.MultipartUploaderBuilder;
-import org.apache.hadoop.fs.QuotaUsage;
-import org.apache.hadoop.fs.PathCapabilities;
-import org.apache.hadoop.fs.StorageStatistics;
-import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.fs.impl.FileSystemMultipartUploaderBuilder;
-import org.apache.hadoop.fs.permission.FsCreateModes;
-import org.apache.hadoop.hdfs.DFSOpsCountStatistics;
-import org.apache.hadoop.hdfs.DFSOpsCountStatistics.OpType;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.QuotaUsage;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsCreateModes;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DFSOpsCountStatistics;
+import org.apache.hadoop.hdfs.DFSOpsCountStatistics.OpType;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.HdfsKMSUtil;
-import org.apache.hadoop.hdfs.client.DfsPathCapabilities;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
@@ -106,12 +101,52 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
-import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.FileEncryptionInfoProto;
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.web.resources.*;
+import org.apache.hadoop.hdfs.web.resources.AccessTimeParam;
+import org.apache.hadoop.hdfs.web.resources.AclPermissionParam;
+import org.apache.hadoop.hdfs.web.resources.BlockSizeParam;
+import org.apache.hadoop.hdfs.web.resources.BufferSizeParam;
+import org.apache.hadoop.hdfs.web.resources.ConcatSourcesParam;
+import org.apache.hadoop.hdfs.web.resources.CreateFlagParam;
+import org.apache.hadoop.hdfs.web.resources.CreateParentParam;
+import org.apache.hadoop.hdfs.web.resources.DelegationParam;
+import org.apache.hadoop.hdfs.web.resources.DeleteOpParam;
+import org.apache.hadoop.hdfs.web.resources.DestinationParam;
+import org.apache.hadoop.hdfs.web.resources.DoAsParam;
+import org.apache.hadoop.hdfs.web.resources.ECPolicyParam;
+import org.apache.hadoop.hdfs.web.resources.ExcludeDatanodesParam;
+import org.apache.hadoop.hdfs.web.resources.FsActionParam;
+import org.apache.hadoop.hdfs.web.resources.GetOpParam;
+import org.apache.hadoop.hdfs.web.resources.GroupParam;
+import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam.Op;
+import org.apache.hadoop.hdfs.web.resources.LengthParam;
+import org.apache.hadoop.hdfs.web.resources.ModificationTimeParam;
+import org.apache.hadoop.hdfs.web.resources.NewLengthParam;
+import org.apache.hadoop.hdfs.web.resources.OffsetParam;
+import org.apache.hadoop.hdfs.web.resources.OldSnapshotNameParam;
+import org.apache.hadoop.hdfs.web.resources.OverwriteParam;
+import org.apache.hadoop.hdfs.web.resources.OwnerParam;
+import org.apache.hadoop.hdfs.web.resources.Param;
+import org.apache.hadoop.hdfs.web.resources.PermissionParam;
+import org.apache.hadoop.hdfs.web.resources.PostOpParam;
+import org.apache.hadoop.hdfs.web.resources.PutOpParam;
+import org.apache.hadoop.hdfs.web.resources.RecursiveParam;
+import org.apache.hadoop.hdfs.web.resources.RenameOptionSetParam;
+import org.apache.hadoop.hdfs.web.resources.RenewerParam;
+import org.apache.hadoop.hdfs.web.resources.ReplicationParam;
+import org.apache.hadoop.hdfs.web.resources.SnapshotNameParam;
+import org.apache.hadoop.hdfs.web.resources.StartAfterParam;
+import org.apache.hadoop.hdfs.web.resources.StoragePolicyParam;
+import org.apache.hadoop.hdfs.web.resources.TokenArgumentParam;
+import org.apache.hadoop.hdfs.web.resources.UnmaskedPermissionParam;
+import org.apache.hadoop.hdfs.web.resources.UserParam;
+import org.apache.hadoop.hdfs.web.resources.XAttrEncodingParam;
+import org.apache.hadoop.hdfs.web.resources.XAttrNameParam;
+import org.apache.hadoop.hdfs.web.resources.XAttrSetFlagParam;
+import org.apache.hadoop.hdfs.web.resources.XAttrValueParam;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -122,25 +157,18 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSelector;
-import org.apache.hadoop.security.token.DelegationTokenIssuer;
-import org.apache.hadoop.util.JsonSerialization;
+import org.apache.hadoop.util.GsonSerialization;
 import org.apache.hadoop.util.KMSUtil;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-
-import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapabilityArgs;
 
 /** A FileSystem for HDFS over the web. */
 public class WebHdfsFileSystem extends FileSystem
@@ -155,7 +183,6 @@ public class WebHdfsFileSystem extends FileSystem
       + "/v" + VERSION;
   public static final String EZ_HEADER = "X-Hadoop-Accept-EZ";
   public static final String FEFINFO_HEADER = "X-Hadoop-feInfo";
-  public static final String DFS_HTTP_POLICY_KEY = "dfs.http.policy";
 
   /**
    * Default connection factory may be overridden in tests to use smaller
@@ -185,7 +212,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   private DFSOpsCountStatistics storageStatistics;
   private KeyProvider testProvider;
-  private boolean isTLSKrb;
 
   /**
    * Return the protocol scheme for the FileSystem.
@@ -247,7 +273,6 @@ public class WebHdfsFileSystem extends FileSystem
           .newDefaultURLConnectionFactory(connectTimeout, readTimeout, conf);
     }
 
-    this.isTLSKrb = "HTTPS_ONLY".equals(conf.get(DFS_HTTP_POLICY_KEY));
 
     ugi = UserGroupInformation.getCurrentUser();
     this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
@@ -368,8 +393,8 @@ public class WebHdfsFileSystem extends FileSystem
       Token<?> token = tokenSelector.selectToken(
           new Text(getCanonicalServiceName()), ugi.getTokens());
       // ugi tokens are usually indicative of a task which can't
-      // refetch tokens.  Don't attempt to fetch tokens from the
-      // namenode in this situation.
+      // refetch tokens.  even if ugi has credentials, don't attempt
+      // to get another token to match hdfs/rpc behavior
       if (token != null) {
         LOG.debug("Using UGI token: {}", token);
         canRefreshDelegationToken = false;
@@ -392,9 +417,6 @@ public class WebHdfsFileSystem extends FileSystem
   @VisibleForTesting
   synchronized boolean replaceExpiredDelegationToken() throws IOException {
     boolean replaced = false;
-    if (attemptReplaceDelegationTokenFromUGI()) {
-      return true;
-    }
     if (canRefreshDelegationToken) {
       Token<?> token = getDelegationToken(null);
       LOG.debug("Replaced expired token: {}", token);
@@ -402,17 +424,6 @@ public class WebHdfsFileSystem extends FileSystem
       replaced = (token != null);
     }
     return replaced;
-  }
-
-  private synchronized boolean attemptReplaceDelegationTokenFromUGI() {
-    Token<?> token = tokenSelector.selectToken(
-            new Text(getCanonicalServiceName()), ugi.getTokens());
-    if (token != null && !token.equals(delegationToken)) {
-      LOG.debug("Replaced expired token with new UGI token: {}", token);
-      setDelegationToken(token);
-      return true;
-    }
-    return false;
   }
 
   @Override
@@ -501,7 +512,8 @@ public class WebHdfsFileSystem extends FileSystem
               + "\" (parsed=\"" + parsed + "\")");
         }
       }
-      return JsonSerialization.mapReader().readValue(in);
+      return GsonSerialization.reader().fromJson(
+        new InputStreamReader(in, StandardCharsets.UTF_8), Map.class);
     } finally {
       in.close();
     }
@@ -719,11 +731,6 @@ public class WebHdfsFileSystem extends FileSystem
       //redirect hostname and port
       redirectHost = null;
 
-      if (url.getProtocol().equals("http") &&
-        UserGroupInformation.isSecurityEnabled() &&
-        isTLSKrb) {
-        throw new IOException("Access denied: dfs.http.policy is HTTPS_ONLY.");
-      }
 
       // resolve redirects for a DN operation unless already resolved
       if (op.getRedirect() && !redirected) {
@@ -1157,11 +1164,6 @@ public class WebHdfsFileSystem extends FileSystem
     ).run();
   }
 
-  @Override
-  public boolean supportsSymlinks() {
-    return true;
-  }
-
   /**
    * Create a symlink pointing to the destination path.
    */
@@ -1356,8 +1358,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   @Override
   public void satisfyStoragePolicy(final Path p) throws IOException {
-    statistics.incrementWriteOps(1);
-    storageStatistics.incrementOpCounter(OpType.SATISFY_STORAGE_POLICY);
     final HttpOpParam.Op op = PutOpParam.Op.SATISFYSTORAGEPOLICY;
     new FsPathRunner(op, p).run();
   }
@@ -1447,7 +1447,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   public SnapshotDiffReport getSnapshotDiffReport(final Path snapshotDir,
       final String fromSnapshot, final String toSnapshot) throws IOException {
-    statistics.incrementReadOps(1);
     storageStatistics.incrementOpCounter(OpType.GET_SNAPSHOT_DIFF);
     final HttpOpParam.Op op = GetOpParam.Op.GETSNAPSHOTDIFF;
     return new FsPathResponseRunner<SnapshotDiffReport>(op, snapshotDir,
@@ -1462,7 +1461,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   public SnapshottableDirectoryStatus[] getSnapshottableDirectoryList()
       throws IOException {
-    statistics.incrementReadOps(1);
     storageStatistics
         .incrementOpCounter(OpType.GET_SNAPSHOTTABLE_DIRECTORY_LIST);
     final HttpOpParam.Op op = GetOpParam.Op.GETSNAPSHOTTABLEDIRECTORYLIST;
@@ -1470,19 +1468,6 @@ public class WebHdfsFileSystem extends FileSystem
       @Override
       SnapshottableDirectoryStatus[] decodeResponse(Map<?, ?> json) {
         return JsonUtilClient.toSnapshottableDirectoryList(json);
-      }
-    }.run();
-  }
-
-  public SnapshotStatus[] getSnapshotListing(final Path snapshotDir)
-      throws IOException {
-    storageStatistics
-        .incrementOpCounter(OpType.GET_SNAPSHOT_LIST);
-    final HttpOpParam.Op op = GetOpParam.Op.GETSNAPSHOTLIST;
-    return new FsPathResponseRunner<SnapshotStatus[]>(op, snapshotDir) {
-      @Override
-      SnapshotStatus[] decodeResponse(Map<?, ?> json) {
-        return JsonUtilClient.toSnapshotList(json);
       }
     }.run();
   }
@@ -1929,48 +1914,6 @@ public class WebHdfsFileSystem extends FileSystem
   }
 
   @Override
-  public void setQuota(Path p, final long namespaceQuota,
-      final long storagespaceQuota) throws IOException {
-    // sanity check
-    if ((namespaceQuota <= 0 &&
-        namespaceQuota != HdfsConstants.QUOTA_RESET) ||
-        (storagespaceQuota < 0 &&
-            storagespaceQuota != HdfsConstants.QUOTA_RESET)) {
-      throw new IllegalArgumentException("Invalid values for quota : " +
-          namespaceQuota + " and " + storagespaceQuota);
-    }
-
-    statistics.incrementWriteOps(1);
-    storageStatistics.incrementOpCounter(OpType.SET_QUOTA_USAGE);
-
-    final HttpOpParam.Op op = PutOpParam.Op.SETQUOTA;
-    new FsPathRunner(op, p, new NameSpaceQuotaParam(namespaceQuota),
-        new StorageSpaceQuotaParam(storagespaceQuota)).run();
-  }
-
-  @Override
-  public void setQuotaByStorageType(Path path, StorageType type, long quota)
-      throws IOException {
-    if (quota <= 0 && quota != HdfsConstants.QUOTA_RESET) {
-      throw new IllegalArgumentException("Invalid values for quota :" + quota);
-    }
-    if (type == null) {
-      throw new IllegalArgumentException("Invalid storage type (null)");
-    }
-    if (!type.supportTypeQuota()) {
-      throw new IllegalArgumentException(
-          "Quota for storage type '" + type.toString() + "' is not supported");
-    }
-
-    statistics.incrementWriteOps(1);
-    storageStatistics.incrementOpCounter(OpType.SET_QUOTA_BYTSTORAGEYPE);
-
-    final HttpOpParam.Op op = PutOpParam.Op.SETQUOTABYSTORAGETYPE;
-    new FsPathRunner(op, path, new StorageTypeParam(type.name()),
-        new StorageSpaceQuotaParam(quota)).run();
-  }
-
-  @Override
   public MD5MD5CRC32FileChecksum getFileChecksum(final Path p
   ) throws IOException {
     statistics.incrementReadOps(1);
@@ -2037,8 +1980,6 @@ public class WebHdfsFileSystem extends FileSystem
   @Override
   public Collection<BlockStoragePolicy> getAllStoragePolicies()
       throws IOException {
-    statistics.incrementReadOps(1);
-    storageStatistics.incrementOpCounter(OpType.GET_STORAGE_POLICIES);
     final HttpOpParam.Op op = GetOpParam.Op.GETALLSTORAGEPOLICY;
     return new FsPathResponseRunner<Collection<BlockStoragePolicy>>(op, null) {
       @Override
@@ -2051,8 +1992,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   @Override
   public BlockStoragePolicy getStoragePolicy(Path src) throws IOException {
-    statistics.incrementReadOps(1);
-    storageStatistics.incrementOpCounter(OpType.GET_STORAGE_POLICY);
     final HttpOpParam.Op op = GetOpParam.Op.GETSTORAGEPOLICY;
     return new FsPathResponseRunner<BlockStoragePolicy>(op, src) {
       @Override
@@ -2135,30 +2074,6 @@ public class WebHdfsFileSystem extends FileSystem
   @VisibleForTesting
   public void setTestProvider(KeyProvider kp) {
     testProvider = kp;
-  }
-
-  /**
-   * HDFS client capabilities.
-   * Uses {@link DfsPathCapabilities} to keep in sync with HDFS.
-   * {@inheritDoc}
-   */
-  @Override
-  public boolean hasPathCapability(final Path path, final String capability)
-      throws IOException {
-    // qualify the path to make sure that it refers to the current FS.
-    final Path p = makeQualified(path);
-    Optional<Boolean> cap = DfsPathCapabilities.hasPathCapability(p,
-        capability);
-    if (cap.isPresent()) {
-      return cap.get();
-    }
-    return super.hasPathCapability(p, capability);
-  }
-
-  @Override
-  public MultipartUploaderBuilder createMultipartUploader(final Path basePath)
-      throws IOException {
-    return new FileSystemMultipartUploaderBuilder(this, basePath);
   }
 
   /**
@@ -2502,12 +2417,10 @@ public class WebHdfsFileSystem extends FileSystem
     @VisibleForTesting
     void closeInputStream(RunnerState rs) throws IOException {
       if (in != null) {
+        IOUtils.close(cachedConnection);
         in = null;
       }
-      if (cachedConnection != null) {
-        IOUtils.close(cachedConnection);
-        cachedConnection = null;
-      }
+      cachedConnection = null;
       runnerState = rs;
     }
 
