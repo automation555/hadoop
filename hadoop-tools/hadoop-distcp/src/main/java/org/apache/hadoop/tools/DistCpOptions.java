@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.tools;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,7 +158,8 @@ public final class DistCpOptions {
   /** Whether data should be written directly to the target paths. */
   private final boolean directWrite;
 
-  private final boolean useIterator;
+  /** Whether DistCp Copy should avoid write on local datanode. */
+  private final boolean noLocalWrite;
 
   /**
    * File attributes for preserve.
@@ -174,8 +175,7 @@ public final class DistCpOptions {
     CHECKSUMTYPE,   // C
     ACL,            // A
     XATTR,          // X
-    TIMES,          // T
-    ERASURECODINGPOLICY; // E
+    TIMES;          // T
 
     public static FileAttribute getAttribute(char symbol) {
       for (FileAttribute attribute : values()) {
@@ -224,8 +224,7 @@ public final class DistCpOptions {
     this.trackPath = builder.trackPath;
 
     this.directWrite = builder.directWrite;
-
-    this.useIterator = builder.useIterator;
+    this.noLocalWrite = builder.noLocalWrite;
   }
 
   public Path getSourceFileListing() {
@@ -357,8 +356,8 @@ public final class DistCpOptions {
     return directWrite;
   }
 
-  public boolean shouldUseIterator() {
-    return useIterator;
+  public boolean shouldNoLocalWrite() {
+    return noLocalWrite;
   }
 
   /**
@@ -411,9 +410,8 @@ public final class DistCpOptions {
     }
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.DIRECT_WRITE,
             String.valueOf(directWrite));
-
-    DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.USE_ITERATOR,
-        String.valueOf(useIterator));
+    DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.NO_LOCAL_WRITE,
+            String.valueOf(noLocalWrite));
   }
 
   /**
@@ -451,7 +449,7 @@ public final class DistCpOptions {
         ", copyBufferSize=" + copyBufferSize +
         ", verboseLog=" + verboseLog +
         ", directWrite=" + directWrite +
-        ", useiterator=" + useIterator +
+        ", noLocalWrite=" + noLocalWrite +
         '}';
   }
 
@@ -502,8 +500,7 @@ public final class DistCpOptions {
             DistCpConstants.COPY_BUFFER_SIZE_DEFAULT;
 
     private boolean directWrite = false;
-
-    private boolean useIterator = false;
+    private boolean noLocalWrite = false;
 
     public Builder(List<Path> sourcePaths, Path targetPath) {
       Preconditions.checkArgument(sourcePaths != null && !sourcePaths.isEmpty(),
@@ -763,8 +760,8 @@ public final class DistCpOptions {
       return this;
     }
 
-    public Builder withUseIterator(boolean useItr) {
-      this.useIterator = useItr;
+    public Builder withNoLocalWrite(boolean newNoLocalWrite) {
+      this.noLocalWrite = newNoLocalWrite;
       return this;
     }
   }

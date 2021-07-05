@@ -85,6 +85,7 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
   private boolean append = false;
   private boolean verboseLog = false;
   private boolean directWrite = false;
+  private boolean noLocalWrite = false;
   private EnumSet<FileAttribute> preserve = EnumSet.noneOf(FileAttribute.class);
 
   private FileSystem targetFS = null;
@@ -114,7 +115,8 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
         PRESERVE_STATUS.getConfigLabel()));
     directWrite = conf.getBoolean(
         DistCpOptionSwitch.DIRECT_WRITE.getConfigLabel(), false);
-
+    noLocalWrite = conf.getBoolean(
+        DistCpOptionSwitch.NO_LOCAL_WRITE.getConfigLabel(), false);
     targetWorkPath = new Path(conf.get(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH));
     Path targetFinalPath = new Path(conf.get(
             DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH));
@@ -158,14 +160,12 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
     try {
       CopyListingFileStatus sourceCurrStatus;
       FileSystem sourceFS;
-      FileStatus sourceStatus;
       try {
         sourceFS = sourcePath.getFileSystem(conf);
-        sourceStatus = sourceFS.getFileStatus(sourcePath);
         final boolean preserveXAttrs =
             fileAttributes.contains(FileAttribute.XATTR);
         sourceCurrStatus = DistCpUtils.toCopyListingFileStatusHelper(sourceFS,
-            sourceStatus,
+            sourceFS.getFileStatus(sourcePath),
             fileAttributes.contains(FileAttribute.ACL),
             preserveXAttrs, preserveRawXattrs,
             sourceFileStatus.getChunkOffset(),
@@ -190,7 +190,7 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
       }
 
       if (sourceCurrStatus.isDirectory()) {
-        createTargetDirsWithRetry(description, target, context, sourceStatus);
+        createTargetDirsWithRetry(description, target, context);
         return;
       }
 
@@ -219,7 +219,7 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
           LOG.debug("copying " + sourceCurrStatus + " " + tmpTarget);
         }
         copyFileWithRetry(description, sourceCurrStatus, tmpTarget,
-            targetStatus, context, action, fileAttributes, sourceStatus);
+            targetStatus, context, action, fileAttributes);
       }
       DistCpUtils.preserve(target.getFileSystem(conf), tmpTarget,
           sourceCurrStatus, fileAttributes, preserveRawXattrs);
@@ -242,24 +242,23 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
     return fileStatus.isDirectory() ? "dir" : "file";
   }
 
-  static EnumSet<DistCpOptions.FileAttribute>
+  private static EnumSet<DistCpOptions.FileAttribute>
           getFileAttributeSettings(Mapper.Context context) {
     String attributeString = context.getConfiguration().get(
             DistCpOptionSwitch.PRESERVE_STATUS.getConfigLabel());
     return DistCpUtils.unpackAttributes(attributeString);
   }
 
-  @SuppressWarnings("checkstyle:parameternumber")
   private void copyFileWithRetry(String description,
       CopyListingFileStatus sourceFileStatus, Path target,
       FileStatus targrtFileStatus, Context context, FileAction action,
-      EnumSet<FileAttribute> fileAttributes, FileStatus sourceStatus)
+      EnumSet<DistCpOptions.FileAttribute> fileAttributes)
       throws IOException, InterruptedException {
     long bytesCopied;
     try {
       bytesCopied = (Long) new RetriableFileCopyCommand(skipCrc, description,
           action, directWrite).execute(sourceFileStatus, target, context,
-              fileAttributes, sourceStatus);
+              fileAttributes);
     } catch (Exception e) {
       context.setStatus("Copy Failure: " + sourceFileStatus.getPath());
       throw new IOException("File copy failed: " + sourceFileStatus.getPath() +
@@ -279,11 +278,10 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
     }
   }
 
-  private void createTargetDirsWithRetry(String description, Path target,
-      Context context, FileStatus sourceStatus) throws IOException {
+  private void createTargetDirsWithRetry(String description,
+                   Path target, Context context) throws IOException {
     try {
-      new RetriableDirectoryCreateCommand(description).execute(target,
-          context, sourceStatus);
+      new RetriableDirectoryCreateCommand(description).execute(target, context);
     } catch (Exception e) {
       throw new IOException("mkdir failed for " + target, e);
     }
