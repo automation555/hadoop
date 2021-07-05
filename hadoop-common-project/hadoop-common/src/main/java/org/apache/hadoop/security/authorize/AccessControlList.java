@@ -98,10 +98,10 @@ public class AccessControlList implements Writable {
   }
 
   /**
-   * Build ACL from the given array of strings.
-   * The strings contain comma separated values.
+   * Build ACL from the given two Strings.
+   * The Strings contain comma separated values.
    *
-   * @param userGroupStrings build ACL from array of Strings
+   * @param aclString build ACL from array of Strings
    */
   private void buildACL(String[] userGroupStrings) {
     users = new HashSet<String>();
@@ -297,9 +297,9 @@ public class AccessControlList implements Writable {
       sb.append('*');
     }
     else {
-      sb.append(getUsersString())
-          .append(" ")
-          .append(getGroupsString());
+      sb.append(getUsersString());
+      sb.append(" ");
+      sb.append(getGroupsString());
     }
     return sb.toString();
   }

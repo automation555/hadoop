@@ -85,7 +85,7 @@ public class TestHsWebServicesAcls {
     this.ctx = buildHistoryContext(this.conf);
     WebApp webApp = mock(HsWebApp.class);
     when(webApp.name()).thenReturn("hsmockwebapp");
-    this.hsWebServices = new HsWebServices(ctx, conf, webApp, null);
+    this.hsWebServices= new HsWebServices(ctx, conf, webApp);
     this.hsWebServices.setResponse(mock(HttpServletResponse.class));
 
     Job job = ctx.getAllJobs().values().iterator().next();
@@ -429,26 +429,6 @@ public class TestHsWebServicesAcls {
 
     @Override
     public void setJobPriority(Priority priority) {
-    }
-
-    @Override
-    public int getFailedMaps() {
-      return mockJob.getFailedMaps();
-    }
-
-    @Override
-    public int getFailedReduces() {
-      return mockJob.getFailedReduces();
-    }
-
-    @Override
-    public int getKilledMaps() {
-      return mockJob.getKilledMaps();
-    }
-
-    @Override
-    public int getKilledReduces() {
-      return mockJob.getKilledReduces();
     }
   }
 }

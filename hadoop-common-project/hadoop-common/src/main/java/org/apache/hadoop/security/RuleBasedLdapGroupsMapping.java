@@ -24,10 +24,10 @@ import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * This class uses {@link LdapGroupsMapping} for group lookup and applies the
@@ -76,13 +76,18 @@ public class RuleBasedLdapGroupsMapping extends LdapGroupsMapping {
   @Override
   public synchronized List<String> getGroups(String user) {
     List<String> groups = super.getGroups(user);
+    List<String> result = new ArrayList<>(groups.size());
     switch (rule) {
     case TO_UPPER:
-      return groups.stream().map(StringUtils::toUpperCase).collect(
-          Collectors.toList());
+      for (String group : groups) {
+        result.add(StringUtils.toUpperCase(group));
+      }
+      return result;
     case TO_LOWER:
-      return groups.stream().map(StringUtils::toLowerCase).collect(
-          Collectors.toList());
+      for (String group : groups) {
+        result.add(StringUtils.toLowerCase(group));
+      }
+      return result;
     case NONE:
     default:
       return groups;
@@ -90,14 +95,21 @@ public class RuleBasedLdapGroupsMapping extends LdapGroupsMapping {
   }
 
   public synchronized Set<String> getGroupsSet(String user) {
+    Set<String> result;
     Set<String> groups = super.getGroupsSet(user);
     switch (rule) {
     case TO_UPPER:
-      return groups.stream().map(StringUtils::toUpperCase).collect(
-          Collectors.toCollection(LinkedHashSet::new));
+      result = new LinkedHashSet<>(groups.size());
+      for (String group : groups) {
+        result.add(StringUtils.toUpperCase(group));
+      }
+      return result;
     case TO_LOWER:
-      return groups.stream().map(StringUtils::toLowerCase).collect(
-          Collectors.toCollection(LinkedHashSet::new));
+      result = new LinkedHashSet<>(groups.size());
+      for (String group : groups) {
+        result.add(StringUtils.toLowerCase(group));
+      }
+      return result;
     case NONE:
     default:
       return groups;

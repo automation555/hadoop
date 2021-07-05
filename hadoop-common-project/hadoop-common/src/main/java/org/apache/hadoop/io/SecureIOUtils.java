@@ -18,6 +18,7 @@
 package org.apache.hadoop.io;
 
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -28,16 +29,18 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.io.nativeio.Errno;
 import org.apache.hadoop.io.nativeio.NativeIO;
+import org.apache.hadoop.io.nativeio.NativeIOException;
 import org.apache.hadoop.io.nativeio.NativeIO.POSIX.Stat;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * This class provides secure APIs for opening and creating files on the local
  * disk. The main issue this class tries to handle is that of symlink traversal.
- * <br>
+ * <br/>
  * An example of such an attack is:
  * <ol>
  * <li> Malicious user removes his task's syslog file, and puts a link to the
@@ -50,7 +53,7 @@ import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTest
  * </ol>
  * A similar attack is possible involving task log truncation, but in that case
  * due to an insecure write to a file.
- * <br>
+ * <br/>
  */
 public class SecureIOUtils {
 

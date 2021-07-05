@@ -19,8 +19,8 @@ package org.apache.hadoop.hdfs.server.federation.router;
 
 import java.io.IOException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.server.federation.store.records.MountTable;
@@ -33,8 +33,7 @@ import org.apache.hadoop.security.UserGroupInformation;
  * Class that helps in checking permissions in Router-based federation.
  */
 public class RouterPermissionChecker extends FSPermissionChecker {
-  static final Logger LOG =
-      LoggerFactory.getLogger(RouterPermissionChecker.class);
+  static final Log LOG = LogFactory.getLog(RouterPermissionChecker.class);
 
   /** Mount table default permission. */
   public static final short MOUNT_TABLE_PERMISSION_DEFAULT = 00755;
@@ -64,7 +63,7 @@ public class RouterPermissionChecker extends FSPermissionChecker {
    * @param mountTable
    *          MountTable being accessed
    * @param access
-   *          type of action being performed on the mount table entry
+   *          type of action being performed on the cache pool
    * @throws AccessControlException
    *           if mount table cannot be accessed
    */
@@ -119,7 +118,7 @@ public class RouterPermissionChecker extends FSPermissionChecker {
     }
 
     // Is this by the Router user itself?
-    if (ugi.getShortUserName().equals(superUser)) {
+    if (ugi.getUserName().equals(superUser)) {
       return;
     }
 

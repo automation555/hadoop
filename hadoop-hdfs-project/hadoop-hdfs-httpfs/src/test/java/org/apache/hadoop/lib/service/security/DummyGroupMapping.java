@@ -23,13 +23,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.collect.Sets;
 import org.apache.hadoop.security.GroupMappingServiceProvider;
 import org.apache.hadoop.test.HadoopUsersConfTestHelper;
-import org.apache.hadoop.util.Sets;
 
 public class DummyGroupMapping implements GroupMappingServiceProvider {
 
   @Override
+  @SuppressWarnings("unchecked")
   public List<String> getGroups(String user) throws IOException {
     if (user.equals("root")) {
       return Arrays.asList("admin");
@@ -38,7 +39,7 @@ public class DummyGroupMapping implements GroupMappingServiceProvider {
       return Arrays.asList("nobody");
     } else {
       String[] groups = HadoopUsersConfTestHelper.getHadoopUserGroups(user);
-      return (groups != null) ? Arrays.asList(groups) : Collections.emptyList();
+      return (groups != null) ? Arrays.asList(groups) : Collections.EMPTY_LIST;
     }
   }
 
@@ -59,7 +60,7 @@ public class DummyGroupMapping implements GroupMappingServiceProvider {
     } else {
       String[] groups = HadoopUsersConfTestHelper.getHadoopUserGroups(user);
       return (groups != null) ? Sets.newHashSet(groups) :
-          Collections.emptySet();
+          Collections.<String>emptySet();
     }
   }
 }
