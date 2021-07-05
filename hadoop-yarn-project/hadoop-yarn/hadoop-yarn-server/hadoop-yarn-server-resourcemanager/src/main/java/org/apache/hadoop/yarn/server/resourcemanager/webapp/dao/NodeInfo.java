@@ -30,13 +30,12 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.yarn.api.records.NodeAttribute;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
-import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 @XmlRootElement(name = "node")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -55,8 +54,6 @@ public class NodeInfo {
   protected long availMemoryMB;
   protected long usedVirtualCores;
   protected long availableVirtualCores;
-  private float memUtilization;
-  private float cpuUtilization;
   private int numRunningOpportContainers;
   private long usedMemoryOpportGB;
   private long usedVirtualCoresOpport;
@@ -68,6 +65,7 @@ public class NodeInfo {
   protected ResourceInfo availableResource;
   protected NodeAttributesInfo nodeAttributesInfo;
   private ResourceInfo totalResource;
+  private String clusterId;
 
   public NodeInfo() {
   } // JAXB needs this
@@ -87,23 +85,6 @@ public class NodeInfo {
           report.getAvailableResource().getVirtualCores();
       this.usedResource = new ResourceInfo(report.getUsedResource());
       this.availableResource = new ResourceInfo(report.getAvailableResource());
-      Resource totalPhysical = ni.getPhysicalResource();
-      long nodeMem;
-      long nodeCores;
-      if (totalPhysical == null) {
-        nodeMem =
-            this.usedMemoryMB + this.availMemoryMB;
-        // If we don't know the number of physical cores, assume 1. Not
-        // accurate but better than nothing.
-        nodeCores = 1;
-      } else {
-        nodeMem = totalPhysical.getMemorySize();
-        nodeCores = totalPhysical.getVirtualCores();
-      }
-      this.memUtilization = nodeMem <= 0 ? 0
-          : (float)report.getUtilization().getPhysicalMemory() * 100F / nodeMem;
-      this.cpuUtilization =
-          (float)report.getUtilization().getCPU() * 100F / nodeCores;
     }
     this.id = id.toString();
     this.rack = ni.getRackName();
@@ -155,6 +136,7 @@ public class NodeInfo {
 
     // update node and containers resource utilization
     this.resourceUtilization = new ResourceUtilizationInfo(ni);
+    this.clusterId = ni.getClusterID();
   }
 
   public String getRack() {
@@ -249,22 +231,6 @@ public class NodeInfo {
     return this.resourceUtilization;
   }
 
-  public float getMemUtilization() {
-    return memUtilization;
-  }
-
-  public void setMemUtilization(float util) {
-    this.memUtilization = util;
-  }
-
-  public float getVcoreUtilization() {
-    return cpuUtilization;
-  }
-
-  public void setVcoreUtilization(float util) {
-    this.cpuUtilization = util;
-  }
-
   public String getAllocationTagsSummary() {
     return this.allocationTags == null ? "" :
         this.allocationTags.toString();
@@ -286,5 +252,9 @@ public class NodeInfo {
 
   public ResourceInfo getTotalResource() {
     return this.totalResource;
+  }
+
+  public String getClusterId() {
+    return clusterId;
   }
 }

@@ -54,7 +54,13 @@ public interface RMNode {
    * @return hostname of this node
    */
   public String getHostName();
-  
+
+  /**
+   * the clusterId of this node
+   * @return clusterId of this node
+   */
+  public String getClusterID();
+
   /**
    * the command port for this node
    * @return command port for this node
@@ -212,8 +218,4 @@ public interface RMNode {
    * @return all node attributes as a Set.
    */
   Set<NodeAttribute> getAllNodeAttributes();
-
-  long calculateHeartBeatInterval(long defaultInterval,
-      long minInterval, long maxInterval, float speedupFactor,
-      float slowdownFactor);
 }
