@@ -23,6 +23,8 @@
 # Hadoop builds across the supported platforms whenever there's a change
 # in any of the C++ files, C++ build files or platform changes.
 
+set -x
+
 ## @description  Check if the given extension is related to C++
 ## @param        seeking
 ## @return       0 if yes
@@ -208,5 +210,7 @@ function run_ci() {
 
 # Check if the CI needs to be run, if so, do so :)
 if check_ci_run; then
-  run_ci
+    run_ci
+else
+  echo "No C++ file/C++ build/platform changes found, will not run CI"
 fi
