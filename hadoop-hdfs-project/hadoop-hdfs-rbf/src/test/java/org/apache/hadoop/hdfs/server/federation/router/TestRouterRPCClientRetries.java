@@ -54,7 +54,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 
 /**
  * Test retry behavior of the Router RPC Client.
@@ -139,7 +139,7 @@ public class TestRouterRPCClientRetries {
     // Verify the retry times, it should only retry one time.
     FederationRPCMetrics rpcMetrics = routerContext.getRouter()
         .getRpcServer().getRPCMetrics();
-    assertEquals(1, rpcMetrics.getProxyOpRetries());
+    assertEquals(3, rpcMetrics.getProxyOpRetries());
   }
 
   @Test
@@ -158,7 +158,7 @@ public class TestRouterRPCClientRetries {
     // Verify the retry times, it will retry one time for ns0.
     FederationRPCMetrics rpcMetrics = routerContext.getRouter()
         .getRpcServer().getRPCMetrics();
-    assertEquals(1, rpcMetrics.getProxyOpRetries());
+    assertEquals(3, rpcMetrics.getProxyOpRetries());
   }
 
   /**
