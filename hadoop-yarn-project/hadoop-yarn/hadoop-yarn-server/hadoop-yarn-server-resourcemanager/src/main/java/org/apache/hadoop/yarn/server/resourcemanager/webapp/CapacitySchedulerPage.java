@@ -159,12 +159,8 @@ class CapacitySchedulerPage extends RmView {
           __("Used Capacity:",
               appendPercent(resourceUsages.getUsed(),
                   capacities.getUsedCapacity() / 100))
-          .__(capacities.getWeight() != -1 ?
-              "Configured Weight:" :
-                  "Configured Capacity:",
-              capacities.getWeight() != -1 ?
-                  capacities.getWeight() :
-                  capacities.getConfiguredMinResource() == null ?
+          .__("Configured Capacity:",
+              capacities.getConfiguredMinResource() == null ?
                   Resources.none().toString() :
                   capacities.getConfiguredMinResource().toString())
           .__("Configured Max Capacity:",
@@ -197,21 +193,16 @@ class CapacitySchedulerPage extends RmView {
 
     private void renderCommonLeafQueueInfo(ResponseInfo ri) {
       ri.
-          __("Num Schedulable Applications:",
-              Integer.toString(lqinfo.getNumActiveApplications())).
-          __("Num Non-Schedulable Applications:",
-              Integer.toString(lqinfo.getNumPendingApplications())).
-          __("Num Containers:",
-              Integer.toString(lqinfo.getNumContainers())).
-          __("Max Applications:",
-              Integer.toString(lqinfo.getMaxApplications())).
-          __("Max Applications Per User:",
-              Integer.toString(lqinfo.getMaxApplicationsPerUser())).
-          __("Configured Minimum User Limit Percent:",
-              lqinfo.getUserLimit() + "%").
+          __("Submit App ACL:", lqinfo.getSubmitAcls()).
+          __("Administer Queue ACL:", lqinfo.getAdminAcls()).
+          __("Num Schedulable Applications:", Integer.toString(lqinfo.getNumActiveApplications())).
+          __("Num Non-Schedulable Applications:", Integer.toString(lqinfo.getNumPendingApplications())).
+          __("Num Containers:", Integer.toString(lqinfo.getNumContainers())).
+          __("Max Applications:", Integer.toString(lqinfo.getMaxApplications())).
+          __("Max Applications Per User:", Integer.toString(lqinfo.getMaxApplicationsPerUser())).
+          __("Configured Minimum User Limit Percent:", Integer.toString(lqinfo.getUserLimit()) + "%").
           __("Configured User Limit Factor:", lqinfo.getUserLimitFactor()).
-          __("Accessible Node Labels:",
-              StringUtils.join(",", lqinfo.getNodeLabels())).
+          __("Accessible Node Labels:", StringUtils.join(",", lqinfo.getNodeLabels())).
           __("Ordering Policy: ", lqinfo.getOrderingPolicyDisplayName()).
           __("Preemption:",
               lqinfo.getPreemptionDisabled() ? "disabled" : "enabled").
@@ -662,9 +653,7 @@ class CapacitySchedulerPage extends RmView {
           "      q = q.substr(q.lastIndexOf(':') + 2);",
           "      q = '^' + q.substr(q.lastIndexOf('.') + 1) + '$';",
           "    }",
-          // Update this filter column index for queue if new columns are added
-          // Current index for queue column is 5
-          "    $('#apps').dataTable().fnFilter(q, 5, true);",
+          "    $('#apps').dataTable().fnFilter(q, 4, true);",
           "  });",
           "  $('#cs').show();",
           "});").__().

@@ -24,6 +24,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
 
+import org.apache.hadoop.yarn.security.AccessType;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueResourceQuotas;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
@@ -43,7 +44,7 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
   protected int numContainers;
   protected int maxApplications;
   protected int maxApplicationsPerUser;
-  protected float userLimit;
+  protected int userLimit;
   protected UsersInfo users; // To add another level in the XML
   protected float userLimitFactor;
   protected float configuredMaxAMResourceLimit;
@@ -52,10 +53,13 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
   protected ResourceInfo userAMResourceLimit;
   protected boolean preemptionDisabled;
   protected boolean intraQueuePreemptionDisabled;
+  protected String defaultNodeLabelExpression;
   protected int defaultPriority;
   protected boolean isAutoCreatedLeafQueue;
   protected long maxApplicationLifetime;
   protected long defaultApplicationLifetime;
+  protected String submitAcls;
+  protected String adminAcls;
 
   @XmlTransient
   protected String orderingPolicyDisplayName;
@@ -80,8 +84,11 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
     intraQueuePreemptionDisabled = q.getIntraQueuePreemptionDisabled();
     orderingPolicyDisplayName = q.getOrderingPolicy().getInfo();
     orderingPolicyInfo = q.getOrderingPolicy().getConfigName();
+    defaultNodeLabelExpression = q.getDefaultNodeLabelExpression();
     defaultPriority = q.getDefaultApplicationPriority().getPriority();
     ArrayList<UserInfo> usersList = users.getUsersList();
+    submitAcls = q.getACLs().get(AccessType.SUBMIT_APP).getAclString();
+    adminAcls = q.getACLs().get(AccessType.ADMINISTER_QUEUE).getAclString();
     if (usersList.isEmpty()) {
       // If no users are present, consider AM Limit for that queue.
       userAMResourceLimit = resources.getPartitionResourceUsageInfo(
@@ -130,7 +137,7 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
     return maxApplicationsPerUser;
   }
 
-  public float getUserLimit() {
+  public int getUserLimit() {
     return userLimit;
   }
 
@@ -146,17 +153,17 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
   public float getConfiguredMaxAMResourceLimit() {
     return configuredMaxAMResourceLimit;
   }
-
+  
   public ResourceInfo getAMResourceLimit() {
     return AMResourceLimit;
   }
-
+  
   public ResourceInfo getUsedAMResource() {
     return usedAMResource;
   }
 
   public ResourceInfo getUserAMResourceLimit() {
-    return userAMResourceLimit;
+    return userAMResourceLimit; 
   }
 
   public boolean getPreemptionDisabled() {
@@ -169,6 +176,10 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
 
   public String getOrderingPolicyDisplayName() {
     return orderingPolicyDisplayName;
+  }
+  
+  public String getDefaultNodeLabelExpression() {
+    return defaultNodeLabelExpression;
   }
 
   public int getDefaultApplicationPriority() {
@@ -185,6 +196,14 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
 
   public long getMaxApplicationLifetime() {
     return maxApplicationLifetime;
+  }
+
+  public String getSubmitAcls() {
+    return submitAcls;
+  }
+
+  public String getAdminAcls() {
+    return adminAcls;
   }
 
 }
