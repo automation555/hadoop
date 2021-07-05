@@ -54,7 +54,7 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * This class is used for block maps stored as text files,
@@ -455,6 +455,12 @@ public class TextFileRegionAliasMap
             .append(Base64.getEncoder().encodeToString(psl.getNonce()));
       }
       out.append("\n");
+    }
+
+    @Override
+    public void remove(Block block) throws IOException {
+      throw new RuntimeException("TextFileWriter does not support " +
+          "block removal");
     }
 
     @Override

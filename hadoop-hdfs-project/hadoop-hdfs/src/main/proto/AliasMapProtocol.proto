@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-syntax = "proto2";
+
 option java_package = "org.apache.hadoop.hdfs.protocol.proto";
 option java_outer_classname = "AliasMapProtocolProtos";
 option java_generic_services = true;
@@ -34,6 +34,13 @@ message WriteRequestProto {
 }
 
 message WriteResponseProto {
+}
+
+message RemoveRequestProto {
+  required BlockProto key = 1;
+}
+
+message RemoveResponseProto {
 }
 
 message ReadRequestProto {
@@ -62,6 +69,7 @@ message BlockPoolResponseProto {
 
 service AliasMapProtocolService {
   rpc write(WriteRequestProto) returns(WriteResponseProto);
+  rpc remove(RemoveRequestProto) returns(RemoveResponseProto);
   rpc read(ReadRequestProto) returns(ReadResponseProto);
   rpc list(ListRequestProto) returns(ListResponseProto);
   rpc getBlockPoolId(BlockPoolRequestProto) returns(BlockPoolResponseProto);

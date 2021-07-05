@@ -16,8 +16,8 @@
  */
 package org.apache.hadoop.hdfs.protocolPB;
 
-import org.apache.hadoop.thirdparty.protobuf.RpcController;
-import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -57,6 +57,9 @@ public class AliasMapProtocolServerSideTranslatorPB
   private static final WriteResponseProto VOID_WRITE_RESPONSE =
       WriteResponseProto.newBuilder().build();
 
+  private static final RemoveResponseProto VOID_REMOVE_RESPONSE =
+      RemoveResponseProto.newBuilder().build();
+
   @Override
   public WriteResponseProto write(RpcController controller,
       WriteRequestProto request) throws ServiceException {
@@ -66,6 +69,19 @@ public class AliasMapProtocolServerSideTranslatorPB
 
       aliasMap.write(toWrite.getBlock(), toWrite.getProvidedStorageLocation());
       return VOID_WRITE_RESPONSE;
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public RemoveResponseProto remove(RpcController controller,
+      RemoveRequestProto request) throws ServiceException {
+    try {
+      Block toRemove =
+          PBHelperClient.convert(request.getKey());
+      aliasMap.remove(toRemove);
+      return VOID_REMOVE_RESPONSE;
     } catch (IOException e) {
       throw new ServiceException(e);
     }
