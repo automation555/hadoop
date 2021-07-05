@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
+import org.apache.hadoop.fs.common.Abortable;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
@@ -63,7 +64,6 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormatCounter;
 import org.apache.hadoop.mapreduce.lib.map.WrappedMapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormatCounter;
-import org.apache.hadoop.mapreduce.security.IntermediateEncryptedStream;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitIndex;
 import org.apache.hadoop.mapreduce.task.MapContextImpl;
 import org.apache.hadoop.mapreduce.CryptoUtils;
@@ -462,6 +462,7 @@ public class MapTask extends Task {
     MapRunnable<INKEY,INVALUE,OUTKEY,OUTVALUE> runner =
       ReflectionUtils.newInstance(job.getMapRunnerClass(), job);
 
+    boolean successful = false;
     try {
       runner.run(in, new OldOutputCollector(collector, conf), reporter);
       mapPhase.complete();
@@ -470,6 +471,7 @@ public class MapTask extends Task {
         setPhase(TaskStatus.Phase.SORT);
       }
       statusUpdate(umbilical);
+      successful = true;
       collector.flush();
       
       in.close();
@@ -478,6 +480,13 @@ public class MapTask extends Task {
       collector.close();
       collector = null;
     } finally {
+      try {
+        if (!successful && collector instanceof Abortable) {
+          ((Abortable) collector).abort();
+        }
+      } catch (Exception ex) {
+        LOG.error(ex.getMessage());
+      }
       closeQuietly(in);
       closeQuietly(collector);
     }
@@ -812,7 +821,7 @@ public class MapTask extends Task {
   }
 
   class DirectMapOutputCollector<K, V>
-    implements MapOutputCollector<K, V> {
+    implements MapOutputCollector<K, V>, Abortable {
  
     private RecordWriter<K, V> out = null;
 
@@ -881,6 +890,15 @@ public class MapTask extends Task {
         bytesWritten = bytesWritten + stat.getBytesWritten();
       }
       return bytesWritten;
+    }
+
+    @Override
+    public void abort() throws IOException {
+      if (out instanceof Abortable) {
+        ((Abortable) out).abort();
+      } else {
+        out.close(reporter);
+      }
     }
   }
 
@@ -1631,9 +1649,7 @@ public class MapTask extends Task {
           IFile.Writer<K, V> writer = null;
           try {
             long segmentStart = out.getPos();
-            partitionOut =
-                IntermediateEncryptedStream.wrapIfNecessary(job, out, false,
-                    filename);
+            partitionOut = CryptoUtils.wrapIfNecessary(job, out, false);
             writer = new Writer<K, V>(job, partitionOut, keyClass, valClass, codec,
                                       spilledRecordsCounter);
             if (combinerRunner == null) {
@@ -1690,7 +1706,6 @@ public class MapTask extends Task {
           Path indexFilename =
               mapOutputFile.getSpillIndexFileForWrite(numSpills, partitions
                   * MAP_OUTPUT_INDEX_RECORD_LENGTH);
-          IntermediateEncryptedStream.addSpillIndexFile(indexFilename, job);
           spillRec.writeToFile(indexFilename, job);
         } else {
           indexCacheList.add(spillRec);
@@ -1731,9 +1746,7 @@ public class MapTask extends Task {
           try {
             long segmentStart = out.getPos();
             // Create a new codec, don't care!
-            partitionOut =
-                IntermediateEncryptedStream.wrapIfNecessary(job, out, false,
-                    filename);
+            partitionOut = CryptoUtils.wrapIfNecessary(job, out, false);
             writer = new IFile.Writer<K,V>(job, partitionOut, keyClass, valClass, codec,
                                             spilledRecordsCounter);
 
@@ -1767,7 +1780,6 @@ public class MapTask extends Task {
           Path indexFilename =
               mapOutputFile.getSpillIndexFileForWrite(numSpills, partitions
                   * MAP_OUTPUT_INDEX_RECORD_LENGTH);
-          IntermediateEncryptedStream.addSpillIndexFile(indexFilename, job);
           spillRec.writeToFile(indexFilename, job);
         } else {
           indexCacheList.add(spillRec);
@@ -1861,19 +1873,15 @@ public class MapTask extends Task {
         finalOutFileSize += rfs.getFileStatus(filename[i]).getLen();
       }
       if (numSpills == 1) { //the spill is the final output
-        Path indexFileOutput =
-            mapOutputFile.getOutputIndexFileForWriteInVolume(filename[0]);
         sameVolRename(filename[0],
             mapOutputFile.getOutputFileForWriteInVolume(filename[0]));
         if (indexCacheList.size() == 0) {
-          Path indexFilePath = mapOutputFile.getSpillIndexFile(0);
-          IntermediateEncryptedStream.validateSpillIndexFile(
-              indexFilePath, job);
-          sameVolRename(indexFilePath, indexFileOutput);
+          sameVolRename(mapOutputFile.getSpillIndexFile(0),
+            mapOutputFile.getOutputIndexFileForWriteInVolume(filename[0]));
         } else {
-          indexCacheList.get(0).writeToFile(indexFileOutput, job);
+          indexCacheList.get(0).writeToFile(
+            mapOutputFile.getOutputIndexFileForWriteInVolume(filename[0]), job);
         }
-        IntermediateEncryptedStream.addSpillIndexFile(indexFileOutput, job);
         sortPhase.complete();
         return;
       }
@@ -1881,7 +1889,6 @@ public class MapTask extends Task {
       // read in paged indices
       for (int i = indexCacheList.size(); i < numSpills; ++i) {
         Path indexFileName = mapOutputFile.getSpillIndexFile(i);
-        IntermediateEncryptedStream.validateSpillIndexFile(indexFileName, job);
         indexCacheList.add(new SpillRecord(indexFileName, job));
       }
 
@@ -1893,7 +1900,7 @@ public class MapTask extends Task {
           mapOutputFile.getOutputFileForWrite(finalOutFileSize);
       Path finalIndexFile =
           mapOutputFile.getOutputIndexFileForWrite(finalIndexFileSize);
-      IntermediateEncryptedStream.addSpillIndexFile(finalIndexFile, job);
+
       //The output stream for the final single output file
       FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
       FSDataOutputStream finalPartitionOut = null;
@@ -1905,9 +1912,8 @@ public class MapTask extends Task {
         try {
           for (int i = 0; i < partitions; i++) {
             long segmentStart = finalOut.getPos();
-            finalPartitionOut =
-                IntermediateEncryptedStream.wrapIfNecessary(job, finalOut,
-                    false, finalOutputFile);
+            finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut,
+                false);
             Writer<K, V> writer =
               new Writer<K, V>(job, finalPartitionOut, keyClass, valClass, codec, null);
             writer.close();
@@ -1970,8 +1976,7 @@ public class MapTask extends Task {
 
           //write merged output to disk
           long segmentStart = finalOut.getPos();
-          finalPartitionOut = IntermediateEncryptedStream.wrapIfNecessary(job,
-              finalOut, false, finalOutputFile);
+          finalPartitionOut = CryptoUtils.wrapIfNecessary(job, finalOut, false);
           Writer<K, V> writer =
               new Writer<K, V>(job, finalPartitionOut, keyClass, valClass, codec,
                                spilledRecordsCounter);

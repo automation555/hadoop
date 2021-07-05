@@ -26,6 +26,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.common.Abortable;
+import org.apache.hadoop.mapred.AbortableRecordWriter;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.RecordWriter;
@@ -79,7 +81,7 @@ extends FileOutputFormat<K, V> {
     final JobConf myJob = job;
     final Progressable myProgressable = arg3;
 
-    return new RecordWriter<K, V>() {
+    return new AbortableRecordWriter<K, V>() {
 
       // a cache storing the record writers for different output files.
       TreeMap<String, RecordWriter<K, V>> recordWriters = new TreeMap<String, RecordWriter<K, V>>();
@@ -115,6 +117,17 @@ extends FileOutputFormat<K, V> {
         }
         this.recordWriters.clear();
       };
+
+      @Override
+      public void abort() throws IOException {
+        Iterator<String> keys = this.recordWriters.keySet().iterator();
+        while (keys.hasNext()) {
+          RecordWriter<K, V> rw = this.recordWriters.get(keys.next());
+          if (rw instanceof Abortable) {
+            ((Abortable) rw).abort();
+          }
+        }
+      }
     };
   }
 
@@ -175,7 +188,7 @@ extends FileOutputFormat<K, V> {
   
 
   /**
-   * Generate the outfile name based on a given name and the input file name. If
+   * Generate the outfile name based on a given anme and the input file name. If
    * the {@link JobContext#MAP_INPUT_FILE} does not exists (i.e. this is not for a map only job),
    * the given name is returned unchanged. If the config value for
    * "num.of.trailing.legs.to.use" is not set, or set 0 or negative, the given
@@ -187,7 +200,7 @@ extends FileOutputFormat<K, V> {
    *          the job config
    * @param name
    *          the output file name
-   * @return the outfile name based on a given name and the input file name.
+   * @return the outfile name based on a given anme and the input file name.
    */
   protected String getInputFileBasedOutputFileName(JobConf job, String name) {
     String infilepath = job.get(MRJobConfig.MAP_INPUT_FILE);
