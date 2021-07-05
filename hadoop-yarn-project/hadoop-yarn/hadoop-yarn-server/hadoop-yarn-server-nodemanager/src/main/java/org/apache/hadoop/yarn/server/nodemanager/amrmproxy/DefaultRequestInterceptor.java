@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import com.google.common.base.Joiner;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
@@ -51,7 +51,7 @@ import org.apache.hadoop.yarn.server.utils.YarnServerSecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Extends the AbstractRequestInterceptor class and provides an implementation
@@ -95,7 +95,7 @@ public final class DefaultRequestInterceptor extends
   private ApplicationMasterProtocol createRMClient(
       AMRMProxyApplicationContext appContext, final Configuration conf)
       throws IOException, InterruptedException {
-    if (appContext.getNMCotext().isDistributedSchedulingEnabled()) {
+    if (appContext.getNMContext().isDistributedSchedulingEnabled()) {
       return user.doAs(
           new PrivilegedExceptionAction<DistributedSchedulingAMProtocol>() {
             @Override
@@ -144,7 +144,7 @@ public final class DefaultRequestInterceptor extends
   registerApplicationMasterForDistributedScheduling
       (RegisterApplicationMasterRequest request) throws YarnException,
       IOException {
-    if (getApplicationContext().getNMCotext()
+    if (getApplicationContext().getNMContext()
         .isDistributedSchedulingEnabled()) {
       LOG.info("Forwarding registerApplicationMasterForDistributedScheduling" +
           "request to the real YARN RM");
@@ -161,7 +161,7 @@ public final class DefaultRequestInterceptor extends
       throws YarnException, IOException {
     LOG.debug("Forwarding allocateForDistributedScheduling request" +
         "to the real YARN RM");
-    if (getApplicationContext().getNMCotext()
+    if (getApplicationContext().getNMContext()
         .isDistributedSchedulingEnabled()) {
       DistributedSchedulingAllocateResponse allocateResponse =
           ((DistributedSchedulingAMProtocol)rmClient)
