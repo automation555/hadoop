@@ -467,6 +467,20 @@ An OAuth 2.0 endpoint, username and password are provided in the configuration/J
   password for account
   </description>
 </property>
+<property>
+  <name>fs.azure.account.oauth2.client.id</name>
+  <value></value>
+  <description>
+  Client ID
+  </description>
+</property>
+<property>
+  <name>fs.azure.account.oauth2.client.secret</name>
+  <value></value>
+  <description>
+  Optional Secret
+  </description>
+</property>
 ```
 
 ### <a name="oauth-refresh-token"></a> OAuth 2.0: Refresh Token
@@ -729,28 +743,6 @@ Consult the javadocs for `org.apache.hadoop.fs.azurebfs.constants.ConfigurationK
 `org.apache.hadoop.fs.azurebfs.AbfsConfiguration` for the full list
 of configuration options and their default values.
 
-### <a name="clientcorrelationoptions"></a> Client Correlation Options
-
-#### <a name="clientcorrelationid"></a> 1. Client CorrelationId Option
-
-Config `fs.azure.client.correlationid` provides an option to correlate client
-requests using this client-provided identifier. This Id will be visible in Azure
-Storage Analytics logs in the `request-id-header` field.
-Reference: [Storage Analytics log format](https://docs.microsoft.com/en-us/rest/api/storageservices/storage-analytics-log-format)
-
-This config accepts a string which can be maximum of 72 characters and should
-contain alphanumeric characters and/or hyphens only. Defaults to empty string if
-input is invalid.
-
-#### <a name="tracingcontextformat"></a> 1. Correlation IDs Display Options
-
-Config `fs.azure.tracingcontext.format` provides an option to select the format
-of IDs included in the `request-id-header`. This config accepts a String value
-corresponding to the following enum options.
-  `SINGLE_ID_FORMAT` : clientRequestId
-  `ALL_ID_FORMAT` : all IDs (default)
-  `TWO_ID_FORMAT` : clientCorrelationId:clientRequestId
-
 ### <a name="flushconfigoptions"></a> Flush Options
 
 #### <a name="abfsflushconfigoptions"></a> 1. Azure Blob File System Flush Options
@@ -811,38 +803,12 @@ to 100 MB). The default value will be 8388608 (8 MB).
 bytes. The value should be between 16384 to 104857600 both inclusive (16 KB to
 100 MB). The default value will be 4194304 (4 MB).
 
-`fs.azure.read.alwaysReadBufferSize`: Read request size configured by
-`fs.azure.read.request.size` will be honoured only when the reads done are in
-sequential pattern. When the read pattern is detected to be random, read size
-will be same as the buffer length provided by the calling process.
-This config when set to true will force random reads to also read in same
-request sizes as sequential reads. This is a means to have same read patterns
-as of ADLS Gen1, as it does not differentiate read patterns and always reads by
-the configured read request size. The default value for this config will be
-false, where reads for the provided buffer length is done when random read
-pattern is detected.
-
 `fs.azure.readaheadqueue.depth`: Sets the readahead queue depth in
 AbfsInputStream. In case the set value is negative the read ahead queue depth
 will be set as Runtime.getRuntime().availableProcessors(). By default the value
-will be 2. To disable readaheads, set this value to 0. If your workload is
+will be -1. To disable readaheads, set this value to 0. If your workload is
  doing only random reads (non-sequential) or you are seeing throttling, you
   may try setting this value to 0.
-
-`fs.azure.read.readahead.blocksize`: To set the read buffer size for the read
-aheads. Specify the value in bytes. The value should be between 16384 to
-104857600 both inclusive (16 KB to 100 MB). The default value will be
-4194304 (4 MB).
-
-`fs.azure.buffered.pread.disable`: By default the positional read API will do a
-seek and read on input stream. This read will fill the buffer cache in
-AbfsInputStream and update the cursor positions. If this optimization is true
-it will skip usage of buffer and do a lock free REST call for reading from blob.
-This optimization is very much helpful for HBase kind of short random read over
-a shared AbfsInputStream instance.
-Note: This is not a config which can be set at cluster level. It can be used as
-an option on FutureDataInputStreamBuilder.
-See FileSystem#openFile(Path path)
 
 To run under limited memory situations configure the following. Especially
 when there are too many writes from the same process. 
@@ -880,7 +846,7 @@ Please refer the following links for further information.
 listStatus API fetches the FileStatus information from server in a page by page
 manner. The config `fs.azure.list.max.results` used to set the maxResults URI
  param which sets the pagesize(maximum results per call). The value should
- be >  0. By default this will be 5000. Server has a maximum value for this
+ be >  0. By default this will be 500. Server has a maximum value for this
  parameter as 5000. So even if the config is above 5000 the response will only
 contain 5000 entries. Please refer the following link for further information.
 https://docs.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/list
@@ -908,22 +874,6 @@ directories. "The atomic rename feature is not supported by the ABFS scheme
 enabled for your Azure Storage account."
 The directories can be specified as comma separated values. By default the value
 is "/hbase"
-
-### <a name="infiniteleaseoptions"></a> Infinite Lease Options
-`fs.azure.infinite-lease.directories`: Directories for infinite lease support
-can be specified comma separated in this config. By default, multiple
-clients will be able to write to the same file simultaneously. When writing
-to files contained within the directories specified in this config, the
-client will obtain a lease on the file that will prevent any other clients
-from writing to the file. When the output stream is closed, the lease will be
-released. To revoke a client's write access for a file, the
-AzureBlobFilesystem breakLease method may be called. If the client dies
-before the file can be closed and the lease released, breakLease will need to
-be called before another client will be able to write to the file.
-
-`fs.azure.lease.threads`: This is the size of the thread pool that will be
-used for lease operations for infinite lease directories. By default the value
-is 0, so it must be set to at least 1 to support infinite lease directories.
 
 ### <a name="perfoptions"></a> Perf Options
 
