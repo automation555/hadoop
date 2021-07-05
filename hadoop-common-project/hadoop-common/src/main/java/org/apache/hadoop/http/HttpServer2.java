@@ -27,18 +27,14 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Enumeration;
 import java.util.Arrays;
-import java.util.Timer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,10 +50,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
-import com.sun.jersey.spi.container.servlet.ServletContainer;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -78,10 +73,7 @@ import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationF
 import org.apache.hadoop.security.authentication.server.PseudoAuthenticationHandler;
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
 import org.apache.hadoop.security.authorize.AccessControlList;
-import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
-import org.apache.hadoop.security.ssl.FileMonitoringTimerTask;
 import org.apache.hadoop.security.ssl.SSLFactory;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
@@ -100,7 +92,6 @@ import org.eclipse.jetty.server.handler.AllowSymLinkAliasChecker;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.RequestLogHandler;
-import org.eclipse.jetty.server.handler.StatisticsHandler;
 import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.FilterMapping;
@@ -113,6 +104,8 @@ import org.eclipse.jetty.util.MultiException;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.webapp.WebAppContext;
+import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,7 +149,7 @@ public final class HttpServer2 implements FilterContainer {
   // idle timeout in milliseconds
   public static final String HTTP_IDLE_TIMEOUT_MS_KEY =
       "hadoop.http.idle_timeout.ms";
-  public static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 60000;
+  public static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 10000;
   public static final String HTTP_TEMP_DIR_KEY = "hadoop.http.temp.dir";
 
   public static final String FILTER_INITIALIZER_PROPERTY
@@ -192,7 +185,6 @@ public final class HttpServer2 implements FilterContainer {
   static final String STATE_DESCRIPTION_ALIVE = " - alive";
   static final String STATE_DESCRIPTION_NOT_LIVE = " - not live";
   private final SignerSecretProvider secretProvider;
-  private final Optional<java.util.Timer> configurationChangeMonitor;
   private XFrameOption xFrameOption;
   private boolean xFrameOptionIsEnabled;
   public static final String HTTP_HEADER_PREFIX = "hadoop.http.header.";
@@ -209,9 +201,6 @@ public final class HttpServer2 implements FilterContainer {
   private boolean prometheusSupport;
   protected static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
   private PrometheusMetricsSink prometheusMetricsSink;
-
-  private StatisticsHandler statsHandler;
-  private HttpServer2Metrics metrics;
 
   /**
    * Class to construct instances of HTTP server with specific options.
@@ -250,8 +239,6 @@ public final class HttpServer2 implements FilterContainer {
     private XFrameOption xFrameOption = XFrameOption.SAMEORIGIN;
 
     private boolean sniHostCheckEnabled;
-
-    private Optional<Timer> configurationChangeMonitor = Optional.empty();
 
     public Builder setName(String name){
       this.name = name;
@@ -583,52 +570,10 @@ public final class HttpServer2 implements FilterContainer {
       }
 
       setEnabledProtocols(sslContextFactory);
-
-      long storesReloadInterval =
-          conf.getLong(FileBasedKeyStoresFactory.SSL_STORES_RELOAD_INTERVAL_TPL_KEY,
-              FileBasedKeyStoresFactory.DEFAULT_SSL_STORES_RELOAD_INTERVAL);
-
-      if (storesReloadInterval > 0 &&
-          (keyStore != null || trustStore != null)) {
-        this.configurationChangeMonitor = Optional.of(
-            this.makeConfigurationChangeMonitor(storesReloadInterval, sslContextFactory));
-      }
-
       conn.addFirstConnectionFactory(new SslConnectionFactory(sslContextFactory,
           HttpVersion.HTTP_1_1.asString()));
 
       return conn;
-    }
-
-    private Timer makeConfigurationChangeMonitor(long reloadInterval,
-        SslContextFactory.Server sslContextFactory) {
-      java.util.Timer timer = new java.util.Timer(FileBasedKeyStoresFactory.SSL_MONITORING_THREAD_NAME, true);
-      ArrayList<Path> locations = new ArrayList<Path>();
-      if (keyStore != null) {
-        locations.add(Paths.get(keyStore));
-      }
-      if (trustStore != null) {
-        locations.add(Paths.get(trustStore));
-      }
-      //
-      // The Jetty SSLContextFactory provides a 'reload' method which will reload both
-      // truststore and keystore certificates.
-      //
-      timer.schedule(new FileMonitoringTimerTask(
-            locations,
-            path -> {
-              LOG.info("Reloading keystore and truststore certificates.");
-              try {
-                sslContextFactory.reload(factory -> { });
-              } catch (Exception ex) {
-                LOG.error("Failed to reload SSL keystore " +
-                    "and truststore certificates", ex);
-              }
-            },null),
-        reloadInterval,
-        reloadInterval
-      );
-      return timer;
     }
 
     private void setEnabledProtocols(SslContextFactory sslContextFactory) {
@@ -673,7 +618,6 @@ public final class HttpServer2 implements FilterContainer {
     this.webAppContext = createWebAppContext(b, adminsAcl, appDir);
     this.xFrameOptionIsEnabled = b.xFrameEnabled;
     this.xFrameOption = b.xFrameOption;
-    this.configurationChangeMonitor = b.configurationChangeMonitor;
 
     try {
       this.secretProvider =
@@ -725,27 +669,6 @@ public final class HttpServer2 implements FilterContainer {
     final String appDir = getWebAppsPath(name);
     addDefaultApps(contexts, appDir, conf);
     webServer.setHandler(handlers);
-
-    if (conf.getBoolean(
-        CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED,
-        CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED_DEFAULT)) {
-      // Jetty StatisticsHandler must be inserted as the first handler.
-      // The tree might look like this:
-      //
-      // - StatisticsHandler (for all requests)
-      //   - HandlerList
-      //     - ContextHandlerCollection
-      //     - RequestLogHandler (if enabled)
-      //     - WebAppContext
-      //       - SessionHandler
-      //       - Servlets
-      //       - Filters
-      //       - etc..
-      //
-      // Reference: https://www.eclipse.org/lists/jetty-users/msg06273.html
-      statsHandler = new StatisticsHandler();
-      webServer.insertHandler(statsHandler);
-    }
 
     Map<String, String> xFrameParams = setHeaders(conf);
     addGlobalFilter("safety", QuotingInputFilter.class.getName(), xFrameParams);
@@ -963,10 +886,24 @@ public final class HttpServer2 implements FilterContainer {
       final String pathSpec, Map<String, String> params) {
     LOG.info("addJerseyResourcePackage: packageName=" + packageName
         + ", pathSpec=" + pathSpec);
-    final ServletHolder sh = new ServletHolder(ServletContainer.class);
-    sh.setInitParameter("com.sun.jersey.config.property.resourceConfigClass",
-        "com.sun.jersey.api.core.PackagesResourceConfig");
-    sh.setInitParameter("com.sun.jersey.config.property.packages", packageName);
+    final ResourceConfig config = new ResourceConfig().packages(packageName);
+    final ServletHolder sh = new ServletHolder(new ServletContainer(config));
+    for (Map.Entry<String, String> entry : params.entrySet()) {
+      sh.setInitParameter(entry.getKey(), entry.getValue());
+    }
+    webAppContext.addServlet(sh, pathSpec);
+  }
+
+  /**
+   * Add a Jersey resource config.
+   * @param config The Jersey ResourceConfig to be registered.
+   * @param pathSpec The path spec for the servlet
+   * @param params properties and features for ResourceConfig
+   */
+  public void addJerseyResourceConfig(final ResourceConfig config,
+      final String pathSpec, Map<String, String> params) {
+    LOG.info("addJerseryResourceConfig: pathSpec={}", pathSpec);
+    final ServletHolder sh = new ServletHolder(new ServletContainer(config));
     for (Map.Entry<String, String> entry : params.entrySet()) {
       sh.setInitParameter(entry.getKey(), entry.getValue());
     }
@@ -1305,16 +1242,6 @@ public final class HttpServer2 implements FilterContainer {
               .register("prometheus", "Hadoop metrics prometheus exporter",
                   prometheusMetricsSink);
         }
-        if (statsHandler != null) {
-          // Create metrics source for each HttpServer2 instance.
-          // Use port number to make the metrics source name unique.
-          int port = -1;
-          for (ServerConnector connector : listeners) {
-            port = connector.getLocalPort();
-            break;
-          }
-          metrics = HttpServer2Metrics.create(statsHandler, port);
-        }
       } catch (IOException ex) {
         LOG.info("HttpServer.start() threw a non Bind IOException", ex);
         throw ex;
@@ -1472,16 +1399,6 @@ public final class HttpServer2 implements FilterContainer {
    */
   public void stop() throws Exception {
     MultiException exception = null;
-    if (this.configurationChangeMonitor.isPresent()) {
-      try {
-        this.configurationChangeMonitor.get().cancel();
-      } catch (Exception e) {
-        LOG.error(
-            "Error while canceling configuration monitoring timer for webapp"
-                + webAppContext.getDisplayName(), e);
-        exception = addMultiException(exception, e);
-      }
-    }
     for (ServerConnector c : listeners) {
       try {
         c.close();
@@ -1507,9 +1424,6 @@ public final class HttpServer2 implements FilterContainer {
 
     try {
       webServer.stop();
-      if (metrics != null) {
-        metrics.remove();
-      }
     } catch (Exception e) {
       LOG.error("Error while stopping web server for webapp "
           + webAppContext.getDisplayName(), e);
@@ -1890,10 +1804,4 @@ public final class HttpServer2 implements FilterContainer {
             splitVal[1]);
     return headers;
   }
-
-  @VisibleForTesting
-  HttpServer2Metrics getMetrics() {
-    return metrics;
-  }
-
 }
