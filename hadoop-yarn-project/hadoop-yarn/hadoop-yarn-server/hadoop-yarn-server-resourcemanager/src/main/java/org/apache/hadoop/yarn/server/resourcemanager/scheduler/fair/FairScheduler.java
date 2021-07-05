@@ -18,12 +18,18 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.SettableFuture;
+import java.io.Serializable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -97,14 +103,9 @@ import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.SettableFuture;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -190,8 +191,7 @@ public class FairScheduler extends
   @Deprecated
   protected volatile int continuousSchedulingSleepMs;
   // Node available resource comparator
-  private Comparator<FSSchedulerNode> nodeAvailableResourceComparator =
-          new NodeAvailableResourceComparator();
+  private Comparator<FSSchedulerNode> nodeAvailableResourceComparator;
   protected double nodeLocalityThreshold; // Cluster threshold for node locality
   protected double rackLocalityThreshold; // Cluster threshold for rack locality
   @Deprecated
@@ -294,6 +294,33 @@ public class FairScheduler extends
           + " allocation configuration: "
           + FairSchedulerConfiguration.RM_SCHEDULER_INCREMENT_ALLOCATION_VCORES
           + "=" + incrementVcore + ". Values must be greater than 0.");
+    }
+  }
+
+  private Comparator<FSSchedulerNode> initNodeComparator(
+      FairSchedulerConfiguration config) {
+    Class<?> nodeComparatorClass = config.getNodeComparatorClass();
+    if (!Comparator.class.isAssignableFrom(nodeComparatorClass)) {
+      throw new YarnRuntimeException("Class: " +
+          nodeComparatorClass.getCanonicalName() + " not instance of " +
+          Comparator.class.getCanonicalName() + "<FSSchedulerNode>");
+    }
+
+    try {
+      try {
+        Constructor constructor =
+            nodeComparatorClass.getDeclaredConstructor(FairScheduler.class);
+        constructor.setAccessible(true);
+        return (Comparator<FSSchedulerNode>) constructor.newInstance(this);
+      } catch (NoSuchMethodException e) {
+        // constructor doesn't exist, use default
+        return (Comparator<FSSchedulerNode>) nodeComparatorClass.newInstance();
+      }
+    } catch (ClassCastException | InstantiationException |
+        IllegalAccessException | InvocationTargetException e) {
+      throw new YarnRuntimeException(
+          "Could not create instance of class: " +
+              nodeComparatorClass.getCanonicalName(), e);
     }
   }
 
@@ -554,15 +581,11 @@ public class FairScheduler extends
           return;
         }
       }
-      boolean unmanagedAM = rmApp != null &&
-          rmApp.getApplicationSubmissionContext() != null
-          && rmApp.getApplicationSubmissionContext().getUnmanagedAM();
 
       SchedulerApplication<FSAppAttempt> application =
-          new SchedulerApplication<>(queue, user, unmanagedAM);
+          new SchedulerApplication<>(queue, user);
       applications.put(applicationId, application);
-
-      queue.getMetrics().submitApp(user, unmanagedAM);
+      queue.getMetrics().submitApp(user);
 
       LOG.info("Accepted application " + applicationId + " from user: " + user
           + ", in queue: " + queueName
@@ -616,7 +639,7 @@ public class FairScheduler extends
         maxRunningEnforcer.trackNonRunnableApp(attempt);
       }
 
-      queue.getMetrics().submitAppAttempt(user, application.isUnmanagedAM());
+      queue.getMetrics().submitAppAttempt(user);
 
       LOG.info("Added Application Attempt " + applicationAttemptId
           + " to scheduler from user: " + user);
@@ -1060,12 +1083,13 @@ public class FairScheduler extends
   }
 
   /** Sort nodes by available resource */
-  private class NodeAvailableResourceComparator
-      implements Comparator<FSSchedulerNode> {
+  protected static class NodeAvailableResourceComparator
+      implements Comparator<FSSchedulerNode>, Serializable {
 
     @Override
     public int compare(FSSchedulerNode n1, FSSchedulerNode n2) {
-      return RESOURCE_CALCULATOR.compare(getClusterResource(),
+      // clusterResource unused by DefaultResourceCalculator
+      return RESOURCE_CALCULATOR.compare(null,
           n2.getUnallocatedResource(),
           n1.getUnallocatedResource());
     }
@@ -1438,6 +1462,7 @@ public class FairScheduler extends
       sizeBasedWeight = this.conf.getSizeBasedWeight();
       usePortForNodeName = this.conf.getUsePortForNodeName();
       reservableNodesRatio = this.conf.getReservableNodes();
+      nodeAvailableResourceComparator = initNodeComparator(this.conf);
 
       updateInterval = this.conf.getUpdateInterval();
       if (updateInterval < 0) {
@@ -1446,13 +1471,6 @@ public class FairScheduler extends
             + " is invalid, so using default value "
             + FairSchedulerConfiguration.DEFAULT_UPDATE_INTERVAL_MS
             + " ms instead");
-      }
-
-      boolean globalAmPreemption = conf.getBoolean(
-          FairSchedulerConfiguration.AM_PREEMPTION,
-          FairSchedulerConfiguration.DEFAULT_AM_PREEMPTION);
-      if (!globalAmPreemption) {
-        LOG.info("AM preemption is DISABLED globally");
       }
 
       rootMetrics = FSQueueMetrics.forQueue("root", null, true, conf);
