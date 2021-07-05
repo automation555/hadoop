@@ -37,12 +37,12 @@
     <!--Whether to proceed to next module if any test failures exist-->
     <ignoreTestFailure>true</ignoreTestFailure>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.4.40.v20210413</jetty.version>
+    <jetty.version>9.4.35.v20201120</jetty.version>
     <test.exclude>_</test.exclude>
     <test.exclude.pattern>_</test.exclude.pattern>
 
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
-    <testsThreadCount>2</testsThreadCount>
+    <testsThreadCount>4</testsThreadCount>
 
     <!-- These 2 versions are defined here because they are used -->
     <!-- JDIFF generation from embedded ant in the antrun plugin -->
@@ -52,6 +52,7 @@
 
     <kafka.version>2.4.0</kafka.version>
 
+    <hadoop.assemblies.version>3.4.0-SNAPSHOT</hadoop.assemblies.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
@@ -70,8 +71,8 @@
 
     <!-- jackson versions -->
     <jackson.version>1.9.13</jackson.version>
-    <jackson2.version>2.10.5</jackson2.version>
-    <jackson2.databind.version>2.10.5.1</jackson2.databind.version>
+    <jackson2.version>2.10.3</jackson2.version>
+    <jackson2.databind.version>2.10.3</jackson2.databind.version>
 
     <!-- httpcomponents versions -->
     <httpclient.version>4.5.13</httpclient.version>
@@ -90,7 +91,7 @@
     <hadoop.protobuf.version>3.7.1</hadoop.protobuf.version>
     <protoc.path>${env.HADOOP_PROTOC_PATH}</protoc.path>
 
-    <hadoop-thirdparty.version>1.1.1</hadoop-thirdparty.version>
+    <hadoop-thirdparty.version>1.1.0-SNAPSHOT</hadoop-thirdparty.version>
     <hadoop-thirdparty-protobuf.version>${hadoop-thirdparty.version}</hadoop-thirdparty-protobuf.version>
     <hadoop-thirdparty-guava.version>${hadoop-thirdparty.version}</hadoop-thirdparty-guava.version>
     <hadoop-thirdparty-shaded-prefix>org.apache.hadoop.thirdparty</hadoop-thirdparty-shaded-prefix>
@@ -100,10 +101,11 @@
     <zookeeper.version>3.5.6</zookeeper.version>
     <curator.version>4.2.0</curator.version>
     <findbugs.version>3.0.5</findbugs.version>
+    <spotbugs.version>4.0.6</spotbugs.version>
     <dnsjava.version>2.1.7</dnsjava.version>
 
     <guava.version>27.0-jre</guava.version>
-    <guice.version>4.2.3</guice.version>
+    <guice.version>4.0</guice.version>
 
     <bouncycastle.version>1.60</bouncycastle.version>
 
@@ -115,10 +117,10 @@
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-cli.version>1.2</commons-cli.version>
     <commons-codec.version>1.15</commons-codec.version>
-    <commons-collections.version>3.2.2</commons-collections.version>
+    <commons-collections4.version>4.4</commons-collections4.version>
     <commons-compress.version>1.19</commons-compress.version>
     <commons-csv.version>1.0</commons-csv.version>
-    <commons-io.version>2.8.0</commons-io.version>
+    <commons-io.version>2.5</commons-io.version>
     <commons-lang3.version>3.7</commons-lang3.version>
     <commons-logging.version>1.1.3</commons-logging.version>
     <commons-logging-api.version>1.1</commons-logging-api.version>
@@ -136,9 +138,11 @@
     <jna.version>5.2.0</jna.version>
     <grizzly.version>2.2.21</grizzly.version>
     <gson.version>2.2.4</gson.version>
+    <htrace3.version>3.1.0-incubating</htrace3.version>
+    <htrace4.version>4.1.0-incubating</htrace4.version>
     <metrics.version>3.2.4</metrics.version>
     <netty3.version>3.10.6.Final</netty3.version>
-    <netty4.version>4.1.61.Final</netty4.version>
+    <netty4.version>4.1.50.Final</netty4.version>
     <snappy-java.version>1.1.8.2</snappy-java.version>
     <lz4-java.version>1.7.1</lz4-java.version>
 
@@ -182,9 +186,9 @@
     <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <surefire.fork.timeout>900</surefire.fork.timeout>
-    <aws-java-sdk.version>1.11.1026</aws-java-sdk.version>
+    <aws-java-sdk.version>1.11.901</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
-    <frontend-maven-plugin.version>1.11.2</frontend-maven-plugin.version>
+    <frontend-maven-plugin.version>1.6</frontend-maven-plugin.version>
     <jasmine-maven-plugin.version>2.1</jasmine-maven-plugin.version>
     <phantomjs-maven-plugin.version>0.7</phantomjs-maven-plugin.version>
     <yuicompressor-maven-plugin.version>1.5.1</yuicompressor-maven-plugin.version>
@@ -198,19 +202,16 @@
     <snakeyaml.version>1.26</snakeyaml.version>
     <hbase.one.version>1.4.8</hbase.one.version>
     <hbase.two.version>2.0.2</hbase.two.version>
-    <junit.version>4.13.2</junit.version>
+    <junit.version>4.12</junit.version>
     <junit.jupiter.version>5.5.1</junit.jupiter.version>
     <junit.vintage.version>5.5.1</junit.vintage.version>
     <junit.platform.version>1.5.1</junit.platform.version>
     <assertj.version>3.12.2</assertj.version>
     <jline.version>3.9.0</jline.version>
     <powermock.version>1.5.6</powermock.version>
-    <solr.version>8.8.2</solr.version>
+    <solr.version>7.7.0</solr.version>
     <openssl-wildfly.version>1.0.7.Final</openssl-wildfly.version>
     <jsonschema2pojo.version>1.0.2</jsonschema2pojo.version>
-    <woodstox.version>5.3.0</woodstox.version>
-    <json-smart.version>2.4.2</json-smart.version>
-    <nimbus-jose-jwt.version>9.8.1</nimbus-jose-jwt.version>
   </properties>
 
   <dependencyManagement>
@@ -677,12 +678,6 @@
 
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-huaweicloud</artifactId>
-        <version>${hadoop.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-kms</artifactId>
         <version>${hadoop.version}</version>
       </dependency>
@@ -1075,9 +1070,9 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>commons-collections</groupId>
-        <artifactId>commons-collections</artifactId>
-        <version>${commons-collections.version}</version>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-collections4</artifactId>
+        <version>${commons-collections4.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-beanutils</groupId>
@@ -1128,12 +1123,12 @@
       <dependency>
         <groupId>org.codehaus.woodstox</groupId>
         <artifactId>stax2-api</artifactId>
-        <version>4.2.1</version>
+        <version>3.1.4</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
-        <version>${woodstox.version}</version>
+        <version>5.0.3</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
@@ -1232,7 +1227,7 @@
       <dependency>
         <groupId>org.apache.ant</groupId>
         <artifactId>ant</artifactId>
-        <version>1.10.9</version>
+        <version>1.8.1</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>
@@ -1253,6 +1248,16 @@
         <groupId>com.jcraft</groupId>
         <artifactId>jsch</artifactId>
         <version>0.1.55</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.htrace</groupId>
+        <artifactId>htrace-core</artifactId>
+        <version>${htrace3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.htrace</groupId>
+        <artifactId>htrace-core4</artifactId>
+        <version>${htrace4.version}</version>
       </dependency>
       <dependency>
         <groupId>org.jdom</groupId>
@@ -1567,7 +1572,7 @@
       <dependency>
           <groupId>com.nimbusds</groupId>
           <artifactId>nimbus-jose-jwt</artifactId>
-          <version>${nimbus-jose-jwt.version}</version>
+          <version>7.9</version>
           <scope>compile</scope>
           <exclusions>
           <exclusion>
@@ -1590,7 +1595,7 @@
           -->
         <groupId>net.minidev</groupId>
         <artifactId>json-smart</artifactId>
-        <version>${json-smart.version}</version>
+        <version>2.3</version>
       </dependency>
       <dependency>
         <groupId>org.skyscreamer</groupId>
@@ -1744,6 +1749,44 @@
          <groupId>org.jsonschema2pojo</groupId>
          <artifactId>jsonschema2pojo-core</artifactId>
          <version>${jsonschema2pojo.version}</version>
+         <exclusions>
+           <exclusion>
+             <groupId>com.fasterxml.jackson.core</groupId>
+             <artifactId>*</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>com.fasterxml.jackson.dataformat</groupId>
+             <artifactId>*</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>org.codehaus.jackson</groupId>
+             <artifactId>*</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>com.google.code.gson</groupId>
+             <artifactId>gson</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>com.google.code.findbugs</groupId>
+             <artifactId>annotations</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>org.scala-lang</groupId>
+             <artifactId>scala-library</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>org.jsonschema2pojo</groupId>
+             <artifactId>jsonschema2pojo-scalagen</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>com.google.code.javaparser</groupId>
+             <artifactId>javaparser</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>javax.validation</groupId>
+             <artifactId>validation-api</artifactId>
+           </exclusion>
+         </exclusions>
       </dependency>
       <dependency>
         <groupId>org.xerial.snappy</groupId>
@@ -1854,6 +1897,18 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-war-plugin</artifactId>
           <version>${maven-war-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>findbugs-maven-plugin</artifactId>
+          <version>${findbugs.version}</version>
+          <dependencies>
+            <dependency>
+              <groupId>com.github.spotbugs</groupId>
+              <artifactId>spotbugs</artifactId>
+              <version>${spotbugs.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -2089,6 +2144,10 @@
         </configuration>
       </plugin>
       <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>
@@ -2282,12 +2341,11 @@
               <fork>true</fork>
               <source>${javac.version}</source>
               <target>${javac.version}</target>
-              <compilerArgs>
-                <arg>-Xlint</arg>
-                <arg>-Xlint:unchecked</arg>
-                <arg>-Xmaxwarns</arg>
-                <arg>9999</arg>
-              </compilerArgs>
+              <compilerArguments>
+                <Xlint/>
+				<Xlint:-unchecked/>
+                <Xmaxwarns>9999</Xmaxwarns>
+              </compilerArguments>
             </configuration>
           </plugin>
         </plugins>
