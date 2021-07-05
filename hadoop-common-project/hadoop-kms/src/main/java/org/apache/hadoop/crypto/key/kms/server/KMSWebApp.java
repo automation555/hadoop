@@ -26,7 +26,7 @@ import javax.servlet.ServletContextListener;
 import com.codahale.metrics.JmxReporter;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.CachingKeyProvider;
@@ -34,10 +34,10 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.VersionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.bridge.SLF4JBridgeHandler;
 
 @InterfaceAudience.Private
 public class KMSWebApp implements ServletContextListener {
@@ -81,11 +81,6 @@ public class KMSWebApp implements ServletContextListener {
   private static KMSAudit kmsAudit;
   private static KeyProviderCryptoExtension keyProviderCryptoExtension;
 
-  static {
-    SLF4JBridgeHandler.removeHandlersForRootLogger();
-    SLF4JBridgeHandler.install();
-  }
-
   @Override
   public void contextInitialized(ServletContextEvent sce) {
     try {
@@ -98,7 +93,7 @@ public class KMSWebApp implements ServletContextListener {
       LOG.info("  KMS Hadoop Version: " + VersionInfo.getVersion());
       LOG.info("-------------------------------------------------------------");
 
-      kmsAcls = new KMSACLs();
+      kmsAcls = createKMSACLs(kmsConf);
       kmsAcls.startReloader();
 
       metricRegistry = new MetricRegistry();
@@ -180,6 +175,13 @@ public class KMSWebApp implements ServletContextListener {
       System.out.println();
       System.exit(1);
     }
+  }
+
+  private KMSACLs createKMSACLs(Configuration conf) {
+    Class<? extends KMSACLs> aclClass = conf.getClass(
+        KMSConfiguration.KEY_MANAGEMENT_ACL_CLASS, FileBasedKMSACLs.class,
+        KMSACLs.class);
+    return ReflectionUtils.newInstance(aclClass, conf);
   }
 
   @Override
