@@ -600,8 +600,7 @@ extern  "C" {
     tSize hdfsRead(hdfsFS fs, hdfsFile file, void* buffer, tSize length);
 
     /** 
-     * hdfsPread - Positional read of data from an open file. Reads up to the
-     * number of specified bytes in length.
+     * hdfsPread - Positional read of data from an open file.
      * @param fs The configured filesystem handle.
      * @param file The file handle.
      * @param position Position from which to read
@@ -611,24 +610,6 @@ extern  "C" {
      */
     LIBHDFS_EXTERNAL
     tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset position,
-                    void* buffer, tSize length);
-
-    /**
-     * hdfsPreadFully - Positional read of data from an open file. Reads the
-     * number of specified bytes in length, or until the end of the data is
-     * reached. Unlike hdfsRead and hdfsPread, this method does not return
-     * the number of bytes read because either (1) the entire length of the
-     * buffer is filled, or (2) the end of the file is reached. If the eof is
-     * reached, an exception is thrown and errno is set to EINTR.
-     * @param fs The configured filesystem handle.
-     * @param file The file handle.
-     * @param position Position from which to read
-     * @param buffer The buffer to copy read bytes into.
-     * @param length The length of the buffer.
-     * @return Returns 0 on success, -1 on error.
-     */
-    LIBHDFS_EXTERNAL
-    int hdfsPreadFully(hdfsFS fs, hdfsFile file, tOffset position,
                     void* buffer, tSize length);
 
 
@@ -914,6 +895,15 @@ extern  "C" {
      */
     LIBHDFS_EXTERNAL
     tOffset hdfsGetUsed(hdfsFS fs);
+
+
+    /**
+     * hdfsGetRemaining - Return the remaining capacity of the filesystem.
+     * @param fs The configured filesystem handle.
+     * @return Returns the remaining-capacity; -1 on error.
+     */
+    LIBHDFS_EXTERNAL
+    tOffset hdfsGetRemaining(hdfsFS fs);
 
     /** 
      * Change the user and/or group of a file or directory.
