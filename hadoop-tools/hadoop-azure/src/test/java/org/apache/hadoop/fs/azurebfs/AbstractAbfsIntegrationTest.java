@@ -31,6 +31,7 @@ import org.junit.Before;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -84,6 +85,7 @@ public abstract class AbstractAbfsIntegrationTest extends
   private AuthType authType;
   private boolean useConfiguredFileSystem = false;
   private boolean usingFilesystemForSASTests = false;
+  private static final int SHORTENED_GUID_LEN = 12;
 
   protected AbstractAbfsIntegrationTest() throws Exception {
     fileSystemName = TEST_CONTAINER_PREFIX + UUID.randomUUID().toString();
@@ -441,6 +443,16 @@ public abstract class AbstractAbfsIntegrationTest extends
   protected Path path(String filepath) throws IOException {
     return getFileSystem().makeQualified(
         new Path(getTestPath(), filepath));
+  }
+
+  /**
+   * Generate a unique path using the given filepath
+   * @param filepath path string
+   * @return unique path created from filepath and a GUID
+   */
+  protected Path getUniquePath(String filepath) {
+    return new Path(filepath + StringUtils
+        .right(UUID.randomUUID().toString(), SHORTENED_GUID_LEN));
   }
 
   /**
