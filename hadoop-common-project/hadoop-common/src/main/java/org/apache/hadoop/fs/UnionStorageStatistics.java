@@ -20,7 +20,7 @@ package org.apache.hadoop.fs;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.noguava.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -79,12 +79,12 @@ public class UnionStorageStatistics extends StorageStatistics {
   public UnionStorageStatistics(String name, StorageStatistics[] stats) {
     super(name);
 
-    Preconditions.checkArgument(name != null,
+    Preconditions.checkIsTrue(name != null,
         "The name of union storage statistics can not be null!");
-    Preconditions.checkArgument(stats != null,
+    Preconditions.checkIsTrue(stats != null,
         "The stats of union storage statistics can not be null!");
     for (StorageStatistics stat : stats) {
-      Preconditions.checkArgument(stat != null,
+      Preconditions.checkIsTrue(stat != null,
           "The stats of union storage statistics can not have null element!");
     }
 

@@ -33,11 +33,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
-import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
-import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.util.noguava.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
@@ -221,14 +221,14 @@ public class ValueQueue <E> {
   public ValueQueue(final int numValues, final float lowWatermark,
       long expiry, int numFillerThreads, SyncGenerationPolicy policy,
       final QueueRefiller<E> refiller) {
-    Preconditions.checkArgument(numValues > 0, "\"numValues\" must be > 0");
-    Preconditions.checkArgument(((lowWatermark > 0)&&(lowWatermark <= 1)),
+    Preconditions.checkIsTrue(numValues > 0, "\"numValues\" must be > 0");
+    Preconditions.checkIsTrue(((lowWatermark > 0)&&(lowWatermark <= 1)),
         "\"lowWatermark\" must be > 0 and <= 1");
     final int watermarkValue = (int) (numValues * lowWatermark);
-    Preconditions.checkArgument(watermarkValue > 0,
+    Preconditions.checkIsTrue(watermarkValue > 0,
         "(int) (\"numValues\" * \"lowWatermark\") must be > 0");
-    Preconditions.checkArgument(expiry > 0, "\"expiry\" must be > 0");
-    Preconditions.checkArgument(numFillerThreads > 0,
+    Preconditions.checkIsTrue(expiry > 0, "\"expiry\" must be > 0");
+    Preconditions.checkIsTrue(numFillerThreads > 0,
         "\"numFillerThreads\" must be > 0");
     Preconditions.checkNotNull(policy, "\"policy\" must not be null");
     this.refiller = refiller;
@@ -299,18 +299,19 @@ public class ValueQueue <E> {
    * @param keyName the key to drain the Queue for
    */
   public void drain(String keyName) {
-    Runnable e;
-    while ((e = queue.deleteByName(keyName)) != null) {
-      executor.remove(e);
-    }
-    writeLock(keyName);
     try {
-      LinkedBlockingQueue kq = keyQueues.getIfPresent(keyName);
-      if (kq != null) {
-        kq.clear();
+      Runnable e;
+      while ((e = queue.deleteByName(keyName)) != null) {
+        executor.remove(e);
       }
-    } finally {
-      writeUnlock(keyName);
+      writeLock(keyName);
+      try {
+        keyQueues.get(keyName).clear();
+      } finally {
+        writeUnlock(keyName);
+      }
+    } catch (ExecutionException ex) {
+      //NOP
     }
   }
 

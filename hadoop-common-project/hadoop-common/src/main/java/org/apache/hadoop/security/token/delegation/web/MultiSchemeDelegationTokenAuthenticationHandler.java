@@ -36,8 +36,8 @@ import org.apache.hadoop.security.authentication.server.CompositeAuthenticationH
 import org.apache.hadoop.security.authentication.server.HttpConstants;
 import org.apache.hadoop.security.authentication.server.MultiSchemeAuthenticationHandler;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.base.Splitter;
+import org.apache.hadoop.util.noguava.Preconditions;
+import com.google.common.base.Splitter;
 
 /**
  * A {@link CompositeAuthenticationHandler} that supports multiple HTTP
@@ -122,7 +122,7 @@ public class MultiSchemeDelegationTokenAuthenticationHandler extends
           .checkAuthScheme(scheme));
     }
 
-    Preconditions.checkArgument(authSchemes.containsAll(delegationAuthSchemes));
+    Preconditions.checkIsTrue(authSchemes.containsAll(delegationAuthSchemes));
   }
 
   /**

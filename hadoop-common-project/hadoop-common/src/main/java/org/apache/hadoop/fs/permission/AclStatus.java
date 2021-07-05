@@ -22,9 +22,9 @@ import java.util.List;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Objects;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Lists;
+import com.google.common.base.Objects;
+import org.apache.hadoop.util.noguava.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * An AclStatus contains the ACL information of a specific file. AclStatus
@@ -245,7 +245,7 @@ public class AclStatus {
   public FsAction getEffectivePermission(AclEntry entry, FsPermission permArg)
       throws IllegalArgumentException {
     // At least one permission bits should be available.
-    Preconditions.checkArgument(this.permission != null || permArg != null,
+    Preconditions.checkIsTrue(this.permission != null || permArg != null,
         "Permission bits are not available to calculate effective permission");
     if (this.permission != null) {
       // permission bits from server response will have the priority for
@@ -257,7 +257,7 @@ public class AclStatus {
         FsAction entryPerm = entry.getPermission();
         return entryPerm.and(permArg.getGroupAction());
       } else {
-        Preconditions.checkArgument(this.entries.contains(entry)
+        Preconditions.checkIsTrue(this.entries.contains(entry)
             && this.entries.size() >= 3,
             "Passed default ACL entry not found in the list of ACLs");
         // default mask entry for effective permission calculation will be the

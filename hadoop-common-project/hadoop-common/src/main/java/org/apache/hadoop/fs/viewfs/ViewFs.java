@@ -34,7 +34,7 @@ import java.util.Map.Entry;
 
 import java.util.Set;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.noguava.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -196,16 +196,7 @@ public class ViewFs extends AbstractFileSystem {
       return targets;
     }
   }
-
-  /**
-   * Returns the ViewFileSystem type.
-   *
-   * @return <code>viewfs</code>
-   */
-  String getType() {
-    return FsConstants.VIEWFS_TYPE;
-  }
-
+  
   public ViewFs(final Configuration conf) throws IOException,
       URISyntaxException {
     this(FsConstants.VIEWFS_URI, conf);
@@ -231,10 +222,7 @@ public class ViewFs extends AbstractFileSystem {
             CONFIG_VIEWFS_MOUNT_LINKS_AS_SYMLINKS_DEFAULT);
     // Now build  client side view (i.e. client side mount table) from config.
     String authority = theUri.getAuthority();
-    boolean initingUriAsFallbackOnNoMounts =
-        !FsConstants.VIEWFS_TYPE.equals(getType());
-    fsState = new InodeTree<AbstractFileSystem>(conf, authority, theUri,
-        initingUriAsFallbackOnNoMounts) {
+    fsState = new InodeTree<AbstractFileSystem>(conf, authority) {
 
       @Override
       protected AbstractFileSystem getTargetFileSystem(final URI uri)
@@ -548,60 +536,23 @@ public class ViewFs extends AbstractFileSystem {
   public void renameInternal(final Path src, final Path dst,
       final boolean overwrite) throws IOException, UnresolvedLinkException {
     // passing resolveLastComponet as false to catch renaming a mount point 
-    // itself we need to catch this as an internal operation and fail if no
-    // fallback.
-    InodeTree.ResolveResult<AbstractFileSystem> resSrc =
-        fsState.resolve(getUriPath(src), false);
-
+    // itself we need to catch this as an internal operation and fail.
+    InodeTree.ResolveResult<AbstractFileSystem> resSrc = 
+      fsState.resolve(getUriPath(src), false); 
+  
     if (resSrc.isInternalDir()) {
-      if (fsState.getRootFallbackLink() == null) {
-        // If fallback is null, we can't rename from src.
-        throw new AccessControlException(
-            "Cannot Rename within internal dirs of mount table: src=" + src
-                + " is readOnly");
-      }
-      InodeTree.ResolveResult<AbstractFileSystem> resSrcWithLastComp =
-          fsState.resolve(getUriPath(src), true);
-      if (resSrcWithLastComp.isInternalDir() || resSrcWithLastComp
-          .isLastInternalDirLink()) {
-        throw new AccessControlException(
-            "Cannot Rename within internal dirs of mount table: src=" + src
-                + " is readOnly");
-      } else {
-        // This is fallback and let's set the src fs with this fallback
-        resSrc = resSrcWithLastComp;
-      }
+      throw new AccessControlException(
+          "Cannot Rename within internal dirs of mount table: src=" + src
+              + " is readOnly");
     }
 
     InodeTree.ResolveResult<AbstractFileSystem> resDst =
-        fsState.resolve(getUriPath(dst), false);
-
+                                fsState.resolve(getUriPath(dst), false);
     if (resDst.isInternalDir()) {
-      if (fsState.getRootFallbackLink() == null) {
-        // If fallback is null, we can't rename to dst.
-        throw new AccessControlException(
-            "Cannot Rename within internal dirs of mount table: dest=" + dst
-                + " is readOnly");
-      }
-      // if the fallback exist, we may have chance to rename to fallback path
-      // where dst parent is matching to internalDir.
-      InodeTree.ResolveResult<AbstractFileSystem> resDstWithLastComp =
-          fsState.resolve(getUriPath(dst), true);
-      if (resDstWithLastComp.isInternalDir()) {
-        // We need to get fallback here. If matching fallback path not exist, it
-        // will fail later. This is a very special case: Even though we are on
-        // internal directory, we should allow to rename, so that src files will
-        // moved under matching fallback dir.
-        resDst = new InodeTree.ResolveResult<AbstractFileSystem>(
-            InodeTree.ResultKind.INTERNAL_DIR,
-            fsState.getRootFallbackLink().getTargetFileSystem(), "/",
-            new Path(resDstWithLastComp.resolvedPath), false);
-      } else {
-        // The link resolved to some target fs or fallback fs.
-        resDst = resDstWithLastComp;
-      }
+      throw new AccessControlException(
+          "Cannot Rename within internal dirs of mount table: dest=" + dst
+              + " is readOnly");
     }
-
     //Alternate 1: renames within same file system
     URI srcUri = resSrc.targetFileSystem.getUri();
     URI dstUri = resDst.targetFileSystem.getUri();
@@ -1018,21 +969,6 @@ public class ViewFs extends AbstractFileSystem {
     @Override
     public BlockLocation[] getFileBlockLocations(final Path f, final long start,
         final long len) throws FileNotFoundException, IOException {
-      // When application calls listFiles on internalDir, it would return
-      // RemoteIterator from InternalDirOfViewFs. If there is a fallBack, there
-      // is a chance of files exists under that internalDir in fallback.
-      // Iterator#next will call getFileBlockLocations with that files. So, we
-      // should return getFileBlockLocations on fallback. See HDFS-15532.
-      if (!InodeTree.SlashPath.equals(f) && this.fsState
-          .getRootFallbackLink() != null) {
-        AbstractFileSystem linkedFallbackFs =
-            this.fsState.getRootFallbackLink().getTargetFileSystem();
-        Path parent = Path.getPathWithoutSchemeAndAuthority(
-            new Path(theInternalDir.fullPath));
-        Path pathToFallbackFs = new Path(parent, f.getName());
-        return linkedFallbackFs
-            .getFileBlockLocations(pathToFallbackFs, start, len);
-      }
       checkPathIsSlash(f);
       throw new FileNotFoundException("Path points to dir not a file");
     }

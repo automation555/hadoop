@@ -29,9 +29,8 @@ import org.apache.hadoop.io.nativeio.NativeIO;
 
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_WILLNEED;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.util.noguava.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,17 +59,7 @@ public class ReadaheadPool {
       return instance;
     }
   }
-
-  @VisibleForTesting
-  public static void resetInstance() {
-    synchronized (ReadaheadPool.class) {
-      if (instance != null) {
-        instance.pool.shutdownNow();
-        instance = null;
-      }
-    }
-  }
-
+  
   private ReadaheadPool() {
     pool = new ThreadPoolExecutor(POOL_SIZE, MAX_POOL_SIZE, 3L, TimeUnit.SECONDS,
         new ArrayBlockingQueue<Runnable>(CAPACITY));
@@ -107,7 +96,7 @@ public class ReadaheadPool {
       long maxOffsetToRead,
       ReadaheadRequest lastReadahead) {
     
-    Preconditions.checkArgument(curPos <= maxOffsetToRead,
+    Preconditions.checkIsTrue(curPos <= maxOffsetToRead,
         "Readahead position %s higher than maxOffsetToRead %s",
         curPos, maxOffsetToRead);
 

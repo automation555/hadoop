@@ -26,8 +26,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.noguava.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +36,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.audit.CommonAuditContext;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.service.Service;
 import org.apache.hadoop.util.ExitCodeProvider;
@@ -592,7 +591,6 @@ public class ServiceLauncher<S extends Service>
     }
     String name = getServiceName();
     LOG.debug("Launched service {}", name);
-    CommonAuditContext.noteEntryPoint(service);
     LaunchableService launchableService = null;
 
     if (service instanceof LaunchableService) {
@@ -658,10 +656,10 @@ public class ServiceLauncher<S extends Service>
    */
   @SuppressWarnings("unchecked")
   public Service instantiateService(Configuration conf) {
-    Preconditions.checkArgument(conf != null, "null conf");
-    Preconditions.checkArgument(serviceClassName != null,
+    Preconditions.checkIsTrue(conf != null, "null conf");
+    Preconditions.checkIsTrue(serviceClassName != null,
         "null service classname");
-    Preconditions.checkArgument(!serviceClassName.isEmpty(),
+    Preconditions.checkIsTrue(!serviceClassName.isEmpty(),
         "undefined service classname");
     configuration = conf;
 

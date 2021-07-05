@@ -29,7 +29,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.noguava.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -38,15 +38,11 @@ import org.apache.hadoop.fs.impl.FutureDataInputStreamBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.statistics.IOStatistics;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
-import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.LambdaUtils;
 import org.apache.hadoop.util.Progressable;
 
 import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapabilityArgs;
-import static org.apache.hadoop.fs.impl.StoreImplementationUtils.isProbeForSyncable;
 
 /****************************************************************
  * Abstract Checksumed FileSystem.
@@ -138,8 +134,7 @@ public abstract class ChecksumFileSystem extends FilterFileSystem {
    * For open()'s FSInputStream
    * It verifies that data matches checksums.
    *******************************************************/
-  private static class ChecksumFSInputChecker extends FSInputChecker implements
-      IOStatisticsSource {
+  private static class ChecksumFSInputChecker extends FSInputChecker {
     private ChecksumFileSystem fs;
     private FSDataInputStream datas;
     private FSDataInputStream sums;
@@ -275,17 +270,6 @@ public abstract class ChecksumFileSystem extends FilterFileSystem {
       }
       return nread;
     }
-
-    /**
-     * Get the IO Statistics of the nested stream, falling back to
-     * null if the stream does not implement the interface
-     * {@link IOStatisticsSource}.
-     * @return an IOStatistics instance or null
-     */
-    @Override
-    public IOStatistics getIOStatistics() {
-      return IOStatisticsSupport.retrieveIOStatistics(datas);
-    }
   }
   
   private static class FSDataBoundedInputStream extends FSDataInputStream {
@@ -411,8 +395,7 @@ public abstract class ChecksumFileSystem extends FilterFileSystem {
 
   /** This class provides an output stream for a checksummed file.
    * It generates checksums for data. */
-  private static class ChecksumFSOutputSummer extends FSOutputSummer
-      implements IOStatisticsSource, StreamCapabilities {
+  private static class ChecksumFSOutputSummer extends FSOutputSummer {
     private FSDataOutputStream datas;    
     private FSDataOutputStream sums;
     private static final float CHKSUM_AS_FRACTION = 0.01f;
@@ -465,31 +448,6 @@ public abstract class ChecksumFileSystem extends FilterFileSystem {
       if (isClosed) {
         throw new ClosedChannelException();
       }
-    }
-
-    /**
-     * Get the IO Statistics of the nested stream, falling back to
-     * null if the stream does not implement the interface
-     * {@link IOStatisticsSource}.
-     * @return an IOStatistics instance or null
-     */
-    @Override
-    public IOStatistics getIOStatistics() {
-      return IOStatisticsSupport.retrieveIOStatistics(datas);
-    }
-
-    /**
-     * Probe the inner stream for a capability.
-     * Syncable operations are rejected before being passed down.
-     * @param capability string to query the stream support for.
-     * @return true if a capability is known to be supported.
-     */
-    @Override
-    public boolean hasCapability(final String capability) {
-      if (isProbeForSyncable(capability)) {
-        return false;
-      }
-      return datas.hasCapability(capability);
     }
   }
 

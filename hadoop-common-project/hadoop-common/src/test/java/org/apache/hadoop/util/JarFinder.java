@@ -13,7 +13,7 @@
  */
 package org.apache.hadoop.util;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.noguava.Preconditions;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -132,10 +132,6 @@ public class JarFinder {
    * @return path to the Jar containing the class.
    */
   public static String getJar(Class klass) {
-    return getJar(klass, null);
-  }
-
-  public static String getJar(Class klass, String testSubDir) {
     Preconditions.checkNotNull(klass, "klass");
     ClassLoader loader = klass.getClassLoader();
     if (loader != null) {
@@ -158,18 +154,15 @@ public class JarFinder {
             klassName = klassName.replace(".", "/") + ".class";
             path = path.substring(0, path.length() - klassName.length());
             File baseDir = new File(path);
-            File testDir =
-                testSubDir == null ? GenericTestUtils.getTestDir()
-                    : GenericTestUtils.getTestDir(testSubDir);
+            File testDir = GenericTestUtils.getTestDir();
             testDir = testDir.getAbsoluteFile();
             if (!testDir.exists()) {
               testDir.mkdirs();
             }
-            File tempFile = File.createTempFile("hadoop-", "", testDir);
-            File tempJar = new File(tempFile.getAbsolutePath() + ".jar");
+            File tempJar = File.createTempFile("hadoop-", "", testDir);
+            tempJar = new File(tempJar.getAbsolutePath() + ".jar");
             createJar(baseDir, tempJar);
             tempJar.deleteOnExit();
-            tempFile.deleteOnExit();
             return tempJar.getAbsolutePath();
           }
         }

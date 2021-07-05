@@ -27,12 +27,13 @@ import java.lang.management.GarbageCollectorMXBean;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.noguava.Preconditions;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.log.metrics.EventCounter;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -153,6 +154,7 @@ public class JvmMetrics implements MetricsSource {
     } else {
       getThreadUsageFromGroup(rb);
     }
+    getEventCounters(rb);
   }
 
   private void getMemoryUsage(MetricsRecordBuilder rb) {
@@ -282,4 +284,10 @@ public class JvmMetrics implements MetricsSource {
         .addGauge(ThreadsTerminated, threadsTerminated);
   }
 
+  private void getEventCounters(MetricsRecordBuilder rb) {
+    rb.addCounter(LogFatal, EventCounter.getFatal())
+      .addCounter(LogError, EventCounter.getError())
+      .addCounter(LogWarn, EventCounter.getWarn())
+      .addCounter(LogInfo, EventCounter.getInfo());
+  }
 }
