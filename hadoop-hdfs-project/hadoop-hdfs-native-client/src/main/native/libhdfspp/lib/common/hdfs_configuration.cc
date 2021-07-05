@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-#include "common/hdfs_configuration.h"
+#include "hdfspp/hdfs_configuration.h"
 #include "common/logging.h"
 
 #include <exception>
@@ -135,7 +135,7 @@ std::vector<NamenodeInfo> HdfsConfiguration::LookupNameService(const std::string
       URI uri;
       try {
         uri = URI::parse_from_string(PrependHdfsScheme(Get(dom_node_name)));
-      } catch (const uri_parse_error&) {
+      } catch (const uri_parse_error) {
         throw ha_parse_error("unable to find " + dom_node_name);
       }
 
@@ -148,7 +148,7 @@ std::vector<NamenodeInfo> HdfsConfiguration::LookupNameService(const std::string
       NamenodeInfo node(nameservice, *node_id, uri);
       namenodes.push_back(node);
     }
-  } catch (const ha_parse_error& e) {
+  } catch (ha_parse_error e) {
     LOG_ERROR(kRPC, << "HA cluster detected but failed because : " << e.what());
     namenodes.clear(); // Don't return inconsistent view
   }

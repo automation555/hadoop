@@ -16,13 +16,5 @@
 # limitations under the License.
 #
 
-# Default LIBHDFSPP_DIR to the default install location.  You can override
-#    it by add -DLIBHDFSPP_DIR=... to your cmake invocation
-set(LIBHDFSPP_DIR CACHE STRING ${CMAKE_INSTALL_PREFIX})
-
-include_directories( ${LIBHDFSPP_DIR}/include )
-link_directories( ${LIBHDFSPP_DIR}/lib )
-
-add_executable(connect_cancel $<TARGET_OBJECTS:x_platform_obj> connect_cancel.cc)
-target_link_libraries(connect_cancel hdfspp_static)
-target_include_directories(connect_cancel PRIVATE ../../lib)
+add_executable(connect_cancel connect_cancel.cc)
+target_link_libraries(connect_cancel hdfspp)
