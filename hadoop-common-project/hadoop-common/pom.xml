@@ -37,6 +37,7 @@
     <wsce.config.file>wsce-site.xml</wsce.config.file>
   </properties>
 
+
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
@@ -47,11 +48,6 @@
       <artifactId>hadoop-annotations</artifactId>
       <scope>compile</scope>
     </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-guava</artifactId>
-    </dependency>
-    <!--Guava is required during runtime for curator-->
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
@@ -287,6 +283,10 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.htrace</groupId>
+      <artifactId>htrace-core4</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
       <exclusions>
@@ -322,6 +322,7 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk15on</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.kerby</groupId>
@@ -362,14 +363,8 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.xerial.snappy</groupId>
-      <artifactId>snappy-java</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.lz4</groupId>
-      <artifactId>lz4-java</artifactId>
-      <scope>provided</scope>
+      <groupId>io.airlift</groupId>
+      <artifactId>aircompressor</artifactId>
     </dependency>
   </dependencies>
 
@@ -413,12 +408,7 @@
           </execution>
           <execution>
             <id>src-test-compile-protoc</id>
-            <configuration>
-              <skip>false</skip>
-              <excludes>
-                <exclude>*legacy.proto</exclude>
-              </excludes>
-            </configuration>
+            <configuration><skip>false</skip></configuration>
           </execution>
         </executions>
       </plugin>
@@ -439,10 +429,6 @@
             <id>replace-generated-test-sources</id>
             <configuration>
               <skip>false</skip>
-              <excludes>
-                <exclude>**/TestProtosLegacy.java</exclude>
-                <exclude>**/TestRpcServiceProtosLegacy.java</exclude>
-              </excludes>
             </configuration>
           </execution>
           <execution>
@@ -455,7 +441,6 @@
                 <exclude>**/RpcWritable.java</exclude>
                 <exclude>**/ProtobufRpcEngineCallback.java</exclude>
                 <exclude>**/ProtobufRpcEngine.java</exclude>
-                <exclude>**/ProtobufRpcEngine2.java</exclude>
                 <exclude>**/ProtobufRpcEngineProtos.java</exclude>
               </excludes>
             </configuration>
@@ -464,9 +449,6 @@
             <id>replace-test-sources</id>
             <configuration>
               <skip>false</skip>
-              <excludes>
-                <exclude>**/TestProtoBufRpc.java</exclude>
-              </excludes>
             </configuration>
           </execution>
         </executions>
@@ -590,6 +572,11 @@
             <exclude>src/main/native/m4/*</exclude>
             <exclude>src/test/empty-file</exclude>
             <exclude>src/test/all-tests</exclude>
+            <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4.h</exclude>
+            <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4.c</exclude>
+            <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4hc.h</exclude>
+            <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4hc.c</exclude>
+            <exclude>src/main/native/src/org/apache/hadoop/io/compress/lz4/lz4hc_encoder.h</exclude>
             <exclude>src/main/native/gtest/**/*</exclude>
             <exclude>src/test/resources/test-untar.tgz</exclude>
             <exclude>src/test/resources/test.har/_SUCCESS</exclude>
@@ -658,6 +645,10 @@
       </activation>
       <properties>
         <require.bzip2>false</require.bzip2>
+        <snappy.prefix></snappy.prefix>
+        <snappy.lib></snappy.lib>
+        <snappy.include></snappy.include>
+        <require.snappy>false</require.snappy>
         <zstd.prefix></zstd.prefix>
         <zstd.lib></zstd.lib>
         <zstd.include></zstd.include>
@@ -711,7 +702,11 @@
                     <GENERATED_JAVAH>${project.build.directory}/native/javah</GENERATED_JAVAH>
                     <JVM_ARCH_DATA_MODEL>${sun.arch.data.model}</JVM_ARCH_DATA_MODEL>
                     <REQUIRE_BZIP2>${require.bzip2}</REQUIRE_BZIP2>
+                    <REQUIRE_SNAPPY>${require.snappy}</REQUIRE_SNAPPY>
                     <REQUIRE_ZSTD>${require.zstd}</REQUIRE_ZSTD>
+                    <CUSTOM_SNAPPY_PREFIX>${snappy.prefix}</CUSTOM_SNAPPY_PREFIX>
+                    <CUSTOM_SNAPPY_LIB>${snappy.lib} </CUSTOM_SNAPPY_LIB>
+                    <CUSTOM_SNAPPY_INCLUDE>${snappy.include} </CUSTOM_SNAPPY_INCLUDE>
                     <CUSTOM_ZSTD_PREFIX>${zstd.prefix}</CUSTOM_ZSTD_PREFIX>
                     <CUSTOM_ZSTD_LIB>${zstd.lib} </CUSTOM_ZSTD_LIB>
                     <CUSTOM_ZSTD_INCLUDE>${zstd.include} </CUSTOM_ZSTD_INCLUDE>
@@ -766,9 +761,14 @@
         </os>
       </activation>
       <properties>
+        <snappy.prefix></snappy.prefix>
+        <snappy.lib></snappy.lib>
+        <snappy.include></snappy.include>
         <require.isal>false</require.isal>
         <isal.prefix></isal.prefix>
         <isal.lib></isal.lib>
+        <require.snappy>false</require.snappy>
+        <bundle.snappy.in.bin>true</bundle.snappy.in.bin>
         <zstd.prefix></zstd.prefix>
         <zstd.lib></zstd.lib>
         <zstd.include></zstd.include>
@@ -868,6 +868,10 @@
                     <argument>/nologo</argument>
                     <argument>/p:Configuration=Release</argument>
                     <argument>/p:OutDir=${project.build.directory}/bin/</argument>
+                    <argument>/p:CustomSnappyPrefix=${snappy.prefix}</argument>
+                    <argument>/p:CustomSnappyLib=${snappy.lib}</argument>
+                    <argument>/p:CustomSnappyInclude=${snappy.include}</argument>
+                    <argument>/p:RequireSnappy=${require.snappy}</argument>
                     <argument>/p:CustomZstdPrefix=${zstd.prefix}</argument>
                     <argument>/p:CustomZstdLib=${zstd.lib}</argument>
                     <argument>/p:CustomZstdInclude=${zstd.include}</argument>
@@ -1058,18 +1062,6 @@
                   </sources>
                 </configuration>
               </execution>
-              <execution>
-                <id>add-test-source-legacy-protobuf</id>
-                <phase>generate-test-sources</phase>
-                <goals>
-                  <goal>add-test-source</goal>
-                </goals>
-                <configuration>
-                  <sources>
-                    <source>${basedir}/src/test/arm-java</source>
-                  </sources>
-                </configuration>
-              </execution>
             </executions>
           </plugin>
         </plugins>
@@ -1108,28 +1100,6 @@
                   <clearOutputDirectory>false</clearOutputDirectory>
                   <includes>
                     <include>ProtobufRpcEngine.proto</include>
-                  </includes>
-                </configuration>
-              </execution>
-              <execution>
-                <id>src-test-compile-protoc-legacy</id>
-                <phase>generate-test-sources</phase>
-                <goals>
-                  <goal>compile</goal>
-                </goals>
-                <configuration>
-                  <skip>false</skip>
-                  <!--Generating with old protobuf version for backward compatibility-->
-                  <protocArtifact>
-                    com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
-                  </protocArtifact>
-                  <includeDependenciesInDescriptorSet>false</includeDependenciesInDescriptorSet>
-                  <protoSourceRoot>${basedir}/src/test/proto</protoSourceRoot>
-                  <outputDirectory>${project.build.directory}/generated-test-sources/java</outputDirectory>
-                  <clearOutputDirectory>false</clearOutputDirectory>
-                  <includes>
-                    <include>test_legacy.proto</include>
-                    <include>test_rpc_service_legacy.proto</include>
                   </includes>
                 </configuration>
               </execution>

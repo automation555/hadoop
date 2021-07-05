@@ -58,7 +58,7 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
   public static final String IPC_CLIENT_RPC_TIMEOUT_KEY =
       "ipc.client.rpc-timeout.ms";
   /** Default value for IPC_CLIENT_RPC_TIMEOUT_KEY. */
-  public static final int IPC_CLIENT_RPC_TIMEOUT_DEFAULT = 120000;
+  public static final int IPC_CLIENT_RPC_TIMEOUT_DEFAULT = 0;
   /** Responses larger than this will be logged */
   public static final String  IPC_SERVER_RPC_MAX_RESPONSE_SIZE_KEY =
     "ipc.server.max.response.size";
@@ -142,7 +142,7 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
 
   /** Default value for IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY */
   public static final int     IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_DEFAULT =
-    64*1024;
+      256 * 1024;
 
   /** Internal buffer size for Snappy compressor/decompressors */
   public static final String IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY =
@@ -438,28 +438,4 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       "hadoop.metrics.jvm.use-thread-mxbean";
   public static final boolean HADOOP_METRICS_JVM_USE_THREAD_MXBEAN_DEFAULT =
       false;
-
-  /** logging level for IOStatistics (debug or info). */
-  public static final String IOSTATISTICS_LOGGING_LEVEL
-      = "fs.iostatistics.logging.level";
-
-  /** DEBUG logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_DEBUG
-      = "debug";
-
-  /** WARN logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_WARN
-      = "warn";
-
-  /** ERROR logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_ERROR
-      = "error";
-
-  /** INFO logging level for IOStatistics logging. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_INFO
-      = "info";
-
-  /** Default value for IOStatistics logging level. */
-  public static final String IOSTATISTICS_LOGGING_LEVEL_DEFAULT
-      = IOSTATISTICS_LOGGING_LEVEL_DEBUG;
 }
