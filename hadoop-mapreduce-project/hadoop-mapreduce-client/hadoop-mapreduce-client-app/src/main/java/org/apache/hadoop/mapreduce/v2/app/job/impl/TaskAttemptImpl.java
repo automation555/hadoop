@@ -145,8 +145,8 @@ import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,9 +158,6 @@ public abstract class TaskAttemptImpl implements
     org.apache.hadoop.mapreduce.v2.app.job.TaskAttempt,
       EventHandler<TaskAttemptEvent> {
 
-  @VisibleForTesting
-  protected final static Map<TaskType, Resource> RESOURCE_REQUEST_CACHE
-      = new HashMap<>();
   static final Counters EMPTY_COUNTERS = new Counters();
   private static final Logger LOG =
       LoggerFactory.getLogger(TaskAttemptImpl.class);
@@ -175,7 +172,7 @@ public abstract class TaskAttemptImpl implements
   private final Clock clock;
   private final org.apache.hadoop.mapred.JobID oldJobId;
   private final TaskAttemptListener taskAttemptListener;
-  private Resource resourceCapability;
+  private final Resource resourceCapability;
   protected Set<String> dataLocalHosts;
   protected Set<String> dataLocalRacks;
   private final List<String> diagnostics = new ArrayList<String>();
@@ -710,10 +707,6 @@ public abstract class TaskAttemptImpl implements
         getResourceTypePrefix(taskType);
     boolean memorySet = false;
     boolean cpuVcoresSet = false;
-    if (RESOURCE_REQUEST_CACHE.get(taskType) != null) {
-      resourceCapability = RESOURCE_REQUEST_CACHE.get(taskType);
-      return;
-    }
     if (resourceTypePrefix != null) {
       List<ResourceInformation> resourceRequests =
           ResourceUtils.getRequestedResourcesFromConfig(conf,
@@ -774,9 +767,6 @@ public abstract class TaskAttemptImpl implements
     if (!cpuVcoresSet) {
       this.resourceCapability.setVirtualCores(getCpuRequired(conf, taskType));
     }
-    RESOURCE_REQUEST_CACHE.put(taskType, resourceCapability);
-    LOG.info("Resource capability of task type {} is set to {}",
-        taskType, resourceCapability);
   }
 
   private String getCpuVcoresKey(TaskType taskType) {
@@ -2456,7 +2446,11 @@ public abstract class TaskAttemptImpl implements
       // register it to finishing state
       taskAttempt.appContext.getTaskAttemptFinishingMonitor().register(
           taskAttempt.attemptId);
-      notifyTaskAttemptFailed(taskAttempt, false);
+      boolean isFastFail = false;
+      if (event instanceof TaskAttemptFailEvent) {
+        isFastFail = ((TaskAttemptFailEvent) event).isFastFail();
+      }
+      notifyTaskAttemptFailed(taskAttempt, isFastFail);
     }
   }
 

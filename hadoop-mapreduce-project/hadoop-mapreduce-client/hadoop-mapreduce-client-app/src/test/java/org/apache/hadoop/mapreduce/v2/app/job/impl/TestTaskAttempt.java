@@ -38,12 +38,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptFailEvent;
 import org.apache.hadoop.yarn.util.resource.CustomResourceTypesConfigurationProvider;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -88,6 +87,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptFailedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptKilledEvent;
 import org.apache.hadoop.mapreduce.v2.app.rm.ContainerRequestEvent;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
@@ -114,7 +114,7 @@ import org.apache.log4j.spi.LoggingEvent;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class TestTaskAttempt{
@@ -154,11 +154,6 @@ public class TestTaskAttempt{
   @BeforeClass
   public static void setupBeforeClass() {
     ResourceUtils.resetResourceTypes(new Configuration());
-  }
-
-  @Before
-  public void before() {
-    TaskAttemptImpl.RESOURCE_REQUEST_CACHE.clear();
   }
 
   @After
@@ -1727,7 +1722,6 @@ public class TestTaskAttempt{
       TestAppender testAppender = new TestAppender();
       final Logger logger = Logger.getLogger(TaskAttemptImpl.class);
       try {
-        TaskAttemptImpl.RESOURCE_REQUEST_CACHE.clear();
         logger.addAppender(testAppender);
         EventHandler eventHandler = mock(EventHandler.class);
         Clock clock = SystemClock.getInstance();
@@ -1932,6 +1926,40 @@ public class TestTaskAttempt{
         TaskAttemptState.FAILED,
         taImpl.getState());
     assertFalse("InternalError occurred", eventHandler.internalError);
+  }
+
+  @Test
+  public void testFastFailEnabledWhenFailFinishing() throws Exception {
+    MockEventHandler eventHandler = new MockEventHandler();
+    TaskAttemptImpl taImpl = createTaskAttemptImpl(eventHandler);
+    boolean isFastFail = true;
+
+    taImpl.handle(new TaskAttemptFailEvent(taImpl.getID(), isFastFail));
+
+    TaskEvent taskEvent = eventHandler.lastTaskEvent;
+    Assert.assertTrue("Task event is not an TaskTAttemptFailedEvent event",
+        taskEvent instanceof TaskTAttemptFailedEvent);
+    TaskTAttemptFailedEvent taskTAttemptFailedEvent =
+        (TaskTAttemptFailedEvent) taskEvent;
+    Assert.assertTrue("Fast fail is not true",
+        taskTAttemptFailedEvent.isFastFail());
+  }
+
+  @Test
+  public void testFastFailDisabledWhenFailFinishing() throws Exception {
+    MockEventHandler eventHandler = new MockEventHandler();
+    TaskAttemptImpl taImpl = createTaskAttemptImpl(eventHandler);
+    boolean isFastFail = false;
+
+    taImpl.handle(new TaskAttemptFailEvent(taImpl.getID(), isFastFail));
+
+    TaskEvent taskEvent = eventHandler.lastTaskEvent;
+    Assert.assertTrue("Task event is not an TaskTAttemptFailedEvent event",
+        taskEvent instanceof TaskTAttemptFailedEvent);
+    TaskTAttemptFailedEvent taskTAttemptFailedEvent =
+        (TaskTAttemptFailedEvent) taskEvent;
+    Assert.assertFalse("Fast fail is not false",
+        taskTAttemptFailedEvent.isFastFail());
   }
 
   private void setupTaskAttemptFinishingMonitor(
