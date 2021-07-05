@@ -24379,7 +24379,7 @@ to databases, and to files.]]>
       static="false" final="false" visibility="public"
       deprecated="not deprecated">
       <doc>
-      <![CDATA[Get extra options specific to an erasure code.
+      <![CDATA[Get extra options specific to a erasure code.
  @return extra options]]>
       </doc>
     </method>
@@ -31418,7 +31418,7 @@ interface.
       static="false" final="false" visibility="public"
       deprecated="not deprecated">
       <doc>
-      <![CDATA[Returns if delegation token is transmitted as a HTTP header.
+      <![CDATA[Returns if delegation token is transmitted as an HTTP header.
 
  @return <code>TRUE</code> if the token is transmitted in the URL query
  string, <code>FALSE</code> if the delegation token is transmitted using the
