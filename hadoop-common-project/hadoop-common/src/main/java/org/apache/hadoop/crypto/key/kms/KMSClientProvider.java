@@ -79,9 +79,9 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.CryptoExtension;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 import static org.apache.hadoop.util.KMSUtil.checkNotEmpty;
 import static org.apache.hadoop.util.KMSUtil.checkNotNull;
@@ -1174,7 +1174,8 @@ public class KMSClientProvider extends KeyProvider implements CryptoExtension,
       actualUgi = currentUgi.getRealUser();
     }
     if (UserGroupInformation.isSecurityEnabled() &&
-        !containsKmsDt(actualUgi) && !actualUgi.shouldRelogin()) {
+        !containsKmsDt(actualUgi) &&
+        !(actualUgi.isFromKeytab() || actualUgi.isFromTicket())) {
       // Use login user is only necessary when Kerberos is enabled
       // but the actual user does not have either
       // Kerberos credential or KMS delegation token for KMS operations
