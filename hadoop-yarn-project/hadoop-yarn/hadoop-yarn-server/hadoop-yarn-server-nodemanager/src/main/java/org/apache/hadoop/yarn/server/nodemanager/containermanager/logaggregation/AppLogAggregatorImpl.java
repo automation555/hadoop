@@ -110,6 +110,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
   private long logFileSizeThreshold;
   private boolean renameTemporaryLogFileFailed = false;
 
+  private boolean logAggFailed = true;
   private final Map<ContainerId, ContainerLogAggregator> containerLogAggregators =
       new HashMap<ContainerId, ContainerLogAggregator>();
   private final ContainerLogAggregationPolicy logAggPolicy;
@@ -320,6 +321,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         logAggregationSucceedInThisCycle = false;
         LOG.error("Cannot create writer for app " + this.applicationId
             + ". Skip log upload this time. ", e1);
+        logAggFailed = false;
         return;
       }
 
@@ -472,7 +474,6 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       // do post clean up of log directories on any other exception
       LOG.error("Error occurred while aggregating the log for the application "
           + appId, e);
-      doAppLogAggregationPostCleanUp();
     } finally {
       if (!this.appAggregationFinished.get() && !this.aborted.get()) {
         LOG.warn("Log aggregation did not complete for application " + appId);
@@ -515,8 +516,9 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     try {
       // App is finished, upload the container logs.
       uploadLogsForContainers(true);
-
-      doAppLogAggregationPostCleanUp();
+      if (logAggFailed) {
+        doAppLogAggregationPostCleanUp();
+      }
     } catch (LogAggregationDFSException e) {
       LOG.error("Error during log aggregation", e);
     }
