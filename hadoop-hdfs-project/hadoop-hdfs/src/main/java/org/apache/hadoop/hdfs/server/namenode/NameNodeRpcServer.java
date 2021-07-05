@@ -45,6 +45,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -217,7 +219,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.tools.proto.GetUserMappingsProtocolProtos.GetUserMappingsProtocolService;
 import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolPB;
 import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolServerSideTranslatorPB;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.util.VersionUtil;
 import org.slf4j.Logger;
@@ -1617,17 +1618,22 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     boolean noStaleStorages = false;
     try {
       if (bm.checkBlockReportLease(context, nodeReg)) {
-        for (int r = 0; r < reports.length; r++) {
-          final BlockListAsLongs blocks = reports[r].getBlocks();
-          //
-          // BlockManager.processReport accumulates information of prior calls
-          // for the same node and storage, so the value returned by the last
-          // call of this loop is the final updated value for noStaleStorage.
-          //
-          final int index = r;
-          noStaleStorages = bm.runBlockOp(() ->
-            bm.processReport(nodeReg, reports[index].getStorage(),
-                blocks, context));
+        try {
+          bm.addFBRDatanode(nodeReg.getDatanodeUuid());
+          for (int r = 0; r < reports.length; r++) {
+            final BlockListAsLongs blocks = reports[r].getBlocks();
+            //
+            // BlockManager.processReport accumulates information of prior calls
+            // for the same node and storage, so the value returned by the last
+            // call of this loop is the final updated value for noStaleStorage.
+            //
+            final int index = r;
+            noStaleStorages = bm.runBlockOp(() ->
+                    bm.processReport(nodeReg, reports[index].getStorage(),
+                            blocks, context));
+          }
+        } finally {
+          bm.removeFBRDatanode(nodeReg.getDatanodeUuid());
         }
       }
     } catch (UnregisteredNodeException une) {
