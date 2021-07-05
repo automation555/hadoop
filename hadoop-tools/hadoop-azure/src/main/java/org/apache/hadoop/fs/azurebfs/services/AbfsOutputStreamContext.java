@@ -27,22 +27,13 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
 
   private boolean enableFlush;
 
-  private boolean enableSmallWriteOptimization;
-
   private boolean disableOutputStreamFlush;
 
-  private AbfsOutputStreamStatistics streamStatistics;
+  private boolean enableAppendWithFlush;
 
   private boolean isAppendBlob;
 
-  private int writeMaxConcurrentRequestCount;
-
-  private int maxWriteRequestsToQueue;
-
-  private AbfsLease lease;
-
-  public AbfsOutputStreamContext(final long sasTokenRenewPeriodForStreamsInSeconds) {
-    super(sasTokenRenewPeriodForStreamsInSeconds);
+  public AbfsOutputStreamContext() {
   }
 
   public AbfsOutputStreamContext withWriteBufferSize(
@@ -56,20 +47,15 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
     return this;
   }
 
-  public AbfsOutputStreamContext enableSmallWriteOptimization(final boolean enableSmallWriteOptimization) {
-    this.enableSmallWriteOptimization = enableSmallWriteOptimization;
-    return this;
-  }
-
   public AbfsOutputStreamContext disableOutputStreamFlush(
           final boolean disableOutputStreamFlush) {
     this.disableOutputStreamFlush = disableOutputStreamFlush;
     return this;
   }
 
-  public AbfsOutputStreamContext withStreamStatistics(
-      final AbfsOutputStreamStatistics streamStatistics) {
-    this.streamStatistics = streamStatistics;
+  public AbfsOutputStreamContext enableAppendWithFlush(
+          final boolean enableAppendWithFlush) {
+    this.enableAppendWithFlush = enableAppendWithFlush;
     return this;
   }
 
@@ -81,23 +67,6 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
 
   public AbfsOutputStreamContext build() {
     // Validation of parameters to be done here.
-    return this;
-  }
-
-  public AbfsOutputStreamContext withWriteMaxConcurrentRequestCount(
-      final int writeMaxConcurrentRequestCount) {
-    this.writeMaxConcurrentRequestCount = writeMaxConcurrentRequestCount;
-    return this;
-  }
-
-  public AbfsOutputStreamContext withMaxWriteRequestsToQueue(
-      final int maxWriteRequestsToQueue) {
-    this.maxWriteRequestsToQueue = maxWriteRequestsToQueue;
-    return this;
-  }
-
-  public AbfsOutputStreamContext withLease(final AbfsLease lease) {
-    this.lease = lease;
     return this;
   }
 
@@ -113,34 +82,11 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
     return disableOutputStreamFlush;
   }
 
-  public AbfsOutputStreamStatistics getStreamStatistics() {
-    return streamStatistics;
+  public boolean isEnableAppendWithFlush() {
+    return enableAppendWithFlush;
   }
 
   public boolean isAppendBlob() {
     return isAppendBlob;
-  }
-
-  public int getWriteMaxConcurrentRequestCount() {
-    return this.writeMaxConcurrentRequestCount;
-  }
-
-  public int getMaxWriteRequestsToQueue() {
-    return this.maxWriteRequestsToQueue;
-  }
-
-  public boolean isEnableSmallWriteOptimization() {
-    return this.enableSmallWriteOptimization;
-  }
-
-  public AbfsLease getLease() {
-    return this.lease;
-  }
-
-  public String getLeaseId() {
-    if (this.lease == null) {
-      return null;
-    }
-    return this.lease.getLeaseID();
   }
 }
