@@ -28,11 +28,11 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -71,8 +71,8 @@ public class CosNFileSystem extends FileSystem {
   private String owner = "Unknown";
   private String group = "Unknown";
 
-  private ExecutorService boundedIOThreadPool;
-  private ExecutorService boundedCopyThreadPool;
+  private ListeningExecutorService boundedIOThreadPool;
+  private ListeningExecutorService boundedCopyThreadPool;
 
   public CosNFileSystem() {
   }
@@ -354,7 +354,7 @@ public class CosNFileSystem extends FileSystem {
     Path absolutePath = makeAbsolute(f);
     String key = pathToKey(absolutePath);
 
-    if (key.length() == 0) {
+    if (key.isEmpty()) {
       // root always exists
       return newDirectory(absolutePath);
     }

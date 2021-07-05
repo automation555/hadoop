@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListeningExecutorService;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.MoreExecutors;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -77,8 +78,8 @@ public class AliyunOSSFileSystem extends FileSystem {
   private int maxKeys;
   private int maxReadAheadPartNumber;
   private int maxConcurrentCopyTasksPerDir;
-  private ExecutorService boundedThreadPool;
-  private ExecutorService boundedCopyThreadPool;
+  private ListeningExecutorService boundedThreadPool;
+  private ListeningExecutorService boundedCopyThreadPool;
 
   private static final PathFilter DEFAULT_FILTER = new PathFilter() {
     @Override
@@ -259,7 +260,7 @@ public class AliyunOSSFileSystem extends FileSystem {
     String key = pathToKey(qualifiedPath);
 
     // Root always exists
-    if (key.length() == 0) {
+    if (key.isEmpty()) {
       return new OSSFileStatus(0, true, 1, 0, 0, qualifiedPath, username);
     }
 

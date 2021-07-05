@@ -86,8 +86,6 @@ import org.apache.hadoop.hdfs.server.datanode.VolumeScanner;
 import org.apache.hadoop.hdfs.server.namenode.ImageServlet;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.hadoop.util.Lists;
-import org.apache.hadoop.util.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -149,6 +147,8 @@ import org.apache.hadoop.util.ToolRunner;
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Sets;
 
 /**
  * This class creates a single-process DFS cluster for junit testing.
@@ -599,7 +599,7 @@ public class MiniDFSCluster implements AutoCloseable {
                        builder.useConfiguredTopologyMappingClass);
   }
   
-  public static class DataNodeProperties {
+  public class DataNodeProperties {
     final DataNode datanode;
     final Configuration conf;
     String[] dnArgs;
@@ -3368,7 +3368,7 @@ public class MiniDFSCluster implements AutoCloseable {
                            boolean checkDataNodeAddrConfig) throws IOException {
     if (setupHostsFile) {
       String hostsFile = conf.get(DFS_HOSTS, "").trim();
-      if (hostsFile.length() == 0) {
+      if (hostsFile.isEmpty()) {
         throw new IOException("Parameter dfs.hosts is not setup in conf");
       }
       // Setup datanode in the include file, if it is defined in the conf

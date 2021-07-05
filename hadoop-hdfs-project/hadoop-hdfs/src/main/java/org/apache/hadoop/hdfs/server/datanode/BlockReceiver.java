@@ -58,8 +58,8 @@ import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.tracing.Span;
-import org.apache.hadoop.tracing.Tracer;
+import org.apache.htrace.core.Span;
+import org.apache.htrace.core.Tracer;
 
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_DONTNEED;
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.SYNC_FILE_RANGE_WRITE;
@@ -167,7 +167,7 @@ class BlockReceiver implements Closeable {
       this.datanode = datanode;
 
       this.clientname = clientname;
-      this.isDatanode = clientname.length() == 0;
+      this.isDatanode = clientname.isEmpty();
       this.isClient = !this.isDatanode;
       this.restartBudget = datanode.getDnConf().restartReplicaExpiry;
       this.datanodeSlowLogThresholdMs =
@@ -369,7 +369,7 @@ class BlockReceiver implements Closeable {
       streams.close();
     }
     if (replicaHandler != null) {
-      IOUtils.cleanupWithLogger(null, replicaHandler);
+      IOUtils.cleanup(null, replicaHandler);
       replicaHandler = null;
     }
     if (measuredFlushTime) {
@@ -1551,12 +1551,11 @@ class BlockReceiver implements Closeable {
         DatanodeRegistration dnR = datanode.getDNRegistrationForBP(block
             .getBlockPoolId());
         ClientTraceLog.info(String.format(DN_CLIENTTRACE_FORMAT, inAddr,
-            myAddr, replicaInfo.getVolume(), block.getNumBytes(),
-            "HDFS_WRITE", clientname, offset, dnR.getDatanodeUuid(),
-            block, endTime - startTime));
+            myAddr, block.getNumBytes(), "HDFS_WRITE", clientname, offset,
+            dnR.getDatanodeUuid(), block, endTime - startTime));
       } else {
-        LOG.info("Received " + block + " on volume "  + replicaInfo.getVolume()
-            + " size " + block.getNumBytes() + " from " + inAddr);
+        LOG.info("Received " + block + " size " + block.getNumBytes()
+            + " from " + inAddr);
       }
     }
     
