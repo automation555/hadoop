@@ -398,25 +398,23 @@ public class ITestAzureBlobFileSystemDelegationSAS extends AbstractAbfsIntegrati
     String src = "/testABC/test.xt";
     fs.create(new Path(src));
     AbfsRestOperation abfsHttpRestOperation = fs.getAbfsClient()
-        .renamePath(src, "/testABC" + "/abc.txt", null,
-            getTestTracingContext(fs, false));
+        .renamePath(src, "/testABC" + "/abc.txt", null);
     AbfsHttpOperation result = abfsHttpRestOperation.getResult();
-    String url = result.getSignatureMaskedUrl();
-    String encodedUrl = result.getSignatureMaskedEncodedUrl();
+    String url = result.getMaskedUrl();
+    String encodedUrl = result.getMaskedEncodedUrl();
     Assertions.assertThat(url.substring(url.indexOf("sig=")))
         .describedAs("Signature query param should be masked")
-        .startsWith("sig=XXXX");
+        .startsWith("sig=XXXXX");
     Assertions.assertThat(encodedUrl.substring(encodedUrl.indexOf("sig%3D")))
         .describedAs("Signature query param should be masked")
-        .startsWith("sig%3DXXXX");
+        .startsWith("sig%3DXXXXX");
   }
 
   @Test
   public void testSignatureMaskOnExceptionMessage() throws Exception {
     intercept(IOException.class, "sig=XXXX",
         () -> getFileSystem().getAbfsClient()
-            .renamePath("testABC/test.xt", "testABC/abc.txt", null,
-                getTestTracingContext(getFileSystem(), false)));
+            .renamePath("testABC/test.xt", "testABC/abc.txt", null));
   }
 
   @Test
