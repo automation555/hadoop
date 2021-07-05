@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -29,9 +30,9 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.TreeSet;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -40,6 +41,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.QueueACL;
 import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppUtils;
@@ -51,8 +53,7 @@ import static org.apache.hadoop.yarn.util.resource.Resources.none;
 @Private
 @Unstable
 public class FSLeafQueue extends FSQueue {
-  private static final Logger LOG = LoggerFactory.
-      getLogger(FSLeafQueue.class.getName());
+  private static final Log LOG = LogFactory.getLog(FSLeafQueue.class.getName());
   private static final List<FSQueue> EMPTY_LIST = Collections.emptyList();
 
   private FSContext context;
@@ -75,6 +76,7 @@ public class FSLeafQueue extends FSQueue {
   // Track the AM resource usage for this queue
   private Resource amResourceUsage;
 
+  private final RMNodeLabelsManager labelsManager;
   private final ActiveUsersManager activeUsersManager;
 
   public FSLeafQueue(String name, FairScheduler scheduler,
@@ -82,6 +84,7 @@ public class FSLeafQueue extends FSQueue {
     super(name, scheduler, parent);
     this.context = scheduler.getContext();
     this.lastTimeAtMinShare = scheduler.getClock().getTime();
+    this.labelsManager = scheduler.getLabelsManager();
     activeUsersManager = new ActiveUsersManager(getMetrics());
     amResourceUsage = Resource.newInstance(0, 0);
     getMetrics().setAMResourceUsage(amResourceUsage);
@@ -283,7 +286,7 @@ public class FSLeafQueue extends FSQueue {
    */
   void updateStarvedApps() {
     // Fetch apps with pending demand
-    TreeSet<FSAppAttempt> appsWithDemand = fetchAppsWithDemand(false);
+    TreeSet<FSAppAttempt> appsWithDemand = fetchAppsWithPreemptionDemand();
 
     // Process apps with fairshare starvation
     Resource fairShareStarvation = updateStarvedAppsFairshare(appsWithDemand);
@@ -347,23 +350,15 @@ public class FSLeafQueue extends FSQueue {
       return assigned;
     }
 
-    for (FSAppAttempt sched : fetchAppsWithDemand(true)) {
+    for (FSAppAttempt sched : fetchAppsWithDemandForNode(node)) {
       if (SchedulerAppUtils.isPlaceBlacklisted(sched, node, LOG)) {
         continue;
       }
       assigned = sched.assignContainer(node);
-
-      boolean isContainerAssignedOrReserved = !assigned.equals(none());
-      boolean isContainerReserved =
-                assigned.equals(FairScheduler.CONTAINER_RESERVED);
-
-      // check if an assignment or a reservation was made.
-      if (isContainerAssignedOrReserved) {
-        // only log container assignment if there was an actual allocation,
-        // not a reservation.
-        if (!isContainerReserved && LOG.isDebugEnabled()) {
-          LOG.debug("Assigned container in queue:{} container:{}",
-              getName(), assigned);
+      if (!assigned.equals(none())) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Assigned container in queue:" + getName() + " " +
+              "container:" + assigned);
         }
         break;
       }
@@ -371,23 +366,49 @@ public class FSLeafQueue extends FSQueue {
     return assigned;
   }
 
-  /**
-   * Fetch the subset of apps that have unmet demand. When used for
-   * preemption-related code (as opposed to allocation), omits apps that
-   * should not be checked for starvation.
-   *
-   * @param assignment whether the apps are for allocation containers, as
-   *                   opposed to preemption calculations
-   * @return Set of apps with unmet demand
-   */
-  private TreeSet<FSAppAttempt> fetchAppsWithDemand(boolean assignment) {
+  private TreeSet<FSAppAttempt> fetchAppsWithDemandForNode(FSSchedulerNode node) {
     TreeSet<FSAppAttempt> pendingForResourceApps =
         new TreeSet<>(policy.getComparator());
     readLock.lock();
     try {
       for (FSAppAttempt app : runnableApps) {
-        if (!Resources.isNone(app.getPendingDemand()) &&
-            (assignment || app.shouldCheckForStarvation())) {
+        Resource pending;
+        if (node.getPartition().isEmpty()) {
+          pending = app.getAppAttemptResourceUsage().getPending();
+        } else {
+          pending = app.getAppAttemptResourceUsage().getPending(node.getPartition());
+          if (pending.equals(Resources.none())
+              && !labelsManager.isExclusiveNodeLabel(node.getPartition())) {
+            pending = app.getAppAttemptResourceUsage().getPending();
+          }
+        }
+        if (!Resources.isNone(pending)) {
+          pendingForResourceApps.add(app);
+        }
+      }
+    } catch (IOException e) {
+      LOG.warn("Exception when trying to get exclusivity of node label=" +
+            node.getPartition(), e);
+      return pendingForResourceApps;
+    } finally {
+      readLock.unlock();
+    }
+    return pendingForResourceApps;
+  }
+
+  /**
+   * Fetch the subset of apps that have unmet demand. Omits apps that
+   * should not be checked for starvation.
+   *
+   * @return Set of apps with unmet demand
+   */
+  private TreeSet<FSAppAttempt> fetchAppsWithPreemptionDemand() {
+    TreeSet<FSAppAttempt> pendingForResourceApps =
+        new TreeSet<>(policy.getComparator());
+    readLock.lock();
+    try {
+      for (FSAppAttempt app : runnableApps) {
+        if (!Resources.isNone(app.getPendingDemand()) && app.shouldCheckForStarvation()) {
           pendingForResourceApps.add(app);
         }
       }
@@ -466,20 +487,6 @@ public class FSLeafQueue extends FSQueue {
     }
   }
 
-  @Override
-  public boolean isEmpty() {
-    readLock.lock();
-    try {
-      if (runnableApps.size() > 0 || nonRunnableApps.size() > 0 ||
-          assignedApps.size() > 0) {
-        return false;
-      }
-    } finally {
-      readLock.unlock();
-    }
-    return true;
-  }
-
   /**
    * TODO: Based on how frequently this is called, we might want to club
    * counting pending and active apps in the same method.
@@ -514,22 +521,17 @@ public class FSLeafQueue extends FSQueue {
   */
   private Resource computeMaxAMResource() {
     Resource maxResource = Resources.clone(getFairShare());
-    Resource maxShare = getMaxShare();
-
     if (maxResource.getMemorySize() == 0) {
       maxResource.setMemorySize(
           Math.min(scheduler.getRootQueueMetrics().getAvailableMB(),
-                   maxShare.getMemorySize()));
+                   getMaxShare().getMemorySize()));
     }
 
     if (maxResource.getVirtualCores() == 0) {
       maxResource.setVirtualCores(Math.min(
           scheduler.getRootQueueMetrics().getAvailableVirtualCores(),
-          maxShare.getVirtualCores()));
+          getMaxShare().getVirtualCores()));
     }
-
-    scheduler.getRootQueueMetrics()
-        .fillInValuesFromAvailableResources(maxShare, maxResource);
 
     // Round up to allow AM to run when there is only one vcore on the cluster
     return Resources.multiplyAndRoundUp(maxResource, maxAMShare);
@@ -675,20 +677,6 @@ public class FSLeafQueue extends FSQueue {
     writeLock.lock();
     try {
       assignedApps.add(applicationId);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  /**
-   * This method is called when an application is removed from this queue
-   * during the submit process.
-   * @param applicationId the application's id
-   */
-  public void removeAssignedApp(ApplicationId applicationId) {
-    writeLock.lock();
-    try {
-      assignedApps.remove(applicationId);
     } finally {
       writeLock.unlock();
     }
