@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.AbstractQueue;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.BlockingQueue;
@@ -33,8 +32,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto;
 
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,10 +77,8 @@ public class CallQueueManager<E extends Schedulable>
     int priorityLevels = parseNumLevels(namespace, conf);
     this.scheduler = createScheduler(schedulerClass, priorityLevels,
         namespace, conf);
-    int[] capacityWeights = parseCapacityWeights(priorityLevels,
-        namespace, conf);
     BlockingQueue<E> bq = createCallQueueInstance(backingClass,
-        priorityLevels, maxQueueSize, namespace, capacityWeights, conf);
+        priorityLevels, maxQueueSize, namespace, conf);
     this.clientBackOffEnabled = clientBackOffEnabled;
     this.serverFailOverEnabled = conf.getBoolean(
         namespace + "." +
@@ -150,14 +146,13 @@ public class CallQueueManager<E extends Schedulable>
 
   private <T extends BlockingQueue<E>> T createCallQueueInstance(
       Class<T> theClass, int priorityLevels, int maxLen, String ns,
-      int[] capacityWeights, Configuration conf) {
+      Configuration conf) {
 
     // Used for custom, configurable callqueues
     try {
       Constructor<T> ctor = theClass.getDeclaredConstructor(int.class,
-          int.class, String.class, int[].class, Configuration.class);
-      return ctor.newInstance(priorityLevels, maxLen, ns,
-          capacityWeights, conf);
+          int.class, String.class, Configuration.class);
+      return ctor.newInstance(priorityLevels, maxLen, ns, conf);
     } catch (RuntimeException e) {
       throw e;
     } catch (InvocationTargetException e) {
@@ -211,19 +206,6 @@ public class CallQueueManager<E extends Schedulable>
   // This should be only called once per call and cached in the call object
   int getPriorityLevel(Schedulable e) {
     return scheduler.getPriorityLevel(e);
-  }
-
-  int getPriorityLevel(UserGroupInformation user) {
-    if (scheduler instanceof DecayRpcScheduler) {
-      return ((DecayRpcScheduler)scheduler).getPriorityLevel(user);
-    }
-    return 0;
-  }
-
-  void setPriorityLevel(UserGroupInformation user, int priority) {
-    if (scheduler instanceof DecayRpcScheduler) {
-      ((DecayRpcScheduler)scheduler).setPriorityLevel(user, priority);
-    }
   }
 
   void setClientBackoffEnabled(boolean value) {
@@ -362,47 +344,6 @@ public class CallQueueManager<E extends Schedulable>
   }
 
   /**
-   * Read the weights of capacity in callqueue and pass the value to
-   * callqueue constructions.
-   */
-  private static int[] parseCapacityWeights(
-      int priorityLevels, String ns, Configuration conf) {
-    int[] weights = conf.getInts(ns + "." +
-      CommonConfigurationKeys.IPC_CALLQUEUE_CAPACITY_WEIGHTS_KEY);
-    if (weights.length == 0) {
-      weights = getDefaultQueueCapacityWeights(priorityLevels);
-    } else if (weights.length != priorityLevels) {
-      throw new IllegalArgumentException(
-          CommonConfigurationKeys.IPC_CALLQUEUE_CAPACITY_WEIGHTS_KEY + " must "
-              + "specify " + priorityLevels + " capacity weights: one for each "
-              + "priority level");
-    } else {
-      // only allow positive numbers
-      for (int w : weights) {
-        if (w <= 0) {
-          throw new IllegalArgumentException(
-              CommonConfigurationKeys.IPC_CALLQUEUE_CAPACITY_WEIGHTS_KEY +
-                  " only takes positive weights. " + w + " capacity weight " +
-                  "found");
-        }
-      }
-    }
-    return weights;
-  }
-
-  /**
-   * By default, queue capacity is the same for all priority levels.
-   *
-   * @param priorityLevels number of levels
-   * @return default weights
-   */
-  public static int[] getDefaultQueueCapacityWeights(int priorityLevels) {
-    int[] weights = new int[priorityLevels];
-    Arrays.fill(weights, 1);
-    return weights;
-  }
-
-  /**
    * Replaces active queue with the newly requested one and transfers
    * all calls to the newQ before returning.
    */
@@ -414,9 +355,8 @@ public class CallQueueManager<E extends Schedulable>
     this.scheduler.stop();
     RpcScheduler newScheduler = createScheduler(schedulerClass, priorityLevels,
         ns, conf);
-    int[] capacityWeights = parseCapacityWeights(priorityLevels, ns, conf);
     BlockingQueue<E> newQ = createCallQueueInstance(queueClassToUse,
-        priorityLevels, maxSize, ns, capacityWeights, conf);
+        priorityLevels, maxSize, ns, conf);
 
     // Our current queue becomes the old queue
     BlockingQueue<E> oldQ = putRef.get();
@@ -447,6 +387,7 @@ public class CallQueueManager<E extends Schedulable>
       try {
         Thread.sleep(CHECKPOINT_INTERVAL_MS);
       } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
         return false;
       }
       if (!q.isEmpty()) {

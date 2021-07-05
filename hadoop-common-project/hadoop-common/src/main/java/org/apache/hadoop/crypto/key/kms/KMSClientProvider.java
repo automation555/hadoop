@@ -79,9 +79,9 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.CryptoExtension;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 import static org.apache.hadoop.util.KMSUtil.checkNotEmpty;
 import static org.apache.hadoop.util.KMSUtil.checkNotNull;
@@ -1044,12 +1044,10 @@ public class KMSClientProvider extends KeyProvider implements CryptoExtension,
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } catch (IOException ioe) {
+      throw ioe;
     } catch (Exception e) {
-      if (e instanceof IOException) {
-        throw (IOException) e;
-      } else {
-        throw new IOException(e);
-      }
+      throw new IOException(e);
     }
     return token;
   }

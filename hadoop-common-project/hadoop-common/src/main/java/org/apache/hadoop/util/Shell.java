@@ -28,14 +28,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.alias.AbstractJavaKeyStoreProvider;
@@ -872,7 +871,6 @@ public abstract class Shell {
     this.interval = interval;
     this.lastTime = (interval < 0) ? 0 : -interval;
     this.redirectErrorStream = redirectErrorStream;
-    this.environment = Collections.emptyMap();
   }
 
   /**
@@ -880,7 +878,7 @@ public abstract class Shell {
    * @param env Mapping of environment variables
    */
   protected void setEnvironment(Map<String, String> env) {
-    this.environment = Objects.requireNonNull(env);
+    this.environment = env;
   }
 
   /**
@@ -917,7 +915,9 @@ public abstract class Shell {
       builder.environment().clear();
     }
 
-    builder.environment().putAll(this.environment);
+    if (environment != null) {
+      builder.environment().putAll(this.environment);
+    }
 
     if (dir != null) {
       builder.directory(this.dir);
@@ -1008,9 +1008,9 @@ public abstract class Shell {
         throw new ExitCodeException(exitCode, errMsg.toString());
       }
     } catch (InterruptedException ie) {
-      InterruptedIOException iie = new InterruptedIOException(ie.toString());
-      iie.initCause(ie);
-      throw iie;
+      Thread.currentThread().interrupt();
+      throw (InterruptedIOException) new InterruptedIOException(ie.toString())
+          .initCause(ie);
     } finally {
       if (timeOutTimer != null) {
         timeOutTimer.cancel();
@@ -1038,15 +1038,19 @@ public abstract class Shell {
   }
 
   private static void joinThread(Thread t) {
+    boolean interrupted = false;
     while (t.isAlive()) {
       try {
         t.join();
       } catch (InterruptedException ie) {
-        if (LOG.isWarnEnabled()) {
-          LOG.warn("Interrupted while joining on: " + t, ie);
-        }
+        LOG.warn("Interrupted while joining on: {}", t, ie);
+        interrupted = true;
         t.interrupt(); // propagate interrupt
       }
+    }
+    if (interrupted) {
+      // Restore the interrupt
+      Thread.currentThread().interrupt();
     }
   }
 

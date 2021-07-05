@@ -28,8 +28,8 @@ import org.apache.hadoop.util.LightWeightCache;
 import org.apache.hadoop.util.LightWeightGSet;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -282,15 +282,19 @@ public class RetryCache {
         "Entry from the cache should not be null");
     // Wait for in progress request to complete
     synchronized (mapEntry) {
+      boolean interrupted = false;
       while (mapEntry.state == CacheEntry.INPROGRESS) {
         try {
           mapEntry.wait();
         } catch (InterruptedException ie) {
-          // Restore the interrupted status
-          Thread.currentThread().interrupt();
+          interrupted = true;
         }
       }
-      // Previous request has failed, the expectation is that it will be
+      if (interrupted) {
+        // Restore the interrupted status
+        Thread.currentThread().interrupt();
+      }
+      // Previous request has failed, the expectation is is that it will be
       // retried again.
       if (mapEntry.state != CacheEntry.SUCCESS) {
         mapEntry.state = CacheEntry.INPROGRESS;

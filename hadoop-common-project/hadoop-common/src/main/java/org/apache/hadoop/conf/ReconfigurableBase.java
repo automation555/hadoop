@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.conf;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
 import org.slf4j.Logger;
@@ -206,6 +206,7 @@ public abstract class ReconfigurableBase
     try {
       tempThread.join();
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 

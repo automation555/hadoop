@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 import org.apache.hadoop.conf.Configured;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
@@ -163,6 +163,7 @@ public class SshFenceByTcpPort extends Configured
       return rc == 0;
     } catch (InterruptedException e) {
       LOG.warn("Interrupted while trying to fence via ssh", e);
+      Thread.currentThread().interrupt();
       return false;
     } catch (IOException e) {
       LOG.warn("Unknown failure while trying to fence via ssh", e);

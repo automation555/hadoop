@@ -38,7 +38,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Time;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -278,7 +278,7 @@ public class TrashPolicyDefault extends TrashPolicy {
         try {                                     // sleep for interval
           Thread.sleep(end - now);
         } catch (InterruptedException e) {
-          break;                                  // exit on interrupt
+          break; // exit on interrupt
         }
 
         try {

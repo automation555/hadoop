@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.util;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +63,7 @@ public class ShutdownThreadsHelper {
       return true;
     } catch (InterruptedException ie) {
       LOG.warn("Interrupted while shutting down thread - " + thread.getName());
+      Thread.currentThread().interrupt();
       return false;
     }
   }

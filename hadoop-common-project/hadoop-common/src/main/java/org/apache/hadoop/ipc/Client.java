@@ -18,10 +18,9 @@
 
 package org.apache.hadoop.ipc;
 
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -54,8 +53,8 @@ import org.apache.hadoop.util.ProtoUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.AsyncGet;
-import org.apache.hadoop.tracing.Span;
-import org.apache.hadoop.tracing.Tracer;
+import org.apache.htrace.core.Span;
+import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -650,7 +649,6 @@ public class Client implements AutoCloseable {
     
     private synchronized void setupConnection(
         UserGroupInformation ticket) throws IOException {
-      LOG.debug("Setup connection to " + server.toString());
       short ioFailures = 0;
       short timeoutFailures = 0;
       while (true) {
@@ -713,16 +711,8 @@ public class Client implements AutoCloseable {
         } catch (IOException ie) {
           if (updateAddress()) {
             timeoutFailures = ioFailures = 0;
-            try {
-              // HADOOP-17068: when server changed, ignore the exception.
-              handleConnectionFailure(ioFailures++, ie);
-            } catch (IOException ioe) {
-              LOG.warn("Exception when handle ConnectionFailure: "
-                  + ioe.getMessage());
-            }
-          } else {
-            handleConnectionFailure(ioFailures++, ie);
           }
+          handleConnectionFailure(ioFailures++, ie);
         }
       }
     }
@@ -771,17 +761,8 @@ public class Client implements AutoCloseable {
               throw (IOException) new IOException(msg).initCause(ex);
             }
           } else {
-            // With RequestHedgingProxyProvider, one rpc call will send multiple
-            // requests to all namenodes. After one request return successfully,
-            // all other requests will be interrupted. It's not a big problem,
-            // and should not print a warning log.
-            if (ex instanceof InterruptedIOException) {
-              LOG.debug("Exception encountered while connecting to the server",
-                  ex);
-            } else {
-              LOG.warn("Exception encountered while connecting to the server ",
-                  ex);
-            }
+            LOG.warn("Exception encountered while connecting to "
+                + "the server : " + ex);
           }
           if (ex instanceof RemoteException)
             throw (RemoteException) ex;
@@ -858,8 +839,7 @@ public class Client implements AutoCloseable {
               }
             } else if (UserGroupInformation.isSecurityEnabled()) {
               if (!fallbackAllowed) {
-                throw new AccessControlException(
-                    "Server asks us to fall back to SIMPLE " +
+                throw new IOException("Server asks us to fall back to SIMPLE " +
                     "auth, but this client is configured to only allow secure " +
                     "connections.");
               }
@@ -971,7 +951,8 @@ public class Client implements AutoCloseable {
       try {
         Thread.sleep(action.delayMillis);
       } catch (InterruptedException e) {
-        throw (IOException)new InterruptedIOException("Interrupted: action="
+        Thread.currentThread().interrupt();
+        throw (IOException) new InterruptedIOException("Interrupted: action="
             + action + ", retry policy=" + connectionRetryPolicy).initCause(e);
       }
       LOG.info("Retrying connect to server: " + server + ". Already tried "
@@ -1051,7 +1032,9 @@ public class Client implements AutoCloseable {
         if (timeout>0) {
           try {
             wait(timeout);
-          } catch (InterruptedException e) {}
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
         }
       }
       
@@ -1288,7 +1271,7 @@ public class Client implements AutoCloseable {
           cleanupCalls();
         }
       } else {
-        // Log the newest server information if update address.
+        // log the info
         if (LOG.isDebugEnabled()) {
           LOG.debug("closing ipc connection to " + server + ": " +
               closeException.getMessage(),closeException);
@@ -1375,16 +1358,22 @@ public class Client implements AutoCloseable {
       conn.interrupt();
       conn.interruptConnectingThread();
     }
-    
+
     // wait until all connections are closed
+    boolean interrupted = false;
     synchronized (emptyCondition) {
       // synchronized the loop to guarantee wait must be notified.
       while (!connections.isEmpty()) {
         try {
           emptyCondition.wait();
         } catch (InterruptedException e) {
+          interrupted = true;
         }
       }
+    }
+    if (interrupted) {
+      // Restore the interrupted status
+      Thread.currentThread().interrupt();
     }
     clientExcecutorFactory.unrefAndCleanup();
   }
@@ -1471,10 +1460,8 @@ public class Client implements AutoCloseable {
         throw new IOException("connection has been closed", e);
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
-        IOException ioe = new InterruptedIOException(
-            "Interrupted waiting to send RPC request to server");
-        ioe.initCause(ie);
-        throw ioe;
+        throw (InterruptedIOException) new InterruptedIOException(
+            "Interrupted waiting to send RPC request to server").initCause(ie);
       }
     } catch(Exception e) {
       if (isAsynchronousMode()) {
@@ -1564,7 +1551,8 @@ public class Client implements AutoCloseable {
           }
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
-          throw new InterruptedIOException("Call interrupted");
+          throw (IOException) new InterruptedIOException("Call interrupted")
+              .initCause(ie);
         }
       }
 
