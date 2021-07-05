@@ -52,6 +52,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DAT
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
@@ -109,7 +111,7 @@ class BlockManagerSafeMode {
   /** Timestamp of the safe mode initialized. */
   private long startTime;
   /** the safe mode monitor thread. */
-  private final Daemon smmthread = new Daemon(new SafeModeMonitor());
+  private final Daemon smmthread;
 
   /** time of the last status printout */
   private long lastStatusReport;
@@ -156,6 +158,8 @@ class BlockManagerSafeMode {
         MILLISECONDS);
 
     this.inRollBack = isInRollBackMode(NameNode.getStartupOption(conf));
+
+    smmthread = new Daemon(new SafeModeMonitor(conf));
 
     LOG.info("{} = {}", DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY, threshold);
     LOG.info("{} = {}", DFS_NAMENODE_SAFEMODE_MIN_DATANODES_KEY,
@@ -638,9 +642,22 @@ class BlockManagerSafeMode {
    * Periodically check whether it is time to leave safe mode.
    * This thread starts when the threshold level is reached.
    */
-  private class SafeModeMonitor implements Runnable {
+  final private class SafeModeMonitor implements Runnable {
     /** Interval in msec for checking safe mode. */
-    private static final long RECHECK_INTERVAL = 1000;
+    private long recheckInterval;
+
+    private SafeModeMonitor(Configuration conf) {
+      recheckInterval = conf.getLong(
+              DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_KEY,
+              DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_DEFAULT);
+      if (recheckInterval < 1) {
+        LOG.warn("Invalid value for " +
+            DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_DEFAULT +
+            ".Should be greater than 0, but is {}", recheckInterval);
+        recheckInterval = DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_DEFAULT;
+      }
+      LOG.info("Using {} as SafeModeMonitor Interval", recheckInterval);
+    }
 
     @Override
     public void run() {
@@ -660,7 +677,7 @@ class BlockManagerSafeMode {
         }
 
         try {
-          Thread.sleep(RECHECK_INTERVAL);
+          Thread.sleep(recheckInterval);
         } catch (InterruptedException ignored) {
         }
       }
