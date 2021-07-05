@@ -63,13 +63,10 @@ import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughputDescription;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
-
-import org.apache.hadoop.fs.s3a.impl.InternalConstants;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListeningExecutorService;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.MoreExecutors;;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -457,8 +454,7 @@ public class DynamoDBMetadataStore implements MetadataStore,
     instrumentation = context.getInstrumentation()
         .getS3GuardInstrumentation();
     username = context.getUsername();
-    executor = MoreExecutors.listeningDecorator(
-        context.createThrottledExecutor());
+    executor = context.createThrottledExecutor();
     ttlTimeProvider = Preconditions.checkNotNull(
         context.getTimeProvider(),
         "ttlTimeProvider must not be null");
@@ -513,14 +509,13 @@ public class DynamoDBMetadataStore implements MetadataStore,
     // the executor capacity for work.
     int executorCapacity = intOption(conf,
         EXECUTOR_CAPACITY, DEFAULT_EXECUTOR_CAPACITY, 1);
-    executor = MoreExecutors.listeningDecorator(
-        BlockingThreadPoolExecutorService.newInstance(
-            executorCapacity,
-            executorCapacity * 2,
-              longOption(conf, KEEPALIVE_TIME,
-                  DEFAULT_KEEPALIVE_TIME, 0),
-                  TimeUnit.SECONDS,
-                  "s3a-ddb-" + tableName));
+    executor = BlockingThreadPoolExecutorService.newInstance(
+        executorCapacity,
+        executorCapacity * 2,
+        longOption(conf, KEEPALIVE_TIME,
+            DEFAULT_KEEPALIVE_TIME, 0),
+        TimeUnit.SECONDS,
+        "s3a-ddb-" + tableName);
     initDataAccessRetries(conf);
     this.ttlTimeProvider = ttlTp;
 
@@ -595,7 +590,7 @@ public class DynamoDBMetadataStore implements MetadataStore,
     }
     // the policy on whether repeating delete operations is based
     // on that of S3A itself
-    boolean idempotent = InternalConstants.DELETE_CONSIDERED_IDEMPOTENT;
+    boolean idempotent = S3AFileSystem.DELETE_CONSIDERED_IDEMPOTENT;
     if (tombstone) {
       Preconditions.checkArgument(ttlTimeProvider != null, "ttlTimeProvider "
           + "must not be null");
@@ -914,9 +909,8 @@ public class DynamoDBMetadataStore implements MetadataStore,
         // this is a root entry: do not add it.
         break;
       }
-      // add it to the ancestor state, failing if it is already there and
-      // of a different type.
-      DDBPathMetadata oldEntry = ancestorState.put(path, entry);
+      // look up the ancestor state
+      DDBPathMetadata oldEntry = ancestorState.get(path);
       boolean addAncestors = true;
       if (oldEntry != null) {
         // check for and warn if the existing bulk operation has an inconsistent
@@ -932,8 +926,6 @@ public class DynamoDBMetadataStore implements MetadataStore,
           LOG.warn("Overwriting a S3Guard file created in the operation: {}",
               oldEntry);
           LOG.warn("With new entry: {}", entry);
-          // restore the old state
-          ancestorState.put(path, oldEntry);
           // then raise an exception
           throw new PathIOException(path.toString(),
               String.format("%s old %s new %s",
@@ -947,6 +939,12 @@ public class DynamoDBMetadataStore implements MetadataStore,
           // and we skip the the subsequent parent scan as we've already been
           // here
           addAncestors = false;
+        }
+      } else {
+        // entry not found in the ancestor state.
+        // add it if it is a directory
+        if (entry.getFileStatus().isDirectory()) {
+          ancestorState.put(path, entry);
         }
       }
       // add the entry to the ancestry map as an explicitly requested entry.
