@@ -23,15 +23,15 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
 import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.MetaRecoveryContext;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeLayoutVersion;
 import org.apache.hadoop.util.StringUtils;
 
@@ -61,6 +61,12 @@ public interface HdfsServerConstants {
    */
   int NAMENODE_LAYOUT_VERSION
       = NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION;
+  /**
+   * Current layout version for DataNode.
+   * Please see {@link DataNodeLayoutVersion.Feature} on adding new layout version.
+   */
+  int DATANODE_LAYOUT_VERSION
+      = DataNodeLayoutVersion.CURRENT_LAYOUT_VERSION;
   /**
    * Path components that are reserved in HDFS.
    * <p>
@@ -288,10 +294,6 @@ public interface HdfsServerConstants {
     /** Temporary replica: created for replication and relocation only. */
     TEMPORARY(4);
 
-    // Since ReplicaState (de)serialization depends on ordinal, either adding
-    // new value should be avoided to this enum or newly appended value should
-    // be handled by NameNodeLayoutVersion#Feature.
-
     private static final ReplicaState[] cachedValues = ReplicaState.values();
 
     private final int value;
@@ -304,32 +306,13 @@ public interface HdfsServerConstants {
       return value;
     }
 
-    /**
-     * Retrieve ReplicaState corresponding to given index.
-     *
-     * @param v Index to retrieve {@link ReplicaState}.
-     * @return {@link ReplicaState} object.
-     * @throws IndexOutOfBoundsException if the index is invalid.
-     */
     public static ReplicaState getState(int v) {
-      Validate.validIndex(cachedValues, v, "Index Expected range: [0, "
-          + (cachedValues.length - 1) + "]. Actual value: " + v);
       return cachedValues[v];
     }
 
-    /**
-     * Retrieve ReplicaState corresponding to index provided in binary stream.
-     *
-     * @param in Index value provided as bytes in given binary stream.
-     * @return {@link ReplicaState} object.
-     * @throws IOException if an I/O error occurs while reading bytes.
-     * @throws IndexOutOfBoundsException if the index is invalid.
-     */
+    /** Read from in */
     public static ReplicaState read(DataInput in) throws IOException {
-      byte idx = in.readByte();
-      Validate.validIndex(cachedValues, idx, "Index Expected range: [0, "
-          + (cachedValues.length - 1) + "]. Actual value: " + idx);
-      return cachedValues[idx];
+      return cachedValues[in.readByte()];
     }
 
     /** Write to out */
@@ -383,14 +366,12 @@ public interface HdfsServerConstants {
       "security.hdfs.unreadable.by.superuser";
   String XATTR_ERASURECODING_POLICY =
       "system.hdfs.erasurecoding.policy";
-  String XATTR_SNAPSHOT_DELETED = "system.hdfs.snapshot.deleted";
 
   String XATTR_SATISFY_STORAGE_POLICY = "user.hdfs.sps";
+  String XATTR_SYNC_TO_EXTERNAL = "user.hdfs.sync";
 
   Path MOVER_ID_PATH = new Path("/system/mover.id");
 
   long BLOCK_GROUP_INDEX_MASK = 15;
   byte MAX_BLOCKS_IN_GROUP = 16;
-  // maximum bandwidth per datanode 1TB/sec.
-  long MAX_BANDWIDTH_PER_DATANODE = 1099511627776L;
 }

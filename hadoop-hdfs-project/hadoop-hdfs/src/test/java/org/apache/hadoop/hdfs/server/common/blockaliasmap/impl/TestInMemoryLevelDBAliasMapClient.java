@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdfs.server.common.blockaliasmap.impl;
 
+import com.google.common.collect.Lists;
+import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -26,9 +28,7 @@ import org.apache.hadoop.hdfs.server.aliasmap.InMemoryAliasMap;
 import org.apache.hadoop.hdfs.server.aliasmap.InMemoryLevelDBAliasMapServer;
 import org.apache.hadoop.hdfs.server.common.blockaliasmap.BlockAliasMap;
 import org.apache.hadoop.hdfs.server.common.FileRegion;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
-import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.net.NetUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -36,6 +36,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_BIND_HOST_KEY;
+import static org.apache.hadoop.test.LambdaTestUtils.assertOptionalUnset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -44,7 +45,6 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -71,13 +71,11 @@ public class TestInMemoryLevelDBAliasMapClient {
   @Before
   public void setUp() throws IOException {
     conf = new Configuration();
-    int port = 9876;
+    int port = NetUtils.getFreeSocketPort();
 
     conf.set(DFSConfigKeys.DFS_PROVIDED_ALIASMAP_INMEMORY_RPC_ADDRESS,
         "localhost:" + port);
-    File testDir = GenericTestUtils.getTestDir();
-    tempDir = Files
-        .createTempDirectory(testDir.toPath(), "test").toFile();
+    tempDir = Files.createTempDir();
     File levelDBDir = new File(tempDir, BPID);
     levelDBDir.mkdirs();
     conf.set(DFSConfigKeys.DFS_PROVIDED_ALIASMAP_INMEMORY_LEVELDB_DIR,
@@ -95,7 +93,7 @@ public class TestInMemoryLevelDBAliasMapClient {
   }
 
   @Test
-  public void writeRead() throws Exception {
+  public void writeReadRemove() throws Exception {
     levelDBAliasMapServer.setConf(conf);
     levelDBAliasMapServer.start();
     inMemoryLevelDBAliasMapClient.setConf(conf);
@@ -113,6 +111,8 @@ public class TestInMemoryLevelDBAliasMapClient {
     Optional<FileRegion> fileRegion = reader.resolve(block);
     assertEquals(new FileRegion(block, providedStorageLocation),
         fileRegion.get());
+    writer.remove(block);
+    assertOptionalUnset("Block should not exist", reader.resolve(block));
   }
 
   @Test
@@ -357,7 +357,7 @@ public class TestInMemoryLevelDBAliasMapClient {
   @Test
   public void testServerBindHost() throws Exception {
     conf.set(DFS_NAMENODE_SERVICE_RPC_BIND_HOST_KEY, "0.0.0.0");
-    writeRead();
+    writeReadRemove();
   }
 
   @Test
@@ -378,7 +378,7 @@ public class TestInMemoryLevelDBAliasMapClient {
 
     BlockAliasMap.Reader<FileRegion> reader =
         inMemoryLevelDBAliasMapClient.getReader(null, BPID);
-    LambdaTestUtils.assertOptionalUnset("Expected empty BlockAlias",
+    assertOptionalUnset("Expected empty BlockAlias",
         reader.resolve(block1));
   }
 }

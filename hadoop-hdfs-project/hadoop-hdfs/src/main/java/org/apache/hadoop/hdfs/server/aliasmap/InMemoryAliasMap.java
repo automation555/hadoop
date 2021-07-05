@@ -16,8 +16,9 @@
  */
 package org.apache.hadoop.hdfs.server.aliasmap;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.protobuf.InvalidProtocolBufferException;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
+import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
@@ -37,7 +38,6 @@ import org.apache.hadoop.hdfs.server.namenode.ImageServlet;
 import org.apache.hadoop.hdfs.server.namenode.TransferFsImage;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.util.Lists;
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
@@ -53,9 +53,9 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
@@ -180,6 +180,11 @@ public class InMemoryAliasMap implements InMemoryAliasMapProtocol,
     levelDb.put(extendedBlockDbFormat, providedStorageLocationDbFormat);
   }
 
+  public void remove(@Nonnull Block block) throws IOException {
+    byte[] extendedBlockDbFormat = toProtoBufBytes(block);
+    levelDb.delete(extendedBlockDbFormat);
+  }
+
   @Override
   public String getBlockPoolId() {
     return blockPoolID;
@@ -218,8 +223,7 @@ public class InMemoryAliasMap implements InMemoryAliasMapProtocol,
 
   public static byte[] toProtoBufBytes(@Nonnull Block block)
       throws IOException {
-    BlockProto blockProto =
-        PBHelperClient.convert(block);
+    BlockProto blockProto = PBHelperClient.convert(block);
     ByteArrayOutputStream blockOutputStream = new ByteArrayOutputStream();
     blockProto.writeTo(blockOutputStream);
     return blockOutputStream.toByteArray();
@@ -320,15 +324,20 @@ public class InMemoryAliasMap implements InMemoryAliasMapProtocol,
   private static File getCompressedAliasMap(File aliasMapDir)
       throws IOException {
     File outCompressedFile = new File(aliasMapDir.getParent(), TAR_NAME);
-
-    try (BufferedOutputStream bOut = new BufferedOutputStream(
-            Files.newOutputStream(outCompressedFile.toPath()));
-         GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(bOut);
-         TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)){
-
+    BufferedOutputStream bOut = null;
+    GzipCompressorOutputStream gzOut = null;
+    TarArchiveOutputStream tOut = null;
+    try {
+      bOut = new BufferedOutputStream(new FileOutputStream(outCompressedFile));
+      gzOut = new GzipCompressorOutputStream(bOut);
+      tOut = new TarArchiveOutputStream(gzOut);
       addFileToTarGzRecursively(tOut, aliasMapDir, "", new Configuration());
+    } finally {
+      if (tOut != null) {
+        tOut.finish();
+      }
+      IOUtils.cleanupWithLogger(null, tOut, gzOut, bOut);
     }
-
     return outCompressedFile;
   }
 
