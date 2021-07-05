@@ -19,11 +19,11 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-project</artifactId>
-    <version>3.4.0-SNAPSHOT</version>
+    <version>3.1.3</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
   <artifactId>hadoop-aws</artifactId>
-  <version>3.4.0-SNAPSHOT</version>
+  <version>3.1.3</version>
   <name>Apache Hadoop Amazon Web Services support</name>
   <description>
     This module contains code to support integration with Amazon Web Services.
@@ -35,8 +35,8 @@
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
     <hadoop.tmp.dir>${project.build.directory}/test</hadoop.tmp.dir>
-    <javadoc.skip.jdk11>true</javadoc.skip.jdk11>
 
+    <dynamodb.local.version>1.11.86</dynamodb.local.version>
     <!-- are scale tests enabled ? -->
     <fs.s3a.scale.test.enabled>unset</fs.s3a.scale.test.enabled>
     <!-- Size in MB of huge files. -->
@@ -49,13 +49,7 @@
     <fs.s3a.s3guard.test.enabled>false</fs.s3a.s3guard.test.enabled>
     <fs.s3a.s3guard.test.authoritative>false</fs.s3a.s3guard.test.authoritative>
     <fs.s3a.s3guard.test.implementation>local</fs.s3a.s3guard.test.implementation>
-    <!-- Set a longer timeout for integration test (in milliseconds) -->
-    <test.integration.timeout>200000</test.integration.timeout>
 
-    <!--   should directory marker retention be audited? -->
-    <fs.s3a.directory.marker.audit>false</fs.s3a.directory.marker.audit>
-    <!--    marker retention policy -->
-    <fs.s3a.directory.marker.retention></fs.s3a.directory.marker.retention>
   </properties>
 
   <profiles>
@@ -127,9 +121,6 @@
                 <fs.s3a.scale.test.huge.filesize>${fs.s3a.scale.test.huge.filesize}</fs.s3a.scale.test.huge.filesize>
                 <fs.s3a.scale.test.huge.huge.partitionsize>${fs.s3a.scale.test.huge.partitionsize}</fs.s3a.scale.test.huge.huge.partitionsize>
                 <fs.s3a.scale.test.timeout>${fs.s3a.scale.test.timeout}</fs.s3a.scale.test.timeout>
-                <!-- Markers-->
-                <fs.s3a.directory.marker.retention>${fs.s3a.directory.marker.retention}</fs.s3a.directory.marker.retention>
-                <fs.s3a.directory.marker.audit>${fs.s3a.directory.marker.audit}</fs.s3a.directory.marker.audit>
               </systemPropertyVariables>
             </configuration>
           </plugin>
@@ -170,9 +161,7 @@
                     <fs.s3a.s3guard.test.enabled>${fs.s3a.s3guard.test.enabled}</fs.s3a.s3guard.test.enabled>
                     <fs.s3a.s3guard.test.authoritative>${fs.s3a.s3guard.test.authoritative}</fs.s3a.s3guard.test.authoritative>
                     <fs.s3a.s3guard.test.implementation>${fs.s3a.s3guard.test.implementation}</fs.s3a.s3guard.test.implementation>
-                    <fs.s3a.directory.marker.retention>${fs.s3a.directory.marker.retention}</fs.s3a.directory.marker.retention>
 
-                    <test.default.timeout>${test.integration.timeout}</test.default.timeout>
                   </systemPropertyVariables>
                   <!-- Some tests cannot run in parallel.  Tests that cover -->
                   <!-- access to the root directory must run in isolation -->
@@ -193,16 +182,6 @@
                     <exclude>**/ITestS3AFileContextStatistics.java</exclude>
                     <exclude>**/ITestS3AEncryptionSSEC*.java</exclude>
                     <exclude>**/ITestS3AHuge*.java</exclude>
-                    <!-- this sets out to overlaod DynamoDB, so must be run standalone -->
-                    <exclude>**/ITestDynamoDBMetadataStoreScale.java</exclude>
-                    <!-- Terasort MR jobs spawn enough processes that they use up all RAM -->
-                    <exclude>**/ITestTerasort*.java</exclude>
-                    <!-- Root marker tool tests -->
-                    <exclude>**/ITestMarkerToolRootOperations.java</exclude>
-                    <!-- operations across the metastore -->
-                    <exclude>**/ITestS3GuardDDBRootOperations.java</exclude>
-                    <!-- leave this until the end for better statistics -->
-                    <exclude>**/ITestAggregateIOStatistics.java</exclude>
                   </excludes>
                 </configuration>
               </execution>
@@ -227,33 +206,14 @@
                     <fs.s3a.s3guard.test.enabled>${fs.s3a.s3guard.test.enabled}</fs.s3a.s3guard.test.enabled>
                     <fs.s3a.s3guard.test.implementation>${fs.s3a.s3guard.test.implementation}</fs.s3a.s3guard.test.implementation>
                     <fs.s3a.s3guard.test.authoritative>${fs.s3a.s3guard.test.authoritative}</fs.s3a.s3guard.test.authoritative>
-                    <!-- Markers-->
-                    <fs.s3a.directory.marker.retention>${fs.s3a.directory.marker.retention}</fs.s3a.directory.marker.retention>
-                    <fs.s3a.directory.marker.audit>${fs.s3a.directory.marker.audit}</fs.s3a.directory.marker.audit>
                   </systemPropertyVariables>
                   <!-- Do a sequential run for tests that cannot handle -->
                   <!-- parallel execution. -->
                   <includes>
-                    <include>**/ITestS3AFileContextStatistics.java</include>
-                    <!-- large uploads consuming all bandwidth -->
-                    <include>**/ITestS3AHuge*.java</include>
-                    <!-- SSE encrypted files confuse everything else -->
-                    <include>**/ITestS3AEncryptionSSEC*.java</include>
-                    <!-- this sets out to overlaod DynamoDB, so must be run standalone -->
-                    <include>**/ITestDynamoDBMetadataStoreScale.java</include>
-                    <!-- the terasort tests both work with a file in the same path in -->
-                    <!--  the local FS. Running them sequentially guarantees isolation -->
-                    <!-- and that they don't conflict with the other MR jobs for RAM -->
-                    <include>**/ITestTerasort*.java</include>
-                    <!-- Root marker tool tests -->
-                    <!-- MUST be run before the other root ops so there's
-                     more likelihood of files in the bucket -->
-                    <include>**/ITestMarkerToolRootOperations.java</include>
-                    <!-- operations across the metastore -->
                     <include>**/ITestS3AContractRootDir.java</include>
-                    <include>**/ITestS3GuardDDBRootOperations.java</include>
-                    <!-- leave this until the end for better statistics -->
-                    <include>**/ITestAggregateIOStatistics.java</include>
+                    <include>**/ITestS3AFileContextStatistics.java</include>
+                    <include>**/ITestS3AHuge*.java</include>
+                    <include>**/ITestS3AEncryptionSSEC*.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -290,9 +250,6 @@
                     <fs.s3a.s3guard.test.enabled>${fs.s3a.s3guard.test.enabled}</fs.s3a.s3guard.test.enabled>
                     <fs.s3a.s3guard.test.implementation>${fs.s3a.s3guard.test.implementation}</fs.s3a.s3guard.test.implementation>
                     <fs.s3a.s3guard.test.authoritative>${fs.s3a.s3guard.test.authoritative}</fs.s3a.s3guard.test.authoritative>
-                    <!-- Markers-->
-                    <fs.s3a.directory.marker.retention>${fs.s3a.directory.marker.retention}</fs.s3a.directory.marker.retention>
-                    <fs.s3a.directory.marker.audit>${fs.s3a.directory.marker.audit}</fs.s3a.directory.marker.audit>
                   </systemPropertyVariables>
                   <forkedProcessTimeoutInSeconds>${fs.s3a.scale.test.timeout}</forkedProcessTimeoutInSeconds>
                 </configuration>
@@ -342,10 +299,23 @@
       </properties>
     </profile>
 
+    <!-- Switch to DynamoDBLocal for S3Guard. Has no effect unless S3Guard is enabled -->
+    <profile>
+      <id>dynamodblocal</id>
+      <activation>
+        <property>
+          <name>dynamodblocal</name>
+        </property>
+      </activation>
+      <properties>
+        <fs.s3a.s3guard.test.implementation>dynamodblocal</fs.s3a.s3guard.test.implementation>
+      </properties>
+    </profile>
+
     <!-- Switch S3Guard from Authoritative=false to true
      Has no effect unless S3Guard is enabled -->
     <profile>
-      <id>auth</id>
+      <id>non-auth</id>
       <activation>
         <property>
           <name>auth</name>
@@ -356,52 +326,15 @@
       </properties>
     </profile>
 
-    <!-- Directory marker retention options, all from the -Dmarkers value-->
-    <profile>
-      <id>keep-markers</id>
-      <activation>
-        <property>
-          <name>markers</name>
-          <value>keep</value>
-        </property>
-      </activation>
-      <properties >
-        <fs.s3a.directory.marker.retention>keep</fs.s3a.directory.marker.retention>
-      </properties>
-    </profile>
-    <profile>
-      <id>delete-markers</id>
-      <activation>
-        <property>
-          <name>markers</name>
-          <value>delete</value>
-        </property>
-      </activation>
-      <properties >
-        <fs.s3a.directory.marker.retention>delete</fs.s3a.directory.marker.retention>
-      </properties>
-    </profile>
-    <profile>
-      <id>auth-markers</id>
-      <activation>
-        <property>
-          <name>markers</name>
-          <value>authoritative</value>
-        </property>
-      </activation>
-      <properties >
-        <fs.s3a.directory.marker.retention>authoritative</fs.s3a.directory.marker.retention>
-      </properties>
-    </profile>
-
   </profiles>
 
   <build>
     <plugins>
       <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
         <configuration>
+          <findbugsXmlOutput>true</findbugsXmlOutput>
           <xmlOutput>true</xmlOutput>
           <excludeFilterFile>${basedir}/dev-support/findbugs-exclude.xml
           </excludeFilterFile>
@@ -413,9 +346,6 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
-          <systemPropertyVariables>
-            <test.default.timeout>${test.integration.timeout}</test.default.timeout>
-          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>
@@ -488,14 +418,24 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-core</artifactId>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>DynamoDBLocal</artifactId>
+      <version>${dynamodb.local.version}</version>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.wildfly.openssl</groupId>
-      <artifactId>wildfly-openssl</artifactId>
-      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.hamcrest</groupId>
+          <artifactId>hamcrest-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-http</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -504,7 +444,7 @@
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
+      <artifactId>mockito-all</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -570,25 +510,15 @@
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-minikdc</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-library</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <!-- Used to create SSL certs for a secure Keystore -->
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk15on</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk15on</artifactId>
-      <scope>test</scope>
+      <groupId>cglib</groupId>
+      <artifactId>cglib</artifactId>
+      <version>3.2.0</version>
+      <exclusions>
+         <exclusion>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+         </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 </project>
