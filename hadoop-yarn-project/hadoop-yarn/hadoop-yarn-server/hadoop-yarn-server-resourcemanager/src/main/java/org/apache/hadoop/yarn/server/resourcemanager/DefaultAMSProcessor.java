@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.ams.ApplicationMasterServiceContext;
 import org.apache.hadoop.yarn.ams.ApplicationMasterServiceUtils;
@@ -39,7 +39,6 @@ import org.apache.hadoop.yarn.api.records.ContainerUpdateType;
 import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeReport;
-import org.apache.hadoop.yarn.api.records.NodeUpdateType;
 import org.apache.hadoop.yarn.api.records.PreemptionContainer;
 import org.apache.hadoop.yarn.api.records.PreemptionContract;
 import org.apache.hadoop.yarn.api.records.PreemptionMessage;
@@ -53,13 +52,9 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.InvalidContainerReleaseException;
 import org.apache.hadoop.yarn.exceptions.InvalidResourceBlacklistRequestException;
 import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException;
-import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException
-        .InvalidResourceType;
-import org.apache.hadoop.yarn.exceptions.SchedulerInvalidResoureRequestException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
-import org.apache.hadoop.yarn.server.resourcemanager.resource.ResourceProfilesManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt
@@ -88,15 +83,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
-
-import static org.apache.hadoop.yarn.exceptions
-        .InvalidResourceRequestException.InvalidResourceType
-        .GREATER_THEN_MAX_ALLOCATION;
-import static org.apache.hadoop.yarn.exceptions
-        .InvalidResourceRequestException.InvalidResourceType.LESS_THAN_ZERO;
 
 /**
  * This is the default Application Master Service processor. It has be the
@@ -104,8 +91,7 @@ import static org.apache.hadoop.yarn.exceptions
  */
 final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DefaultAMSProcessor.class);
+  private static final Log LOG = LogFactory.getLog(DefaultAMSProcessor.class);
 
   private final static List<Container> EMPTY_CONTAINER_LIST =
       new ArrayList<Container>();
@@ -116,20 +102,12 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
       RecordFactoryProvider.getRecordFactory(null);
 
   private RMContext rmContext;
-  private ResourceProfilesManager resourceProfilesManager;
-  private boolean timelineServiceV2Enabled;
-  private boolean nodelabelsEnabled;
   private Set<String> exclusiveEnforcedPartitions;
 
   @Override
   public void init(ApplicationMasterServiceContext amsContext,
       ApplicationMasterServiceProcessor nextProcessor) {
     this.rmContext = (RMContext)amsContext;
-    this.resourceProfilesManager = rmContext.getResourceProfilesManager();
-    this.timelineServiceV2Enabled = YarnConfiguration.
-        timelineServiceV2Enabled(rmContext.getYarnConfiguration());
-    this.nodelabelsEnabled = YarnConfiguration
-        .areNodeLabelsEnabled(rmContext.getYarnConfiguration());
     this.exclusiveEnforcedPartitions = YarnConfiguration
         .getExclusiveEnforcedPartitions(rmContext.getYarnConfiguration());
   }
@@ -205,12 +183,6 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     response.setSchedulerResourceTypes(getScheduler()
         .getSchedulingResourceTypes());
     response.setResourceTypes(ResourceUtils.getResourcesTypeInfo());
-    if (getRmContext().getYarnConfiguration().getBoolean(
-        YarnConfiguration.RM_RESOURCE_PROFILES_ENABLED,
-        YarnConfiguration.DEFAULT_RM_RESOURCE_PROFILES_ENABLED)) {
-      response.setResourceProfiles(
-          resourceProfilesManager.getResourceProfiles());
-    }
   }
 
   @Override
@@ -226,10 +198,10 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
         request.getResourceBlacklistRequest();
     List<String> blacklistAdditions =
         (blacklistRequest != null) ?
-            blacklistRequest.getBlacklistAdditions() : Collections.emptyList();
+            blacklistRequest.getBlacklistAdditions() : Collections.EMPTY_LIST;
     List<String> blacklistRemovals =
         (blacklistRequest != null) ?
-            blacklistRequest.getBlacklistRemovals() : Collections.emptyList();
+            blacklistRequest.getBlacklistRemovals() : Collections.EMPTY_LIST;
     RMApp app =
         getRmContext().getRMApps().get(appAttemptId.getApplicationId());
 
@@ -253,10 +225,10 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     try {
       RMServerUtils.normalizeAndValidateRequests(ask,
           maximumCapacity, app.getQueue(),
-          getScheduler(), getRmContext(), nodelabelsEnabled);
+          getScheduler(), getRmContext());
     } catch (InvalidResourceRequestException e) {
-      RMAppAttempt rmAppAttempt = app.getRMAppAttempt(appAttemptId);
-      handleInvalidResourceException(e, rmAppAttempt);
+      LOG.warn("Invalid resource ask by application " + appAttemptId, e);
+      throw e;
     }
 
     try {
@@ -298,14 +270,10 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
           " state, ignore container allocate request.");
       allocation = EMPTY_ALLOCATION;
     } else {
-      try {
-        allocation = getScheduler().allocate(appAttemptId, ask,
-            request.getSchedulingRequests(), release,
-            blacklistAdditions, blacklistRemovals, containerUpdateRequests);
-      } catch (SchedulerInvalidResoureRequestException e) {
-        LOG.warn("Exceptions caught when scheduler handling requests");
-        throw new YarnException(e);
-      }
+      allocation =
+          getScheduler().allocate(appAttemptId, ask, release,
+              blacklistAdditions, blacklistRemovals,
+              containerUpdateRequests);
     }
 
     if (!blacklistAdditions.isEmpty() || !blacklistRemovals.isEmpty()) {
@@ -341,7 +309,8 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     response.setNumClusterNodes(getScheduler().getNumClusterNodes());
 
     // add collector address for this application
-    if (timelineServiceV2Enabled) {
+    if (YarnConfiguration.timelineServiceV2Enabled(
+        getRmContext().getYarnConfiguration())) {
       CollectorInfo collectorInfo = app.getCollectorInfo();
       if (collectorInfo != null) {
         response.setCollectorInfo(collectorInfo);
@@ -354,32 +323,13 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     // Set application priority
     response.setApplicationPriority(app
         .getApplicationPriority());
-
-    response.setContainersFromPreviousAttempts(
-        allocation.getPreviousAttemptContainers());
-
-    response.setRejectedSchedulingRequests(allocation.getRejectedRequest());
-
-  }
-
-  private void handleInvalidResourceException(InvalidResourceRequestException e,
-          RMAppAttempt rmAppAttempt) throws InvalidResourceRequestException {
-    if (e.getInvalidResourceType() == LESS_THAN_ZERO ||
-            e.getInvalidResourceType() == GREATER_THEN_MAX_ALLOCATION) {
-      rmAppAttempt.updateAMLaunchDiagnostics(e.getMessage());
-    }
-    LOG.warn("Invalid resource ask by application " +
-            rmAppAttempt.getAppAttemptId(), e);
-    throw e;
   }
 
   private void handleNodeUpdates(RMApp app, AllocateResponse allocateResponse) {
-    Map<RMNode, NodeUpdateType> updatedNodes = new HashMap<>();
+    List<RMNode> updatedNodes = new ArrayList<>();
     if(app.pullRMNodeUpdates(updatedNodes) > 0) {
       List<NodeReport> updatedNodeReports = new ArrayList<>();
-      for(Map.Entry<RMNode, NodeUpdateType> rmNodeEntry :
-          updatedNodes.entrySet()) {
-        RMNode rmNode = rmNodeEntry.getKey();
+      for(RMNode rmNode: updatedNodes) {
         SchedulerNodeReport schedulerNodeReport =
             getScheduler().getNodeReport(rmNode.getNodeID());
         Resource used = BuilderUtils.newResource(0, 0);
@@ -394,8 +344,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
                 rmNode.getHttpAddress(), rmNode.getRackName(), used,
                 rmNode.getTotalCapability(), numContainers,
                 rmNode.getHealthReport(), rmNode.getLastHealthReportTime(),
-                rmNode.getNodeLabels(), rmNode.getDecommissioningTimeout(),
-                rmNodeEntry.getValue());
+                rmNode.getNodeLabels());
 
         updatedNodeReports.add(report);
       }

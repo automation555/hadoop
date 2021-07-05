@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.yarn.api.protocolrecords.impl.pb;
 
-
-import java.nio.ByteBuffer;
-import java.util.*;
-
+import com.google.protobuf.ByteString;
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
@@ -35,8 +33,6 @@ import org.apache.hadoop.yarn.api.records.impl.pb.NMTokenPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoUtils;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourcePBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ResourceTypeInfoPBImpl;
-import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProfilesProto;
-import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProfileEntry;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationACLMapProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
@@ -46,9 +42,13 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterR
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.RegisterApplicationMasterResponseProtoOrBuilder;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
-import org.apache.hadoop.thirdparty.protobuf.TextFormat;
-
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 @Private
 @Unstable
@@ -64,7 +64,6 @@ public class RegisterApplicationMasterResponsePBImpl extends
   private List<Container> containersFromPreviousAttempts = null;
   private List<NMToken> nmTokens = null;
   private EnumSet<SchedulerResourceTypes> schedulerResourceTypes = null;
-  private Map<String, Resource> profiles = null;
   private List<ResourceTypeInfo> resourceTypeInfo = null;
 
   public RegisterApplicationMasterResponsePBImpl() {
@@ -129,9 +128,6 @@ public class RegisterApplicationMasterResponsePBImpl extends
     }
     if(schedulerResourceTypes != null) {
       addSchedulerResourceTypes();
-    }
-    if (profiles != null) {
-      addResourceProfiles();
     }
     if (resourceTypeInfo != null) {
       addResourceTypeInfosToProto();
@@ -443,58 +439,6 @@ public class RegisterApplicationMasterResponsePBImpl extends
     initSchedulerResourceTypes();
     this.schedulerResourceTypes.clear();
     this.schedulerResourceTypes.addAll(types);
-  }
-
-  private void addResourceProfiles() {
-    maybeInitBuilder();
-    builder.clearResourceProfiles();
-    if (profiles == null) {
-      return;
-    }
-    ResourceProfilesProto.Builder profilesBuilder =
-        ResourceProfilesProto.newBuilder();
-    for (Map.Entry<String, Resource> entry : profiles.entrySet()) {
-      ResourceProfileEntry.Builder entryBuilder =
-          ResourceProfileEntry.newBuilder();
-      entryBuilder.setName(entry.getKey());
-      entryBuilder.setResources(convertToProtoFormat(entry.getValue()));
-      profilesBuilder.addResourceProfilesMap(entryBuilder.build());
-    }
-    builder.setResourceProfiles(profilesBuilder.build());
-  }
-
-  private void initResourceProfiles() {
-    if (this.profiles != null) {
-      return;
-    }
-    this.profiles = new HashMap<>();
-    RegisterApplicationMasterResponseProtoOrBuilder p =
-        viaProto ? proto : builder;
-
-    if (p.hasResourceProfiles()) {
-      ResourceProfilesProto profilesProto = p.getResourceProfiles();
-      for (ResourceProfileEntry entry : profilesProto
-          .getResourceProfilesMapList()) {
-        this.profiles
-            .put(entry.getName(), convertFromProtoFormat(entry.getResources()));
-      }
-    }
-  }
-
-  @Override
-  public Map<String, Resource> getResourceProfiles() {
-    initResourceProfiles();
-    return this.profiles;
-  }
-
-  @Override
-  public void setResourceProfiles(Map<String, Resource> profilesMap) {
-    if (profilesMap == null) {
-      return;
-    }
-    initResourceProfiles();
-    this.profiles.clear();
-    this.profiles.putAll(profilesMap);
   }
 
   private Resource convertFromProtoFormat(ResourceProto resource) {

@@ -207,25 +207,6 @@ public abstract class RegisterApplicationMasterResponse {
       EnumSet<SchedulerResourceTypes> types);
 
   /**
-   * Get list of supported resource profiles from RM.
-   *
-   * @return a map of resource profiles and its capabilities.
-   */
-  @Public
-  @Unstable
-  public abstract Map<String, Resource> getResourceProfiles();
-
-  /**
-   * Set supported resource profiles for RM.
-   *
-   * @param profiles
-   *          a map of resource profiles with its capabilities.
-   */
-  @Private
-  @Unstable
-  public abstract void setResourceProfiles(Map<String, Resource> profiles);
-
-  /**
    * Get available resource types supported by RM.
    *
    * @return a Map of RM settings
