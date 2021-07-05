@@ -85,8 +85,8 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableSet;
 
 public class TestRMAdminCLI {
 
@@ -216,9 +216,12 @@ public class TestRMAdminCLI {
   
   @Test
   public void testRefreshQueues() throws Exception {
+    ByteArrayOutputStream dataOut = new ByteArrayOutputStream();
+    System.setOut(new PrintStream(dataOut));
     String[] args = { "-refreshQueues" };
     assertEquals(0, rmAdminCLI.run(args));
     verify(admin).refreshQueues(any(RefreshQueuesRequest.class));
+    assertTrue(dataOut.toString().contains("success"));
   }
 
   @Test
