@@ -26,8 +26,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.ADLStoreOptions;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
@@ -39,25 +39,16 @@ import com.microsoft.azure.datalake.store.oauth2.ClientCredsTokenProvider;
 import com.microsoft.azure.datalake.store.oauth2.DeviceCodeTokenProvider;
 import com.microsoft.azure.datalake.store.oauth2.MsiTokenProvider;
 import com.microsoft.azure.datalake.store.oauth2.RefreshTokenBasedTokenProvider;
+import org.apache.hadoop.fs.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonPathCapabilities;
-import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.ContentSummary.Builder;
-import org.apache.hadoop.fs.CreateFlag;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.InvalidPathException;
-import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Options.Rename;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.adl.oauth2.AzureADTokenProvider;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
@@ -71,7 +62,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.VersionInfo;
 
 import static org.apache.hadoop.fs.adl.AdlConfKeys.*;
-import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapabilityArgs;
 
 /**
  * A FileSystem to access Azure Data Lake Store.
@@ -127,11 +117,20 @@ public class AdlFileSystem extends FileSystem {
    * @param originalConf  the configuration to use for the FS. The account-
    *                      specific options are patched over the base ones
    *                      before any use is made of the config.
+   * @throws InvalidCharactersException if an invalid character is found
+   *                      in the uri.
    */
   @Override
   public void initialize(URI storeUri, Configuration originalConf)
       throws IOException {
     String hostname = storeUri.getHost();
+
+    // check invalid characters in hostname
+    if (hostname == null){
+      if(storeUri.toString().contains("_")){
+        throw new InvalidCharactersException("Underscore is illegal in URI : " + storeUri);
+      }
+    }
     String accountName = getAccountNameFromFQDN(hostname);
     Configuration conf = propagateAccountOptions(originalConf, accountName);
 
@@ -196,18 +195,6 @@ public class AdlFileSystem extends FileSystem {
     options.setUserAgentSuffix(clientVersion + "/" +
         VersionInfo.getVersion().trim() + "/" + clusterName + "/"
         + clusterType);
-
-    int timeout = conf.getInt(ADL_HTTP_TIMEOUT, -1);
-    if (timeout > 0) {
-      // only set timeout if specified in config. Otherwise use SDK default
-      options.setDefaultTimeout(timeout);
-    } else {
-      LOG.info("No valid ADL SDK timeout configured: using SDK default.");
-    }
-
-    String sslChannelMode = conf.get(ADL_SSL_CHANNEL_MODE,
-        "Default");
-    options.setSSLChannelMode(sslChannelMode);
 
     adlClient.setOptions(options);
 
@@ -332,11 +319,6 @@ public class AdlFileSystem extends FileSystem {
   @VisibleForTesting
   AzureADTokenProvider getAzureTokenProvider() {
     return azureTokenProvider;
-  }
-
-  @VisibleForTesting
-  public ADLStoreClient getAdlClient() {
-    return adlClient;
   }
 
   /**
@@ -1034,21 +1016,5 @@ public class AdlFileSystem extends FileSystem {
       dest.set(generic, value, key + " via " + origin);
     }
     return dest;
-  }
-
-  @Override
-  public boolean hasPathCapability(final Path path, final String capability)
-      throws IOException {
-
-    switch (validatePathCapabilityArgs(makeQualified(path), capability)) {
-
-    case CommonPathCapabilities.FS_ACLS:
-    case CommonPathCapabilities.FS_APPEND:
-    case CommonPathCapabilities.FS_CONCAT:
-    case CommonPathCapabilities.FS_PERMISSIONS:
-      return true;
-    default:
-      return super.hasPathCapability(path, capability);
-    }
   }
 }
