@@ -56,8 +56,8 @@ import org.apache.hadoop.tracing.TraceScope;
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_DONTNEED;
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_SEQUENTIAL;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 
 /**
@@ -256,7 +256,7 @@ class BlockSender implements java.io.Closeable {
       // the append write.
       ChunkChecksum chunkChecksum = null;
       final long replicaVisibleLength;
-      try(AutoCloseableLock lock = datanode.data.acquireDatasetReadLock()) {
+      try(AutoCloseableLock lock = datanode.data.acquireDatasetLock()) {
         replica = getReplica(block, datanode);
         replicaVisibleLength = replica.getVisibleLength();
       }
@@ -432,7 +432,6 @@ class BlockSender implements java.io.Closeable {
       ris = new ReplicaInputStreams(
           blockIn, checksumIn, volumeRef, fileIoProvider);
     } catch (IOException ioe) {
-      IOUtils.cleanupWithLogger(null, volumeRef);
       IOUtils.closeStream(this);
       org.apache.commons.io.IOUtils.closeQuietly(blockIn);
       org.apache.commons.io.IOUtils.closeQuietly(checksumIn);
@@ -753,7 +752,7 @@ class BlockSender implements java.io.Closeable {
   long sendBlock(DataOutputStream out, OutputStream baseStream, 
                  DataTransferThrottler throttler) throws IOException {
     final TraceScope scope = FsTracer.get(null)
-        .newScope("sendBlock_" + block.getBlockId());
+        .newScope("sendBlock_" + block.getBlockId());  // TODO: Hack
     try {
       return doSendBlock(out, baseStream, throttler);
     } finally {

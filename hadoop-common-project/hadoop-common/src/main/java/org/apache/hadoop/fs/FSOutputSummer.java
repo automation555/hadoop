@@ -33,8 +33,7 @@ import java.util.zip.Checksum;
  */
 @InterfaceAudience.LimitedPrivate({"HDFS"})
 @InterfaceStability.Unstable
-abstract public class FSOutputSummer extends OutputStream implements
-    StreamCapabilities {
+abstract public class FSOutputSummer extends OutputStream {
   // data checksum
   private final DataChecksum sum;
   // internal buffer for storing data before it is checksumed
@@ -254,10 +253,5 @@ abstract public class FSOutputSummer extends OutputStream implements
 
   protected synchronized void resetChecksumBufSize() {
     setChecksumBufSize(sum.getBytesPerChecksum() * BUFFER_NUM_CHUNKS);
-  }
-
-  @Override
-  public boolean hasCapability(String capability) {
-    return false;
   }
 }

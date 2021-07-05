@@ -20,39 +20,47 @@ package org.apache.hadoop.tracing;
 import java.io.Closeable;
 
 public class TraceScope implements Closeable {
-  Span span;
+  private io.opentracing.Scope otScope;
 
-  public TraceScope(Span span) {
-    this.span = span;
+  public TraceScope(io.opentracing.Scope scope) {
+    this.otScope = scope;
   }
 
   // Add tag to the span
-  public void addKVAnnotation(String key, String value) {
+  public Span addKVAnnotation(String key, String value) {
+    // TODO: Try to reduce overhead from "new" object by returning void?
+    return new Span(this.otScope.span().setTag(key, value));
   }
 
-  public void addKVAnnotation(String key, Number value) {
+  public Span addKVAnnotation(String key, Number value) {
+    return new Span(this.otScope.span().setTag(key, value));
   }
 
-  public void addTimelineAnnotation(String msg) {
+  public Span addTimelineAnnotation(String msg) {
+    return new Span(this.otScope.span().log(msg));
   }
 
   public Span span() {
-    return span;
+    return new Span(this.otScope.span());
   }
 
   public Span getSpan() {
-    return span;
+    /* e.g.
+      TraceScope scope = tracer.newScope(instance.getCommandName());
+      if (scope.getSpan() != null) {
+    */
+    return new Span(this.otScope.span());
   }
 
   public void reattach() {
+    // TODO: Server.java:2820
+    // scope = GlobalTracer.get().scopeManager().activate(call.span, true);
   }
 
   public void detach() {
   }
 
   public void close() {
-    if (span != null) {
-      span.close();
-    }
+    otScope.close();
   }
 }

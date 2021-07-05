@@ -17,26 +17,29 @@
  */
 package org.apache.hadoop.tracing;
 
-/**
- * No-Op Tracer (for now) to remove HTrace without changing too many files.
- */
+import io.opentracing.Scope;
+import io.opentracing.SpanContext;
+import io.opentracing.util.GlobalTracer;
+
 public class Tracer {
-  // Singleton
-  private static final Tracer globalTracer = null;
-  private final NullTraceScope nullTraceScope;
-  private final String name;
+  // Avoid creating new objects every time it is called
+  private static Tracer globalTracer;
+  public io.opentracing.Tracer tracer;
 
-  public final static String SPAN_RECEIVER_CLASSES_KEY =
-      "span.receiver.classes";
+  public Tracer(io.opentracing.Tracer tracer) {
+    this.tracer = tracer;
+  }
 
-  public Tracer(String name) {
-    this.name = name;
-    nullTraceScope = NullTraceScope.INSTANCE;
+  public static io.opentracing.Tracer get() {
+    return GlobalTracer.get();
   }
 
   // Keeping this function at the moment for HTrace compatiblity,
   // in fact all threads share a single global tracer for OpenTracing.
   public static Tracer curThreadTracer() {
+    if (globalTracer == null) {
+      globalTracer = new Tracer(GlobalTracer.get());
+    }
     return globalTracer;
   }
 
@@ -45,39 +48,49 @@ public class Tracer {
    * @return org.apache.hadoop.tracing.Span
    */
   public static Span getCurrentSpan() {
-    return null;
+    io.opentracing.Span span = GlobalTracer.get().activeSpan();
+    if (span != null) {
+      // Only wrap the OpenTracing span when it isn't null
+      return new Span(span);
+    } else {
+      return null;
+    }
   }
 
   public TraceScope newScope(String description) {
-    return nullTraceScope;
+    Scope scope = tracer.buildSpan(description).startActive(true);
+    return new TraceScope(scope);
   }
 
   public Span newSpan(String description, SpanContext spanCtx) {
-    return new Span();
+    io.opentracing.Span otspan = tracer.buildSpan(description)
+        .asChildOf(spanCtx).start();
+    return new Span(otspan);
   }
 
   public TraceScope newScope(String description, SpanContext spanCtx) {
-    return nullTraceScope;
+    io.opentracing.Scope otscope = tracer.buildSpan(description)
+        .asChildOf(spanCtx).startActive(true);
+    return new TraceScope(otscope);
   }
 
   public TraceScope newScope(String description, SpanContext spanCtx,
       boolean finishSpanOnClose) {
-    return nullTraceScope;
+    io.opentracing.Scope otscope = tracer.buildSpan(description)
+        .asChildOf(spanCtx).startActive(finishSpanOnClose);
+    return new TraceScope(otscope);
   }
 
   public TraceScope activateSpan(Span span) {
-    return nullTraceScope;
+    return new TraceScope(tracer.scopeManager().activate(span.otSpan, true));
   }
 
   public void close() {
   }
 
-  public String getName() {
-    return name;
-  }
-
   public static class Builder {
     static Tracer globalTracer;
+
     private String name;
 
     public Builder(final String name) {
@@ -90,7 +103,8 @@ public class Tracer {
 
     public Tracer build() {
       if (globalTracer == null) {
-        globalTracer = new Tracer(name);
+        io.opentracing.Tracer oTracer = TraceUtils.createAndRegisterTracer(name);
+        globalTracer = new Tracer(oTracer);
       }
       return globalTracer;
     }

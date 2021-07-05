@@ -28,8 +28,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.util.ByteArrayManager;
+import org.apache.hadoop.tracing.TraceScope;
 import org.apache.hadoop.tracing.Span;
-import org.apache.hadoop.tracing.SpanContext;
+import io.opentracing.SpanContext;
 
 /****************************************************************
  * DFSPacket is used by DataStreamer and DFSOutputStream.
@@ -40,7 +41,7 @@ import org.apache.hadoop.tracing.SpanContext;
 @InterfaceAudience.Private
 public class DFSPacket {
   public static final long HEART_BEAT_SEQNO = -1L;
-  private static final SpanContext[] EMPTY = new SpanContext[0];
+  private static SpanContext[] EMPTY = new SpanContext[0];
   private final long seqno; // sequence number of buffer in block
   private final long offsetInBlock; // offset in block
   private boolean syncBlock; // this packet forces the current block to disk
@@ -305,7 +306,7 @@ public class DFSPacket {
     if (span == null) {
       return;
     }
-    addTraceParent(span.getContext());
+    addTraceParent(span.context());
   }
 
   public void addTraceParent(SpanContext ctx) {
