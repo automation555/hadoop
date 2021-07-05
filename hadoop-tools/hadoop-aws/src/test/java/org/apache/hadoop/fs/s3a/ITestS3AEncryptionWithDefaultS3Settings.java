@@ -28,14 +28,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.fs.s3a.auth.delegation.EncryptionSecrets;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.writeDataset;
 import static org.apache.hadoop.fs.s3a.Constants.SERVER_SIDE_ENCRYPTION_ALGORITHM;
 import static org.apache.hadoop.fs.s3a.Constants.SERVER_SIDE_ENCRYPTION_KEY;
-import static org.apache.hadoop.fs.s3a.EncryptionTestUtils.AWS_KMS_SSE_ALGORITHM;
 import static org.apache.hadoop.fs.s3a.S3AEncryptionMethods.SSE_KMS;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.removeBaseAndBucketOverrides;
 
@@ -66,8 +64,6 @@ public class ITestS3AEncryptionWithDefaultS3Settings extends
   @Override
   protected void patchConfigurationEncryptionSettings(
       final Configuration conf) {
-    removeBaseAndBucketOverrides(conf,
-        SERVER_SIDE_ENCRYPTION_ALGORITHM);
     conf.set(SERVER_SIDE_ENCRYPTION_ALGORITHM,
             getSSEAlgorithm().getMethod());
   }
@@ -99,30 +95,7 @@ public class ITestS3AEncryptionWithDefaultS3Settings extends
   @Override
   @Ignore
   @Test
-  public void testEncryptionSettingPropagation() throws Throwable {
-  }
-
-  @Override
-  @Ignore
-  @Test
   public void testEncryption() throws Throwable {
-  }
-
-  /**
-   * Skipping if the test bucket is not configured with
-   * aws:kms encryption algorithm.
-   */
-  @Override
-  public void testEncryptionOverRename() throws Throwable {
-    S3AFileSystem fs = getFileSystem();
-    Path path = path(getMethodName() + "find-encryption-algo");
-    ContractTestUtils.touch(fs, path);
-    String sseAlgorithm = fs.getObjectMetadata(path).getSSEAlgorithm();
-    if(StringUtils.isBlank(sseAlgorithm) ||
-            !sseAlgorithm.equals(AWS_KMS_SSE_ALGORITHM)) {
-      skip("Test bucket is not configured with " + AWS_KMS_SSE_ALGORITHM);
-    }
-    super.testEncryptionOverRename();
   }
 
   @Test
@@ -133,8 +106,6 @@ public class ITestS3AEncryptionWithDefaultS3Settings extends
     // this will pick up whatever defaults we have.
     Path src = path(createFilename(1024));
     byte[] data = dataset(1024, 'a', 'z');
-    EncryptionSecrets secrets = fs.getEncryptionSecrets();
-    validateEncrytionSecrets(secrets);
     writeDataset(fs, src, data, data.length, 1024 * 1024, true);
     ContractTestUtils.verifyFileContents(fs, src, data);
 
