@@ -25,7 +25,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.amazonaws.event.ProgressEvent;
 import com.amazonaws.event.ProgressEventType;
 import com.amazonaws.event.ProgressListener;
-import org.assertj.core.api.Assertions;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
@@ -35,24 +36,17 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.S3ATestUtils;
+import org.apache.hadoop.fs.s3a.S3AInstrumentation;
 import org.apache.hadoop.fs.s3a.Statistic;
-import org.apache.hadoop.fs.s3a.statistics.BlockOutputStreamStatistics;
-import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.util.Progressable;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.Statistic.STREAM_WRITE_BLOCK_UPLOADS_BYTES_PENDING;
-import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.lookupCounterStatistic;
-import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.verifyStatisticGaugeValue;
-import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.demandStringifyIOStatistics;
-import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsSourceToString;
 
 /**
  * Scale test which creates a huge file.
@@ -109,7 +103,7 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
         KEY_HUGE_PARTITION_SIZE,
         DEFAULT_HUGE_PARTITION_SIZE);
     assertTrue("Partition size too small: " + partitionSize,
-        partitionSize >= MULTIPART_MIN_SIZE);
+        partitionSize > MULTIPART_MIN_SIZE);
     conf.setLong(SOCKET_SEND_BUFFER, _1MB);
     conf.setLong(SOCKET_RECV_BUFFER, _1MB);
     conf.setLong(MIN_MULTIPART_THRESHOLD, partitionSize);
@@ -128,7 +122,8 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
 
   @Test
   public void test_010_CreateHugeFile() throws IOException {
-
+    assertFalse("Please run this test sequentially to avoid timeouts" +
+        " and bandwidth problems", isParallelExecution());
     long filesizeMB = filesize / _1MB;
 
     // clean up from any previous attempts
@@ -168,15 +163,14 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     // there's lots of logging here, so that a tail -f on the output log
     // can give a view of what is happening.
     S3AFileSystem fs = getFileSystem();
-    IOStatistics iostats = fs.getIOStatistics();
-
+    StorageStatistics storageStatistics = fs.getStorageStatistics();
     String putRequests = Statistic.OBJECT_PUT_REQUESTS.getSymbol();
     String putBytes = Statistic.OBJECT_PUT_BYTES.getSymbol();
     Statistic putRequestsActive = Statistic.OBJECT_PUT_REQUESTS_ACTIVE;
     Statistic putBytesPending = Statistic.OBJECT_PUT_BYTES_PENDING;
 
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
-    BlockOutputStreamStatistics streamStatistics;
+    S3AInstrumentation.OutputStreamStatistics streamStatistics;
     long blocksPer10MB = blocksPerMB * 10;
     ProgressCallback progress = new ProgressCallback(timer);
     try (FSDataOutputStream out = fs.create(fileToCreate,
@@ -205,9 +199,9 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
               percentage,
               writtenMB,
               filesizeMB,
-              iostats.counters().get(putBytes),
+              storageStatistics.getLong(putBytes),
               gaugeValue(putBytesPending),
-              iostats.counters().get(putRequests),
+              storageStatistics.getLong(putRequests),
               gaugeValue(putRequestsActive),
               elapsedTime,
               writtenMB / elapsedTime));
@@ -227,32 +221,20 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     logFSState();
     bandwidth(timer, filesize);
     LOG.info("Statistics after stream closed: {}", streamStatistics);
-
-    LOG.info("IOStatistics after upload: {}",
-        demandStringifyIOStatistics(iostats));
-    long putRequestCount = lookupCounterStatistic(iostats, putRequests);
-    long putByteCount = lookupCounterStatistic(iostats, putBytes);
-    Assertions.assertThat(putRequestCount)
-        .describedAs("Put request count from filesystem stats %s",
-            iostats)
-        .isGreaterThan(0);
-    Assertions.assertThat(putByteCount)
-        .describedAs("%s count from filesystem stats %s",
-            putBytes, iostats)
-        .isGreaterThan(0);
+    long putRequestCount = storageStatistics.getLong(putRequests);
+    Long putByteCount = storageStatistics.getLong(putBytes);
     LOG.info("PUT {} bytes in {} operations; {} MB/operation",
         putByteCount, putRequestCount,
         putByteCount / (putRequestCount * _1MB));
     LOG.info("Time per PUT {} nS",
         toHuman(timer.nanosPerOperation(putRequestCount)));
-    verifyStatisticGaugeValue(iostats, putRequestsActive.getSymbol(), 0);
-    verifyStatisticGaugeValue(iostats,
-        STREAM_WRITE_BLOCK_UPLOADS_BYTES_PENDING.getSymbol(), 0);
+    assertEquals("active put requests in \n" + fs,
+        0, gaugeValue(putRequestsActive));
     progress.verifyNoFailures(
         "Put file " + fileToCreate + " of size " + filesize);
     if (streamStatistics != null) {
       assertEquals("actively allocated blocks in " + streamStatistics,
-          0, streamStatistics.getBlocksActivelyAllocated());
+          0, streamStatistics.blocksActivelyAllocated());
     }
   }
 
@@ -475,30 +457,6 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     logFSState();
   }
 
-  /**
-   * Test to verify source file encryption key.
-   * @throws IOException
-   */
-  @Test
-  public void test_090_verifyRenameSourceEncryption() throws IOException {
-    if(isEncrypted(getFileSystem())) {
-      assertEncrypted(getHugefile());
-    }
-  }
-
-  protected void assertEncrypted(Path hugeFile) throws IOException {
-    //Concrete classes will have implementation.
-  }
-
-  /**
-   * Checks if the encryption is enabled for the file system.
-   * @param fileSystem
-   * @return
-   */
-  protected boolean isEncrypted(S3AFileSystem fileSystem) {
-    return false;
-  }
-
   @Test
   public void test_100_renameHugeFile() throws Throwable {
     assumeHugeFileExists();
@@ -527,20 +485,31 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     bandwidth(timer2, size);
   }
 
-  /**
-   * Test to verify target file encryption key.
-   * @throws IOException
-   */
   @Test
-  public void test_110_verifyRenameDestEncryption() throws IOException {
-    if(isEncrypted(getFileSystem())) {
-      /**
-       * Using hugeFile again as hugeFileRenamed is renamed back
-       * to hugeFile.
-       */
-      assertEncrypted(hugefile);
-    }
+  public void test_200_copyHugeFile() throws Throwable {
+    assumeHugeFileExists();
+    describe("copying %s to %s", hugefile, hugefileRenamed);
+    S3AFileSystem fs = getFileSystem();
+    FileStatus status = fs.getFileStatus(hugefile);
+    long size = status.getLen();
+    Path hugeFileCopy = fs.makeQualified(
+        new Path(scaleTestDir, "hugeFileCopy"));
+    fs.delete(hugeFileCopy, false);
+    ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
+    fs.copyFile(hugefile.toUri(), hugeFileCopy.toUri()).get();
+    long mb = Math.max(size / _1MB, 1);
+    timer.end("time to native copy file of %d MB", mb);
+    LOG.info("Time per MB to copy = {} nS",
+        toHuman(timer.nanosPerOperation(mb)));
+    bandwidth(timer, size);
+    logFSState();
+    FileStatus destFileStatus = fs.getFileStatus(hugeFileCopy);
+    assertEquals(size, destFileStatus.getLen());
+
+    // delete hugeFileCopy
+    fs.delete(hugefileRenamed, false);
   }
+
   /**
    * Cleanup: delete the files.
    */
@@ -559,7 +528,12 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
    */
   @Test
   public void test_900_dumpStats() {
-    LOG.info("Statistics\n{}", ioStatisticsSourceToString(getFileSystem()));
+    StringBuilder sb = new StringBuilder();
+
+    getFileSystem().getStorageStatistics()
+        .forEach(kv -> sb.append(kv.toString()).append("\n"));
+
+    LOG.info("Statistics\n{}", sb);
   }
 
   protected void deleteHugeFile() throws IOException {

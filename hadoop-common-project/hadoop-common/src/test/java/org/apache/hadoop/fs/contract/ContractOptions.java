@@ -52,15 +52,6 @@ public interface ContractOptions {
   String CREATE_VISIBILITY_DELAYED = "create-visibility-delayed";
 
   /**
-   * Flag to indicate that it is possible to create a file under a file.
-   * This is a complete violation of the filesystem rules, but it is one
-   * which object stores have been known to do for performance
-   * <i>and because nobody has ever noticed.</i>
-   * {@value}
-   */
-  String CREATE_FILE_UNDER_FILE_ALLOWED = "create-file-under-file-allowed";
-
-  /**
    * Is a filesystem case sensitive.
    * Some of the filesystems that say "no" here may mean
    * that it varies from platform to platform -the localfs being the key
@@ -216,6 +207,11 @@ public interface ContractOptions {
   String SUPPORTS_UNBUFFER = "supports-unbuffer";
 
   /**
+   * Indicates that FS supports native copy.
+   */
+  String SUPPORTS_NATIVE_COPY = "supports-native-copy";
+
+  /**
    * Maximum path length
    * {@value}
    */
@@ -241,19 +237,4 @@ public interface ContractOptions {
    */
   String TEST_RANDOM_SEEK_COUNT = "test.random-seek-count";
 
-  /**
-   * Is hflush supported in API and StreamCapabilities?
-   */
-  String SUPPORTS_HFLUSH = "supports-hflush";
-
-  /**
-   * Is hsync supported in API and StreamCapabilities?
-   */
-  String SUPPORTS_HSYNC = "supports-hsync";
-
-  /**
-   * Is the metadata updated after an hsync?
-   * HDFS does not do this.
-   */
-  String METADATA_UPDATED_ON_HSYNC = "metadata_updated_on_hsync";
 }

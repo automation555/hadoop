@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.impl;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.URI;
 import java.util.List;
 
 import com.amazonaws.AmazonClientException;
@@ -105,7 +106,7 @@ public interface OperationCallbacks {
       throws IOException;
 
   /**
-   * Recursive list of files and directory markers.
+   * Recursive list of files and empty directories.
    *
    * @param path path to list from
    * @param status optional status of path to list.
@@ -115,7 +116,7 @@ public interface OperationCallbacks {
    * @throws IOException failure
    */
   @Retries.RetryTranslated
-  RemoteIterator<S3ALocatedFileStatus> listFilesAndDirectoryMarkers(
+  RemoteIterator<S3ALocatedFileStatus> listFilesAndEmptyDirectories(
       Path path,
       S3AFileStatus status,
       boolean collectTombstones,
@@ -135,6 +136,25 @@ public interface OperationCallbacks {
   @Retries.RetryTranslated
   CopyResult copyFile(String srcKey,
       String destKey,
+      S3ObjectAttributes srcAttributes,
+      S3AReadOpContext readContext)
+      throws IOException;
+
+  /**
+   * Copy a single object in the bucket via a COPY operation.
+   * There's no update of metadata, directory markers, etc.
+   * Callers must implement.
+   * @param src source path
+   * @param dst destination path
+   * @param srcAttributes S3 attributes of the source object
+   * @param readContext the read context
+   * @return the result of the copy
+   * @throws InterruptedIOException the operation was interrupted
+   * @throws IOException Other IO problems
+   */
+  @Retries.RetryTranslated
+  CopyResult copyFile(URI src,
+      URI dst,
       S3ObjectAttributes srcAttributes,
       S3AReadOpContext readContext)
       throws IOException;
