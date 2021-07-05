@@ -56,7 +56,7 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.webapp.WebAppContext;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,8 +236,8 @@ public class ApplicationHistoryServer extends CompositeService {
   @SuppressWarnings("unchecked")
   private void startWebApp() {
     Configuration conf = getConfig();
-    // Always load pseudo authentication filter to parse "user.name" in an URL
-    // to identify a HTTP request's user in insecure mode.
+    // Always load pseudo authentication filter to parse "user.name" in a URL
+    // to identify an HTTP request's user in insecure mode.
     // When Kerberos authentication type is set (i.e., secure mode is turned on),
     // the customized filter will be loaded by the timeline server to do Kerberos
     // + DT authentication.

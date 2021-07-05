@@ -27,8 +27,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -62,7 +60,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.ClientResponse.Status;
@@ -263,24 +262,20 @@ public class TestTimelineReaderWebServicesHBaseStorage
     event54.setTimestamp(cTime);
     entity5.addEvent(event54);
     Map<String, Set<String>> isRelatedTo1 = new HashMap<String, Set<String>>();
-    isRelatedTo1.put("type2", new HashSet<>(Arrays.asList("entity21",
-        "entity22", "entity23", "entity24")));
-    isRelatedTo1.put("type4", new HashSet<>(Arrays.asList("entity41",
-        "entity42")));
-    isRelatedTo1.put("type1", new HashSet<>(Arrays.asList("entity14",
-        "entity15")));
-    isRelatedTo1.put("type3", new HashSet<>(Arrays.asList("entity31",
-        "entity35", "entity32", "entity33")));
+    isRelatedTo1.put("type2",
+        Sets.newHashSet("entity21", "entity22", "entity23", "entity24"));
+    isRelatedTo1.put("type4", Sets.newHashSet("entity41", "entity42"));
+    isRelatedTo1.put("type1", Sets.newHashSet("entity14", "entity15"));
+    isRelatedTo1.put("type3",
+        Sets.newHashSet("entity31", "entity35", "entity32", "entity33"));
     entity5.addIsRelatedToEntities(isRelatedTo1);
     Map<String, Set<String>> relatesTo1 = new HashMap<String, Set<String>>();
-    relatesTo1.put("type2", new HashSet<>(Arrays.asList("entity21",
-        "entity22", "entity23", "entity24")));
-    relatesTo1.put("type4", new HashSet<>(Arrays.asList("entity41",
-        "entity42")));
-    relatesTo1.put("type1", new HashSet<>(Arrays.asList("entity14",
-        "entity15")));
-    relatesTo1.put("type3", new HashSet<>(Arrays.asList("entity31",
-        "entity35", "entity32", "entity33")));
+    relatesTo1.put("type2",
+        Sets.newHashSet("entity21", "entity22", "entity23", "entity24"));
+    relatesTo1.put("type4", Sets.newHashSet("entity41", "entity42"));
+    relatesTo1.put("type1", Sets.newHashSet("entity14", "entity15"));
+    relatesTo1.put("type3",
+        Sets.newHashSet("entity31", "entity35", "entity32", "entity33"));
     entity5.addRelatesToEntities(relatesTo1);
     userEntities.addEntity(new SubApplicationEntity(entity5));
 
@@ -328,25 +323,18 @@ public class TestTimelineReaderWebServicesHBaseStorage
     event64.setTimestamp(cTime);
     entity6.addEvent(event64);
     Map<String, Set<String>> isRelatedTo2 = new HashMap<String, Set<String>>();
-    isRelatedTo2.put("type2", new HashSet<>(Arrays.asList("entity21",
-        "entity22", "entity23", "entity24")));
-    isRelatedTo2.put("type5", new HashSet<>(Arrays.asList("entity51",
-        "entity52")));
-    isRelatedTo2.put("type6", new HashSet<>(Arrays.asList("entity61",
-        "entity66")));
-    isRelatedTo2.put("type3",
-        new HashSet<>(Collections.singletonList("entity31")));
+    isRelatedTo2.put("type2",
+        Sets.newHashSet("entity21", "entity22", "entity23", "entity24"));
+    isRelatedTo2.put("type5", Sets.newHashSet("entity51", "entity52"));
+    isRelatedTo2.put("type6", Sets.newHashSet("entity61", "entity66"));
+    isRelatedTo2.put("type3", Sets.newHashSet("entity31"));
     entity6.addIsRelatedToEntities(isRelatedTo2);
     Map<String, Set<String>> relatesTo2 = new HashMap<String, Set<String>>();
     relatesTo2.put("type2",
-        new HashSet<>(Arrays.asList("entity21", "entity22", "entity23",
-            "entity24")));
-    relatesTo2.put("type5", new HashSet<>(Arrays.asList("entity51",
-        "entity52")));
-    relatesTo2.put("type6", new HashSet<>(Arrays.asList("entity61",
-        "entity66")));
-    relatesTo2.put("type3",
-        new HashSet<>(Collections.singletonList("entity31")));
+        Sets.newHashSet("entity21", "entity22", "entity23", "entity24"));
+    relatesTo2.put("type5", Sets.newHashSet("entity51", "entity52"));
+    relatesTo2.put("type6", Sets.newHashSet("entity61", "entity66"));
+    relatesTo2.put("type3", Sets.newHashSet("entity31"));
     entity6.addRelatesToEntities(relatesTo2);
     userEntities.addEntity(new SubApplicationEntity(entity6));
 
@@ -618,7 +606,7 @@ public class TestTimelineReaderWebServicesHBaseStorage
             (entity.getMetrics().size() == 1)));
       }
 
-      // fields as CONFIGS will lead to a HTTP 400 as it makes no sense for
+      // fields as CONFIGS will lead to an HTTP 400 as it makes no sense for
       // flow runs.
       uri = URI.create("http://localhost:" + getServerPort() + "/ws/v2/" +
           "timeline/clusters/cluster1/users/user1/flows/flow_name/runs?" +

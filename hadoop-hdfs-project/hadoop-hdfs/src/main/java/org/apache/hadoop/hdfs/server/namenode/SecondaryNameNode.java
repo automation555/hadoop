@@ -29,6 +29,7 @@ import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.util.*;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -73,12 +74,11 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Daemon;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.util.VersionInfo;
 
 import javax.management.ObjectName;
@@ -276,7 +276,7 @@ public class SecondaryNameNode implements Runnable,
   }
 
   /**
-   * Shut down this instance of the secondary namenode.
+   * Shut down this instance of the datanode.
    * Returns only after shutdown is complete.
    */
   public void shutdown() {
@@ -634,7 +634,7 @@ public class SecondaryNameNode implements Runnable,
       
     } catch (RemoteException e) {
       //
-      // This is a error returned by hadoop server. Print
+      // This is an error returned by hadoop server. Print
       // out the first line of the error mesage, ignore the stack trace.
       exitCode = 1;
       try {

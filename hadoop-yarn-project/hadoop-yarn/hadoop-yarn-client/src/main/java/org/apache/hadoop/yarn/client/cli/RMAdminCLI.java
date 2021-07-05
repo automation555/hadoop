@@ -81,8 +81,8 @@ import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 
 import static org.apache.hadoop.yarn.client.util.YarnClientUtils.NO_LABEL_ERR_MSG;
 
@@ -140,7 +140,7 @@ public class RMAdminCLI extends HAAdmin {
                   "remove from cluster node labels"))
           .put("-replaceLabelsOnNode",
               new UsageInfo(
-                  "<\"node1[:port]=label1 node2[:port]=label2\"> "
+                  "<\"node1[:port]=label1,label2 node2[:port]=label1,label2\"> "
                   + "[-failOnUnknownNodes] ",
               "replace labels on nodes"
                   + " (please note that we do not support specifying multiple"
@@ -186,7 +186,9 @@ public class RMAdminCLI extends HAAdmin {
 
   private static void appendHAUsage(final StringBuilder usageBuilder) {
     for (Map.Entry<String,UsageInfo> cmdEntry : USAGE.entrySet()) {
-      if (cmdEntry.getKey().equals("-help")) {
+      if (cmdEntry.getKey().equals("-help")
+          || cmdEntry.getKey().equals("-failover")
+          || cmdEntry.getKey().equals("-transitionToObserver")) {
         continue;
       }
       UsageInfo usageInfo = cmdEntry.getValue();
@@ -280,7 +282,7 @@ public class RMAdminCLI extends HAAdmin {
         + "label2(exclusive=false),label3\">]"
         + " [-removeFromClusterNodeLabels <label1,label2,label3>]"
         + " [-replaceLabelsOnNode "
-        + "<\"node1[:port]=label1 node2[:port]=label2\"> "
+        + "<\"node1[:port]=label1,label2 node2[:port]=label1\"> "
         + "[-failOnUnknownNodes]]"
         + " [-directlyAccessNodeLabelStore]"
         + " [-refreshClusterMaxPriority]"
@@ -301,7 +303,8 @@ public class RMAdminCLI extends HAAdmin {
     }
     if (isHAEnabled) {
       for (String cmdKey : USAGE.keySet()) {
-        if (!cmdKey.equals("-help")) {
+        if (!cmdKey.equals("-help") && !cmdKey.equals("-failover")
+            && !cmdKey.equals("-transitionToObserver")) {
           buildHelpMsg(cmdKey, helpBuilder);
           helpBuilder.append("\n");
         }
@@ -790,7 +793,7 @@ public class RMAdminCLI extends HAAdmin {
       printUsage(cmd, isHAEnabled);
     } catch (RemoteException e) {
       //
-      // This is a error returned by hadoop server. Print
+      // This is an error returned by hadoop server. Print
       // out the first line of the error message, ignore the stack trace.
       exitCode = -1;
       try {

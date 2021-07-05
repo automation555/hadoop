@@ -46,9 +46,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
@@ -63,7 +61,6 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.DelegationTokenRenewer;
@@ -76,12 +73,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.GlobalStorageStatistics.StorageStatisticsProvider;
-import org.apache.hadoop.fs.MultipartUploaderBuilder;
 import org.apache.hadoop.fs.QuotaUsage;
-import org.apache.hadoop.fs.PathCapabilities;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.fs.impl.FileSystemMultipartUploaderBuilder;
 import org.apache.hadoop.fs.permission.FsCreateModes;
 import org.apache.hadoop.hdfs.DFSOpsCountStatistics;
 import org.apache.hadoop.hdfs.DFSOpsCountStatistics.OpType;
@@ -97,7 +91,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.HdfsKMSUtil;
-import org.apache.hadoop.hdfs.client.DfsPathCapabilities;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
@@ -106,7 +99,6 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
-import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.FileEncryptionInfoProto;
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -130,17 +122,15 @@ import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSelect
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.util.JsonSerialization;
 import org.apache.hadoop.util.KMSUtil;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-
-import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapabilityArgs;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /** A FileSystem for HDFS over the web. */
 public class WebHdfsFileSystem extends FileSystem
@@ -155,7 +145,6 @@ public class WebHdfsFileSystem extends FileSystem
       + "/v" + VERSION;
   public static final String EZ_HEADER = "X-Hadoop-Accept-EZ";
   public static final String FEFINFO_HEADER = "X-Hadoop-feInfo";
-  public static final String DFS_HTTP_POLICY_KEY = "dfs.http.policy";
 
   /**
    * Default connection factory may be overridden in tests to use smaller
@@ -185,7 +174,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   private DFSOpsCountStatistics storageStatistics;
   private KeyProvider testProvider;
-  private boolean isTLSKrb;
 
   /**
    * Return the protocol scheme for the FileSystem.
@@ -247,7 +235,6 @@ public class WebHdfsFileSystem extends FileSystem
           .newDefaultURLConnectionFactory(connectTimeout, readTimeout, conf);
     }
 
-    this.isTLSKrb = "HTTPS_ONLY".equals(conf.get(DFS_HTTP_POLICY_KEY));
 
     ugi = UserGroupInformation.getCurrentUser();
     this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
@@ -368,8 +355,8 @@ public class WebHdfsFileSystem extends FileSystem
       Token<?> token = tokenSelector.selectToken(
           new Text(getCanonicalServiceName()), ugi.getTokens());
       // ugi tokens are usually indicative of a task which can't
-      // refetch tokens.  Don't attempt to fetch tokens from the
-      // namenode in this situation.
+      // refetch tokens.  even if ugi has credentials, don't attempt
+      // to get another token to match hdfs/rpc behavior
       if (token != null) {
         LOG.debug("Using UGI token: {}", token);
         canRefreshDelegationToken = false;
@@ -392,9 +379,6 @@ public class WebHdfsFileSystem extends FileSystem
   @VisibleForTesting
   synchronized boolean replaceExpiredDelegationToken() throws IOException {
     boolean replaced = false;
-    if (attemptReplaceDelegationTokenFromUGI()) {
-      return true;
-    }
     if (canRefreshDelegationToken) {
       Token<?> token = getDelegationToken(null);
       LOG.debug("Replaced expired token: {}", token);
@@ -402,17 +386,6 @@ public class WebHdfsFileSystem extends FileSystem
       replaced = (token != null);
     }
     return replaced;
-  }
-
-  private synchronized boolean attemptReplaceDelegationTokenFromUGI() {
-    Token<?> token = tokenSelector.selectToken(
-            new Text(getCanonicalServiceName()), ugi.getTokens());
-    if (token != null && !token.equals(delegationToken)) {
-      LOG.debug("Replaced expired token with new UGI token: {}", token);
-      setDelegationToken(token);
-      return true;
-    }
-    return false;
   }
 
   @Override
@@ -646,7 +619,7 @@ public class WebHdfsFileSystem extends FileSystem
   }
 
   /**
-   * This class is for initialing a HTTP connection, connecting to server,
+   * This class is for initialing an HTTP connection, connecting to server,
    * obtaining a response, and also handling retry on failures.
    */
   abstract class AbstractRunner<T> {
@@ -699,7 +672,7 @@ public class WebHdfsFileSystem extends FileSystem
      * Two-step requests redirected to a DN
      *
      * Create/Append:
-     * Step 1) Submit a Http request with neither auto-redirect nor data.
+     * Step 1) Submit an Http request with neither auto-redirect nor data.
      * Step 2) Submit another Http request with the URL from the Location header
      * with data.
      *
@@ -719,11 +692,6 @@ public class WebHdfsFileSystem extends FileSystem
       //redirect hostname and port
       redirectHost = null;
 
-      if (url.getProtocol().equals("http") &&
-        UserGroupInformation.isSecurityEnabled() &&
-        isTLSKrb) {
-        throw new IOException("Access denied: dfs.http.policy is HTTPS_ONLY.");
-      }
 
       // resolve redirects for a DN operation unless already resolved
       if (op.getRedirect() && !redirected) {
@@ -1157,11 +1125,6 @@ public class WebHdfsFileSystem extends FileSystem
     ).run();
   }
 
-  @Override
-  public boolean supportsSymlinks() {
-    return true;
-  }
-
   /**
    * Create a symlink pointing to the destination path.
    */
@@ -1356,8 +1319,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   @Override
   public void satisfyStoragePolicy(final Path p) throws IOException {
-    statistics.incrementWriteOps(1);
-    storageStatistics.incrementOpCounter(OpType.SATISFY_STORAGE_POLICY);
     final HttpOpParam.Op op = PutOpParam.Op.SATISFYSTORAGEPOLICY;
     new FsPathRunner(op, p).run();
   }
@@ -1447,7 +1408,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   public SnapshotDiffReport getSnapshotDiffReport(final Path snapshotDir,
       final String fromSnapshot, final String toSnapshot) throws IOException {
-    statistics.incrementReadOps(1);
     storageStatistics.incrementOpCounter(OpType.GET_SNAPSHOT_DIFF);
     final HttpOpParam.Op op = GetOpParam.Op.GETSNAPSHOTDIFF;
     return new FsPathResponseRunner<SnapshotDiffReport>(op, snapshotDir,
@@ -1462,7 +1422,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   public SnapshottableDirectoryStatus[] getSnapshottableDirectoryList()
       throws IOException {
-    statistics.incrementReadOps(1);
     storageStatistics
         .incrementOpCounter(OpType.GET_SNAPSHOTTABLE_DIRECTORY_LIST);
     final HttpOpParam.Op op = GetOpParam.Op.GETSNAPSHOTTABLEDIRECTORYLIST;
@@ -1470,19 +1429,6 @@ public class WebHdfsFileSystem extends FileSystem
       @Override
       SnapshottableDirectoryStatus[] decodeResponse(Map<?, ?> json) {
         return JsonUtilClient.toSnapshottableDirectoryList(json);
-      }
-    }.run();
-  }
-
-  public SnapshotStatus[] getSnapshotListing(final Path snapshotDir)
-      throws IOException {
-    storageStatistics
-        .incrementOpCounter(OpType.GET_SNAPSHOT_LIST);
-    final HttpOpParam.Op op = GetOpParam.Op.GETSNAPSHOTLIST;
-    return new FsPathResponseRunner<SnapshotStatus[]>(op, snapshotDir) {
-      @Override
-      SnapshotStatus[] decodeResponse(Map<?, ?> json) {
-        return JsonUtilClient.toSnapshotList(json);
       }
     }.run();
   }
@@ -2037,8 +1983,6 @@ public class WebHdfsFileSystem extends FileSystem
   @Override
   public Collection<BlockStoragePolicy> getAllStoragePolicies()
       throws IOException {
-    statistics.incrementReadOps(1);
-    storageStatistics.incrementOpCounter(OpType.GET_STORAGE_POLICIES);
     final HttpOpParam.Op op = GetOpParam.Op.GETALLSTORAGEPOLICY;
     return new FsPathResponseRunner<Collection<BlockStoragePolicy>>(op, null) {
       @Override
@@ -2051,8 +1995,6 @@ public class WebHdfsFileSystem extends FileSystem
 
   @Override
   public BlockStoragePolicy getStoragePolicy(Path src) throws IOException {
-    statistics.incrementReadOps(1);
-    storageStatistics.incrementOpCounter(OpType.GET_STORAGE_POLICY);
     final HttpOpParam.Op op = GetOpParam.Op.GETSTORAGEPOLICY;
     return new FsPathResponseRunner<BlockStoragePolicy>(op, src) {
       @Override
@@ -2135,30 +2077,6 @@ public class WebHdfsFileSystem extends FileSystem
   @VisibleForTesting
   public void setTestProvider(KeyProvider kp) {
     testProvider = kp;
-  }
-
-  /**
-   * HDFS client capabilities.
-   * Uses {@link DfsPathCapabilities} to keep in sync with HDFS.
-   * {@inheritDoc}
-   */
-  @Override
-  public boolean hasPathCapability(final Path path, final String capability)
-      throws IOException {
-    // qualify the path to make sure that it refers to the current FS.
-    final Path p = makeQualified(path);
-    Optional<Boolean> cap = DfsPathCapabilities.hasPathCapability(p,
-        capability);
-    if (cap.isPresent()) {
-      return cap.get();
-    }
-    return super.hasPathCapability(p, capability);
-  }
-
-  @Override
-  public MultipartUploaderBuilder createMultipartUploader(final Path basePath)
-      throws IOException {
-    return new FileSystemMultipartUploaderBuilder(this, basePath);
   }
 
   /**
@@ -2502,12 +2420,10 @@ public class WebHdfsFileSystem extends FileSystem
     @VisibleForTesting
     void closeInputStream(RunnerState rs) throws IOException {
       if (in != null) {
+        IOUtils.close(cachedConnection);
         in = null;
       }
-      if (cachedConnection != null) {
-        IOUtils.close(cachedConnection);
-        cachedConnection = null;
-      }
+      cachedConnection = null;
       runnerState = rs;
     }
 

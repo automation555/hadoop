@@ -20,7 +20,6 @@ package org.apache.hadoop.yarn.webapp.util;
 import static org.apache.hadoop.yarn.util.StringHelper.PATH_JOINER;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -98,17 +97,24 @@ public class WebAppUtils {
    */
   public static <T, R> R execOnActiveRM(Configuration conf,
       ThrowingBiFunction<String, T, R> func, T arg) throws Exception {
-    int haIndex = 0;
-    if (HAUtil.isHAEnabled(conf)) {
-      String activeRMId = RMHAUtils.findActiveRMHAId(conf);
-      if (activeRMId != null) {
-        haIndex = new ArrayList<>(HAUtil.getRMHAIds(conf)).indexOf(activeRMId);
-      } else {
-        throw new ConnectException("No Active RM available");
+    String rm1Address = getRMWebAppURLWithScheme(conf, 0);
+    try {
+      return func.apply(rm1Address, arg);
+    } catch (Exception e) {
+      if (HAUtil.isHAEnabled(conf)) {
+        int rms = HAUtil.getRMHAIds(conf).size();
+        for (int i=1; i<rms; i++) {
+          try {
+            rm1Address = getRMWebAppURLWithScheme(conf, i);
+            return func.apply(rm1Address, arg);
+          } catch (Exception e1) {
+            // ignore and try next one when RM is down
+            e = e1;
+          }
+        }
       }
+      throw e;
     }
-    String rm1Address = getRMWebAppURLWithScheme(conf, haIndex);
-    return func.apply(rm1Address, arg);
   }
 
   /** A BiFunction which throws on Exception. */
@@ -604,7 +610,7 @@ public class WebAppUtils {
   }
 
   /**
-   * Add the query params from a HttpServletRequest to the target uri passed.
+   * Add the query params from an HttpServletRequest to the target uri passed.
    * @param request HttpServletRequest with the request details
    * @param targetUri the uri to which the query params must be added
    * @return URL encoded string containing the targetUri + "?" + query string

@@ -26,7 +26,7 @@ import org.apache.hadoop.ipc.RemoteException;
 
 
 /**
- * A ErrorReportAction is an instruction issued by BPOfferService to 
+ * An ErrorReportAction is an instruction issued by BPOfferService to
  * BPServiceActor about a particular block encapsulated in errorMessage.
  */
 public class ErrorReportAction implements BPServiceActorAction {
@@ -68,7 +68,7 @@ public class ErrorReportAction implements BPServiceActorAction {
     if (this == obj) {
       return true;
     }
-    if (!(obj instanceof ErrorReportAction)) {
+    if (obj == null || !(obj instanceof ErrorReportAction)) {
       return false;
     }
     ErrorReportAction other = (ErrorReportAction) obj;
