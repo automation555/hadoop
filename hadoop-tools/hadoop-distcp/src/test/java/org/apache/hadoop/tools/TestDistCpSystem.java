@@ -48,15 +48,21 @@ import org.apache.hadoop.util.ToolRunner;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * A JUnit test for copying files recursively.
  */
+// Test
 
 public class TestDistCpSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDistCpSystem.class);
+
+  @Rule
+  public Timeout globalTimeout = new Timeout(30000);
 
   private static final String SRCDAT = "srcdat";
   private static final String DSTDAT = "dstdat";
