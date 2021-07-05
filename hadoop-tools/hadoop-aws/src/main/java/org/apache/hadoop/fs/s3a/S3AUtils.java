@@ -34,6 +34,7 @@ import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.MultiObjectDeleteException;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 
@@ -41,6 +42,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -54,7 +56,7 @@ import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.security.ProviderUtils;
 import org.apache.hadoop.util.VersionInfo;
 
-import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +91,6 @@ import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.impl.ErrorTranslation.isUnknownBucket;
 import static org.apache.hadoop.fs.s3a.impl.MultiObjectDeleteSupport.translateDeleteException;
 import static org.apache.hadoop.io.IOUtils.cleanupWithLogger;
-import static org.apache.hadoop.util.functional.RemoteIterators.filteringRemoteIterator;
 
 /**
  * Utility methods for S3A code.
@@ -132,8 +133,11 @@ public final class S3AUtils {
       S3AEncryptionMethods.SSE_S3.getMethod()
           + " is enabled but an encryption key was set in "
           + SERVER_SIDE_ENCRYPTION_KEY;
-  private static final String EOF_MESSAGE_IN_XML_PARSER
+  public static final String EOF_MESSAGE_IN_XML_PARSER
       = "Failed to sanitize XML document destined for handler class";
+
+  public static final String EOF_READ_DIFFERENT_LENGTH
+      = "Data read has a different length than the expected";
 
   private static final String BUCKET_PATTERN = FS_S3A_BUCKET_PREFIX + "%s.%s";
 
@@ -194,14 +198,13 @@ public final class S3AUtils {
         // interrupted IO, or a socket exception underneath that class
         return translateInterruptedException(exception, innerCause, message);
       }
-      if (signifiesConnectionBroken(exception)) {
+      if (isMessageTranslatableToEOF(exception)) {
         // call considered an sign of connectivity failure
         return (EOFException)new EOFException(message).initCause(exception);
       }
       if (exception instanceof CredentialInitializationException) {
         // the exception raised by AWSCredentialProvider list if the
-        // credentials were not accepted,
-        // or auditing blocked the operation.
+        // credentials were not accepted.
         return (AccessDeniedException)new AccessDeniedException(path, null,
             exception.toString()).initCause(exception);
       }
@@ -415,13 +418,14 @@ public final class S3AUtils {
 
   /**
    * Cue that an AWS exception is likely to be an EOF Exception based
-   * on the message coming back from an XML/JSON parser. This is likely
-   * to be brittle, so only a hint.
+   * on the message coming back from the client. This is likely to be
+   * brittle, so only a hint.
    * @param ex exception
    * @return true if this is believed to be a sign the connection was broken.
    */
-  public static boolean signifiesConnectionBroken(SdkBaseException ex) {
-    return ex.toString().contains(EOF_MESSAGE_IN_XML_PARSER);
+  public static boolean isMessageTranslatableToEOF(SdkBaseException ex) {
+    return ex.toString().contains(EOF_MESSAGE_IN_XML_PARSER) ||
+            ex.toString().contains(EOF_READ_DIFFERENT_LENGTH);
   }
 
   /**
@@ -1423,19 +1427,23 @@ public final class S3AUtils {
    * an array. Given tombstones are filtered out. If the iterator
    * does return any item, an empty array is returned.
    * @param iterator a non-null iterator
-   * @param tombstones possibly empty set of tombstones
+   * @param tombstones
    * @return a possibly-empty array of file status entries
-   * @throws IOException failure
+   * @throws IOException
    */
   public static S3AFileStatus[] iteratorToStatuses(
       RemoteIterator<S3AFileStatus> iterator, Set<Path> tombstones)
       throws IOException {
-    // this will close the span afterwards
-    RemoteIterator<S3AFileStatus> source = filteringRemoteIterator(iterator,
-        st -> !tombstones.contains(st.getPath()));
-    S3AFileStatus[] statuses = RemoteIterators
-        .toArray(source, new S3AFileStatus[0]);
-    return statuses;
+    List<FileStatus> statuses = new ArrayList<>();
+
+    while (iterator.hasNext()) {
+      S3AFileStatus status = iterator.next();
+      if (!tombstones.contains(status.getPath())) {
+        statuses.add(status);
+      }
+    }
+
+    return statuses.toArray(new S3AFileStatus[0]);
   }
 
   /**
