@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.amazonaws.services.s3.model.PartETag;
-import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -175,7 +175,6 @@ public class ITestCommitOperations extends AbstractCommitITest {
     Path destFile = methodPath(filename);
     Path pendingFilePath = makeMagic(destFile);
     touch(fs, pendingFilePath);
-    waitForConsistency();
     validateIntermediateAndFinalPaths(pendingFilePath, destFile);
     Path pendingDataPath = validatePendingCommitData(filename,
         pendingFilePath);
@@ -195,8 +194,7 @@ public class ITestCommitOperations extends AbstractCommitITest {
     setThrottling(FULL_THROTTLE, STANDARD_FAILURE_LIMIT);
   }
 
-  private CommitOperations newCommitOperations()
-      throws IOException {
+  private CommitOperations newCommitOperations() {
     return new CommitOperations(getFileSystem());
   }
 
@@ -674,7 +672,7 @@ public class ITestCommitOperations extends AbstractCommitITest {
     Path subdir = new Path(destDir, "subdir");
     // file 2
     Path destFile2 = new Path(subdir, "file2");
-    Path destFile3 = new Path(subdir, "file3 with space");
+    Path destFile3 = new Path(subdir, "file3");
     List<Path> destinations = Lists.newArrayList(destFile1, destFile2,
         destFile3);
     List<SinglePendingCommit> commits = new ArrayList<>(3);
@@ -707,8 +705,7 @@ public class ITestCommitOperations extends AbstractCommitITest {
       LOG.info("Commit #2");
       writes.reset();
       commitContext.commitOrFail(commits.get(1));
-      assertPathExists("subdirectory", subdir);
-      assertPathExists("destFile2", destFile2);
+
       final String secondCommitContextString = commitContext.toString();
       LOG.info("Second Commit state {}", secondCommitContextString);
 
@@ -726,11 +723,11 @@ public class ITestCommitOperations extends AbstractCommitITest {
                 + "; second commit ancestors: " + secondCommitContextString,
             2);
       }
-
+      assertPathExists("subdirectory", subdir);
+      assertPathExists("destFile2", destFile2);
       LOG.info("Commit #3");
       writes.reset();
       commitContext.commitOrFail(commits.get(2));
-      assertPathExists("destFile3", destFile3);
       if (writesOnFirstCommit != 0) {
         // this file is in the same dir as destFile2, so only its entry
         // is added
@@ -739,6 +736,7 @@ public class ITestCommitOperations extends AbstractCommitITest {
                 + "first commit had " + writesOnFirstCommit,
             1);
       }
+      assertPathExists("destFile3", destFile3);
     }
     resetFailures();
   }
