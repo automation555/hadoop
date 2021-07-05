@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -118,13 +118,14 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
 
   public FSAppAttempt(FairScheduler scheduler,
       ApplicationAttemptId applicationAttemptId, String user, FSLeafQueue queue,
-      ActiveUsersManager activeUsersManager, RMContext rmContext) {
+      ActiveUsersManager activeUsersManager, RMContext rmContext,
+      Priority priority) {
     super(applicationAttemptId, user, queue, activeUsersManager, rmContext);
 
     this.scheduler = scheduler;
     this.startTime = scheduler.getClock().getTime();
     this.lastTimeAtFairShare = this.startTime;
-    this.appPriority = Priority.newInstance(1);
+    this.appPriority = priority;
     this.enableAMPreemption = scheduler.getConf()
             .getAMPreemptionEnabled(getQueue().getQueueName());
   }
@@ -693,7 +694,7 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
   /**
    * Reserve a spot for {@code container} on this {@code node}. If
    * the container is {@code alreadyReserved} on the node, simply
-   * update relevant bookkeeping. This dispatches ro relevant handlers
+   * update relevant bookeeping. This dispatches ro relevant handlers
    * in {@link FSSchedulerNode}..
    * return whether reservation was possible with the current threshold limits
    */
@@ -1332,8 +1333,6 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
 
   @Override
   public Priority getPriority() {
-    // Right now per-app priorities are not passed to scheduler,
-    // so everyone has the same priority.
     return appPriority;
   }
 
@@ -1393,12 +1392,12 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
       return;
     }
 
-    StringBuilder diagnosticMessage = new StringBuilder();
-    diagnosticMessage.append(" (Resource request: ")
+    StringBuilder diagnosticMessageBldr = new StringBuilder();
+    diagnosticMessageBldr.append(" (Resource request: ")
         .append(resource)
         .append(reason);
     updateAMContainerDiagnostics(AMState.INACTIVATED,
-        diagnosticMessage.toString());
+        diagnosticMessageBldr.toString());
   }
 
   /*

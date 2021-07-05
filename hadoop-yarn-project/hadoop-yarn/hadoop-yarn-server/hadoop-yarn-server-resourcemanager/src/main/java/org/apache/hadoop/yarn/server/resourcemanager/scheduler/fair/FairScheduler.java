@@ -18,12 +18,17 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.SettableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -96,13 +101,6 @@ import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
-
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.SettableFuture;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -468,7 +466,7 @@ public class FairScheduler extends
    */
   protected void addApplication(ApplicationId applicationId,
       String queueName, String user, boolean isAppRecovering,
-      ApplicationPlacementContext placementContext) {
+      ApplicationPlacementContext placementContext, Priority appPriority) {
     // If the  placement was rejected the placementContext will be null.
     // We ignore placement rules on recovery.
     if (!isAppRecovering && placementContext == null) {
@@ -554,15 +552,11 @@ public class FairScheduler extends
           return;
         }
       }
-      boolean unmanagedAM = rmApp != null &&
-          rmApp.getApplicationSubmissionContext() != null
-          && rmApp.getApplicationSubmissionContext().getUnmanagedAM();
 
       SchedulerApplication<FSAppAttempt> application =
-          new SchedulerApplication<>(queue, user, unmanagedAM);
+          new SchedulerApplication<>(queue, user, appPriority);
       applications.put(applicationId, application);
-
-      queue.getMetrics().submitApp(user, unmanagedAM);
+      queue.getMetrics().submitApp(user);
 
       LOG.info("Accepted application " + applicationId + " from user: " + user
           + ", in queue: " + queueName
@@ -601,7 +595,8 @@ public class FairScheduler extends
       FSLeafQueue queue = (FSLeafQueue) application.getQueue();
 
       FSAppAttempt attempt = new FSAppAttempt(this, applicationAttemptId, user,
-          queue, new ActiveUsersManager(getRootQueueMetrics()), rmContext);
+          queue, new ActiveUsersManager(getRootQueueMetrics()), rmContext,
+          application.getPriority());
       if (transferStateFromPreviousAttempt) {
         attempt.transferStateFromPreviousAttempt(
             application.getCurrentAppAttempt());
@@ -616,7 +611,7 @@ public class FairScheduler extends
         maxRunningEnforcer.trackNonRunnableApp(attempt);
       }
 
-      queue.getMetrics().submitAppAttempt(user, application.isUnmanagedAM());
+      queue.getMetrics().submitAppAttempt(user);
 
       LOG.info("Added Application Attempt " + applicationAttemptId
           + " to scheduler from user: " + user);
@@ -1253,7 +1248,9 @@ public class FairScheduler extends
         addApplication(appAddedEvent.getApplicationId(),
             queueName, appAddedEvent.getUser(),
             appAddedEvent.getIsAppRecovering(),
-            appAddedEvent.getPlacementContext());
+            appAddedEvent.getPlacementContext(),
+            appAddedEvent.getApplicatonPriority()
+        );
       }
       break;
     case APP_REMOVED:
@@ -1446,13 +1443,6 @@ public class FairScheduler extends
             + " is invalid, so using default value "
             + FairSchedulerConfiguration.DEFAULT_UPDATE_INTERVAL_MS
             + " ms instead");
-      }
-
-      boolean globalAmPreemption = conf.getBoolean(
-          FairSchedulerConfiguration.AM_PREEMPTION,
-          FairSchedulerConfiguration.DEFAULT_AM_PREEMPTION);
-      if (!globalAmPreemption) {
-        LOG.info("AM preemption is DISABLED globally");
       }
 
       rootMetrics = FSQueueMetrics.forQueue("root", null, true, conf);

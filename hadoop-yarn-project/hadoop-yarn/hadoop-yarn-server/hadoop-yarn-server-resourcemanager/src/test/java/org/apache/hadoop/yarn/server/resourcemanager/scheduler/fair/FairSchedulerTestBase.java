@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
@@ -182,7 +182,7 @@ public class FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext(queueId);
     scheduler.addApplication(id.getApplicationId(), queueId, userId, false,
-        placementCtx);
+        placementCtx, Priority.newInstance(1));
     // This conditional is for testAclSubmitApplication where app is rejected
     // and no app is added.
     if (scheduler.getSchedulerApplications()
@@ -221,7 +221,7 @@ public class FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext(queueId);
     scheduler.addApplication(id.getApplicationId(), queueId, userId, false,
-        placementCtx);
+        placementCtx, Priority.newInstance(1));
     // This conditional is for testAclSubmitApplication where app is rejected
     // and no app is added.
     if (scheduler.getSchedulerApplications().containsKey(
@@ -290,7 +290,7 @@ public class FairSchedulerTestBase {
     ApplicationPlacementContext placementCtx =
         new ApplicationPlacementContext(queueId);
     scheduler.addApplication(id.getApplicationId(), queueId, userId, true,
-        placementCtx);
+        placementCtx, Priority.newInstance(1));
     return id;
   }
 
