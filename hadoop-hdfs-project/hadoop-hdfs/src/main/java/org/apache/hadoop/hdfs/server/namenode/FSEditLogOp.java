@@ -132,16 +132,16 @@ import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RpcConstants;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.StringUtils;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.AttributesImpl;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 
 /**
  * Helper classes for reading the ops from an InputStream.
@@ -281,11 +281,6 @@ public abstract class FSEditLogOp {
 
   public abstract void writeFields(DataOutputStream out)
       throws IOException;
-
-  public void writeFields(DataOutputStream out, int logVersion)
-      throws IOException {
-    writeFields(out);
-  }
 
   static interface BlockListUpdatingOp {
     Block[] getBlocks();
@@ -551,12 +546,6 @@ public abstract class FSEditLogOp {
 
     @Override
     public void writeFields(DataOutputStream out) throws IOException {
-      throw new IOException("Unsupported without logversion");
-    }
-
-    @Override
-    public void writeFields(DataOutputStream out, int logVersion)
-        throws IOException {
       FSImageSerialization.writeLong(inodeId, out);
       FSImageSerialization.writeString(path, out);
       FSImageSerialization.writeShort(replication, out);
@@ -575,10 +564,7 @@ public abstract class FSEditLogOp {
         FSImageSerialization.writeString(clientMachine,out);
         FSImageSerialization.writeBoolean(overwrite, out);
         FSImageSerialization.writeByte(storagePolicyId, out);
-        if (NameNodeLayoutVersion.supports(
-            NameNodeLayoutVersion.Feature.ERASURE_CODING, logVersion)) {
-          FSImageSerialization.writeByte(erasureCodingPolicyId, out);
-        }
+        FSImageSerialization.writeByte(erasureCodingPolicyId, out);
         // write clientId and callId
         writeRpcIds(rpcClientId, rpcCallId, out);
       }
@@ -1836,15 +1822,7 @@ public abstract class FSEditLogOp {
     }
   }
 
-  /**
-   * This operation does not actually update gen stamp immediately,
-   * the new gen stamp is recorded as impending gen stamp.
-   * The global generation stamp on Standby Node is updated when
-   * the block with the next generation stamp is actually received.
-   * We keep logging this operation for backward compatibility.
-   * The impending gen stamp will take effect when the standby
-   * transition to become an active.
-   */
+  /** Similar with {@link SetGenstampV1Op} */
   static class SetGenstampV2Op extends FSEditLogOp {
     long genStampV2;
 
@@ -2934,7 +2912,7 @@ public abstract class FSEditLogOp {
       this.newLength = Long.parseLong(st.getValue("NEWLENGTH"));
       this.timestamp = Long.parseLong(st.getValue("TIMESTAMP"));
       if (st.hasChildren("BLOCK"))
-        this.truncateBlock = FSEditLogOp.blockFromXml(st);
+        this.truncateBlock = FSEditLogOp.blockFromXml(st.getChildren("BLOCK").get(0));
     }
 
     @Override
@@ -3437,8 +3415,6 @@ public abstract class FSEditLogOp {
   static class CreateSnapshotOp extends FSEditLogOp {
     String snapshotRoot;
     String snapshotName;
-    /** Modification time of the edit set by Time.now(). */
-    long mtime;
     
     public CreateSnapshotOp() {
       super(OP_CREATE_SNAPSHOT);
@@ -3452,55 +3428,31 @@ public abstract class FSEditLogOp {
     void resetSubFields() {
       snapshotRoot = null;
       snapshotName = null;
-      mtime = 0L;
     }
 
-    /* set the name of the snapshot. */
     CreateSnapshotOp setSnapshotName(String snapName) {
       this.snapshotName = snapName;
       return this;
     }
 
-    /* set the directory path where the snapshot is taken. */
     public CreateSnapshotOp setSnapshotRoot(String snapRoot) {
       snapshotRoot = snapRoot;
       return this;
     }
-
-    /* The snapshot creation time set by Time.now(). */
-    CreateSnapshotOp setSnapshotMTime(long mTime) {
-      this.mtime = mTime;
-      return this;
-    }
-
+    
     @Override
     void readFields(DataInputStream in, int logVersion) throws IOException {
       snapshotRoot = FSImageSerialization.readString(in);
       snapshotName = FSImageSerialization.readString(in);
-      if (NameNodeLayoutVersion
-          .supports(NameNodeLayoutVersion.Feature.SNAPSHOT_MODIFICATION_TIME,
-              logVersion)) {
-        mtime = FSImageSerialization.readLong(in);
-      }
+      
       // read RPC ids if necessary
       readRpcIds(in, logVersion);
     }
 
     @Override
     public void writeFields(DataOutputStream out) throws IOException {
-      throw new IOException("Unsupported without logversion");
-    }
-
-    @Override
-    public void writeFields(DataOutputStream out, int logVersion)
-        throws IOException {
       FSImageSerialization.writeString(snapshotRoot, out);
       FSImageSerialization.writeString(snapshotName, out);
-      if (NameNodeLayoutVersion
-          .supports(NameNodeLayoutVersion.Feature.SNAPSHOT_MODIFICATION_TIME,
-              logVersion)) {
-        FSImageSerialization.writeLong(mtime, out);
-      }
       writeRpcIds(rpcClientId, rpcCallId, out);
     }
 
@@ -3508,7 +3460,6 @@ public abstract class FSEditLogOp {
     protected void toXml(ContentHandler contentHandler) throws SAXException {
       XMLUtils.addSaxString(contentHandler, "SNAPSHOTROOT", snapshotRoot);
       XMLUtils.addSaxString(contentHandler, "SNAPSHOTNAME", snapshotName);
-      XMLUtils.addSaxString(contentHandler, "MTIME", Long.toString(mtime));
       appendRpcIdsToXml(contentHandler, rpcClientId, rpcCallId);
     }
 
@@ -3516,7 +3467,6 @@ public abstract class FSEditLogOp {
     void fromXml(Stanza st) throws InvalidXmlException {
       snapshotRoot = st.getValue("SNAPSHOTROOT");
       snapshotName = st.getValue("SNAPSHOTNAME");
-      this.mtime = Long.parseLong(st.getValue("MTIME"));
       
       readRpcIdsFromXml(st);
     }
@@ -3527,8 +3477,7 @@ public abstract class FSEditLogOp {
       builder.append("CreateSnapshotOp [snapshotRoot=")
           .append(snapshotRoot)
           .append(", snapshotName=")
-          .append(snapshotName)
-          .append(", mtime=").append(mtime);
+          .append(snapshotName);
       appendRpcIdsToString(builder, rpcClientId, rpcCallId);
       builder.append("]");
       return builder.toString();
@@ -3542,8 +3491,6 @@ public abstract class FSEditLogOp {
   static class DeleteSnapshotOp extends FSEditLogOp {
     String snapshotRoot;
     String snapshotName;
-    /** Modification time of the edit set by Time.now(). */
-    long mtime;
     
     DeleteSnapshotOp() {
       super(OP_DELETE_SNAPSHOT);
@@ -3557,55 +3504,31 @@ public abstract class FSEditLogOp {
     void resetSubFields() {
       snapshotRoot = null;
       snapshotName = null;
-      mtime = 0L;
     }
-
-    /* set the name of the snapshot. */
+    
     DeleteSnapshotOp setSnapshotName(String snapName) {
       this.snapshotName = snapName;
       return this;
     }
 
-    /* set the directory path where the snapshot is taken. */
     DeleteSnapshotOp setSnapshotRoot(String snapRoot) {
       snapshotRoot = snapRoot;
       return this;
     }
-
-    /* The snapshot deletion time set by Time.now(). */
-    DeleteSnapshotOp setSnapshotMTime(long mTime) {
-      this.mtime = mTime;
-      return this;
-    }
-
+    
     @Override
     void readFields(DataInputStream in, int logVersion) throws IOException {
       snapshotRoot = FSImageSerialization.readString(in);
       snapshotName = FSImageSerialization.readString(in);
-      if (NameNodeLayoutVersion
-          .supports(NameNodeLayoutVersion.Feature.SNAPSHOT_MODIFICATION_TIME,
-              logVersion)) {
-        mtime = FSImageSerialization.readLong(in);
-      }
+      
       // read RPC ids if necessary
       readRpcIds(in, logVersion);
     }
 
     @Override
     public void writeFields(DataOutputStream out) throws IOException {
-      throw new IOException("Unsupported without logversion");
-    }
-
-    @Override
-    public void writeFields(DataOutputStream out, int logVersion)
-        throws IOException {
       FSImageSerialization.writeString(snapshotRoot, out);
       FSImageSerialization.writeString(snapshotName, out);
-      if (NameNodeLayoutVersion
-          .supports(NameNodeLayoutVersion.Feature.SNAPSHOT_MODIFICATION_TIME,
-              logVersion)) {
-        FSImageSerialization.writeLong(mtime, out);
-      }
       writeRpcIds(rpcClientId, rpcCallId, out);
     }
 
@@ -3613,7 +3536,6 @@ public abstract class FSEditLogOp {
     protected void toXml(ContentHandler contentHandler) throws SAXException {
       XMLUtils.addSaxString(contentHandler, "SNAPSHOTROOT", snapshotRoot);
       XMLUtils.addSaxString(contentHandler, "SNAPSHOTNAME", snapshotName);
-      XMLUtils.addSaxString(contentHandler, "MTIME", Long.toString(mtime));
       appendRpcIdsToXml(contentHandler, rpcClientId, rpcCallId);
     }
 
@@ -3621,7 +3543,6 @@ public abstract class FSEditLogOp {
     void fromXml(Stanza st) throws InvalidXmlException {
       snapshotRoot = st.getValue("SNAPSHOTROOT");
       snapshotName = st.getValue("SNAPSHOTNAME");
-      this.mtime = Long.parseLong(st.getValue("MTIME"));
       
       readRpcIdsFromXml(st);
     }
@@ -3632,8 +3553,7 @@ public abstract class FSEditLogOp {
       builder.append("DeleteSnapshotOp [snapshotRoot=")
           .append(snapshotRoot)
           .append(", snapshotName=")
-          .append(snapshotName)
-          .append(", mtime=").append(mtime);
+          .append(snapshotName);
       appendRpcIdsToString(builder, rpcClientId, rpcCallId);
       builder.append("]");
       return builder.toString();
@@ -3648,9 +3568,6 @@ public abstract class FSEditLogOp {
     String snapshotRoot;
     String snapshotOldName;
     String snapshotNewName;
-    /** Modification time of the edit set by Time.now(). */
-    long mtime;
-
     
     RenameSnapshotOp() {
       super(OP_RENAME_SNAPSHOT);
@@ -3665,16 +3582,13 @@ public abstract class FSEditLogOp {
       snapshotRoot = null;
       snapshotOldName = null;
       snapshotNewName = null;
-      mtime = 0L;
     }
-
-    /* set the old name of the snapshot. */
+    
     RenameSnapshotOp setSnapshotOldName(String snapshotOldName) {
       this.snapshotOldName = snapshotOldName;
       return this;
     }
 
-    /* set the new name of the snapshot. */
     RenameSnapshotOp setSnapshotNewName(String snapshotNewName) {
       this.snapshotNewName = snapshotNewName;
       return this;
@@ -3685,42 +3599,22 @@ public abstract class FSEditLogOp {
       return this;
     }
     
-    /* The snapshot rename time set by Time.now(). */
-    RenameSnapshotOp setSnapshotMTime(long mTime) {
-      this.mtime = mTime;
-      return this;
-    }
-
     @Override
     void readFields(DataInputStream in, int logVersion) throws IOException {
       snapshotRoot = FSImageSerialization.readString(in);
       snapshotOldName = FSImageSerialization.readString(in);
       snapshotNewName = FSImageSerialization.readString(in);
-      if (NameNodeLayoutVersion
-          .supports(NameNodeLayoutVersion.Feature.SNAPSHOT_MODIFICATION_TIME,
-              logVersion)) {
-        mtime = FSImageSerialization.readLong(in);
-      }
+      
       // read RPC ids if necessary
       readRpcIds(in, logVersion);
     }
 
     @Override
     public void writeFields(DataOutputStream out) throws IOException {
-      throw new IOException("Unsupported without logversion");
-    }
-
-    @Override
-    public void writeFields(DataOutputStream out, int logVersion)
-        throws IOException {
       FSImageSerialization.writeString(snapshotRoot, out);
       FSImageSerialization.writeString(snapshotOldName, out);
       FSImageSerialization.writeString(snapshotNewName, out);
-      if (NameNodeLayoutVersion
-          .supports(NameNodeLayoutVersion.Feature.SNAPSHOT_MODIFICATION_TIME,
-              logVersion)) {
-        FSImageSerialization.writeLong(mtime, out);
-      }
+      
       writeRpcIds(rpcClientId, rpcCallId, out);
     }
 
@@ -3729,7 +3623,6 @@ public abstract class FSEditLogOp {
       XMLUtils.addSaxString(contentHandler, "SNAPSHOTROOT", snapshotRoot);
       XMLUtils.addSaxString(contentHandler, "SNAPSHOTOLDNAME", snapshotOldName);
       XMLUtils.addSaxString(contentHandler, "SNAPSHOTNEWNAME", snapshotNewName);
-      XMLUtils.addSaxString(contentHandler, "MTIME", Long.toString(mtime));
       appendRpcIdsToXml(contentHandler, rpcClientId, rpcCallId);
     }
 
@@ -3738,7 +3631,6 @@ public abstract class FSEditLogOp {
       snapshotRoot = st.getValue("SNAPSHOTROOT");
       snapshotOldName = st.getValue("SNAPSHOTOLDNAME");
       snapshotNewName = st.getValue("SNAPSHOTNEWNAME");
-      this.mtime = Long.parseLong(st.getValue("MTIME"));
       
       readRpcIdsFromXml(st);
     }
@@ -3751,9 +3643,7 @@ public abstract class FSEditLogOp {
           .append(", snapshotOldName=")
           .append(snapshotOldName)
           .append(", snapshotNewName=")
-          .append(snapshotNewName)
-          .append(", mtime=")
-          .append(mtime);
+          .append(snapshotNewName);
       appendRpcIdsToString(builder, rpcClientId, rpcCallId);
       builder.append("]");
       return builder.toString();
@@ -4964,18 +4854,16 @@ public abstract class FSEditLogOp {
      * Write an operation to the output stream
      * 
      * @param op The operation to write
-     * @param logVersion The version of edit log
      * @throws IOException if an error occurs during writing.
      */
-    public void writeOp(FSEditLogOp op, int logVersion)
-        throws IOException {
+    public void writeOp(FSEditLogOp op) throws IOException {
       int start = buf.getLength();
       // write the op code first to make padding and terminator verification
       // work
       buf.writeByte(op.opCode.getOpCode());
       buf.writeInt(0); // write 0 for the length first
       buf.writeLong(op.txid);
-      op.writeFields(buf, logVersion);
+      op.writeFields(buf);
       int end = buf.getLength();
       
       // write the length back: content of the op + 4 bytes checksum - op_code
