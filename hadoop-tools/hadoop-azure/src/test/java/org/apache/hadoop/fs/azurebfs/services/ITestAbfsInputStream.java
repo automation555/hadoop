@@ -31,7 +31,6 @@ import org.apache.hadoop.fs.azurebfs.AbfsConfiguration;
 import org.apache.hadoop.fs.azurebfs.AbstractAbfsIntegrationTest;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystemStore;
-import org.apache.hadoop.fs.azurebfs.utils.TracingContext;
 import org.junit.Test;
 
 import static org.apache.hadoop.fs.azurebfs.constants.FileSystemConfigurations.ONE_MB;
@@ -119,8 +118,7 @@ public class ITestAbfsInputStream extends AbstractAbfsIntegrationTest {
       doThrow(new IOException())
           .doCallRealMethod()
           .when(abfsInputStream)
-          .readRemote(anyLong(), any(), anyInt(), anyInt(),
-              any(TracingContext.class));
+          .readRemote(anyLong(), any(), anyInt(), anyInt());
 
       iStream = new FSDataInputStream(abfsInputStream);
       verifyBeforeSeek(abfsInputStream);
@@ -172,7 +170,7 @@ public class ITestAbfsInputStream extends AbstractAbfsIntegrationTest {
 
   protected Path createFileWithContent(FileSystem fs, String fileName,
       byte[] fileContent) throws IOException {
-    Path testFilePath = path(fileName);
+    Path testFilePath = getUniquePath(fileName);
     try (FSDataOutputStream oStream = fs.create(testFilePath)) {
       oStream.write(fileContent);
       oStream.flush();

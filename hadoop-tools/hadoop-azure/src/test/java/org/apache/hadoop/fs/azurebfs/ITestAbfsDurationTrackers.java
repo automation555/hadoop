@@ -64,7 +64,7 @@ public class ITestAbfsDurationTrackers extends AbstractAbfsIntegrationTest {
         + "work as expected.");
 
     AzureBlobFileSystem fs = getFileSystem();
-    Path testFilePath = path(getMethodName());
+    Path testFilePath = getUniquePath(getMethodName());
 
     // Declaring output and input stream.
     AbfsOutputStream out = null;
@@ -76,8 +76,7 @@ public class ITestAbfsDurationTrackers extends AbstractAbfsIntegrationTest {
       out.hflush();
 
       // GET the file.
-      in = fs.getAbfsStore().openFileForRead(testFilePath,
-          fs.getFsStatistics(), getTestTracingContext(fs, false));
+      in = fs.getAbfsStore().openFileForRead(testFilePath, fs.getFsStatistics());
       int res = in.read();
       LOG.info("Result of Read: {}", res);
 
