@@ -40,7 +40,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * {@link UsersManager} tracks users in the system and its respective data
@@ -77,7 +77,7 @@ public class UsersManager implements AbstractUsersManager {
   private Map<String, Map<SchedulingMode, Long>> localVersionOfAllUsersState =
       new HashMap<String, Map<SchedulingMode, Long>>();
 
-  private volatile float userLimit;
+  private volatile int userLimit;
   private volatile float userLimitFactor;
 
   private WriteLock writeLock;
@@ -320,7 +320,7 @@ public class UsersManager implements AbstractUsersManager {
    * Get configured user-limit.
    * @return user limit
    */
-  public float getUserLimit() {
+  public int getUserLimit() {
     return userLimit;
   }
 
@@ -328,7 +328,7 @@ public class UsersManager implements AbstractUsersManager {
    * Set configured user-limit.
    * @param userLimit user limit
    */
-  public void setUserLimit(float userLimit) {
+  public void setUserLimit(int userLimit) {
     this.userLimit = userLimit;
   }
 
@@ -702,8 +702,7 @@ public class UsersManager implements AbstractUsersManager {
     activeUsersWithOnlyPendingApps = new AtomicInteger(numPendingUsers);
   }
 
-  @VisibleForTesting
-  Resource computeUserLimit(String userName, Resource clusterResource,
+  private Resource computeUserLimit(String userName, Resource clusterResource,
       String nodePartition, SchedulingMode schedulingMode, boolean activeUser) {
     Resource partitionResource = labelManager.getResourceByLabel(nodePartition,
         clusterResource);
@@ -717,7 +716,6 @@ public class UsersManager implements AbstractUsersManager {
      * (which extra resources we are allocating)
      */
     Resource queueCapacity = lQueue.getEffectiveCapacity(nodePartition);
-    Resource originalCapacity = queueCapacity;
 
     /*
      * Assume we have required resource equals to minimumAllocation, this can
@@ -793,19 +791,8 @@ public class UsersManager implements AbstractUsersManager {
     // IGNORE_PARTITION_EXCLUSIVITY allocation.
     Resource maxUserLimit = Resources.none();
     if (schedulingMode == SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY) {
-      if (getUserLimitFactor() == -1 ||
-          originalCapacity.equals(Resources.none())) {
-        // If user-limit-factor set to -1, we should disable user limit.
-        //
-        // Also prevent incorrect maxUserLimit due to low queueCapacity
-        // Can happen if dynamic queue has capacity = 0%
-        maxUserLimit = lQueue.
-            getEffectiveMaxCapacityDown(
-                nodePartition, lQueue.getMinimumAllocation());
-      } else {
-        maxUserLimit = Resources.multiplyAndRoundDown(queueCapacity,
-            getUserLimitFactor());
-      }
+      maxUserLimit = Resources.multiplyAndRoundDown(queueCapacity,
+          getUserLimitFactor());
     } else if (schedulingMode == SchedulingMode.IGNORE_PARTITION_EXCLUSIVITY) {
       maxUserLimit = partitionResource;
     }
@@ -1135,10 +1122,5 @@ public class UsersManager implements AbstractUsersManager {
   @VisibleForTesting
   public int getNumActiveUsersWithOnlyPendingApps() {
     return activeUsersWithOnlyPendingApps.get();
-  }
-
-  @VisibleForTesting
-  void setUsageRatio(String label, float usage) {
-    qUsageRatios.usageRatios.put(label, usage);
   }
 }
