@@ -154,7 +154,7 @@ import org.apache.hadoop.yarn.security.client.ClientToAMTokenSecretManager;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1714,6 +1714,16 @@ public class MRAppMaster extends CompositeService {
       }
       appMaster.notifyIsLastAMRetry(appMaster.isLastAMRetry);
       appMaster.stop();
+      try {
+        JobContext jobContext = appMaster.getJobContextFromConf(appMaster.getConfig());
+        appMaster.committer.abortJob(jobContext, State.KILLED);
+      } catch (FileNotFoundException e) {
+        System.out.println("Previous job temporary files do not exist, no clean up was necessary.");
+      } catch (Exception e) {
+        // the clean up of a previous attempt is not critical to the success
+        // of this job - only logging the error
+        System.err.println("Error while trying to clean up previous job's temporary files" + e);
+      }
     }
   }
 
