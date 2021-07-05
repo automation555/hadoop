@@ -46,6 +46,7 @@ class Syscall {
    * @param message The char pointer to write to stdout.
    * @returns A boolean indicating whether the write
    * was successful.
+   
    */
   static int WriteToStdout(const char* message);
 
@@ -112,6 +113,22 @@ class Syscall {
    * successful.
    */
   static bool CloseFile(int file_descriptor);
+
+  /**
+   * Creates and opens a temporary file with a given {@link pattern}.
+   * The {@link pattern} must end with a minimum of 6 'X' characters.
+   * This function will first modify the last 6 'X' characters with
+   * random character values, which serve as the temporary file name.
+   * Subsequently opens the file and returns the file descriptor for
+   * the same. The behaviour of this function is the same as that of
+   * POSIX mkstemp function. The file must be later closed by the
+   * application and is not handled by this function.
+   *
+   * @param pattern the pattern to be used for the temporary filename.
+   * @returns true if the creation of directory succeeds, false
+   * otherwise.
+   */
+  static bool CreateTempDir(std::vector<char>& pattern);
 
  private:
   static bool WriteToStdoutImpl(const char* message);
