@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.registry.client.impl.zk;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.curator.ensemble.EnsembleProvider;
 import org.apache.curator.ensemble.fixed.FixedEnsembleProvider;
 import org.apache.curator.framework.CuratorFramework;
@@ -573,9 +573,9 @@ public class CuratorService extends CompositeService
     }
 
     try {
-      RegistrySecurity.AclListInfo aclInfo =
-          new RegistrySecurity.AclListInfo(acls);
       if (LOG.isDebugEnabled()) {
+        RegistrySecurity.AclListInfo aclInfo =
+                new RegistrySecurity.AclListInfo(acls);
         LOG.debug("Creating path {} with mode {} and ACL {}",
             path, mode, aclInfo);
       }

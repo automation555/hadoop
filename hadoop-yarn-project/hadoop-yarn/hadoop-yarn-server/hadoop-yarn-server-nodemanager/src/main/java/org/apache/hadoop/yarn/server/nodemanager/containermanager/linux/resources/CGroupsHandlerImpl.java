@@ -20,8 +20,8 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -470,8 +470,8 @@ class CGroupsHandlerImpl implements CGroupsHandler {
   * Utility routine to print first line from cgroup tasks file
   */
   private void logLineFromTasksFile(File cgf) {
-    String str;
     if (LOG.isDebugEnabled()) {
+      String str;
       try (BufferedReader inl =
           new BufferedReader(new InputStreamReader(new FileInputStream(cgf
               + "/tasks"), "UTF-8"))) {
