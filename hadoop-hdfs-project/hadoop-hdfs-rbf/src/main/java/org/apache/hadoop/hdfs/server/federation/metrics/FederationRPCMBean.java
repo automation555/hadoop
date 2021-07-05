@@ -30,6 +30,10 @@ public interface FederationRPCMBean {
 
   long getProxyOps();
 
+  long getActiveProxyOps();
+
+  long getObserverProxyOps();
+
   double getProxyAvg();
 
   long getProcessingOps();
@@ -75,21 +79,6 @@ public interface FederationRPCMBean {
    * @return Number of active RPC connections between the Router and the NNs.
    */
   int getRpcClientNumActiveConnections();
-
-  /**
-   * Get the number of idle RPC connections between the Router and the NNs.
-   * @return Number of idle RPC connections between the Router and the NNs.
-   */
-  int getRpcClientNumIdleConnections();
-
-  /**
-   * Get the number of recently active RPC connections between
-   * the Router and the NNs.
-   *
-   * @return Number of recently active RPC connections between
-   * the Router and the NNs.
-   */
-  int getRpcClientNumActiveConnectionsRecently();
 
   /**
    * Get the number of RPC connections to be created.

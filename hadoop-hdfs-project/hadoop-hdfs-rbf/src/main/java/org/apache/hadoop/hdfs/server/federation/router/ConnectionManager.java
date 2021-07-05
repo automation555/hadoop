@@ -32,6 +32,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdfs.ClientGSIContext;
+import org.apache.hadoop.ipc.AlignmentContext;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -73,6 +75,8 @@ public class ConnectionManager {
 
   /** Queue for creating new connections. */
   private final BlockingQueue<ConnectionPool> creatorQueue;
+
+  private final Map<String, AlignmentContext> alignmentContexts;
   /** Max size of queue for creating new connections. */
   private final int creatorQueueMaxSize;
 
@@ -125,6 +129,8 @@ public class ConnectionManager {
         RBFConfigKeys.DFS_ROUTER_NAMENODE_CONNECTION_CLEAN_MS_DEFAULT);
     LOG.info("Cleaning connections every {} seconds",
         TimeUnit.MILLISECONDS.toSeconds(this.connectionCleanupPeriodMs));
+    // Initialize observer context
+    alignmentContexts = new HashMap<>();
   }
 
   /**
@@ -172,11 +178,12 @@ public class ConnectionManager {
    * @param ugi User group information.
    * @param nnAddress Namenode address for the connection.
    * @param protocol Protocol for the connection.
+   * @param nsId Nameservice Identify.
    * @return Proxy client to connect to nnId as UGI.
    * @throws IOException If the connection cannot be obtained.
    */
   public ConnectionContext getConnection(UserGroupInformation ugi,
-      String nnAddress, Class<?> protocol) throws IOException {
+      String nnAddress, Class<?> protocol, String nsId) throws IOException {
 
     // Check if the manager is shutdown
     if (!this.running) {
@@ -203,9 +210,16 @@ public class ConnectionManager {
       try {
         pool = this.pools.get(connectionId);
         if (pool == null) {
+          if(!alignmentContexts.containsKey(nsId)) {
+            synchronized (alignmentContexts) {
+              if(!alignmentContexts.containsKey(nsId)) {
+                alignmentContexts.put(nsId, new ClientGSIContext());
+              }
+            }
+          }
           pool = new ConnectionPool(
               this.conf, nnAddress, ugi, this.minSize, this.maxSize,
-              this.minActiveRatio, protocol);
+              this.minActiveRatio, protocol, alignmentContexts.get(nsId));
           this.pools.put(connectionId, pool);
         }
       } finally {
@@ -282,42 +296,6 @@ public class ConnectionManager {
   }
 
   /**
-   * Get number of idle connections.
-   *
-   * @return Number of active connections.
-   */
-  public int getNumIdleConnections() {
-    int total = 0;
-    readLock.lock();
-    try {
-      for (ConnectionPool pool : this.pools.values()) {
-        total += pool.getNumIdleConnections();
-      }
-    } finally {
-      readLock.unlock();
-    }
-    return total;
-  }
-
-  /**
-   * Get number of recently active connections.
-   *
-   * @return Number of recently active connections.
-   */
-  public int getNumActiveConnectionsRecently() {
-    int total = 0;
-    readLock.lock();
-    try {
-      for (ConnectionPool pool : this.pools.values()) {
-        total += pool.getNumActiveConnectionsRecently();
-      }
-    } finally {
-      readLock.unlock();
-    }
-    return total;
-  }
-
-  /**
    * Get the number of connections to be created.
    *
    * @return Number of connections to be created.
@@ -363,21 +341,12 @@ public class ConnectionManager {
       // Check if the pool hasn't been active in a while or not 50% are used
       long timeSinceLastActive = Time.now() - pool.getLastActiveTime();
       int total = pool.getNumConnections();
-      // Active is a transient status in many cases for a connection since
-      // the handler thread uses the connection very quickly. Thus the number
-      // of connections with handlers using at the call time is constantly low.
-      // Recently active is more lasting status and it shows how many
-      // connections have been used with a recent time period. (i.e. 30 seconds)
-      int active = pool.getNumActiveConnectionsRecently();
+      int active = pool.getNumActiveConnections();
       float poolMinActiveRatio = pool.getMinActiveRatio();
       if (timeSinceLastActive > connectionCleanupPeriodMs ||
           active < poolMinActiveRatio * total) {
-        // Be greedy here to close as many connections as possible in one shot
-        // The number should at least be 1
-        int targetConnectionsCount = Math.max(1,
-            (int)(poolMinActiveRatio * total) - active);
-        List<ConnectionContext> conns =
-            pool.removeConnections(targetConnectionsCount);
+        // Remove and close 1 connection
+        List<ConnectionContext> conns = pool.removeConnections(1);
         for (ConnectionContext conn : conns) {
           conn.close();
         }
@@ -459,7 +428,7 @@ public class ConnectionManager {
           ConnectionPool pool = this.queue.take();
           try {
             int total = pool.getNumConnections();
-            int active = pool.getNumActiveConnectionsRecently();
+            int active = pool.getNumActiveConnections();
             float poolMinActiveRatio = pool.getMinActiveRatio();
             if (pool.getNumConnections() < pool.getMaxSize() &&
                 active >= poolMinActiveRatio * total) {

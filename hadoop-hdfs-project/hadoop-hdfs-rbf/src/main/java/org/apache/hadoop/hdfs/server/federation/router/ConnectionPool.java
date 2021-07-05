@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.SocketFactory;
 
+import org.apache.hadoop.ipc.AlignmentContext;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -105,6 +106,8 @@ public class ConnectionPool {
   /** The last time a connection was active. */
   private volatile long lastActiveTime = 0;
 
+  private final AlignmentContext alignmentContext;
+
   /** Map for the protocols and their protobuf implementations. */
   private final static Map<Class<?>, ProtoImpl> PROTO_MAP = new HashMap<>();
   static {
@@ -134,7 +137,8 @@ public class ConnectionPool {
 
   protected ConnectionPool(Configuration config, String address,
       UserGroupInformation user, int minPoolSize, int maxPoolSize,
-      float minActiveRatio, Class<?> proto) throws IOException {
+      float minActiveRatio, Class<?> proto, AlignmentContext alignmentContext)
+      throws IOException {
 
     this.conf = config;
 
@@ -149,6 +153,8 @@ public class ConnectionPool {
     this.minSize = minPoolSize;
     this.maxSize = maxPoolSize;
     this.minActiveRatio = minActiveRatio;
+
+    this.alignmentContext = alignmentContext;
 
     // Add minimum connections to the pool
     for (int i=0; i<this.minSize; i++) {
@@ -252,23 +258,19 @@ public class ConnectionPool {
    */
   public synchronized List<ConnectionContext> removeConnections(int num) {
     List<ConnectionContext> removed = new LinkedList<>();
-    if (this.connections.size() > this.minSize) {
-      int targetCount = Math.min(num, this.connections.size() - this.minSize);
-      // Remove and close targetCount of connections
-      List<ConnectionContext> tmpConnections = new ArrayList<>();
-      for (int i = 0; i < this.connections.size(); i++) {
-        ConnectionContext conn = this.connections.get(i);
-        // Only pick idle connections to close
-        if (removed.size() < targetCount && conn.isUsable()) {
-          removed.add(conn);
-        } else {
-          tmpConnections.add(conn);
-        }
+
+    // Remove and close the last connection
+    List<ConnectionContext> tmpConnections = new ArrayList<>();
+    for (int i=0; i<this.connections.size(); i++) {
+      ConnectionContext conn = this.connections.get(i);
+      if (i < this.minSize || i < this.connections.size() - num) {
+        tmpConnections.add(conn);
+      } else {
+        removed.add(conn);
       }
-      this.connections = tmpConnections;
     }
-    LOG.debug("Expected to remove {} connection " +
-        "and actually removed {} connections", num, removed.size());
+    this.connections = tmpConnections;
+
     return removed;
   }
 
@@ -282,7 +284,7 @@ public class ConnectionPool {
         this.connectionPoolId, timeSinceLastActive);
 
     for (ConnectionContext connection : this.connections) {
-      connection.close(true);
+      connection.close();
     }
     this.connections.clear();
   }
@@ -314,39 +316,6 @@ public class ConnectionPool {
   }
 
   /**
-   * Number of usable i.e. no active thread connections.
-   *
-   * @return Number of idle connections
-   */
-  protected int getNumIdleConnections() {
-    int ret = 0;
-
-    List<ConnectionContext> tmpConnections = this.connections;
-    for (ConnectionContext conn : tmpConnections) {
-      if (conn.isUsable()) {
-        ret++;
-      }
-    }
-    return ret;
-  }
-
-  /**
-   * Number of active connections recently in the pool.
-   *
-   * @return Number of active connections recently.
-   */
-  protected int getNumActiveConnectionsRecently() {
-    int ret = 0;
-    List<ConnectionContext> tmpConnections = this.connections;
-    for (ConnectionContext conn : tmpConnections) {
-      if (conn.isActiveRecently()) {
-        ret++;
-      }
-    }
-    return ret;
-  }
-
-  /**
    * Get the last time the connection pool was used.
    *
    * @return Last time the connection pool was used.
@@ -368,18 +337,12 @@ public class ConnectionPool {
   public String getJSON() {
     final Map<String, String> info = new LinkedHashMap<>();
     info.put("active", Integer.toString(getNumActiveConnections()));
-    info.put("recent_active",
-        Integer.toString(getNumActiveConnectionsRecently()));
-    info.put("idle", Integer.toString(getNumIdleConnections()));
     info.put("total", Integer.toString(getNumConnections()));
     if (LOG.isDebugEnabled()) {
       List<ConnectionContext> tmpConnections = this.connections;
       for (int i=0; i<tmpConnections.size(); i++) {
         ConnectionContext connection = tmpConnections.get(i);
         info.put(i + " active", Boolean.toString(connection.isActive()));
-        info.put(i + " recent_active",
-            Integer.toString(getNumActiveConnectionsRecently()));
-        info.put(i + " idle", Boolean.toString(connection.isUsable()));
         info.put(i + " closed", Boolean.toString(connection.isClosed()));
       }
     }
@@ -393,8 +356,8 @@ public class ConnectionPool {
    * @throws IOException If it cannot get a new connection.
    */
   public ConnectionContext newConnection() throws IOException {
-    return newConnection(
-        this.conf, this.namenodeAddress, this.ugi, this.protocol);
+    return newConnection(this.conf, this.namenodeAddress, this.ugi,
+        this.protocol, alignmentContext);
   }
 
   /**
@@ -407,13 +370,15 @@ public class ConnectionPool {
    * @param conf Configuration for the connection.
    * @param nnAddress Address of server supporting the ClientProtocol.
    * @param ugi User context.
+   * @param alignmentContext client alignment context.
    * @param proto Interface of the protocol.
    * @return proto for the target ClientProtocol that contains the user's
    *         security context.
    * @throws IOException If it cannot be created.
    */
   protected static <T> ConnectionContext newConnection(Configuration conf,
-      String nnAddress, UserGroupInformation ugi, Class<T> proto)
+      String nnAddress, UserGroupInformation ugi, Class<T> proto,
+      AlignmentContext alignmentContext)
       throws IOException {
     if (!PROTO_MAP.containsKey(proto)) {
       String msg = "Unsupported protocol for connection to NameNode: "
@@ -438,7 +403,8 @@ public class ConnectionPool {
     InetSocketAddress socket = NetUtils.createSocketAddr(nnAddress);
     final long version = RPC.getProtocolVersion(classes.protoPb);
     Object proxy = RPC.getProtocolProxy(classes.protoPb, version, socket, ugi,
-        conf, factory, RPC.getRpcTimeout(conf), defaultPolicy, null).getProxy();
+        conf, factory, RPC.getRpcTimeout(conf), defaultPolicy, null,
+        alignmentContext).getProxy();
     T client = newProtoClient(proto, classes, proxy);
     Text dtService = SecurityUtil.buildTokenService(socket);
 
