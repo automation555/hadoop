@@ -22,6 +22,7 @@ import static org.apache.hadoop.yarn.util.StringHelper.join;
 
 import java.io.IOException;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -41,7 +42,7 @@ import org.apache.hadoop.yarn.webapp.Controller;
 import org.apache.hadoop.yarn.webapp.View;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import com.google.common.base.Joiner;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,8 +176,10 @@ public class AppController extends Controller implements AMParams {
       renderText(e.getMessage());
       return;
     }
-    set(COUNTER_GROUP, URLDecoder.decode($(COUNTER_GROUP), "UTF-8"));
-    set(COUNTER_NAME, URLDecoder.decode($(COUNTER_NAME), "UTF-8"));
+    set(COUNTER_GROUP,
+        URLDecoder.decode($(COUNTER_GROUP), StandardCharsets.UTF_8.name()));
+    set(COUNTER_NAME,
+        URLDecoder.decode($(COUNTER_NAME), StandardCharsets.UTF_8.name()));
     if (app.getJob() != null) {
       setTitle(StringHelper.join($(COUNTER_GROUP)," ",$(COUNTER_NAME),
           " for ", $(JOB_ID)));
@@ -196,8 +199,10 @@ public class AppController extends Controller implements AMParams {
       renderText(e.getMessage());
       return;
     }
-    set(COUNTER_GROUP, URLDecoder.decode($(COUNTER_GROUP), "UTF-8"));
-    set(COUNTER_NAME, URLDecoder.decode($(COUNTER_NAME), "UTF-8"));
+    set(COUNTER_GROUP,
+        URLDecoder.decode($(COUNTER_GROUP), StandardCharsets.UTF_8.name()));
+    set(COUNTER_NAME,
+        URLDecoder.decode($(COUNTER_NAME), StandardCharsets.UTF_8.name()));
     if (app.getTask() != null) {
       setTitle(StringHelper.join($(COUNTER_GROUP)," ",$(COUNTER_NAME),
           " for ", $(TASK_ID)));

@@ -24,13 +24,14 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Arrays;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -64,7 +65,7 @@ import org.apache.hadoop.yarn.logaggregation.LogCLIHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import com.google.common.base.Charsets;
 
 /**
  * Interprets the map reduce cli options 
@@ -614,7 +615,7 @@ public class CLI extends Configured implements Tool {
     PrintStream ps = System.out;
     if (historyOutFile != null) {
       ps = new PrintStream(new BufferedOutputStream(new FileOutputStream(
-          new File(historyOutFile))), true, "UTF-8");
+          new File(historyOutFile))), true, StandardCharsets.UTF_8.name());
     }
     historyViewer.print(ps);
   }
@@ -771,10 +772,10 @@ public class CLI extends Configured implements Tool {
   }
 
   @Private
-  public static String headerPattern = "%23s\t%40s\t%10s\t%14s\t%12s\t%12s" +
+  public static String headerPattern = "%23s\t%20s\t%10s\t%14s\t%12s\t%12s" +
       "\t%10s\t%15s\t%15s\t%8s\t%8s\t%10s\t%10s\n";
   @Private
-  public static String dataPattern   = "%23s\t%40s\t%10s\t%14d\t%12s\t%12s" +
+  public static String dataPattern   = "%23s\t%20s\t%10s\t%14d\t%12s\t%12s" +
       "\t%10s\t%15s\t%15s\t%8s\t%8s\t%10s\t%10s\n";
   private static String memPattern   = "%dM";
   private static String UNAVAILABLE  = "N/A";
@@ -792,8 +793,8 @@ public class CLI extends Configured implements Tool {
       long rsvdMem = job.getReservedMem();
       long neededMem = job.getNeededMem();
       int jobNameLength = job.getJobName().length();
-      writer.printf(dataPattern, job.getJobID().toString(), job.getJobName()
-              .substring(0, jobNameLength > 40 ? 40 : jobNameLength),
+      writer.printf(dataPattern, job.getJobID().toString(),
+          job.getJobName().substring(0, jobNameLength > 20 ? 20 : jobNameLength),
           job.getState(), job.getStartTime(), job.getUsername(),
           job.getQueue(), job.getPriority().name(),
           numUsedSlots < 0 ? UNAVAILABLE : numUsedSlots,

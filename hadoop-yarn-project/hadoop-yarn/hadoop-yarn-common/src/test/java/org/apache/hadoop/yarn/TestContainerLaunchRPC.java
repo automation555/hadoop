@@ -21,11 +21,12 @@ package org.apache.hadoop.yarn;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.NetUtils;
@@ -79,8 +80,7 @@ import org.junit.Test;
  */
 public class TestContainerLaunchRPC {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestContainerLaunchRPC.class);
+  static final Log LOG = LogFactory.getLog(TestContainerLaunchRPC.class);
 
   private static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
@@ -122,7 +122,7 @@ public class TestContainerLaunchRPC {
             resource, System.currentTimeMillis() + 10000, 42, 42,
             Priority.newInstance(0), 0);
       Token containerToken =
-          newContainerToken(nodeId, "password".getBytes(),
+          newContainerToken(nodeId, "password".getBytes(StandardCharsets.UTF_8),
             containerTokenIdentifier);
 
       StartContainerRequest scRequest =
@@ -172,7 +172,7 @@ public class TestContainerLaunchRPC {
         // make the thread sleep to look like its not going to respond
         Thread.sleep(10000);
       } catch (Exception e) {
-        LOG.error(e.toString());
+        LOG.error(e);
         throw new YarnException(e);
       }
       throw new YarnException("Shouldn't happen!!");

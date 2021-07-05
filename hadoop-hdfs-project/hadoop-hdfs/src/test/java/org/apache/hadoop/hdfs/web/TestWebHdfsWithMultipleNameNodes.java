@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.web;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 import org.slf4j.Logger;
 import org.apache.hadoop.conf.Configuration;
@@ -48,7 +49,7 @@ public class TestWebHdfsWithMultipleNameNodes {
     GenericTestUtils.setLogLevel(LOG, Level.TRACE);
     GenericTestUtils.setLogLevel(NamenodeWebHdfsMethods.LOG, Level.TRACE);
 
-    DFSTestUtil.setNameNodeLogLevel(Level.TRACE);
+    DFSTestUtil.setNameNodeLogLevel(org.apache.log4j.Level.TRACE);
   }
 
   private static final Configuration conf = new HdfsConfiguration();
@@ -119,7 +120,7 @@ public class TestWebHdfsWithMultipleNameNodes {
     //test create: create a file for each namenode
     for(int i = 0; i < webhdfs.length; i++) {
       final FSDataOutputStream out = webhdfs[i].create(p);
-      out.write(writeStrings[i].getBytes());
+      out.write(writeStrings[i].getBytes(StandardCharsets.UTF_8));
       out.close();
     }
     
@@ -141,7 +142,7 @@ public class TestWebHdfsWithMultipleNameNodes {
     //test append: append to the file for each namenode
     for(int i = 0; i < webhdfs.length; i++) {
       final FSDataOutputStream out = webhdfs[i].append(p);
-      out.write(appendStrings[i].getBytes());
+      out.write(appendStrings[i].getBytes(StandardCharsets.UTF_8));
       out.close();
     }
 

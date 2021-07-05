@@ -22,12 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
-
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -125,7 +120,8 @@ public class SLSUtils {
     JsonFactory jsonF = new JsonFactory();
     ObjectMapper mapper = new ObjectMapper();
     Reader input =
-        new InputStreamReader(new FileInputStream(jobTrace), "UTF-8");
+        new InputStreamReader(new FileInputStream(jobTrace),
+            StandardCharsets.UTF_8);
     try {
       Iterator<Map> i = mapper.readValues(jsonF.createParser(input), Map.class);
       while (i.hasNext()) {
@@ -171,8 +167,8 @@ public class SLSUtils {
     Set<NodeDetails> nodeSet = new HashSet<>();
     JsonFactory jsonF = new JsonFactory();
     ObjectMapper mapper = new ObjectMapper();
-    Reader input =
-        new InputStreamReader(new FileInputStream(nodeFile), "UTF-8");
+    Reader input = new InputStreamReader(new FileInputStream(nodeFile),
+        StandardCharsets.UTF_8);
     try {
       Iterator<Map> i = mapper.readValues(jsonF.createParser(input), Map.class);
       while (i.hasNext()) {
@@ -223,33 +219,5 @@ public class SLSUtils {
           "/rack" + i % numRacks + "/node" + i));
     }
     return nodeSet;
-  }
-
-  /**
-   * Generates a node to rack mapping file based on node details.
-   * This file is then being used by TableMapping to resolve rack names.
-   * The format required by TableMapping is a two column text file
-   * where first column specifies node name
-   * and second column specifies rack name.
-   * @param nodeDetails Set of node details.
-   * @param filePath File path where to write table mapping.
-   * @throws IOException
-   */
-  public static void generateNodeTableMapping(Set<NodeDetails> nodeDetails,
-      String filePath) throws IOException {
-    List<String> entries = new ArrayList<>();
-    for (NodeDetails nodeDetail : nodeDetails) {
-      if (nodeDetail.getHostname().contains("/")) {
-        String hostname = nodeDetail.getHostname();
-        int lIndex = hostname.lastIndexOf("/");
-        String node = hostname.substring(lIndex + 1);
-        String rack = hostname.substring(0, lIndex);
-        entries.add(node + " " + rack);
-      }
-    }
-    Files.write(Paths.get(filePath),
-        entries,
-        StandardCharsets.UTF_8,
-        StandardOpenOption.CREATE);
   }
 }

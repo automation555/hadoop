@@ -31,7 +31,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.Writer;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,7 +65,6 @@ import org.apache.hadoop.io.SecureIOUtils;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.file.tfile.TFile;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.LogAggregationContext;
@@ -74,8 +73,10 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.util.Times;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Iterables;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 
 @Public
 @Evolving
@@ -281,7 +282,7 @@ public class AggregatedLogFormat {
           this.uploadedFiles.add(logFile);
         } catch (IOException e) {
           String message = logErrorMessage(logFile, e);
-          out.write(message.getBytes(Charset.forName("UTF-8")));
+          out.write(message.getBytes(StandardCharsets.UTF_8));
         } finally {
           IOUtils.cleanupWithLogger(LOG, in);
         }
@@ -354,9 +355,14 @@ public class AggregatedLogFormat {
               : this.logAggregationContext.getRolledLogsExcludePattern(),
           candidates, true);
 
-      Iterable<File> mask = Iterables.filter(candidates, (input) ->
-          !alreadyUploadedLogFiles
-              .contains(getLogFileMetaData(input)));
+      Iterable<File> mask =
+          Iterables.filter(candidates, new Predicate<File>() {
+            @Override
+            public boolean apply(File next) {
+              return !alreadyUploadedLogFiles
+                  .contains(getLogFileMetaData(next));
+            }
+          });
       return Sets.newHashSet(mask);
     }
 
@@ -573,17 +579,13 @@ public class AggregatedLogFormat {
 
     public LogReader(Configuration conf, Path remoteAppLogFile)
         throws IOException {
-      try {
-        FileContext fileContext =
-            FileContext.getFileContext(remoteAppLogFile.toUri(), conf);
-        this.fsDataIStream = fileContext.open(remoteAppLogFile);
-        reader = new TFile.Reader(this.fsDataIStream,
-            fileContext.getFileStatus(remoteAppLogFile).getLen(), conf);
-        this.scanner = reader.createScanner();
-      } catch (IOException ioe) {
-        close();
-        throw new IOException("Error in creating LogReader", ioe);
-      }
+      FileContext fileContext =
+          FileContext.getFileContext(remoteAppLogFile.toUri(), conf);
+      this.fsDataIStream = fileContext.open(remoteAppLogFile);
+      reader =
+          new TFile.Reader(this.fsDataIStream, fileContext.getFileStatus(
+              remoteAppLogFile).getLen(), conf);
+      this.scanner = reader.createScanner();
     }
 
     private boolean atBeginning = true;
@@ -770,7 +772,7 @@ public class AggregatedLogFormat {
       OutputStream os = null;
       PrintStream ps = null;
       try {
-        os = new WriterOutputStream(writer, Charset.forName("UTF-8"));
+        os = new WriterOutputStream(writer, StandardCharsets.UTF_8);
         ps = new PrintStream(os);
         while (true) {
           try {
@@ -1047,7 +1049,7 @@ public class AggregatedLogFormat {
             new BoundedInputStream(valueStream, currentLogLength);
         currentLogData.setPropagateClose(false);
         currentLogISR = new InputStreamReader(currentLogData,
-            Charset.forName("UTF-8"));
+            StandardCharsets.UTF_8);
         currentLogType = logType;
       } catch (EOFException e) {
       }

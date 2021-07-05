@@ -24,6 +24,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -47,6 +48,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -98,14 +100,12 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import java.util.function.Supplier;
-import org.apache.hadoop.thirdparty.com.google.common.primitives.Bytes;
-import org.apache.hadoop.thirdparty.com.google.common.primitives.Ints;
+import com.google.common.base.Supplier;
+import com.google.common.primitives.Bytes;
+import com.google.common.primitives.Ints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for IPC. */
 public class TestIPC {
@@ -1132,8 +1132,8 @@ public class TestIPC {
   
   @Test(timeout=60000)
   public void testHttpGetResponse() throws IOException {
-    doIpcVersionTest("GET / HTTP/1.0\r\n\r\n".getBytes(),
-        Server.RECEIVED_HTTP_REQ_RESPONSE.getBytes());
+    doIpcVersionTest("GET / HTTP/1.0\r\n\r\n".getBytes(StandardCharsets.UTF_8),
+        Server.RECEIVED_HTTP_REQ_RESPONSE.getBytes(StandardCharsets.UTF_8));
   }
   
   @Test(timeout=60000)
@@ -1275,7 +1275,7 @@ public class TestIPC {
       retryProxy.dummyRun();
     } finally {
       // Check if dummyRun called only once
-      assertThat(handler.invocations).isOne();
+      Assert.assertEquals(handler.invocations, 1);
       Client.setCallIdAndRetryCount(0, 0, null);
       client.stop();
       server.stop();
@@ -1456,8 +1456,7 @@ public class TestIPC {
   @Test
   public void testClientGetTimeout() throws IOException {
     Configuration config = new Configuration();
-    config.setInt(CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_KEY, 0);
-    assertThat(Client.getTimeout(config)).isEqualTo(-1);
+    assertEquals(Client.getTimeout(config), -1);
   }
 
   @Test(timeout=60000)
@@ -1584,10 +1583,11 @@ public class TestIPC {
     try {
       call(client, 0, addr, conf);
     } catch (IOException ioe) {
-      Assert.assertNotNull(ioe);
-      Assert.assertEquals(RpcException.class, ioe.getClass());
+      Throwable t = ioe.getCause();
+      Assert.assertNotNull(t);
+      Assert.assertEquals(RpcException.class, t.getClass());
       Assert.assertEquals("RPC response exceeds maximum data length",
-          ioe.getMessage());
+          t.getMessage());
       return;
     }
     Assert.fail("didn't get limit exceeded");
@@ -1754,7 +1754,7 @@ public class TestIPC {
       "50 43 24 56 65 72 73 69  6f 6e 4d 69 73 6d 61 74 PC$Versi onMismat\n" +
       "63 68                                            ch               \n"),
        Ints.toByteArray(HADOOP0_18_ERROR_MSG.length()),
-       HADOOP0_18_ERROR_MSG.getBytes());
+       HADOOP0_18_ERROR_MSG.getBytes(StandardCharsets.UTF_8));
     
     /**
      * Wireshark dump of an RPC request from Hadoop 0.20.3
@@ -1790,7 +1790,7 @@ public class TestIPC {
       "63 2e 52 50 43 24 56 65  72 73 69 6f 6e 4d 69 73 c.RPC$Ve rsionMis\n" +
       "6d 61 74 63 68                                   match            \n"),
       Ints.toByteArray(HADOOP0_20_ERROR_MSG.length()),
-      HADOOP0_20_ERROR_MSG.getBytes());
+      HADOOP0_20_ERROR_MSG.getBytes(StandardCharsets.UTF_8));
     
     
     final static String HADOOP0_21_ERROR_MSG =
@@ -1821,6 +1821,6 @@ public class TestIPC {
       "63 2e 52 50 43 24 56 65  72 73 69 6f 6e 4d 69 73 c.RPC$Ve rsionMis\n" +
       "6d 61 74 63 68                                   match            \n"),
       Ints.toByteArray(HADOOP0_21_ERROR_MSG.length()),
-      HADOOP0_21_ERROR_MSG.getBytes());
+      HADOOP0_21_ERROR_MSG.getBytes(StandardCharsets.UTF_8));
   }
 }

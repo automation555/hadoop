@@ -13,7 +13,7 @@
  */
 package org.apache.hadoop.util;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Enumeration;
 import java.util.jar.JarFile;
@@ -132,10 +133,6 @@ public class JarFinder {
    * @return path to the Jar containing the class.
    */
   public static String getJar(Class klass) {
-    return getJar(klass, null);
-  }
-
-  public static String getJar(Class klass, String testSubDir) {
     Preconditions.checkNotNull(klass, "klass");
     ClassLoader loader = klass.getClassLoader();
     if (loader != null) {
@@ -148,9 +145,9 @@ public class JarFinder {
           if (path.startsWith("file:")) {
             path = path.substring("file:".length());
           }
-          path = URLDecoder.decode(path, "UTF-8");
+          path = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
           if ("jar".equals(url.getProtocol())) {
-            path = URLDecoder.decode(path, "UTF-8");
+            path = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
             return path.replaceAll("!.*$", "");
           }
           else if ("file".equals(url.getProtocol())) {
@@ -158,18 +155,15 @@ public class JarFinder {
             klassName = klassName.replace(".", "/") + ".class";
             path = path.substring(0, path.length() - klassName.length());
             File baseDir = new File(path);
-            File testDir =
-                testSubDir == null ? GenericTestUtils.getTestDir()
-                    : GenericTestUtils.getTestDir(testSubDir);
+            File testDir = GenericTestUtils.getTestDir();
             testDir = testDir.getAbsoluteFile();
             if (!testDir.exists()) {
               testDir.mkdirs();
             }
-            File tempFile = File.createTempFile("hadoop-", "", testDir);
-            File tempJar = new File(tempFile.getAbsolutePath() + ".jar");
+            File tempJar = File.createTempFile("hadoop-", "", testDir);
+            tempJar = new File(tempJar.getAbsolutePath() + ".jar");
             createJar(baseDir, tempJar);
             tempJar.deleteOnExit();
-            tempFile.deleteOnExit();
             return tempJar.getAbsolutePath();
           }
         }

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
@@ -47,7 +48,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSet;
 
 public class TestOfflineEditsViewer {
   private static final Logger LOG = LoggerFactory
@@ -154,8 +155,9 @@ public class TestOfflineEditsViewer {
     assertEquals(0, runOev(editsReparsed, editsParsedXml2, "xml", false));
 
     // judgment time
-    assertTrue("Test round trip", FileUtils.contentEqualsIgnoreEOL(
-        new File(editsParsedXml), new File(editsParsedXml2), "UTF-8"));
+    assertTrue("Test round trip",
+        FileUtils.contentEqualsIgnoreEOL(new File(editsParsedXml),
+            new File(editsParsedXml2), StandardCharsets.UTF_8.name()));
 
     os.close();
   }
@@ -182,7 +184,7 @@ public class TestOfflineEditsViewer {
         hasAllOpCodes(editsStored));
     assertTrue("Reference XML edits and parsed to XML should be same",
         FileUtils.contentEqualsIgnoreEOL(new File(editsStoredXml),
-            new File(editsStoredParsedXml), "UTF-8"));
+            new File(editsStoredParsedXml), StandardCharsets.UTF_8.name()));
     assertTrue(
         "Reference edits and reparsed (bin to XML to bin) should be same",
         filesEqualIgnoreTrailingZeros(editsStored, editsStoredReparsed));

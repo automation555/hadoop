@@ -26,6 +26,7 @@ import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.net.URI;
 import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
@@ -86,10 +87,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * The underlying volume used to store replica.
@@ -120,7 +121,6 @@ public class FsVolumeImpl implements FsVolumeSpi {
   private final File currentDir;    // <StorageDirectory>/current
   private final DF usage;
   private final ReservedSpaceCalculator reserved;
-  private long cachedCapacity;
   private CloseableReferenceCount reference = new CloseableReferenceCount();
 
   // Disk space reserved for blocks (RBW or Re-replicating) open for write.
@@ -133,10 +133,6 @@ public class FsVolumeImpl implements FsVolumeSpi {
   protected volatile long configuredCapacity;
   private final FileIoProvider fileIoProvider;
   private final DataNodeVolumeMetrics metrics;
-  private URI baseURI;
-  private boolean enableSameDiskTiering;
-  private final String mount;
-  private double reservedForArchive;
 
   /**
    * Per-volume worker pool that processes new blocks to cache.
@@ -168,47 +164,22 @@ public class FsVolumeImpl implements FsVolumeSpi {
     this.storageType = storageLocation.getStorageType();
     this.configuredCapacity = -1;
     this.usage = usage;
-    if (this.usage != null) {
-      reserved = new ReservedSpaceCalculator.Builder(conf)
-          .setUsage(this.usage).setStorageType(storageType).build();
-      boolean fixedSizeVolume = conf.getBoolean(
-          DFSConfigKeys.DFS_DATANODE_FIXED_VOLUME_SIZE_KEY,
-          DFSConfigKeys.DFS_DATANODE_FIXED_VOLUME_SIZE_DEFAULT);
-      if (fixedSizeVolume) {
-        cachedCapacity = this.usage.getCapacity();
-      }
-    } else {
-      reserved = null;
-      LOG.warn("Setting reserved to null as usage is null");
-      cachedCapacity = -1;
-    }
     if (currentDir != null) {
       File parent = currentDir.getParentFile();
       cacheExecutor = initializeCacheExecutor(parent);
       this.metrics = DataNodeVolumeMetrics.create(conf, parent.getPath());
-      this.baseURI = new File(currentDir.getParent()).toURI();
     } else {
       cacheExecutor = null;
       this.metrics = null;
     }
     this.conf = conf;
     this.fileIoProvider = fileIoProvider;
-    this.enableSameDiskTiering =
-        conf.getBoolean(DFSConfigKeys.DFS_DATANODE_ALLOW_SAME_DISK_TIERING,
-            DFSConfigKeys.DFS_DATANODE_ALLOW_SAME_DISK_TIERING_DEFAULT);
-    if (enableSameDiskTiering && usage != null) {
-      this.mount = usage.getMount();
-    } else {
-      mount = "";
-    }
-  }
-
-  String getMount() {
-    return mount;
+    this.reserved = new ReservedSpaceCalculator.Builder(conf)
+        .setUsage(usage).setStorageType(storageType).build();
   }
 
   protected ThreadPoolExecutor initializeCacheExecutor(File parent) {
-    if (storageType.isRAM()) {
+    if (storageType.isTransient()) {
       return null;
     }
     if (dataset.datanode == null) {
@@ -220,10 +191,9 @@ public class FsVolumeImpl implements FsVolumeSpi {
         DFSConfigKeys.DFS_DATANODE_FSDATASETCACHE_MAX_THREADS_PER_VOLUME_KEY,
         DFSConfigKeys.DFS_DATANODE_FSDATASETCACHE_MAX_THREADS_PER_VOLUME_DEFAULT);
 
-    String escapedPath = parent.toString().replaceAll("%", "%%");
     ThreadFactory workerFactory = new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat("FsVolumeImplWorker-" + escapedPath + "-%d")
+        .setNameFormat("FsVolumeImplWorker-" + parent.toString() + "-%d")
         .build();
     ThreadPoolExecutor executor = new ThreadPoolExecutor(
         1, maxNumThreads,
@@ -319,7 +289,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
   }
 
   @VisibleForTesting
-  public int getReferenceCount() {
+  int getReferenceCount() {
     return this.reference.getReferenceCount();
   }
 
@@ -422,34 +392,16 @@ public class FsVolumeImpl implements FsVolumeSpi {
    * Return either the configured capacity of the file system if configured; or
    * the capacity of the file system excluding space reserved for non-HDFS.
    *
-   * When same-disk-tiering is turned on, the reported capacity
-   * will take reservedForArchive value into consideration of.
-   *
    * @return the unreserved number of bytes left in this filesystem. May be
    *         zero.
    */
   @VisibleForTesting
   public long getCapacity() {
-    long capacity;
     if (configuredCapacity < 0L) {
-      long remaining;
-      if (cachedCapacity > 0L) {
-        remaining = cachedCapacity - getReserved();
-      } else {
-        remaining = usage.getCapacity() - getReserved();
-      }
-      capacity = Math.max(remaining, 0L);
-    } else {
-      capacity = configuredCapacity;
+      long remaining = usage.getCapacity() - getReserved();
+      return Math.max(remaining, 0L);
     }
-
-    if (enableSameDiskTiering && dataset.getMountVolumeMap() != null) {
-      double capacityRatio = dataset.getMountVolumeMap()
-          .getCapacityRatioByMountAndStorageType(mount, storageType);
-      capacity = (long) (capacity * capacityRatio);
-    }
-
-    return capacity;
+    return configuredCapacity;
   }
 
   /**
@@ -480,33 +432,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
   }
 
   long getActualNonDfsUsed() throws IOException {
-    // DISK and ARCHIVAL on same disk
-    // should share the same amount of reserved capacity.
-    // When calculating actual non dfs used,
-    // exclude DFS used capacity by another volume.
-    if (enableSameDiskTiering
-        && StorageType.allowSameDiskTiering(storageType)) {
-      StorageType counterpartStorageType = storageType == StorageType.DISK
-          ? StorageType.ARCHIVE : StorageType.DISK;
-      FsVolumeReference counterpartRef = dataset
-          .getMountVolumeMap()
-          .getVolumeRefByMountAndStorageType(mount, counterpartStorageType);
-      if (counterpartRef != null) {
-        FsVolumeImpl counterpartVol = (FsVolumeImpl) counterpartRef.getVolume();
-        long used = getDfUsed() - getDfsUsed() - counterpartVol.getDfsUsed();
-        counterpartRef.close();
-        return used;
-      }
-    }
-    return getDfUsed() - getDfsUsed();
-  }
-
-  /**
-   * This function is only used for Mock.
-   */
-  @VisibleForTesting
-  public long getDfUsed() {
-    return usage.getUsed();
+    return usage.getUsed() - getDfsUsed();
   }
 
   private long getRemainingReserved() throws IOException {
@@ -548,7 +474,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
   }
 
   long getReserved(){
-    return reserved != null ? reserved.getReserved() : 0;
+    return reserved.getReserved();
   }
 
   @VisibleForTesting
@@ -562,7 +488,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
 
   @Override
   public URI getBaseURI() {
-    return baseURI;
+    return new File(currentDir.getParent()).toURI();
   }
 
   @Override
@@ -585,11 +511,6 @@ public class FsVolumeImpl implements FsVolumeSpi {
   @Override
   public boolean isTransientStorage() {
     return storageType.isTransient();
-  }
-
-  @Override
-  public boolean isRAMStorage() {
-    return storageType.isRAM();
   }
 
   @VisibleForTesting
@@ -915,7 +836,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
       boolean success = false;
       try (BufferedWriter writer = new BufferedWriter(
           new OutputStreamWriter(fileIoProvider.getFileOutputStream(
-              FsVolumeImpl.this, getTempSaveFile()), "UTF-8"))) {
+              FsVolumeImpl.this, getTempSaveFile()), StandardCharsets.UTF_8))) {
         WRITER.writeValue(writer, state);
         success = true;
       } finally {
@@ -1449,9 +1370,9 @@ public class FsVolumeImpl implements FsVolumeSpi {
       if (!Block.isBlockFilename(file)) {
         if (isBlockMetaFile(Block.BLOCK_FILE_PREFIX, file.getName())) {
           long blockId = Block.getBlockId(file.getName());
-          verifyFileLocation(file, bpFinalizedDir,
+          verifyFileLocation(file.getParentFile(), bpFinalizedDir,
               blockId);
-          report.add(new ScanInfo(blockId, dir, null, fileNames.get(i), this));
+          report.add(new ScanInfo(blockId, null, file, this));
         }
         continue;
       }
@@ -1474,8 +1395,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
         }
       }
       verifyFileLocation(blockFile, bpFinalizedDir, blockId);
-      report.add(new ScanInfo(blockId, dir, blockFile.getName(),
-          metaFile == null ? null : metaFile.getName(), this));
+      report.add(new ScanInfo(blockId, blockFile, metaFile, this));
     }
   }
 
@@ -1517,24 +1437,6 @@ public class FsVolumeImpl implements FsVolumeSpi {
         block.getGenerationStamp(), replicaInfo,
         getTmpDir(block.getBlockPoolId()),
         replicaInfo.isOnTransientStorage(), smallBufferSize, conf);
-
-    ReplicaInfo newReplicaInfo = new ReplicaBuilder(ReplicaState.TEMPORARY)
-        .setBlockId(replicaInfo.getBlockId())
-        .setGenerationStamp(replicaInfo.getGenerationStamp())
-        .setFsVolume(this)
-        .setDirectoryToUse(blockFiles[0].getParentFile())
-        .setBytesToReserve(0)
-        .build();
-    newReplicaInfo.setNumBytes(blockFiles[1].length());
-    return newReplicaInfo;
-  }
-
-  public ReplicaInfo hardLinkBlockToTmpLocation(ExtendedBlock block,
-      ReplicaInfo replicaInfo) throws IOException {
-
-    File[] blockFiles = FsDatasetImpl.hardLinkBlockFiles(block.getBlockId(),
-        block.getGenerationStamp(), replicaInfo,
-        getTmpDir(block.getBlockPoolId()));
 
     ReplicaInfo newReplicaInfo = new ReplicaBuilder(ReplicaState.TEMPORARY)
         .setBlockId(replicaInfo.getBlockId())

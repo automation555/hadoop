@@ -19,7 +19,6 @@ package org.apache.hadoop.yarn.client.cli;
 
 import org.apache.hadoop.yarn.api.records.NodeAttribute;
 import org.apache.hadoop.yarn.api.records.NodeAttributeType;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -38,6 +37,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -52,7 +52,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.cli.Options;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
@@ -101,7 +100,8 @@ import org.eclipse.jetty.util.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 
 public class TestYarnCLI {
   private static final Logger LOG = LoggerFactory.getLogger(TestYarnCLI.class);
@@ -147,7 +147,6 @@ public class TestYarnCLI {
           null, null, false, Priority.newInstance(0), "high-mem", "high-mem");
       newApplicationReport.setLogAggregationStatus(LogAggregationStatus.SUCCEEDED);
       newApplicationReport.setPriority(Priority.newInstance(0));
-      newApplicationReport.setRMClusterId("Cluster1");
       ApplicationTimeout timeout = ApplicationTimeout
           .newInstance(ApplicationTimeoutType.LIFETIME, "UNLIMITED", -1);
       newApplicationReport.setApplicationTimeouts(
@@ -187,10 +186,9 @@ public class TestYarnCLI {
       pw.print("\tTimeoutType : LIFETIME");
       pw.print("\tExpiryTime : UNLIMITED");
       pw.println("\tRemainingTime : -1seconds");
-      pw.println("\tRMClusterId : Cluster1");
       pw.println();
       pw.close();
-      String appReportStr = baos.toString("UTF-8");
+      String appReportStr = baos.toString(StandardCharsets.UTF_8.name());
       Assert.assertEquals(appReportStr, sysOutStream.toString());
       sysOutStream.reset();
       verify(sysOut, times(1 + i)).println(isA(String.class));
@@ -226,7 +224,7 @@ public class TestYarnCLI {
     pw.println("\tAM Host : host");
     pw.println("\tDiagnostics : diagnostics");
     pw.close();
-    String appReportStr = baos.toString("UTF-8");
+    String appReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appReportStr, sysOutStream.toString());
     verify(sysOut, times(1)).println(isA(String.class));
   }
@@ -272,7 +270,7 @@ public class TestYarnCLI {
     pw.print("\t      container_1234_0005_02_000001");
     pw.println("\t                                url");
     pw.close();
-    String appReportStr = baos.toString("UTF-8");
+    String appReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appReportStr, sysOutStream.toString());
   }
   
@@ -314,7 +312,7 @@ public class TestYarnCLI {
     pw.println("\tExposedPorts : {\"192.168.0.1\":[{\"abc\":\"123\"}]}");
     pw.println("\tDiagnostics : diagnosticInfo");
     pw.close();
-    String appReportStr = baos.toString("UTF-8");
+    String appReportStr = baos.toString(StandardCharsets.UTF_8.name());
 
     Assert.assertEquals(appReportStr, sysOutStream.toString());
     verify(sysOut, times(1)).println(isA(String.class));
@@ -359,7 +357,7 @@ public class TestYarnCLI {
     verify(client).getContainers(attemptId);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     OutputStreamWriter stream =
-        new OutputStreamWriter(baos, "UTF-8");
+        new OutputStreamWriter(baos, StandardCharsets.UTF_8);
     PrintWriter pw = new PrintWriter(stream);
     pw.println("Total number of containers :3");
     pw.printf(ApplicationCLI.CONTAINER_PATTERN, "Container-Id", "Start Time",
@@ -374,11 +372,11 @@ public class TestYarnCLI {
         Times.format(time1), "N/A", "RUNNING", "host:1234",
         "http://host:2345", "");
     pw.close();
-    String appReportStr = baos.toString("UTF-8");
+    String appReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Log.getLog().info("ExpectedOutput");
     Log.getLog().info("["+appReportStr+"]");
     Log.getLog().info("OutputFrom command");
-    String actualOutput = sysOutStream.toString("UTF-8");
+    String actualOutput = sysOutStream.toString(StandardCharsets.UTF_8.name());
     Log.getLog().info("["+actualOutput+"]");
     Assert.assertEquals(appReportStr, actualOutput);
   }
@@ -509,7 +507,7 @@ public class TestYarnCLI {
     pw.print("KILLED\t         99.79%");
     pw.println("\t                                N/A");
     pw.close();
-    String appsReportStr = baos.toString("UTF-8");
+    String appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(1)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -550,7 +548,7 @@ public class TestYarnCLI {
     pw.print("SUCCEEDED\t         53.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(2)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -591,7 +589,7 @@ public class TestYarnCLI {
     pw.print("SUCCEEDED\t         83.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(3)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -630,7 +628,7 @@ public class TestYarnCLI {
     pw.print("SUCCEEDED\t         63.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(4)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -652,7 +650,7 @@ public class TestYarnCLI {
     String output = sb.toString();
     pw.println(output.substring(0, output.length()-1));
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(4)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -711,7 +709,7 @@ public class TestYarnCLI {
     pw.print("KILLED\t         99.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(5)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -747,7 +745,7 @@ public class TestYarnCLI {
     pw.print("SUCCEEDED\t         63.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(6)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -781,7 +779,7 @@ public class TestYarnCLI {
     pw.print("SUCCEEDED\t         73.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(7)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -821,7 +819,7 @@ public class TestYarnCLI {
     pw.print("SUCCEEDED\t         83.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(8)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -850,7 +848,7 @@ public class TestYarnCLI {
     pw.print("SUCCEEDED\t         53.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(9)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -881,7 +879,7 @@ public class TestYarnCLI {
     pw.print("KILLED\t         93.79%");
     pw.println("\t                                N/A");
     pw.close();
-    appsReportStr = baos.toString("UTF-8");
+    appsReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(appsReportStr, sysOutStream.toString());
     verify(sysOut, times(10)).write(any(byte[].class), anyInt(), anyInt());
   }
@@ -1324,7 +1322,7 @@ public class TestYarnCLI {
     pw.print("         host0:0\t            NEW\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    String nodesReportStr = baos.toString("UTF-8");
+    String nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(1)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1347,7 +1345,7 @@ public class TestYarnCLI {
     pw.print("         host1:0\t        RUNNING\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(2)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1382,7 +1380,7 @@ public class TestYarnCLI {
     pw.println("\tResource Utilization by Containers : PMem:1024 MB, VMem:2048 MB, VCores:4.0");
     pw.println("\tNode-Labels : ");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(4)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1403,7 +1401,7 @@ public class TestYarnCLI {
     pw.print("         host0:0\t      UNHEALTHY\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(5)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1424,7 +1422,7 @@ public class TestYarnCLI {
     pw.print("         host0:0\t DECOMMISSIONED\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(6)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1445,7 +1443,7 @@ public class TestYarnCLI {
     pw.print("         host0:0\t       REBOOTED\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(7)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1466,7 +1464,7 @@ public class TestYarnCLI {
     pw.print("         host0:0\t           LOST\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(8)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1499,7 +1497,7 @@ public class TestYarnCLI {
     pw.print("         host0:0\t           LOST\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(9)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1534,7 +1532,7 @@ public class TestYarnCLI {
     pw.print("         host0:0\t           LOST\t       host1:8888\t");
     pw.println("                           0");
     pw.close();
-    nodesReportStr = baos.toString("UTF-8");
+    nodesReportStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(nodesReportStr, sysOutStream.toString());
     verify(sysOut, times(10)).write(any(byte[].class), anyInt(), anyInt());
 
@@ -1586,7 +1584,7 @@ public class TestYarnCLI {
     pw.println("\tResource Utilization by Node : PMem:2048 MB, VMem:4096 MB, VCores:8.0");
     pw.println("\tResource Utilization by Containers : PMem:1024 MB, VMem:2048 MB, VCores:4.0");
     pw.close();
-    String nodeStatusStr = baos.toString("UTF-8");
+    String nodeStatusStr = baos.toString(StandardCharsets.UTF_8.name());
     verify(sysOut, times(1)).println(isA(String.class));
     verify(sysOut).println(nodeStatusStr);
   }
@@ -1620,7 +1618,7 @@ public class TestYarnCLI {
     pw.println("\tResource Utilization by Node : PMem:2048 MB, VMem:4096 MB, VCores:8.0");
     pw.println("\tResource Utilization by Containers : PMem:1024 MB, VMem:2048 MB, VCores:4.0");
     pw.close();
-    String nodeStatusStr = baos.toString("UTF-8");
+    String nodeStatusStr = baos.toString(StandardCharsets.UTF_8.name());
     verify(sysOut, times(1)).println(isA(String.class));
     verify(sysOut).println(nodeStatusStr);
   }
@@ -1654,7 +1652,7 @@ public class TestYarnCLI {
     pw.println("\tResource Utilization by Node : ");
     pw.println("\tResource Utilization by Containers : ");
     pw.close();
-    String nodeStatusStr = baos.toString("UTF-8");
+    String nodeStatusStr = baos.toString(StandardCharsets.UTF_8.name());
     verify(sysOut, times(1)).println(isA(String.class));
     verify(sysOut).println(nodeStatusStr);
   }
@@ -1688,26 +1686,26 @@ public class TestYarnCLI {
   public void testMissingArguments() throws Exception {
     ApplicationCLI cli = createAndGetAppCLI();
     int result = cli.run(new String[] { "application", "-status" });
-    assertThat(result).isEqualTo(-1);
+    Assert.assertEquals(result, -1);
     Assert.assertEquals(String.format("Missing argument for options%n%1s",
         createApplicationCLIHelpMessage()), sysOutStream.toString());
 
     sysOutStream.reset();
     result = cli.run(new String[] { "applicationattempt", "-status" });
-    assertThat(result).isEqualTo(-1);
+    Assert.assertEquals(result, -1);
     Assert.assertEquals(String.format("Missing argument for options%n%1s",
         createApplicationAttemptCLIHelpMessage()), sysOutStream.toString());
 
     sysOutStream.reset();
     result = cli.run(new String[] { "container", "-status" });
-    assertThat(result).isEqualTo(-1);
+    Assert.assertEquals(result, -1);
     Assert.assertEquals(String.format("Missing argument for options %1s",
         createContainerCLIHelpMessage()), normalize(sysOutStream.toString()));
 
     sysOutStream.reset();
     NodeCLI nodeCLI = createAndGetNodeCLI();
     result = nodeCLI.run(new String[] { "-status" });
-    assertThat(result).isEqualTo(-1);
+    Assert.assertEquals(result, -1);
     Assert.assertEquals(String.format("Missing argument for options%n%1s",
         createNodeCLIHelpMessage()), sysOutStream.toString());
   }
@@ -1718,11 +1716,8 @@ public class TestYarnCLI {
     Set<String> nodeLabels = new HashSet<String>();
     nodeLabels.add("GPU");
     nodeLabels.add("JDK_7");
-    QueueInfo queueInfo = QueueInfo.
-        newInstance("queueA", "root.queueA",
-            0.4f, 0.8f, 0.5f,
-        null, null, QueueState.RUNNING, nodeLabels,
-        "GPU", null, false, -1.0f, null,
+    QueueInfo queueInfo = QueueInfo.newInstance("queueA", 0.4f, 0.8f, 0.5f,
+        null, null, QueueState.RUNNING, nodeLabels, "GPU", null, false, null,
         false);
     when(client.getQueueInfo(any(String.class))).thenReturn(queueInfo);
     int result = cli.run(new String[] { "-status", "queueA" });
@@ -1732,18 +1727,16 @@ public class TestYarnCLI {
     PrintWriter pw = new PrintWriter(baos);
     pw.println("Queue Information : ");
     pw.println("Queue Name : " + "queueA");
-    pw.println("Queue Path : " + "root.queueA");
     pw.println("\tState : " + "RUNNING");
-    pw.println("\tCapacity : " + "40.00%");
-    pw.println("\tCurrent Capacity : " + "50.00%");
-    pw.println("\tMaximum Capacity : " + "80.00%");
-    pw.println("\tWeight : " + "-1.00");
+    pw.println("\tCapacity : " + "40.0%");
+    pw.println("\tCurrent Capacity : " + "50.0%");
+    pw.println("\tMaximum Capacity : " + "80.0%");
     pw.println("\tDefault Node Label expression : " + "GPU");
     pw.println("\tAccessible Node Labels : " + "JDK_7,GPU");
     pw.println("\tPreemption : " + "enabled");
     pw.println("\tIntra-queue Preemption : " + "enabled");
     pw.close();
-    String queueInfoStr = baos.toString("UTF-8");
+    String queueInfoStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(queueInfoStr, sysOutStream.toString());
   }
 
@@ -1891,11 +1884,8 @@ public class TestYarnCLI {
   @Test
   public void testGetQueueInfoWithEmptyNodeLabel() throws Exception {
     QueueCLI cli = createAndGetQueueCLI();
-    QueueInfo queueInfo = QueueInfo.
-        newInstance("queueA", "root.queueA",
-            0.4f, 0.8f, 0.5f,
-        null, null, QueueState.RUNNING, null, null, null,
-        true, -1.0f, null, true);
+    QueueInfo queueInfo = QueueInfo.newInstance("queueA", 0.4f, 0.8f, 0.5f,
+        null, null, QueueState.RUNNING, null, null, null, true, null, true);
     when(client.getQueueInfo(any(String.class))).thenReturn(queueInfo);
     int result = cli.run(new String[] { "-status", "queueA" });
     assertEquals(0, result);
@@ -1904,19 +1894,17 @@ public class TestYarnCLI {
     PrintWriter pw = new PrintWriter(baos);
     pw.println("Queue Information : ");
     pw.println("Queue Name : " + "queueA");
-    pw.println("Queue Path : " + "root.queueA");
     pw.println("\tState : " + "RUNNING");
-    pw.println("\tCapacity : " + "40.00%");
-    pw.println("\tCurrent Capacity : " + "50.00%");
-    pw.println("\tMaximum Capacity : " + "80.00%");
-    pw.println("\tWeight : " + "-1.00");
+    pw.println("\tCapacity : " + "40.0%");
+    pw.println("\tCurrent Capacity : " + "50.0%");
+    pw.println("\tMaximum Capacity : " + "80.0%");
     pw.println("\tDefault Node Label expression : "
         + NodeLabel.DEFAULT_NODE_LABEL_PARTITION);
     pw.println("\tAccessible Node Labels : ");
     pw.println("\tPreemption : " + "disabled");
     pw.println("\tIntra-queue Preemption : " + "disabled");
     pw.close();
-    String queueInfoStr = baos.toString("UTF-8");
+    String queueInfoStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(queueInfoStr, sysOutStream.toString());
   }
   
@@ -1932,7 +1920,7 @@ public class TestYarnCLI {
     pw.println("Cannot get queue from RM by queueName = " + queueName
         + ", please check.");
     pw.close();
-    String queueInfoStr = baos.toString("UTF-8");
+    String queueInfoStr = baos.toString(StandardCharsets.UTF_8.name());
     Assert.assertEquals(queueInfoStr, sysOutStream.toString());
   }
 
@@ -2030,7 +2018,7 @@ public class TestYarnCLI {
         cli.run(new String[] { "application", "-appId",
             applicationId.toString(),
         "-updatePriority", "1" });
-    assertThat(result).isEqualTo(0);
+    Assert.assertEquals(result, 0);
     verify(client).updateApplicationPriority(any(ApplicationId.class),
         any(Priority.class));
 
@@ -2039,8 +2027,9 @@ public class TestYarnCLI {
   @Test
   public void testFailApplicationAttempt() throws Exception {
     ApplicationCLI cli = createAndGetAppCLI();
-    int exitCode = cli.run(new String[] {"applicationattempt", "-fail",
-        "appattempt_1444199730803_0003_000001"});
+    int exitCode =
+        cli.run(new String[] { "applicationattempt", "-fail",
+            "appattempt_1444199730803_0003_000001" });
     Assert.assertEquals(0, exitCode);
 
     verify(client).failApplicationAttempt(any(ApplicationAttemptId.class));
@@ -2312,7 +2301,7 @@ public class TestYarnCLI {
     pw.println("                                          -initiate, -instances, or");
     pw.println("                                          -finalize options.");
     pw.close();
-    String appsHelpStr = baos.toString("UTF-8");
+    String appsHelpStr = baos.toString(StandardCharsets.UTF_8.name());
     return appsHelpStr;
   }
 
@@ -2329,7 +2318,7 @@ public class TestYarnCLI {
     pw.println(" -status <Application Attempt ID>   Prints the status of the application");
     pw.println("                                    attempt.");
     pw.close();
-    String appsHelpStr = baos.toString("UTF-8");
+    String appsHelpStr = baos.toString(StandardCharsets.UTF_8.name());
     return appsHelpStr;
   }
 
@@ -2352,7 +2341,7 @@ public class TestYarnCLI {
     pw.println(" -version <arg>                   Works with -list to filter instances based on input application version. ");
     pw.close();
     try {
-      return normalize(baos.toString("UTF-8"));
+      return normalize(baos.toString(StandardCharsets.UTF_8.name()));
     } catch (UnsupportedEncodingException infeasible) {
       return infeasible.toString();
     }
@@ -2376,7 +2365,7 @@ public class TestYarnCLI {
     pw.println("                    OMMISSIONING,SHUTDOWN.");
     pw.println(" -status <NodeId>   Prints the status report of the node.");
     pw.close();
-    String nodesHelpStr = baos.toString("UTF-8");
+    String nodesHelpStr = baos.toString(StandardCharsets.UTF_8.name());
     return nodesHelpStr;
   }
 
@@ -2425,7 +2414,7 @@ public class TestYarnCLI {
 
     int result = cli.run(new String[] { "application", "-appId",
         applicationId.toString(), "-updateLifetime", "10" });
-    assertThat(result).isEqualTo(0);
+    Assert.assertEquals(result, 0);
     verify(client)
         .updateApplicationTimeouts(any(UpdateApplicationTimeoutsRequest.class));
   }

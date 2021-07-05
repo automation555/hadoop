@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -41,7 +42,6 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.Lists;
 
 import static org.apache.hadoop.fs.permission.AclEntryScope.ACCESS;
 import static org.apache.hadoop.fs.permission.AclEntryType.USER;
@@ -60,7 +60,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Tests NameNode interaction for all XAttr APIs.
@@ -127,7 +128,7 @@ public class FSXAttrBaseTest {
 
   @After
   public void destroyFileSystems() {
-    IOUtils.cleanupWithLogger(null, fs);
+    IOUtils.cleanup(null, fs);
     fs = null;
   }
   
@@ -447,7 +448,7 @@ public class FSXAttrBaseTest {
      */
     final UserGroupInformation user = UserGroupInformation.
         createUserForTesting("user", new String[] {"mygroup"});
-    fs.setXAttr(path, "trusted.foo", "1234".getBytes());
+    fs.setXAttr(path, "trusted.foo", "1234".getBytes(StandardCharsets.UTF_8));
     try {
       user.doAs(new PrivilegedExceptionAction<Object>() {
           @Override
@@ -462,7 +463,7 @@ public class FSXAttrBaseTest {
       GenericTestUtils.assertExceptionContains("User doesn't have permission", e);
     }
 
-    fs.setXAttr(path, name1, "1234".getBytes());
+    fs.setXAttr(path, name1, "1234".getBytes(StandardCharsets.UTF_8));
 
     /*
      * Test that an exception is thrown if the caller doesn't have permission to
@@ -491,7 +492,7 @@ public class FSXAttrBaseTest {
     final Path childDir = new Path(path, "child" + pathCount);
     /* Set access to parent so that only the owner has access. */
     FileSystem.mkdirs(fs, childDir, FsPermission.createImmutable((short)0700));
-    fs.setXAttr(childDir, name1, "1234".getBytes());
+    fs.setXAttr(childDir, name1, "1234".getBytes(StandardCharsets.UTF_8));
     try {
       user.doAs(new PrivilegedExceptionAction<Object>() {
           @Override
@@ -685,7 +686,7 @@ public class FSXAttrBaseTest {
     final Path childDir = new Path(path, "child" + pathCount);
     /* Set access to parent so that only the owner has access. */
     FileSystem.mkdirs(fs, childDir, FsPermission.createImmutable((short)0700));
-    fs.setXAttr(childDir, name1, "1234".getBytes());
+    fs.setXAttr(childDir, name1, "1234".getBytes(StandardCharsets.UTF_8));
     try {
       user.doAs(new PrivilegedExceptionAction<Object>() {
           @Override
@@ -809,7 +810,7 @@ public class FSXAttrBaseTest {
     fs.setPermission(path, new FsPermission((short) 0704));
     final Path childDir = new Path(path, "child" + pathCount);
     FileSystem.mkdirs(fs, childDir, FsPermission.createImmutable((short) 0700));
-    fs.setXAttr(childDir, name1, "1234".getBytes());
+    fs.setXAttr(childDir, name1, "1234".getBytes(StandardCharsets.UTF_8));
     try {
       user.doAs(new PrivilegedExceptionAction<Object>() {
           @Override
@@ -866,7 +867,8 @@ public class FSXAttrBaseTest {
      */
     // Allow the user to read child path.
     fs.setPermission(childDir, new FsPermission((short) 0704));
-    fs.setXAttr(childDir, "trusted.myxattr", "1234".getBytes());
+    fs.setXAttr(childDir, "trusted.myxattr",
+        "1234".getBytes(StandardCharsets.UTF_8));
     user.doAs(new PrivilegedExceptionAction<Object>() {
         @Override
         public Object run() throws Exception {

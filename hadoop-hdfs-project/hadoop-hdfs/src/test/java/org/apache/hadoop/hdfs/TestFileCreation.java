@@ -51,6 +51,7 @@ import java.lang.reflect.Modifier;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
@@ -239,8 +240,9 @@ public class TestFileCreation {
    * Test that server defaults are updated on the client after cache expiration.
    */
   @Test
-  public void testServerDefaultsWithMinimalCaching() throws Exception  {
-    // Create cluster with an explicit block size param.
+  public void testServerDefaultsWithMinimalCaching()
+      throws IOException, InterruptedException {
+    // Create cluster with an explicit block size param
     Configuration clusterConf = new HdfsConfiguration();
     long originalBlockSize = DFS_BLOCK_SIZE_DEFAULT * 2;
     clusterConf.setLong(DFS_BLOCK_SIZE_KEY, originalBlockSize);
@@ -272,17 +274,10 @@ public class TestFileCreation {
               defaults.getDefaultStoragePolicyId());
       doReturn(newDefaults).when(spyNamesystem).getServerDefaults();
 
-      // Verify that the value is updated correctly. Wait for 3 seconds.
-      GenericTestUtils.waitFor(()->{
-        try {
-          FsServerDefaults currDef = dfsClient.getServerDefaults();
-          return (currDef.getBlockSize() == updatedDefaultBlockSize);
-        } catch (IOException e) {
-          // do nothing;
-          return false;
-        }
-      }, 1, 3000);
-
+      Thread.sleep(1);
+      defaults = dfsClient.getServerDefaults();
+      // Value is updated correctly
+      assertEquals(updatedDefaultBlockSize, defaults.getBlockSize());
     } finally {
       cluster.shutdown();
     }
@@ -1087,7 +1082,7 @@ public class TestFileCreation {
       final String f = DIR + "foo";
       final Path fpath = new Path(f);
       HdfsDataOutputStream out = create(dfs, fpath, DATANODE_NUM);
-      out.write("something".getBytes());
+      out.write("something".getBytes(StandardCharsets.UTF_8));
       out.hflush();
       int actualRepl = out.getCurrentBlockReplication();
       assertTrue(f + " should be replicated to " + DATANODE_NUM + " datanodes.",
@@ -1142,7 +1137,7 @@ public class TestFileCreation {
       final String f = DIR + "foofs";
       final Path fpath = new Path(f);
       FSDataOutputStream out = TestFileCreation.createFile(dfs, fpath, DATANODE_NUM);
-      out.write("something".getBytes());
+      out.write("something".getBytes(StandardCharsets.UTF_8));
 
       // close file system without closing file
       dfs.close();
@@ -1174,7 +1169,7 @@ public class TestFileCreation {
       final String f = DIR + "testFsCloseAfterClusterShutdown";
       final Path fpath = new Path(f);
       FSDataOutputStream out = TestFileCreation.createFile(dfs, fpath, DATANODE_NUM);
-      out.write("something_test".getBytes());
+      out.write("something_test".getBytes(StandardCharsets.UTF_8));
       out.hflush();    // ensure that block is allocated
 
       // shutdown last datanode in pipeline.
@@ -1252,7 +1247,7 @@ public class TestFileCreation {
           try {
             nnrpc.create(pathStr, new FsPermission((short)0755), "client",
                 new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)),
-                true, (short) 1, 128 * 1024 * 1024L, null, null, null);
+                true, (short)1, 128*1024*1024L, null, null);
             fail("Should have thrown exception when creating '"
                 + pathStr + "'" + " by " + method);
           } catch (InvalidPathException ipe) {

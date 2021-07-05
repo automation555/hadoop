@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,12 +38,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsMountConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
@@ -75,7 +74,8 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
   private Configuration conf;
   private String cgroupPrefix;
-  private CGroupsMountConfig cGroupsMountConfig;
+  private boolean cgroupMount;
+  private String cgroupMountPath;
 
   private boolean cpuWeightEnabled = true;
   private boolean strictResourceUsageMode = false;
@@ -116,7 +116,11 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
     this.cgroupPrefix = conf.get(YarnConfiguration.
             NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn");
-    this.cGroupsMountConfig = new CGroupsMountConfig(conf);
+    this.cgroupMount = conf.getBoolean(YarnConfiguration.
+            NM_LINUX_CONTAINER_CGROUPS_MOUNT, false);
+    this.cgroupMountPath = conf.get(YarnConfiguration.
+            NM_LINUX_CONTAINER_CGROUPS_MOUNT_PATH, null);
+
     this.deleteCgroupTimeout = conf.getLong(
         YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT,
         YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT);
@@ -153,10 +157,10 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     initConfig();
 
     // mount cgroups if requested
-    if (cGroupsMountConfig.mountEnabledAndMountPathDefined()) {
+    if (cgroupMount && cgroupMountPath != null) {
       ArrayList<String> cgroupKVs = new ArrayList<String>();
-      cgroupKVs.add(CONTROLLER_CPU + "=" +
-          cGroupsMountConfig.getMountPath() + "/" + CONTROLLER_CPU);
+      cgroupKVs.add(CONTROLLER_CPU + "=" + cgroupMountPath + "/" +
+                    CONTROLLER_CPU);
       lce.mountCgroups(cgroupKVs, cgroupPrefix);
     }
 
@@ -203,7 +207,9 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
         throws IOException {
     String path = pathForCgroup(controller, groupName);
 
-    LOG.debug("createCgroup: {}", path);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("createCgroup: " + path);
+    }
 
     if (!new File(path).mkdir()) {
       throw new IOException("Failed to create cgroup at " + path);
@@ -215,12 +221,15 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     String path = pathForCgroup(controller, groupName);
     param = controller + "." + param;
 
-    LOG.debug("updateCgroup: {}: {}={}", path, param, value);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("updateCgroup: " + path + ": " + param + "=" + value);
+    }
 
     PrintWriter pw = null;
     try {
       File file = new File(path + "/" + param);
-      Writer w = new OutputStreamWriter(new FileOutputStream(file), "UTF-8");
+      Writer w = new OutputStreamWriter(new FileOutputStream(file),
+          StandardCharsets.UTF_8);
       pw = new PrintWriter(w);
       pw.write(value);
     } catch (IOException e) {
@@ -249,10 +258,10 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     if (LOG.isDebugEnabled()) {
       try (BufferedReader inl =
             new BufferedReader(new InputStreamReader(new FileInputStream(cgf
-              + "/tasks"), "UTF-8"))) {
+              + "/tasks"), StandardCharsets.UTF_8))) {
         str = inl.readLine();
         if (str != null) {
-          LOG.debug("First line in cgroup tasks file: {} {}", cgf, str);
+          LOG.debug("First line in cgroup tasks file: " + cgf + " " + str);
         }
       } catch (IOException e) {
         LOG.warn("Failed to read cgroup tasks file. ", e);
@@ -295,7 +304,9 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
   boolean deleteCgroup(String cgroupPath) {
     boolean deleted = false;
 
-    LOG.debug("deleteCgroup: {}", cgroupPath);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("deleteCgroup: " + cgroupPath);
+    }
     long start = clock.getTime();
     do {
       try {
@@ -403,7 +414,8 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
 
     try {
       FileInputStream fis = new FileInputStream(new File(getMtabFileName()));
-      in = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
+      in = new BufferedReader(
+          new InputStreamReader(fis, StandardCharsets.UTF_8));
 
       for (String str = in.readLine(); str != null;
           str = in.readLine()) {
@@ -453,9 +465,9 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     String controllerPath;
     Map<String, Set<String>> parsedMtab = null;
 
-    if (this.cGroupsMountConfig.mountDisabledButMountPathDefined()) {
+    if (this.cgroupMountPath != null && !this.cgroupMount) {
       parsedMtab = ResourceHandlerModule.
-          parseConfiguredCGroupPath(this.cGroupsMountConfig.getMountPath());
+          parseConfiguredCGroupPath(this.cgroupMountPath);
     }
 
     if (parsedMtab == null) {
@@ -473,7 +485,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
         controllerPaths.put(CONTROLLER_CPU, controllerPath);
       } else {
         throw new IOException("Not able to enforce cpu weights; cannot write "
-            + "to cgroup at: " + f.getPath());
+            + "to cgroup at: " + controllerPath);
       }
     } else {
       throw new IOException("Not able to enforce cpu weights; cannot find "

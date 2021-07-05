@@ -46,7 +46,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import org.apache.hadoop.thirdparty.com.google.common.io.Files;
+import com.google.common.io.Files;
 
 public class TestSecurityUtil {
 
@@ -370,16 +370,6 @@ public class TestSecurityUtil {
     verifyServiceAddr(staticHost, "255.255.255.255");
   }
 
-  @Test
-  public void testSocketAddrWithChangeIP() {
-    String staticHost = "host4";
-    NetUtils.addStaticResolution(staticHost, "255.255.255.255");
-    verifyServiceAddr(staticHost, "255.255.255.255");
-
-    NetUtils.addStaticResolution(staticHost, "255.255.255.254");
-    verifyServiceAddr(staticHost, "255.255.255.254");
-  }
-
   // this is a bizarre case, but it's if a test tries to remap an ip address
   @Test
   public void testSocketAddrWithIPToStaticIP() {
@@ -436,7 +426,8 @@ public class TestSecurityUtil {
     assertEquals(1, zkAuths.size());
     ZKAuthInfo zkAuthInfo = zkAuths.get(0);
     assertEquals("a_scheme", zkAuthInfo.getScheme());
-    assertArrayEquals("a_password".getBytes(), zkAuthInfo.getAuth());
+    assertArrayEquals("a_password".getBytes(StandardCharsets.UTF_8),
+        zkAuthInfo.getAuth());
   }
 
   @Test
@@ -444,8 +435,7 @@ public class TestSecurityUtil {
     Configuration conf = new Configuration();
     File passwordTxtFile = File.createTempFile(
         getClass().getSimpleName() +  ".testAuthAtPathNotation-", ".txt");
-    Files.asCharSink(passwordTxtFile, StandardCharsets.UTF_8)
-        .write(ZK_AUTH_VALUE);
+    Files.write(ZK_AUTH_VALUE, passwordTxtFile, StandardCharsets.UTF_8);
     try {
       conf.set(CommonConfigurationKeys.ZK_AUTH,
           "@" + passwordTxtFile.getAbsolutePath());
@@ -454,7 +444,8 @@ public class TestSecurityUtil {
       assertEquals(1, zkAuths.size());
       ZKAuthInfo zkAuthInfo = zkAuths.get(0);
       assertEquals("a_scheme", zkAuthInfo.getScheme());
-      assertArrayEquals("a_password".getBytes(), zkAuthInfo.getAuth());
+      assertArrayEquals("a_password".getBytes(StandardCharsets.UTF_8),
+          zkAuthInfo.getAuth());
     } finally {
       boolean deleted = passwordTxtFile.delete();
       assertTrue(deleted);
@@ -477,7 +468,8 @@ public class TestSecurityUtil {
       assertEquals(1, zkAuths.size());
       ZKAuthInfo zkAuthInfo = zkAuths.get(0);
       assertEquals("a_scheme", zkAuthInfo.getScheme());
-      assertArrayEquals("a_password".getBytes(), zkAuthInfo.getAuth());
+      assertArrayEquals("a_password".getBytes(StandardCharsets.UTF_8),
+          zkAuthInfo.getAuth());
     } finally {
       boolean deleted = localJceksFile.delete();
       assertTrue(deleted);

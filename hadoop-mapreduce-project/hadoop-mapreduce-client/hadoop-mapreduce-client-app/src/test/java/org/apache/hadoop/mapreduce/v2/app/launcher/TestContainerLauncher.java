@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.mapreduce.v2.app.launcher;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -125,7 +125,7 @@ public class TestContainerLauncher {
     ThreadPoolExecutor threadPool = containerLauncher.getThreadPool();
 
     // No events yet
-    assertThat(containerLauncher.initialPoolSize).isEqualTo(
+    Assert.assertEquals(containerLauncher.initialPoolSize,
         MRJobConfig.DEFAULT_MR_AM_CONTAINERLAUNCHER_THREADPOOL_INITIAL_SIZE);
     Assert.assertEquals(0, threadPool.getPoolSize());
     Assert.assertEquals(containerLauncher.initialPoolSize,
@@ -191,7 +191,7 @@ public class TestContainerLauncher {
         20);
     containerLauncher = new CustomContainerLauncher(context);
     containerLauncher.init(conf);
-    assertThat(containerLauncher.initialPoolSize).isEqualTo(20);
+    Assert.assertEquals(containerLauncher.initialPoolSize, 20);
   }
 
   @Test(timeout = 5000)
@@ -274,7 +274,7 @@ public class TestContainerLauncher {
     NMTokenSecretManagerInNM tokenSecretManager =
         new NMTokenSecretManagerInNM();
     MasterKey masterKey = Records.newRecord(MasterKey.class);
-    masterKey.setBytes(ByteBuffer.wrap("key".getBytes()));
+    masterKey.setBytes(ByteBuffer.wrap("key".getBytes(StandardCharsets.UTF_8)));
     tokenSecretManager.setMasterKey(masterKey);
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
       "token");

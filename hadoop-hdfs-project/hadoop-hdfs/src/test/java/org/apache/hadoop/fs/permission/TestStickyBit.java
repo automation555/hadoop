@@ -28,6 +28,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.apache.hadoop.conf.Configuration;
@@ -96,7 +97,7 @@ public class TestStickyBit {
 
   @AfterClass
   public static void shutdown() throws Exception {
-    IOUtils.cleanupWithLogger(null, hdfs, hdfsAsUser1, hdfsAsUser2);
+    IOUtils.cleanup(null, hdfs, hdfsAsUser1, hdfsAsUser2);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -117,11 +118,11 @@ public class TestStickyBit {
     FSDataOutputStream h = null;
     try {
       h = hdfsAsUser2.append(file2);
-      h.write("Some more data".getBytes());
+      h.write("Some more data".getBytes(StandardCharsets.UTF_8));
       h.close();
       h = null;
     } finally {
-      IOUtils.cleanupWithLogger(null, h);
+      IOUtils.cleanup(null, h);
     }
   }
 
@@ -496,11 +497,11 @@ public class TestStickyBit {
     FSDataOutputStream o = null;
     try {
       o = hdfs.create(p);
-      o.write("some file contents".getBytes());
+      o.write("some file contents".getBytes(StandardCharsets.UTF_8));
       o.close();
       o = null;
     } finally {
-      IOUtils.cleanupWithLogger(null, o);
+      IOUtils.cleanup(null, o);
     }
   }
 

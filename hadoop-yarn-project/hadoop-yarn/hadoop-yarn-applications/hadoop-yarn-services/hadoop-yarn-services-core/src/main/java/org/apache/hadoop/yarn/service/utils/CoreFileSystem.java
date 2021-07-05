@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.service.utils;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -46,14 +46,13 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 public class CoreFileSystem {
   private static final Logger
     log = LoggerFactory.getLogger(CoreFileSystem.class);
-
-  private static final String UTF_8 = "UTF-8";
 
   protected final FileSystem fileSystem;
   protected final Configuration configuration;
@@ -97,8 +96,8 @@ public class CoreFileSystem {
   public String toString() {
     final StringBuilder sb =
       new StringBuilder("CoreFileSystem{");
-    sb.append("fileSystem=").append(fileSystem.getUri())
-        .append('}');
+    sb.append("fileSystem=").append(fileSystem.getUri());
+    sb.append('}');
     return sb.toString();
   }
 
@@ -384,19 +383,13 @@ public class CoreFileSystem {
    * @param resourceType resource type
    * @return the local resource for AM
    */
-  public LocalResource createAmResource(Path destPath,
-      LocalResourceType resourceType,
-      LocalResourceVisibility visibility) throws IOException {
-
+  public LocalResource createAmResource(Path destPath, LocalResourceType resourceType) throws IOException {
     FileStatus destStatus = fileSystem.getFileStatus(destPath);
     LocalResource amResource = Records.newRecord(LocalResource.class);
     amResource.setType(resourceType);
     // Set visibility of the resource
     // Setting to most private option
-    if (visibility == null) {
-      visibility = LocalResourceVisibility.APPLICATION;
-    }
-    amResource.setVisibility(visibility);
+    amResource.setVisibility(LocalResourceVisibility.APPLICATION);
     // Set the resource to be copied over
     amResource.setResource(
         URL.fromPath(fileSystem.resolvePath(destStatus.getPath())));
@@ -425,7 +418,7 @@ public class CoreFileSystem {
     for (FileStatus entry : fileset) {
 
       LocalResource resource = createAmResource(entry.getPath(),
-              LocalResourceType.FILE, LocalResourceVisibility.APPLICATION);
+              LocalResourceType.FILE);
       String relativePath = destRelativeDir + "/" + entry.getPath().getName();
       localResources.put(relativePath, resource);
     }
@@ -471,8 +464,7 @@ public class CoreFileSystem {
     // Set the type of resource - file or archive
     // archives are untarred at destination
     // we don't need the jar file to be untarred for now
-    return createAmResource(destPath, LocalResourceType.FILE,
-        LocalResourceVisibility.APPLICATION);
+    return createAmResource(destPath, LocalResourceType.FILE);
   }
 
   /**
@@ -490,7 +482,7 @@ public class CoreFileSystem {
       BadClusterStateException {
     Path dependencyLibTarGzip = getDependencyTarGzip();
     LocalResource lc = createAmResource(dependencyLibTarGzip,
-        LocalResourceType.ARCHIVE, LocalResourceVisibility.APPLICATION);
+        LocalResourceType.ARCHIVE);
     providerResources.put(YarnServiceConstants.DEPENDENCY_LOCALIZED_DIR_LINK, lc);
   }
 
@@ -548,7 +540,7 @@ public class CoreFileSystem {
     try {
       in = fileSystem.open(path);
       int count = in.read(b);
-      return new String(b, 0, count, UTF_8);
+      return new String(b, 0, count, StandardCharsets.UTF_8);
     } finally {
       IOUtils.closeStream(in);
     }

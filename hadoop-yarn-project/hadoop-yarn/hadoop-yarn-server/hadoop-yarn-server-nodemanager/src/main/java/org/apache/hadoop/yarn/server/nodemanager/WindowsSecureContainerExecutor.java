@@ -29,15 +29,15 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DelegateToFileSystem;
 import org.apache.hadoop.fs.FileContext;
@@ -68,8 +68,8 @@ import org.apache.hadoop.yarn.server.nodemanager.executor.LocalizerStartContext;
  */
 public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   
-  private static final Logger LOG = LoggerFactory
-      .getLogger(WindowsSecureContainerExecutor.class);
+  private static final Log LOG = LogFactory
+      .getLog(WindowsSecureContainerExecutor.class);
   
   public static final String LOCALIZER_PID_FORMAT = "STAR_LOCALIZER_%s";
   
@@ -374,7 +374,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
           return os;
         } finally {
           if (!success) {
-            IOUtils.cleanupWithLogger(LOG, os);
+            IOUtils.cleanup(LOG, os);
           }
         }
       }
@@ -502,7 +502,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
         @Override
         public void run() {
           try (BufferedReader lines = new BufferedReader(
-                   new InputStreamReader(stream, Charset.forName("UTF-8")))) {
+                   new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             char[] buf = new char[512];
             int nRead;
             while ((nRead = lines.read(buf, 0, buf.length)) > 0) {
@@ -591,7 +591,10 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   
   @Override
   protected void copyFile(Path src, Path dst, String owner) throws IOException {
-    LOG.debug("copyFile: {} -> {} owner:{}", src, dst, owner);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("copyFile: %s -> %s owner:%s", src.toString(), 
+          dst.toString(), owner));
+    }
     Native.Elevated.copy(src,  dst, true);
     Native.Elevated.chown(dst, owner, nodeManagerGroup);
   }
@@ -604,7 +607,10 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     // This is similar to how LCE creates dirs
     //
     perms = new FsPermission(DIR_PERM);
-    LOG.debug("createDir: {} perm:{} owner:{}", dirPath, perms, owner);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("createDir: %s perm:%s owner:%s", 
+          dirPath.toString(), perms.toString(), owner));
+    }
     
     super.createDir(dirPath, perms, createParent, owner);
     lfs.setOwner(dirPath, owner, nodeManagerGroup);
@@ -613,7 +619,10 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   @Override
   protected void setScriptExecutable(Path script, String owner) 
       throws IOException {
-    LOG.debug("setScriptExecutable: {} owner:{}", script, owner);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("setScriptExecutable: %s owner:%s", 
+          script.toString(), owner));
+    }
     super.setScriptExecutable(script, owner);
     Native.Elevated.chown(script, owner, nodeManagerGroup);
   }
@@ -621,7 +630,10 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   @Override
   public Path localizeClasspathJar(Path jarPath, Path target, String owner) 
       throws IOException {
-    LOG.debug("localizeClasspathJar: {} {} o:{}", jarPath, target, owner);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("localizeClasspathJar: %s %s o:%s", 
+          jarPath, target, owner));
+    }
     createDir(target,  new FsPermission(DIR_PERM), true, owner);
     String fileName = jarPath.getName();
     Path dst = new Path(target, fileName);
@@ -657,7 +669,9 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     copyFile(nmPrivateContainerTokensPath, tokenDst, user);
 
     File cwdApp = new File(appStorageDir.toString());
-    LOG.debug("cwdApp: {}", cwdApp);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("cwdApp: %s", cwdApp));
+    }
 
     List<String> command ;
 

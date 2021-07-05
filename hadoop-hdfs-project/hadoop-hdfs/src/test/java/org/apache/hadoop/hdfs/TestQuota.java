@@ -32,11 +32,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Scanner;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -57,7 +58,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ToolRunner;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -65,7 +65,8 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
@@ -150,12 +151,12 @@ public class TestQuota {
     resetStream();
   }
 
-  static void runCommand(DFSAdmin admin, boolean expectError, String... args)
+  private void runCommand(DFSAdmin admin, boolean expectError, String... args) 
                          throws Exception {
     runCommand(admin, args, expectError);
   }
-
-  static void runCommand(DFSAdmin admin, String[] args, boolean expectEror)
+  
+  private void runCommand(DFSAdmin admin, String args[], boolean expectEror)
   throws Exception {
     int val = admin.run(args);
     if (expectEror) {
@@ -413,13 +414,13 @@ public class TestQuota {
       }
     });
 
-    // 19: clrQuota on the root directory ("/") should pass.
-    runCommand(admin, false, "-clrQuota", "/");
+    // 19: clrQuota on the root directory ("/") should fail
+    runCommand(admin, true, "-clrQuota", "/");
 
     // 20: setQuota on the root directory ("/") should succeed
     runCommand(admin, false, "-setQuota", "1000000", "/");
 
-    runCommand(admin, false, "-clrQuota", "/");
+    runCommand(admin, true, "-clrQuota", "/");
     runCommand(admin, false, "-clrSpaceQuota", "/");
     runCommand(admin, new String[]{"-clrQuota", parent.toString()}, false);
     runCommand(admin, false, "-clrSpaceQuota", parent.toString());
@@ -456,7 +457,7 @@ public class TestQuota {
     final Path childFile4 = new Path(dir, "datafile2");
     final Path childFile5 = new Path(dir, "datafile3");
 
-    runCommand(admin, false, "-clrQuota", "/");
+    runCommand(admin, true, "-clrQuota", "/");
     runCommand(admin, false, "-clrSpaceQuota", "/");
     // set space quota to a real low value
     runCommand(admin, false, "-setSpaceQuota", Long.toString(spaceQuota2), "/");
@@ -1513,7 +1514,7 @@ public class TestQuota {
 
     final Path testFile = new Path(dir, "file");
     final FSDataOutputStream stream = dfs.create(testFile);
-    stream.write("whatever".getBytes());
+    stream.write("whatever".getBytes(StandardCharsets.UTF_8));
     try {
       stream.close();
       fail("close should fail");
@@ -1541,7 +1542,7 @@ public class TestQuota {
     // get the lease renewer now so we can verify it later without calling
     // getLeaseRenewer, which will automatically add the client into it.
     final LeaseRenewer leaseRenewer = dfs.getClient().getLeaseRenewer();
-    stream.write("whatever".getBytes());
+    stream.write("whatever".getBytes(StandardCharsets.UTF_8));
     try {
       stream.hflush();
       fail("flush should fail");
@@ -1566,57 +1567,6 @@ public class TestQuota {
   }
 
   @Test
-  public void testClrQuotaOnRoot() throws Exception {
-    long orignalQuota = dfs.getQuotaUsage(new Path("/")).getQuota();
-    DFSAdmin admin = new DFSAdmin(conf);
-    String[] args;
-    args = new String[] {"-setQuota", "3K", "/"};
-    runCommand(admin, args, false);
-    assertEquals(3 * 1024, dfs.getQuotaUsage(new Path("/")).getQuota());
-    args = new String[] {"-clrQuota", "/"};
-    runCommand(admin, args, false);
-    assertEquals(orignalQuota, dfs.getQuotaUsage(new Path("/")).getQuota());
-  }
-
-  @Test
-  public void testRename() throws Exception {
-    int fileLen = 1024;
-    short replication = 3;
-
-    final Path parent = new Path(PathUtils.getTestDir(getClass()).getPath(),
-        GenericTestUtils.getMethodName());
-    assertTrue(dfs.mkdirs(parent));
-
-    final Path srcDir = new Path(parent, "src-dir");
-    Path file = new Path(srcDir, "file1");
-    DFSTestUtil.createFile(dfs, file, fileLen, replication, 0);
-    dfs.setStoragePolicy(srcDir, HdfsConstants.HOT_STORAGE_POLICY_NAME);
-
-    final Path dstDir = new Path(parent, "dst-dir");
-    assertTrue(dfs.mkdirs(dstDir));
-    dfs.setStoragePolicy(dstDir, HdfsConstants.ALLSSD_STORAGE_POLICY_NAME);
-
-    dfs.setQuota(srcDir, 100000, 100000);
-    dfs.setQuota(dstDir, 100000, 100000);
-
-    Path dstFile = new Path(dstDir, "file1");
-    // Test quota check of rename. Expect a QuotaExceedException.
-    dfs.setQuotaByStorageType(dstDir, StorageType.SSD, 10);
-    try {
-      dfs.rename(file, dstFile);
-      fail("Expect QuotaExceedException.");
-    } catch (QuotaExceededException qe) {
-    }
-
-    // Set enough quota, expect a successful rename.
-    dfs.setQuotaByStorageType(dstDir, StorageType.SSD, fileLen * replication);
-    dfs.rename(file, dstFile);
-    // Verify the storage type usage is properly updated on source and dst.
-    checkQuotaAndCount(dfs, srcDir);
-    checkQuotaAndCount(dfs, dstDir);
-  }
-
-  @Test
   public void testSpaceQuotaExceptionOnAppend() throws Exception {
     GenericTestUtils.setLogLevel(DFSOutputStream.LOG, Level.TRACE);
     GenericTestUtils.setLogLevel(DataStreamer.LOG, Level.TRACE);
@@ -1632,7 +1582,7 @@ public class TestQuota {
 
     final Path testFile = new Path(dir, "file");
     OutputStream stream = dfs.create(testFile);
-    stream.write("whatever".getBytes());
+    stream.write("whatever".getBytes(StandardCharsets.UTF_8));
     stream.close();
 
     assertEquals(0, cluster.getNamesystem().getNumFilesUnderConstruction());
@@ -1685,16 +1635,5 @@ public class TestQuota {
       list.add(scanner.nextLine());
     }
     scanner.close();
-  }
-
-  // quota and count should match.
-  private void checkQuotaAndCount(DistributedFileSystem fs, Path path)
-      throws IOException {
-    QuotaUsage qu = fs.getQuotaUsage(path);
-    ContentSummary cs = fs.getContentSummary(path);
-    for (StorageType st : StorageType.values()) {
-      // it will fail here, because the quota and consume is not handled right.
-      assertEquals(qu.getTypeConsumed(st), cs.getTypeConsumed(st));
-    }
   }
 }

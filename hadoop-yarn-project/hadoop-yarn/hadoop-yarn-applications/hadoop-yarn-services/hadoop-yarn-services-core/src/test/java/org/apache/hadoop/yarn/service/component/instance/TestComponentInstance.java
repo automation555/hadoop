@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.service.component.instance;
 
-import org.apache.hadoop.util.Lists;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
@@ -47,6 +47,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
@@ -276,7 +277,7 @@ public class TestComponentInstance {
         "testUpdateLocalizationStatuses");
 
     String file1 = rule.getServiceBasePath().toString() + "/file1";
-    Files.write(Paths.get(file1), "test file".getBytes(),
+    Files.write(Paths.get(file1), "test file".getBytes(StandardCharsets.UTF_8),
         StandardOpenOption.CREATE_NEW);
 
     org.apache.hadoop.yarn.service.api.records.Component compDef =

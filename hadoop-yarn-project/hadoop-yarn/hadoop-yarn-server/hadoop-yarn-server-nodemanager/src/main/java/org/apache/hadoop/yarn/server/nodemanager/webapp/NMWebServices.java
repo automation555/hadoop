@@ -21,7 +21,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -328,7 +328,9 @@ public class NMWebServices {
       } catch (IOException ex) {
         // Something wrong with we tries to access the remote fs for the logs.
         // Skip it and do nothing
-        LOG.debug("{}", ex);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(ex.getMessage());
+        }
       }
       GenericEntity<List<ContainerLogsInfo>> meta = new GenericEntity<List<
           ContainerLogsInfo>>(containersLogsInfo){};
@@ -431,8 +433,10 @@ public class NMWebServices {
     } catch (Exception ex) {
       // This NM does not have this container any more. We
       // assume the container has already finished.
-      LOG.debug("Can not find the container:{} in this node.",
-          containerId);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Can not find the container:" + containerId
+            + " in this node.");
+      }
     }
     final boolean isRunning = tempIsRunning;
     File logFile = null;
@@ -490,7 +494,7 @@ public class NMWebServices {
             }
             sb.append(StringUtils.repeat("*", endOfFile.length() + 50)
                 + "\n\n");
-            os.write(sb.toString().getBytes(Charset.forName("UTF-8")));
+            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
             // If we have aggregated logs for this container,
             // output the aggregation logs as well.
             ApplicationId appId = containerId.getApplicationAttemptId()

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.service.utils;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.ArrayUtils;
@@ -47,6 +47,7 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -136,7 +137,7 @@ public final class ServiceUtils {
         // either unencoded or encoded as "%20"). Replace +s first, so
         // that they are kept sacred during the decoding process.
         toReturn = toReturn.replaceAll("\\+", "%2B");
-        toReturn = URLDecoder.decode(toReturn, "UTF-8");
+        toReturn = URLDecoder.decode(toReturn, StandardCharsets.UTF_8.name());
         String jarFilePath = toReturn.replaceAll("!.*$", "");
         return new File(jarFilePath);
       } else {
@@ -213,8 +214,8 @@ public final class ServiceUtils {
       return trailing ? separator : "";
     }
     for (Object o : collection) {
-      b.append(o)
-          .append(separator);
+      b.append(o);
+      b.append(separator);
     }
     int length = separator.length();
     String s = b.toString();
@@ -451,7 +452,6 @@ public final class ServiceUtils {
    * @param sliderConfDir relative path to the dir containing slider config
    *                      options to put on the classpath -or null
    * @param libdir directory containing the JAR files
-   * @param configClassPath extra class path configured in yarn-site.xml
    * @param usingMiniMRCluster flag to indicate the MiniMR cluster is in use
    * (and hence the current classpath should be used, not anything built up)
    * @return a classpath
@@ -459,7 +459,6 @@ public final class ServiceUtils {
   public static ClasspathConstructor buildClasspath(String sliderConfDir,
       String libdir,
       SliderFileSystem sliderFileSystem,
-      String configClassPath,
       boolean usingMiniMRCluster) {
 
     ClasspathConstructor classpath = new ClasspathConstructor();
@@ -481,11 +480,6 @@ public final class ServiceUtils {
       classpath.addRemoteClasspathEnvVar();
       classpath.append(ApplicationConstants.Environment.HADOOP_CONF_DIR.$$());
     }
-
-    if (!configClassPath.isEmpty()) {
-      classpath.appendAll(Arrays.asList(configClassPath.split(",")));
-    }
-
     return classpath;
   }
 

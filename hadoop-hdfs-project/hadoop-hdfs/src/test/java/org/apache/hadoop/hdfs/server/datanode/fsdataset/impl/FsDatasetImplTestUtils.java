@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileExistsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +46,7 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi.FsVolumeRef
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DataChecksum;
-import org.slf4j.event.Level;
+import org.apache.log4j.Level;
 
 import java.io.DataOutputStream;
 import java.io.File;
@@ -55,6 +55,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -163,7 +164,7 @@ public class FsDatasetImplTestUtils implements FsDatasetTestUtils {
         FileChannel channel = raf.getChannel();
         int offset = random.nextInt((int)channel.size() / 2);
         raf.seek(offset);
-        raf.write("BADBAD".getBytes());
+        raf.write("BADBAD".getBytes(StandardCharsets.UTF_8));
       }
     }
 
@@ -434,7 +435,7 @@ public class FsDatasetImplTestUtils implements FsDatasetTestUtils {
   @Override
   public Iterator<Replica> getStoredReplicas(String bpid) throws IOException {
     // Reload replicas from the disk.
-    ReplicaMap replicaMap = new ReplicaMap(dataset.datasetRWLock);
+    ReplicaMap replicaMap = new ReplicaMap(dataset.datasetLock);
     try (FsVolumeReferences refs = dataset.getFsVolumeReferences()) {
       for (FsVolumeSpi vol : refs) {
         FsVolumeImpl volume = (FsVolumeImpl) vol;

@@ -26,6 +26,7 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -104,7 +105,7 @@ public class DFSck extends Configured implements Tool {
           "every block\n"
       + "\t-storagepolicies\tprint out storage policy summary for the blocks\n"
       + "\t-maintenance\tprint out maintenance state node details\n"
-      + "\t-showprogress\tDeprecated. Progress is now shown by default\n"
+      + "\t-showprogress\tshow progress in output. Default is OFF (no progress)\n"
       + "\t-blockId\tprint out which file this blockId belongs to, locations"
       + " (nodes, racks) of this block, and other diagnostics info"
       + " (under replicated, corrupted or not, etc)\n"
@@ -196,7 +197,7 @@ public class DFSck extends Configured implements Tool {
       }
       InputStream stream = connection.getInputStream();
       BufferedReader input = new BufferedReader(new InputStreamReader(
-          stream, "UTF-8"));
+          stream, StandardCharsets.UTF_8));
       try {
         String line = null;
         while ((line = input.readLine()) != null) {
@@ -227,7 +228,7 @@ public class DFSck extends Configured implements Tool {
             continue;
           numCorrupt++;
           if (numCorrupt == 1) {
-            out.println("The list of corrupt blocks under path '"
+            out.println("The list of corrupt files under path '"
                 + dir + "' are:");
           }
           out.println(line);
@@ -237,7 +238,7 @@ public class DFSck extends Configured implements Tool {
       }
     }
     out.println("The filesystem under path '" + dir + "' has " 
-        + numCorrupt + " CORRUPT blocks");
+        + numCorrupt + " CORRUPT files");
     if (numCorrupt == 0)
       errCode = 0;
     return errCode;
@@ -309,7 +310,8 @@ public class DFSck extends Configured implements Tool {
           sb.append(" ");
           idx++;
         }
-        url.append("&blockId=").append(URLEncoder.encode(sb.toString(), "UTF-8"));
+        url.append("&blockId=").append(
+            URLEncoder.encode(sb.toString(), StandardCharsets.UTF_8.name()));
       } else if (args[idx].equals("-replicate")) {
         url.append("&replicate=1");
       } else if (!args[idx].startsWith("-")) {
@@ -349,8 +351,10 @@ public class DFSck extends Configured implements Tool {
     }
 
     url.insert(0, namenodeAddress.toString());
-    url.append("&path=").append(URLEncoder.encode(
-        Path.getPathWithoutSchemeAndAuthority(dirpath).toString(), "UTF-8"));
+    url.append("&path=")
+        .append(URLEncoder.encode(
+            Path.getPathWithoutSchemeAndAuthority(dirpath).toString(),
+            StandardCharsets.UTF_8.name()));
     System.err.println("Connecting to namenode via " + url.toString());
 
     if (doListCorruptFileBlocks) {
@@ -364,8 +368,8 @@ public class DFSck extends Configured implements Tool {
       throw new IOException(e);
     }
     InputStream stream = connection.getInputStream();
-    BufferedReader input = new BufferedReader(new InputStreamReader(
-                                              stream, "UTF-8"));
+    BufferedReader input = new BufferedReader(
+        new InputStreamReader(stream, StandardCharsets.UTF_8));
     String line = null;
     String lastLine = NamenodeFsck.CORRUPT_STATUS;
     int errCode = -1;

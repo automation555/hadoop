@@ -18,13 +18,10 @@
 
 package org.apache.hadoop.yarn.server.webproxy;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,14 +34,11 @@ import java.net.HttpCookie;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
-import java.net.SocketTimeoutException;
-import java.util.Collections;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -99,12 +93,11 @@ public class TestWebAppProxyServlet {
   @BeforeClass
   public static void start() throws Exception {
     server = new Server(0);
-    ((QueuedThreadPool)server.getThreadPool()).setMaxThreads(20);
+    ((QueuedThreadPool)server.getThreadPool()).setMaxThreads(10);
     ServletContextHandler context = new ServletContextHandler();
     context.setContextPath("/foo");
     server.setHandler(context);
     context.addServlet(new ServletHolder(TestServlet.class), "/bar");
-    context.addServlet(new ServletHolder(TimeOutTestServlet.class), "/timeout");
     ((ServerConnector)server.getConnectors()[0]).setHost("localhost");
     server.start();
     originalPort = ((ServerConnector)server.getConnectors()[0]).getLocalPort();
@@ -148,29 +141,6 @@ public class TestWebAppProxyServlet {
       }
       is.close();
       os.close();
-      resp.setStatus(HttpServletResponse.SC_OK);
-    }
-  }
-
-  @SuppressWarnings("serial")
-  public static class TimeOutTestServlet extends HttpServlet {
-
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-        throws ServletException, IOException {
-      try {
-        Thread.sleep(10 * 1000);
-      } catch (InterruptedException e) {
-        LOG.warn("doGet() interrupted", e);
-        resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-        return;
-      }
-      resp.setStatus(HttpServletResponse.SC_OK);
-    }
-
-    @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
-        throws ServletException, IOException {
       resp.setStatus(HttpServletResponse.SC_OK);
     }
   }
@@ -286,45 +256,6 @@ public class TestWebAppProxyServlet {
     }
   }
 
-  @Test(expected = SocketTimeoutException.class)
-  public void testWebAppProxyConnectionTimeout()
-      throws IOException, ServletException{
-    HttpServletRequest request = mock(HttpServletRequest.class);
-    when(request.getMethod()).thenReturn("GET");
-    when(request.getRemoteUser()).thenReturn("dr.who");
-    when(request.getPathInfo()).thenReturn("/application_00_0");
-    when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
-
-    HttpServletResponse response = mock(HttpServletResponse.class);
-    when(response.getOutputStream()).thenReturn(null);
-
-    WebAppProxyServlet servlet = new WebAppProxyServlet();
-    YarnConfiguration conf = new YarnConfiguration();
-    conf.setBoolean(YarnConfiguration.RM_PROXY_TIMEOUT_ENABLED,
-        true);
-    conf.setInt(YarnConfiguration.RM_PROXY_CONNECTION_TIMEOUT,
-        1000);
-
-    servlet.setConf(conf);
-
-    ServletConfig config = mock(ServletConfig.class);
-    ServletContext context = mock(ServletContext.class);
-    when(config.getServletContext()).thenReturn(context);
-
-    AppReportFetcherForTest appReportFetcher =
-        new AppReportFetcherForTest(new YarnConfiguration());
-
-    when(config.getServletContext()
-        .getAttribute(WebAppProxy.FETCHER_ATTRIBUTE))
-        .thenReturn(appReportFetcher);
-
-    appReportFetcher.answer = 7;
-
-    servlet.init(config);
-    servlet.doGet(request, response);
-
-  }
-
   @Test(timeout=5000)
   public void testAppReportForEmptyTrackingUrl() throws Exception {
     configuration.set(YarnConfiguration.PROXY_ADDRESS, "localhost:9090");
@@ -404,7 +335,7 @@ public class TestWebAppProxyServlet {
           "Access-Control-Request-Headers", "Authorization");
       proxyConn.addRequestProperty(UNKNOWN_HEADER, "unknown");
       // Verify if four headers mentioned above have been added
-      assertThat(proxyConn.getRequestProperties()).hasSize(4);
+      assertEquals(proxyConn.getRequestProperties().size(), 4);
       proxyConn.connect();
       assertEquals(HttpURLConnection.HTTP_OK, proxyConn.getResponseCode());
       // Verify if number of headers received by end server is 9.
@@ -460,9 +391,9 @@ public class TestWebAppProxyServlet {
 
   @Test(timeout=5000)
   public void testCheckHttpsStrictAndNotProvided() throws Exception {
-    HttpServletResponse resp = mock(HttpServletResponse.class);
+    HttpServletResponse resp = Mockito.mock(HttpServletResponse.class);
     StringWriter sw = new StringWriter();
-    when(resp.getWriter()).thenReturn(new PrintWriter(sw));
+    Mockito.when(resp.getWriter()).thenReturn(new PrintWriter(sw));
     YarnConfiguration conf = new YarnConfiguration();
     final URI httpLink = new URI("http://foo.com");
     final URI httpsLink = new URI("https://foo.com");
@@ -510,7 +441,7 @@ public class TestWebAppProxyServlet {
     while ((read = input.read(buffer)) >= 0) {
       data.write(buffer, 0, read);
     }
-    return new String(data.toByteArray(), "UTF-8");
+    return new String(data.toByteArray(), StandardCharsets.UTF_8);
   }
 
   private boolean isResponseCookiePresent(HttpURLConnection proxyConn,
@@ -635,12 +566,6 @@ public class TestWebAppProxyServlet {
         return result;
       } else if (answer == 6) {
         return getDefaultApplicationReport(appId, false);
-      } else if (answer == 7) {
-        // test connection timeout
-        FetchedAppReport result = getDefaultApplicationReport(appId);
-        result.getApplicationReport().setOriginalTrackingUrl("localhost:"
-            + originalPort + "/foo/timeout?a=b#main");
-        return result;
       }
       return null;
     }

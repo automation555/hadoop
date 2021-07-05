@@ -24,6 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
 
 import org.apache.commons.lang3.RandomUtils;
@@ -156,7 +157,7 @@ public class TestSnapshotDeletion {
     assertEquals(2, cluster.getNamesystem().getSnapshotManager()
         .getNumSnapshottableDirs());
     assertEquals(2, cluster.getNamesystem().getSnapshotManager()
-        .getSnapshottableDirs().size());
+        .getSnapshottableDirs().length);
 
     // delete /foo
     hdfs.delete(foo, true);
@@ -165,7 +166,7 @@ public class TestSnapshotDeletion {
     assertEquals(0, cluster.getNamesystem().getSnapshotManager()
         .getNumSnapshottableDirs());
     assertEquals(0, cluster.getNamesystem().getSnapshotManager()
-        .getSnapshottableDirs().size());
+        .getSnapshottableDirs().length);
     hdfs.setSafeMode(SafeModeAction.SAFEMODE_ENTER);
     hdfs.saveNamespace();
     hdfs.setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
@@ -527,7 +528,7 @@ public class TestSnapshotDeletion {
     assertEquals(snapshot1.getId(), diffList.getLast().getSnapshotId());
     diffList = fsdir.getINode(metaChangeDir.toString()).asDirectory()
         .getDiffs();
-    assertEquals(null, diffList);
+    assertEquals(0, diffList.asList().size());
     
     // check 2. noChangeDir and noChangeFile are still there
     final INodeDirectory noChangeDirNode = 
@@ -1235,7 +1236,8 @@ public class TestSnapshotDeletion {
     Assert.assertNotNull(p);
     INodeDirectory pd = p.asDirectory();
     Assert.assertNotNull(pd);
-    Assert.assertNull(pd.getChild("bar".getBytes(), Snapshot.CURRENT_STATE_ID));
+    Assert.assertNull(pd.getChild("bar".getBytes(StandardCharsets.UTF_8),
+        Snapshot.CURRENT_STATE_ID));
 
     // make sure bar has been cleaned from inodeMap
     Assert.assertNull(fsdir.getInode(fileId));

@@ -19,11 +19,12 @@ package org.apache.hadoop.hdfs.util;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.regex.Matcher;
@@ -34,8 +35,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.util.StringUtils;
-
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
 
 /**
  * Static functions for dealing with files of the same format
@@ -74,8 +73,8 @@ public abstract class MD5FileUtils {
    */
   private static Matcher readStoredMd5(File md5File) throws IOException {
     BufferedReader reader =
-        new BufferedReader(new InputStreamReader(
-            Files.newInputStream(md5File.toPath()), Charsets.UTF_8));
+        new BufferedReader(new InputStreamReader(new FileInputStream(
+            md5File), StandardCharsets.UTF_8));
     String md5Line;
     try {
       md5Line = reader.readLine();
@@ -125,7 +124,7 @@ public abstract class MD5FileUtils {
    * Read dataFile and compute its MD5 checksum.
    */
   public static MD5Hash computeMd5ForFile(File dataFile) throws IOException {
-    InputStream in = Files.newInputStream(dataFile.toPath());
+    InputStream in = new FileInputStream(dataFile);
     try {
       MessageDigest digester = MD5Hash.getDigester();
       DigestInputStream dis = new DigestInputStream(in, digester);
@@ -155,7 +154,7 @@ public abstract class MD5FileUtils {
     String md5Line = digestString + " *" + dataFile.getName() + "\n";
 
     AtomicFileOutputStream afos = new AtomicFileOutputStream(md5File);
-    afos.write(md5Line.getBytes(Charsets.UTF_8));
+    afos.write(md5Line.getBytes(StandardCharsets.UTF_8));
     afos.close();
 
     if (LOG.isDebugEnabled()) {

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdfs.tools.offlineImageViewer;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -37,6 +36,7 @@ import org.apache.hadoop.util.StringUtils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -85,15 +85,10 @@ class FSImageHandler extends SimpleChannelInboundHandler<HttpRequest> {
     }
 
     QueryStringDecoder decoder = new QueryStringDecoder(request.getUri());
-    // check path. throw exception if path doesn't start with WEBHDFS_PREFIX
-    String path = getPath(decoder);
     final String op = getOp(decoder);
-    // check null op
-    if (op == null) {
-      throw new IllegalArgumentException("Param op must be specified.");
-    }
 
     final String content;
+    String path = getPath(decoder);
     switch (op) {
     case "GETFILESTATUS":
       content = image.getFileStatus(path);
@@ -124,7 +119,7 @@ class FSImageHandler extends SimpleChannelInboundHandler<HttpRequest> {
 
     DefaultFullHttpResponse resp = new DefaultFullHttpResponse(HTTP_1_1,
         HttpResponseStatus.OK, Unpooled.wrappedBuffer(content
-            .getBytes(Charsets.UTF_8)));
+            .getBytes(StandardCharsets.UTF_8)));
     resp.headers().set(CONTENT_TYPE, APPLICATION_JSON_UTF8);
     resp.headers().set(CONTENT_LENGTH, resp.content().readableBytes());
     resp.headers().set(CONNECTION, CLOSE);
@@ -142,7 +137,8 @@ class FSImageHandler extends SimpleChannelInboundHandler<HttpRequest> {
     Exception e = cause instanceof Exception ? (Exception) cause : new
       Exception(cause);
     final String output = JsonUtil.toJsonString(e);
-    ByteBuf content = Unpooled.wrappedBuffer(output.getBytes(Charsets.UTF_8));
+    ByteBuf content =
+        Unpooled.wrappedBuffer(output.getBytes(StandardCharsets.UTF_8));
     final DefaultFullHttpResponse resp = new DefaultFullHttpResponse(
             HTTP_1_1, INTERNAL_SERVER_ERROR, content);
 

@@ -40,6 +40,7 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -133,14 +134,15 @@ import org.jboss.netty.util.Timer;
 import org.eclipse.jetty.http.HttpHeader;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
-import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
-import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
-import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
-import org.apache.hadoop.thirdparty.com.google.common.cache.RemovalListener;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import com.google.common.cache.Weigher;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.ByteString;
 
 public class ShuffleHandler extends AuxiliaryService {
 
@@ -153,18 +155,6 @@ public class ShuffleHandler extends AuxiliaryService {
 
   public static final String SHUFFLE_READAHEAD_BYTES = "mapreduce.shuffle.readahead.bytes";
   public static final int DEFAULT_SHUFFLE_READAHEAD_BYTES = 4 * 1024 * 1024;
-
-  public static final String MAX_WEIGHT =
-      "mapreduce.shuffle.pathcache.max-weight";
-  public static final int DEFAULT_MAX_WEIGHT = 10 * 1024 * 1024;
-
-  public static final String EXPIRE_AFTER_ACCESS_MINUTES =
-      "mapreduce.shuffle.pathcache.expire-after-access-minutes";
-  public static final int DEFAULT_EXPIRE_AFTER_ACCESS_MINUTES = 5;
-
-  public static final String CONCURRENCY_LEVEL =
-      "mapreduce.shuffle.pathcache.concurrency-level";
-  public static final int DEFAULT_CONCURRENCY_LEVEL = 16;
   
   // pattern to identify errors related to the client closing the socket early
   // idea borrowed from Netty SslHandler
@@ -846,46 +836,63 @@ public class ShuffleHandler extends AuxiliaryService {
       // TODO factor out encode/decode to permit binary shuffle
       // TODO factor out decode of index to permit alt. models
     }
+
   }
 
   class Shuffle extends SimpleChannelUpstreamHandler {
+    private static final int MAX_WEIGHT = 10 * 1024 * 1024;
+    private static final int EXPIRE_AFTER_ACCESS_MINUTES = 5;
+    private static final int ALLOWED_CONCURRENCY = 16;
+    private final Configuration conf;
     private final IndexCache indexCache;
-    private final
-    LoadingCache<AttemptPathIdentifier, AttemptPathInfo> pathCache;
-
     private int port;
-
-    Shuffle(Configuration conf) {
-      this.port = conf.getInt(SHUFFLE_PORT_CONFIG_KEY, DEFAULT_SHUFFLE_PORT);
-      this.indexCache = new IndexCache(new JobConf(conf));
-      this.pathCache = CacheBuilder.newBuilder()
-          .expireAfterAccess(conf.getInt(EXPIRE_AFTER_ACCESS_MINUTES,
-              DEFAULT_EXPIRE_AFTER_ACCESS_MINUTES), TimeUnit.MINUTES)
-          .softValues()
-          .concurrencyLevel(conf.getInt(CONCURRENCY_LEVEL,
-              DEFAULT_CONCURRENCY_LEVEL))
-          .removalListener((RemovalListener<AttemptPathIdentifier,
-              AttemptPathInfo>) notification ->
-              LOG.debug("PathCache Eviction: {}, Reason={}",
-                  notification.getKey(), notification.getCause()))
-          .maximumWeight(conf.getInt(MAX_WEIGHT, DEFAULT_MAX_WEIGHT))
-          .weigher((key, value) -> key.jobId.length() + key.user.length() +
-              key.attemptId.length()+ value.indexPath.toString().length() +
-              value.dataPath.toString().length())
-          .build(new CacheLoader<AttemptPathIdentifier, AttemptPathInfo>() {
+    private final LoadingCache<AttemptPathIdentifier, AttemptPathInfo> pathCache =
+      CacheBuilder.newBuilder().expireAfterAccess(EXPIRE_AFTER_ACCESS_MINUTES,
+      TimeUnit.MINUTES).softValues().concurrencyLevel(ALLOWED_CONCURRENCY).
+      removalListener(
+          new RemovalListener<AttemptPathIdentifier, AttemptPathInfo>() {
             @Override
-            public AttemptPathInfo load(AttemptPathIdentifier key) throws
-                Exception {
-              String base = getBaseLocation(key.jobId, key.user);
-              String attemptBase = base + key.attemptId;
-              Path indexFileName = getAuxiliaryLocalPathHandler()
-                  .getLocalPathForRead(attemptBase + "/" + INDEX_FILE_NAME);
-              Path mapOutputFileName = getAuxiliaryLocalPathHandler()
-                  .getLocalPathForRead(attemptBase + "/" + DATA_FILE_NAME);
-              LOG.debug("Loaded : {} via loader", key);
-              return new AttemptPathInfo(indexFileName, mapOutputFileName);
+            public void onRemoval(RemovalNotification<AttemptPathIdentifier,
+                AttemptPathInfo> notification) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("PathCache Eviction: " + notification.getKey() +
+                    ", Reason=" + notification.getCause());
+              }
             }
-          });
+          }
+      ).maximumWeight(MAX_WEIGHT).weigher(
+          new Weigher<AttemptPathIdentifier, AttemptPathInfo>() {
+            @Override
+            public int weigh(AttemptPathIdentifier key,
+                AttemptPathInfo value) {
+              return key.jobId.length() + key.user.length() +
+                  key.attemptId.length()+
+                  value.indexPath.toString().length() +
+                  value.dataPath.toString().length();
+            }
+          }
+      ).build(new CacheLoader<AttemptPathIdentifier, AttemptPathInfo>() {
+        @Override
+        public AttemptPathInfo load(AttemptPathIdentifier key) throws
+            Exception {
+          String base = getBaseLocation(key.jobId, key.user);
+          String attemptBase = base + key.attemptId;
+          Path indexFileName = getAuxiliaryLocalPathHandler()
+              .getLocalPathForRead(attemptBase + "/" + INDEX_FILE_NAME);
+          Path mapOutputFileName = getAuxiliaryLocalPathHandler()
+              .getLocalPathForRead(attemptBase + "/" + DATA_FILE_NAME);
+
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Loaded : " + key + " via loader");
+          }
+          return new AttemptPathInfo(indexFileName, mapOutputFileName);
+        }
+      });
+
+    public Shuffle(Configuration conf) {
+      this.conf = conf;
+      indexCache = new IndexCache(new JobConf(conf));
+      this.port = conf.getInt(SHUFFLE_PORT_CONFIG_KEY, DEFAULT_SHUFFLE_PORT);
     }
 
     public void setPort(int port) {
@@ -1170,13 +1177,8 @@ public class ShuffleHandler extends AuxiliaryService {
         StringBuilder sb = new StringBuilder("shuffle for ");
         sb.append(jobId).append(" reducer ").append(reduce);
         sb.append(" length ").append(contentLength);
-        if (AUDITLOG.isTraceEnabled()) {
-          // For trace level logging, append the list of mappers
-          sb.append(" mappers: ").append(mapIds);
-          AUDITLOG.trace(sb.toString());
-        } else {
-          AUDITLOG.debug(sb.toString());
-        }
+        sb.append(" mappers: ").append(mapIds);
+        AUDITLOG.debug(sb.toString());
       }
     }
 
@@ -1235,7 +1237,7 @@ public class ShuffleHandler extends AuxiliaryService {
       SecureShuffleUtils.verifyReply(urlHashStr, enc_str, tokenSecret);
       // verification passed - encode the reply
       String reply =
-        SecureShuffleUtils.generateHash(urlHashStr.getBytes(Charsets.UTF_8), 
+        SecureShuffleUtils.generateHash(urlHashStr.getBytes(StandardCharsets.UTF_8), 
             tokenSecret);
       response.headers().set(
           SecureShuffleUtils.HTTP_HEADER_REPLY_URL_HASH, reply);

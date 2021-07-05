@@ -25,12 +25,11 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathCapabilities;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Assert;
-import org.junit.AssumptionViolatedException;
+import org.junit.internal.AssumptionViolatedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +38,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -233,8 +233,8 @@ public class ContractTestUtils extends Assert {
   public static void verifyFileContents(FileSystem fs,
                                         Path path,
                                         byte[] original) throws IOException {
+    assertIsFile(fs, path);
     FileStatus stat = fs.getFileStatus(path);
-    assertIsFile(path, stat);
     String statText = stat.toString();
     assertEquals("wrong length " + statText, original.length, stat.getLen());
     byte[] bytes = readDataset(fs, path, original.length);
@@ -399,7 +399,9 @@ public class ContractTestUtils extends Assert {
       IOException {
     if (fileSystem != null) {
       rejectRootOperation(path, allowRootDelete);
-      return fileSystem.delete(path, recursive);
+      if (fileSystem.exists(path)) {
+        return fileSystem.delete(path, recursive);
+      }
     }
     return false;
 
@@ -416,9 +418,8 @@ public class ContractTestUtils extends Assert {
   public static void rename(FileSystem fileSystem, Path src, Path dst)
       throws IOException {
     rejectRootOperation(src, false);
-    assertTrue("rename(" + src + ", " + dst + ") failed",
-        fileSystem.rename(src, dst));
-    assertPathDoesNotExist(fileSystem, "renamed source dir", src);
+    assertTrue(fileSystem.rename(src, dst));
+    assertPathDoesNotExist(fileSystem, "renamed", src);
   }
 
   /**
@@ -457,10 +458,8 @@ public class ContractTestUtils extends Assert {
   public static FileStatus[] deleteChildren(FileSystem fileSystem,
       Path path,
       boolean recursive) throws IOException {
-    LOG.debug("Deleting children of {} (recursive={})", path, recursive);
     FileStatus[] children = listChildren(fileSystem, path);
     for (FileStatus entry : children) {
-      LOG.debug("Deleting {}", entry);
       fileSystem.delete(entry.getPath(), recursive);
     }
     return children;
@@ -558,8 +557,7 @@ public class ContractTestUtils extends Assert {
    */
   public static void assertIsDirectory(FileSystem fs,
                                        Path path) throws IOException {
-    FileStatus fileStatus = verifyPathExists(fs,
-        "Expected to find a directory", path);
+    FileStatus fileStatus = fs.getFileStatus(path);
     assertIsDirectory(fileStatus);
   }
 
@@ -675,8 +673,7 @@ public class ContractTestUtils extends Assert {
   /**
    * Delete a file/dir and assert that delete() returned true
    * <i>and</i> that the path no longer exists. This variant rejects
-   * all operations on root directories and requires the target path
-   * to exist before the deletion operation.
+   * all operations on root directories.
    * @param fs filesystem
    * @param file path to delete
    * @param recursive flag to enable recursive delete
@@ -690,9 +687,8 @@ public class ContractTestUtils extends Assert {
 
   /**
    * Delete a file/dir and assert that delete() returned true
-   * <i>and</i> that the path no longer exists.
-   * This variant requires the target path
-   * to exist before the deletion operation.
+   * <i>and</i> that the path no longer exists. This variant rejects
+   * all operations on root directories
    * @param fs filesystem
    * @param file path to delete
    * @param recursive flag to enable recursive delete
@@ -701,35 +697,13 @@ public class ContractTestUtils extends Assert {
    */
   public static void assertDeleted(FileSystem fs,
       Path file,
-      boolean recursive,
-      boolean allowRootOperations) throws IOException {
-    assertDeleted(fs, file, true, recursive, allowRootOperations);
-  }
-
-  /**
-   * Delete a file/dir and assert that delete() returned true
-   * <i>and</i> that the path no longer exists.
-   * @param fs filesystem
-   * @param file path to delete
-   * @param requirePathToExist check for the path existing first?
-   * @param recursive flag to enable recursive delete
-   * @param allowRootOperations can the root dir be deleted?
-   * @throws IOException IO problems
-   */
-  public static void assertDeleted(FileSystem fs,
-      Path file,
-      boolean requirePathToExist,
       boolean recursive,
       boolean allowRootOperations) throws IOException {
     rejectRootOperation(file, allowRootOperations);
-    if (requirePathToExist) {
-      assertPathExists(fs, "about to be deleted file", file);
-    }
+    assertPathExists(fs, "about to be deleted file", file);
     boolean deleted = fs.delete(file, recursive);
-    if (!deleted) {
-      String dir = ls(fs, file.getParent());
-      assertTrue("Delete failed on " + file + ": " + dir, deleted);
-    }
+    String dir = ls(fs, file.getParent());
+    assertTrue("Delete failed on " + file + ": " + dir, deleted);
     assertPathDoesNotExist(fs, "Deleted file", file);
   }
 
@@ -792,7 +766,7 @@ public class ContractTestUtils extends Assert {
     try (FSDataInputStream in = fs.open(path)) {
       byte[] buf = new byte[length];
       in.readFully(0, buf);
-      return new String(buf, "UTF-8");
+      return new String(buf, StandardCharsets.UTF_8);
     }
   }
 
@@ -1455,52 +1429,6 @@ public class ContractTestUtils extends Assert {
 
   /**
    * Convert a remote iterator over file status results into a list.
-   * The utility equivalents in commons collection and guava cannot be
-   * used here, as this is a different interface, one whose operators
-   * can throw IOEs.
-   * @param iterator input iterator
-   * @return the file status entries as a list.
-   * @throws IOException
-   */
-  public static <T extends FileStatus> List<T> iteratorToList(
-          RemoteIterator<T> iterator) throws IOException {
-    List<T> list = new ArrayList<>();
-    while (iterator.hasNext()) {
-      list.add(iterator.next());
-    }
-    return list;
-  }
-
-
-  /**
-   * Convert a remote iterator over file status results into a list.
-   * This uses {@link RemoteIterator#next()} calls only, expecting
-   * a raised {@link NoSuchElementException} exception to indicate that
-   * the end of the listing has been reached. This iteration strategy is
-   * designed to verify that the implementation of the remote iterator
-   * generates results and terminates consistently with the {@code hasNext/next}
-   * iteration. More succinctly "verifies that the {@code next()} operator
-   * isn't relying on {@code hasNext()} to always be called during an iteration.
-   * @param iterator input iterator
-   * @return the status entries as a list.
-   * @throws IOException IO problems
-   */
-  @SuppressWarnings("InfiniteLoopStatement")
-  public static <T extends FileStatus> List<T> iteratorToListThroughNextCallsAlone(
-          RemoteIterator<T> iterator) throws IOException {
-    List<T> list = new ArrayList<>();
-    try {
-      while (true) {
-        list.add(iterator.next());
-      }
-    } catch (NoSuchElementException expected) {
-      // ignored
-    }
-    return list;
-  }
-
-  /**
-   * Convert a remote iterator over file status results into a list.
    * This uses {@link RemoteIterator#next()} calls only, expecting
    * a raised {@link NoSuchElementException} exception to indicate that
    * the end of the listing has been reached. This iteration strategy is
@@ -1539,89 +1467,19 @@ public class ContractTestUtils extends Assert {
     assertTrue("Stream should be instanceof StreamCapabilities",
         stream instanceof StreamCapabilities);
 
-    StreamCapabilities source = (StreamCapabilities) stream;
-    if (shouldHaveCapabilities != null) {
+    if (shouldHaveCapabilities!=null) {
       for (String shouldHaveCapability : shouldHaveCapabilities) {
-        assertTrue("Should have capability: " + shouldHaveCapability
-                + " in " + source,
-            source.hasCapability(shouldHaveCapability));
+        assertTrue("Should have capability: " + shouldHaveCapability,
+            ((StreamCapabilities) stream).hasCapability(shouldHaveCapability));
       }
     }
 
-    if (shouldNotHaveCapabilities != null) {
+    if (shouldNotHaveCapabilities!=null) {
       for (String shouldNotHaveCapability : shouldNotHaveCapabilities) {
-        assertFalse("Should not have capability: " + shouldNotHaveCapability
-                + " in " + source,
-            source.hasCapability(shouldNotHaveCapability));
+        assertFalse("Should not have capability: " + shouldNotHaveCapability,
+            ((StreamCapabilities) stream)
+                .hasCapability(shouldNotHaveCapability));
       }
-    }
-  }
-
-
-  /**
-   * Custom assert to verify capabilities supported by
-   * an object through {@link StreamCapabilities}.
-   *
-   * @param source The object to test for StreamCapabilities
-   * @param capabilities The list of expected capabilities
-   */
-  public static void assertHasStreamCapabilities(
-      final Object source,
-      final String... capabilities) {
-    assertCapabilities(source, capabilities, null);
-  }
-
-  /**
-   * Custom assert to verify capabilities NOT supported by
-   * an object through {@link StreamCapabilities}.
-   *
-   * @param source The object to test for StreamCapabilities
-   * @param capabilities The list of capabilities which must not be
-   * supported.
-   */
-  public static void assertLacksStreamCapabilities(
-      final Object source,
-      final String... capabilities) {
-    assertCapabilities(source, null, capabilities);
-  }
-
-  /**
-   * Custom assert to test {@link PathCapabilities}.
-   *
-   * @param source source (FS, FC, etc)
-   * @param path path to check
-   * @param capabilities The array of unexpected capabilities
-   */
-  public static void assertHasPathCapabilities(
-      final PathCapabilities source,
-      final Path path,
-      final String...capabilities) throws IOException {
-
-    for (String shouldHaveCapability: capabilities) {
-      assertTrue("Should have capability: " + shouldHaveCapability
-              + " under " + path
-              + " in " + source,
-          source.hasPathCapability(path, shouldHaveCapability));
-    }
-  }
-
-  /**
-   * Custom assert to test that the named {@link PathCapabilities}
-   * are not supported.
-   *
-   * @param source source (FS, FC, etc)
-   * @param path path to check
-   * @param capabilities The array of unexpected capabilities
-   */
-  public static void assertLacksPathCapabilities(
-      final PathCapabilities source,
-      final Path path,
-      final String...capabilities) throws IOException {
-
-    for (String shouldHaveCapability: capabilities) {
-      assertFalse("Path  must not support capability: " + shouldHaveCapability
-              + " under " + path,
-          source.hasPathCapability(path, shouldHaveCapability));
     }
   }
 
@@ -1679,7 +1537,7 @@ public class ContractTestUtils extends Assert {
      * @param results results of the listFiles/listStatus call.
      * @throws IOException IO problems during the iteration.
      */
-    public TreeScanResults(RemoteIterator<? extends FileStatus> results)
+    public TreeScanResults(RemoteIterator<LocatedFileStatus> results)
         throws IOException {
       while (results.hasNext()) {
         add(results.next());
@@ -1747,22 +1605,6 @@ public class ContractTestUtils extends Assert {
     }
 
     /**
-     * Dump the files and directories to a multi-line string for error
-     * messages and assertions.
-     * @return a dump of the internal state
-     */
-    private String dump() {
-      StringBuilder sb = new StringBuilder(toString());
-      sb.append("\nFiles:");
-      directories.forEach(p ->
-          sb.append("\n  \"").append(p.toString()));
-      sb.append("\nDirectories:");
-      files.forEach(p ->
-          sb.append("\n  \"").append(p.toString()));
-      return sb.toString();
-    }
-
-    /**
      * Equality check compares files and directory counts.
      * As these are non-final fields, this class cannot be used in
      * hash tables.
@@ -1802,7 +1644,7 @@ public class ContractTestUtils extends Assert {
      * @param o expected other entries.
      */
     public void assertSizeEquals(String text, long f, long d, long o) {
-      String self = dump();
+      String self = toString();
       Assert.assertEquals(text + ": file count in " + self,
           f, getFileCount());
       Assert.assertEquals(text + ": directory count in " + self,

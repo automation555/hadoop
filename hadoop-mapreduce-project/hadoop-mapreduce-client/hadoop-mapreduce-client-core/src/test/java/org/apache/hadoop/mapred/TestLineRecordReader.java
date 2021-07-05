@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.mapred;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -238,7 +237,7 @@ public class TestLineRecordReader {
     }
     fis.close();
     assertTrue("Test file data too big for buffer", count < data.length);
-    return new String(data, 0, count, "UTF-8").split("\n");
+    return new String(data, 0, count, StandardCharsets.UTF_8).split("\n");
   }
 
   public void checkRecordSpanningMultipleSplits(String testFile,
@@ -566,7 +565,7 @@ public class TestLineRecordReader {
         reader = new LineRecordReader(conf, split, recordDelimiterBytes);
         // Get first record: "abcd|efgh" always possible
         assertTrue("Expected record got nothing", reader.next(key, value));
-        assertThat(value.toString()).isEqualTo("abcd|efgh");
+        assertTrue("abcd|efgh".equals(value.toString()));
         assertEquals("Wrong position after record read", 9, value.getLength());
         // Position should be 12 right after "|+|"
         int recordPos = 12;
@@ -575,7 +574,7 @@ public class TestLineRecordReader {
         // get the next record: "ij|kl" if the split/buffer allows it
         if (reader.next(key, value)) {
           // check the record info: "ij|kl"
-          assertThat(value.toString()).isEqualTo("ij|kl");
+          assertTrue("ij|kl".equals(value.toString()));
           // Position should be 20 right after "|+|"
           recordPos = 20;
           assertEquals("Wrong position after record read", recordPos,
@@ -584,7 +583,7 @@ public class TestLineRecordReader {
         // get the third record: "mno|pqr" if the split/buffer allows it
         if (reader.next(key, value)) {
           // check the record info: "mno|pqr"
-          assertThat(value.toString()).isEqualTo("mno|pqr");
+          assertTrue("mno|pqr".equals(value.toString()));
           // Position should be 27 at the end of the string now
           recordPos = inputData.length();
           assertEquals("Wrong position after record read", recordPos,

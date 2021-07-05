@@ -28,6 +28,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -180,7 +181,8 @@ public class ITestProvidedImplementation {
           LOG.info("Creating " + newFile.toString());
           newFile.createNewFile();
           Writer writer = new OutputStreamWriter(
-              new FileOutputStream(newFile.getAbsolutePath()), "utf-8");
+              new FileOutputStream(newFile.getAbsolutePath()),
+              StandardCharsets.UTF_8);
           for(int j=0; j < baseFileLen*i; j++) {
             writer.write("0");
           }
@@ -1146,7 +1148,7 @@ public class ITestProvidedImplementation {
     DataNode dn1 = cluster.getDataNodes().get(0);
     DataNode dn2 = cluster.getDataNodes().get(1);
 
-    // stop the 1st DN while being decommissioned.
+    // stop the 1st DN while being decomissioned.
     MiniDFSCluster.DataNodeProperties dn1Properties = cluster.stopDataNode(0);
     BlockManagerTestUtil.noticeDeadDatanode(cluster.getNameNode(),
         dn1.getDatanodeId().getXferAddr());

@@ -33,10 +33,9 @@ import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -47,7 +46,6 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.DefaultImpersonationProvider;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -86,16 +84,6 @@ public class TestRefreshUserMappings {
   
     @Override
     public void cacheGroupsAdd(List<String> groups) throws IOException {
-    }
-
-    @Override
-    public Set<String> getGroupsSet(String user) {
-      LOG.info("Getting groups in MockUnixGroupsMapping");
-      String g1 = user + (10 * i + 1);
-      String g2 = user + (10 * i + 2);
-      Set<String> s = Sets.newHashSet(g1, g2);
-      i++;
-      return s;
     }
   }
   
@@ -209,8 +197,6 @@ public class TestRefreshUserMappings {
     // set groups for users
     when(ugi1.getGroups()).thenReturn(groupNames1);
     when(ugi2.getGroups()).thenReturn(groupNames2);
-    when(ugi1.getGroupsSet()).thenReturn(new LinkedHashSet<>(groupNames1));
-    when(ugi2.getGroupsSet()).thenReturn(new LinkedHashSet<>(groupNames2));
 
 
     // check before
@@ -265,7 +251,8 @@ public class TestRefreshUserMappings {
     Configuration conf = new Configuration();
     URL url = conf.getResource("hdfs-site.xml");
 
-    String urlPath = URLDecoder.decode(url.getPath().toString(), "UTF-8");
+    String urlPath = URLDecoder.decode(url.getPath().toString(),
+        StandardCharsets.UTF_8.name());
     Path p = new Path(urlPath);
     Path dir = p.getParent();
     String tmp = dir.toString() + "/" + rsrcName;

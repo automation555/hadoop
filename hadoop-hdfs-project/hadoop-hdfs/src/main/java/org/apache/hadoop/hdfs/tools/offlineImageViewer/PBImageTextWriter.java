@@ -17,33 +17,14 @@
  */
 package org.apache.hadoop.hdfs.tools.offlineImageViewer;
 
-import java.io.BufferedInputStream;
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.io.RandomAccessFile;
-import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
 import org.apache.hadoop.hdfs.server.namenode.FSImageFormatPBINode;
 import org.apache.hadoop.hdfs.server.namenode.FSImageFormatProtobuf;
 import org.apache.hadoop.hdfs.server.namenode.FSImageFormatProtobuf.SectionName;
@@ -56,9 +37,7 @@ import org.apache.hadoop.hdfs.server.namenode.INodeId;
 import org.apache.hadoop.hdfs.server.namenode.SerialNumberManager;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.LimitInputStream;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Time;
-
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
@@ -66,8 +45,24 @@ import org.iq80.leveldb.WriteBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import java.io.BufferedInputStream;
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * This class reads the protobuf-based fsimage and generates text output
@@ -321,10 +316,10 @@ abstract class PBImageTextWriter implements Closeable {
       @Override
       public void close() throws IOException {
         if (batch != null) {
-          IOUtils.cleanupWithLogger(null, batch);
+          IOUtils.cleanup(null, batch);
           batch = null;
         }
-        IOUtils.cleanupWithLogger(null, db);
+        IOUtils.cleanup(null, db);
         db = null;
       }
 
@@ -390,13 +385,13 @@ abstract class PBImageTextWriter implements Closeable {
         dirMap = new LevelDBStore(new File(dbDir, "dirMap"));
       } catch (IOException e) {
         LOG.error("Failed to open LevelDBs", e);
-        IOUtils.cleanupWithLogger(null, this);
+        IOUtils.cleanup(null, this);
       }
     }
 
     @Override
     public void close() throws IOException {
-      IOUtils.cleanupWithLogger(null, dirChildMap, dirMap);
+      IOUtils.cleanup(null, dirChildMap, dirMap);
       dirChildMap = null;
       dirMap = null;
     }
@@ -405,9 +400,8 @@ abstract class PBImageTextWriter implements Closeable {
       return ByteBuffer.allocate(8).putLong(value).array();
     }
 
-    private static byte[] toBytes(String value)
-        throws UnsupportedEncodingException {
-      return value.getBytes("UTF-8");
+    private static byte[] toBytes(String value) {
+      return value.getBytes(StandardCharsets.UTF_8);
     }
 
     private static long toLong(byte[] bytes) {
@@ -416,11 +410,7 @@ abstract class PBImageTextWriter implements Closeable {
     }
 
     private static String toString(byte[] bytes) throws IOException {
-      try {
-        return new String(bytes, "UTF-8");
-      } catch (UnsupportedEncodingException e) {
-        throw new IOException(e);
-      }
+      return new String(bytes, StandardCharsets.UTF_8);
     }
 
     @Override
@@ -517,7 +507,7 @@ abstract class PBImageTextWriter implements Closeable {
   @Override
   public void close() throws IOException {
     out.flush();
-    IOUtils.cleanupWithLogger(null, metadataMap);
+    IOUtils.cleanup(null, metadataMap);
   }
 
   void append(StringBuffer buffer, int field) {
@@ -599,11 +589,7 @@ abstract class PBImageTextWriter implements Closeable {
         is = FSImageUtil.wrapInputStreamForCompression(conf,
             summary.getCodec(), new BufferedInputStream(new LimitInputStream(
                 fin, section.getLength())));
-        SectionName sectionName = SectionName.fromString(section.getName());
-        if (sectionName == null) {
-          throw new IOException("Unrecognized section " + section.getName());
-        }
-        switch (sectionName) {
+        switch (SectionName.fromString(section.getName())) {
         case STRING_TABLE:
           LOG.info("Loading string table");
           stringTable = FSImageLoader.loadStringTable(is);
@@ -809,17 +795,5 @@ abstract class PBImageTextWriter implements Closeable {
       LOG.debug("No snapshot name found for inode {}", inode);
     }
     return new IgnoreSnapshotException();
-  }
-
-  public int getStoragePolicy(
-      INodeSection.XAttrFeatureProto xattrFeatureProto) {
-    List<XAttr> xattrs =
-        FSImageFormatPBINode.Loader.loadXAttrs(xattrFeatureProto, stringTable);
-    for (XAttr xattr : xattrs) {
-      if (BlockStoragePolicySuite.isStoragePolicyXAttr(xattr)) {
-        return xattr.getValue()[0];
-      }
-    }
-    return HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
   }
 }

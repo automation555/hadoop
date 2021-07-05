@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.net.*;
@@ -47,6 +47,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.junit.Assert.fail;
@@ -92,7 +93,7 @@ public class TestDataXceiverBackwardsCompat {
       doReturn(pair).when(saslClient).socketSend(
           any(Socket.class), any(OutputStream.class), any(InputStream.class),
           any(DataEncryptionKeyFactory.class), any(),
-          any(DatanodeID.class), any());
+          any(DatanodeID.class));
       doReturn(mock(ReplicaHandler.class)).when(data).createTemporary(
           any(StorageType.class), any(String.class), any(ExtendedBlock.class),
           anyBoolean());
@@ -168,8 +169,8 @@ public class TestDataXceiverBackwardsCompat {
 
     Token<BlockTokenIdentifier> token = (Token<BlockTokenIdentifier>)mock(
         Token.class);
-    doReturn("".getBytes()).when(token).getIdentifier();
-    doReturn("".getBytes()).when(token).getPassword();
+    doReturn("".getBytes(StandardCharsets.UTF_8)).when(token).getIdentifier();
+    doReturn("".getBytes(StandardCharsets.UTF_8)).when(token).getPassword();
     doReturn(new Text("")).when(token).getKind();
     doReturn(new Text("")).when(token).getService();
 

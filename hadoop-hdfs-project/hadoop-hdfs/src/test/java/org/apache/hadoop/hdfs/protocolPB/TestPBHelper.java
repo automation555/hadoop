@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdfs.protocolPB;
 
 
-import org.apache.hadoop.thirdparty.protobuf.UninitializedMessageException;
+import com.google.protobuf.UninitializedMessageException;
 import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
 import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.hdfs.server.protocol.SlowDiskReports;
@@ -30,12 +30,13 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.permission.AclEntryType;
@@ -112,13 +113,13 @@ import org.apache.hadoop.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.Lists;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 
 /**
  * Tests for {@link PBHelper}
@@ -286,7 +287,8 @@ public class TestPBHelper {
   }
 
   private static BlockKey getBlockKey(int keyId) {
-    return new BlockKey(keyId, 10, "encodedKey".getBytes());
+    return new BlockKey(keyId, 10,
+        "encodedKey".getBytes(StandardCharsets.UTF_8));
   }
 
   private void compare(BlockKey k1, BlockKey k2) {
@@ -465,7 +467,7 @@ public class TestPBHelper {
   
   @Test
   public void testConvertText() {
-    Text t = new Text("abc".getBytes());
+    Text t = new Text("abc".getBytes(StandardCharsets.UTF_8));
     String s = t.toString();
     Text t1 = new Text(s);
     assertEquals(t, t1);
@@ -474,7 +476,8 @@ public class TestPBHelper {
   @Test
   public void testConvertBlockToken() {
     Token<BlockTokenIdentifier> token = new Token<BlockTokenIdentifier>(
-        "identifier".getBytes(), "password".getBytes(), new Text("kind"),
+        "identifier".getBytes(StandardCharsets.UTF_8),
+        "password".getBytes(StandardCharsets.UTF_8), new Text("kind"),
         new Text("service"));
     TokenProto tokenProto = PBHelperClient.convert(token);
     Token<BlockTokenIdentifier> token2 = PBHelperClient.convert(tokenProto);
@@ -529,23 +532,20 @@ public class TestPBHelper {
             AdminStates.NORMAL),
         DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h4",
             AdminStates.NORMAL),
-        DFSTestUtil.getLocalDatanodeInfo("127.0.0.1", "h5",
-            AdminStates.NORMAL),
     };
-    String[] storageIDs = {"s1", "s2", "s3", "s4", "s5"};
+    String[] storageIDs = {"s1", "s2", "s3", "s4"};
     StorageType[] media = {
         StorageType.DISK,
         StorageType.SSD,
         StorageType.DISK,
-        StorageType.RAM_DISK,
-        StorageType.NVDIMM,
+        StorageType.RAM_DISK
     };
-
     LocatedBlock lb = new LocatedBlock(
         new ExtendedBlock("bp12", 12345, 10, 53),
         dnInfos, storageIDs, media, 5, false, new DatanodeInfo[]{});
     lb.setBlockToken(new Token<BlockTokenIdentifier>(
-        "identifier".getBytes(), "password".getBytes(), new Text("kind"),
+        "identifier".getBytes(StandardCharsets.UTF_8),
+        "password".getBytes(StandardCharsets.UTF_8), new Text("kind"),
         new Text("service")));
     return lb;
   }
@@ -562,7 +562,8 @@ public class TestPBHelper {
     LocatedBlock lb = new LocatedBlock(
         new ExtendedBlock("bp12", 12345, 10, 53), dnInfos);
     lb.setBlockToken(new Token<BlockTokenIdentifier>(
-        "identifier".getBytes(), "password".getBytes(), new Text("kind"),
+        "identifier".getBytes(StandardCharsets.UTF_8),
+        "password".getBytes(StandardCharsets.UTF_8), new Text("kind"),
         new Text("service")));
     lb.setStartOffset(5);
     return lb;
@@ -914,7 +915,7 @@ public class TestPBHelper {
     b.setFileBufferSize(DFSConfigKeys.IO_FILE_BUFFER_SIZE_DEFAULT);
     b.setEncryptDataTransfer(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_DEFAULT);
     b.setTrashInterval(DFSConfigKeys.FS_TRASH_INTERVAL_DEFAULT);
-    b.setChecksumType(HdfsProtos.ChecksumTypeProto.forNumber(
+    b.setChecksumType(HdfsProtos.ChecksumTypeProto.valueOf(
         DataChecksum.Type.valueOf(DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT).id));
     HdfsProtos.FsServerDefaultsProto proto = b.build();
 

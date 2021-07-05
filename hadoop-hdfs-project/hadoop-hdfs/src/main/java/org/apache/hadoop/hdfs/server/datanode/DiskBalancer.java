@@ -18,8 +18,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -399,7 +400,7 @@ public class DiskBalancer {
 
     if ((planID == null) ||
         (planID.length() != sha1Length) ||
-        !DigestUtils.sha1Hex(plan.getBytes(Charset.forName("UTF-8")))
+        !DigestUtils.shaHex(plan.getBytes(StandardCharsets.UTF_8))
             .equalsIgnoreCase(planID)) {
       LOG.error("Disk Balancer - Invalid plan hash.");
       throw new DiskBalancerException("Invalid or mis-matched hash.",
@@ -504,7 +505,7 @@ public class DiskBalancer {
     Map<String, String> storageIDToVolBasePathMap = new HashMap<>();
     FsDatasetSpi.FsVolumeReferences references;
     try {
-      try(AutoCloseableLock lock = this.dataset.acquireDatasetReadLock()) {
+      try(AutoCloseableLock lock = this.dataset.acquireDatasetLock()) {
         references = this.dataset.getFsVolumeReferences();
         for (int ndx = 0; ndx < references.size(); ndx++) {
           FsVolumeSpi vol = references.get(ndx);
@@ -902,32 +903,36 @@ public class DiskBalancer {
      */
     private ExtendedBlock getBlockToCopy(FsVolumeSpi.BlockIterator iter,
                                          DiskBalancerWorkItem item) {
-      while (!iter.atEnd() && item.getErrorCount() <= getMaxError(item)) {
+      while (!iter.atEnd() && item.getErrorCount() < getMaxError(item)) {
         try {
           ExtendedBlock block = iter.nextBlock();
-          if(null == block){
-            LOG.info("NextBlock call returned null. No valid block to copy. {}",
-                item.toJson());
-            return null;
+
+          if (block != null) {
+            // A valid block is a finalized block, we iterate until we get
+            // finalized blocks
+            if (!this.dataset.isValidBlock(block)) {
+              continue;
+            }
+
+            // We don't look for the best, we just do first fit
+            if (isLessThanNeeded(block.getNumBytes(), item)) {
+              return block;
+            }
+          } else {
+            LOG.info("There are no blocks in the blockPool {}", iter.getBlockPoolId());
           }
-          // A valid block is a finalized block, we iterate until we get
-          // finalized blocks
-          if (!this.dataset.isValidBlock(block)) {
-            continue;
-          }
-          // We don't look for the best, we just do first fit
-          if (isLessThanNeeded(block.getNumBytes(), item)) {
-            return block;
-          }
+
         } catch (IOException e) {
           item.incErrorCount();
         }
       }
-      if (item.getErrorCount() > getMaxError(item)) {
+
+      if (item.getErrorCount() >= getMaxError(item)) {
         item.setErrMsg("Error count exceeded.");
         LOG.info("Maximum error count exceeded. Error count: {} Max error:{} ",
             item.getErrorCount(), item.getMaxDiskErrors());
       }
+
       return null;
     }
 

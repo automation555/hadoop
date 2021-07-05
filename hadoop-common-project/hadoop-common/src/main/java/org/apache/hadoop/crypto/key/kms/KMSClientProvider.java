@@ -79,9 +79,9 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.CryptoExtension;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 import static org.apache.hadoop.util.KMSUtil.checkNotEmpty;
 import static org.apache.hadoop.util.KMSUtil.checkNotNull;
@@ -108,8 +108,6 @@ public class KMSClientProvider extends KeyProvider implements CryptoExtension,
   public static final Text TOKEN_KIND = KMSDelegationToken.TOKEN_KIND;
 
   public static final String SCHEME_NAME = "kms";
-
-  private static final String UTF8 = "UTF-8";
 
   private static final String CONTENT_TYPE = "Content-Type";
   private static final String APPLICATION_JSON_MIME = "application/json";
@@ -459,7 +457,8 @@ public class KMSClientProvider extends KeyProvider implements CryptoExtension,
       if (collection != null) {
         sb.append(collection);
         if (resource != null) {
-          sb.append("/").append(URLEncoder.encode(resource, UTF8));
+          sb.append("/").append(
+              URLEncoder.encode(resource, StandardCharsets.UTF_8.name()));
           if (subResource != null) {
             sb.append("/").append(subResource);
           }

@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router;
 
-import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_MONITOR_NAMENODE;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,22 +24,13 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Set;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
-import org.apache.hadoop.hdfs.server.federation.fairness.RouterRpcFairnessPolicyController;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
 import org.apache.hadoop.hdfs.server.federation.store.StateStoreService;
-import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.apache.hadoop.util.VersionInfo;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -66,12 +55,9 @@ public final class FederationUtil {
    *
    * @param beanQuery JMX bean.
    * @param webAddress Web address of the JMX endpoint.
-   * @param connectionFactory to open http/https connection.
-   * @param scheme to use for URL connection.
    * @return JSON with the JMX data
    */
-  public static JSONArray getJmx(String beanQuery, String webAddress,
-      URLConnectionFactory connectionFactory, String scheme) {
+  public static JSONArray getJmx(String beanQuery, String webAddress) {
     JSONArray ret = null;
     BufferedReader reader = null;
     try {
@@ -82,15 +68,12 @@ public final class FederationUtil {
         host = webAddressSplit[0];
         port = Integer.parseInt(webAddressSplit[1]);
       }
-      URL jmxURL = new URL(scheme, host, port, "/jmx?qry=" + beanQuery);
-      LOG.debug("JMX URL: {}", jmxURL);
-      // Create a URL connection
-      URLConnection conn = connectionFactory.openConnection(
-          jmxURL, UserGroupInformation.isSecurityEnabled());
+      URL jmxURL = new URL("http", host, port, "/jmx?qry=" + beanQuery);
+      URLConnection conn = jmxURL.openConnection();
       conn.setConnectTimeout(5 * 1000);
       conn.setReadTimeout(5 * 1000);
       InputStream in = conn.getInputStream();
-      InputStreamReader isr = new InputStreamReader(in, "UTF-8");
+      InputStreamReader isr = new InputStreamReader(in, StandardCharsets.UTF_8);
       reader = new BufferedReader(isr);
 
       StringBuilder sb = new StringBuilder();
@@ -104,14 +87,13 @@ public final class FederationUtil {
       JSONObject json = new JSONObject(jmxOutput);
       ret = json.getJSONArray("beans");
     } catch (IOException e) {
-      LOG.error("Cannot read JMX bean {} from server {}",
-          beanQuery, webAddress, e);
+      LOG.error("Cannot read JMX bean {} from server {}: {}",
+          beanQuery, webAddress, e.getMessage());
     } catch (JSONException e) {
-      // We shouldn't need more details if the JSON parsing fails.
       LOG.error("Cannot parse JMX output for {} from server {}: {}",
           beanQuery, webAddress, e.getMessage());
     } catch (Exception e) {
-      LOG.error("Cannot parse JMX output for {} from server {}",
+      LOG.error("Cannot parse JMX output for {} from server {}: {}",
           beanQuery, webAddress, e);
     } finally {
       if (reader != null) {
@@ -159,16 +141,9 @@ public final class FederationUtil {
       final R context, final Class<R> contextClass, final Class<T> clazz) {
     try {
       if (contextClass == null) {
-        if (conf == null) {
-          // Default constructor if no context
-          Constructor<T> constructor = clazz.getConstructor();
-          return constructor.newInstance();
-        } else {
-          // Constructor with configuration but no context
-          Constructor<T> constructor = clazz.getConstructor(
-              Configuration.class);
-          return constructor.newInstance(conf);
-        }
+        // Default constructor if no context
+        Constructor<T> constructor = clazz.getConstructor();
+        return constructor.newInstance();
       } else {
         // Constructor with context
         Constructor<T> constructor = clazz.getConstructor(
@@ -214,91 +189,21 @@ public final class FederationUtil {
   }
 
   /**
-   * Creates an instance of DelegationTokenSecretManager from the
-   * configuration.
-   *
-   * @param conf Configuration that defines the token manager class.
-   * @return New delegation token secret manager.
+   * Check if the given path is the child of parent path.
+   * @param path Path to be check.
+   * @param parent Parent path.
+   * @return True if parent path is parent entry for given path.
    */
-  public static AbstractDelegationTokenSecretManager<DelegationTokenIdentifier>
-      newSecretManager(Configuration conf) {
-    Class<? extends AbstractDelegationTokenSecretManager> clazz =
-        conf.getClass(
-        RBFConfigKeys.DFS_ROUTER_DELEGATION_TOKEN_DRIVER_CLASS,
-        RBFConfigKeys.DFS_ROUTER_DELEGATION_TOKEN_DRIVER_CLASS_DEFAULT,
-        AbstractDelegationTokenSecretManager.class);
-    return newInstance(conf, null, null, clazz);
-  }
-
-  /**
-   * Add the the number of children for an existing HdfsFileStatus object.
-   * @param dirStatus HdfsfileStatus object.
-   * @param children number of children to be added.
-   * @return HdfsFileStatus with the number of children specified.
-   */
-  public static HdfsFileStatus updateMountPointStatus(HdfsFileStatus dirStatus,
-      int children) {
-    // Get flags to set in new FileStatus.
-    EnumSet<HdfsFileStatus.Flags> flags =
-        DFSUtil.getFlags(dirStatus.isEncrypted(), dirStatus.isErasureCoded(),
-            dirStatus.isSnapshotEnabled(), dirStatus.hasAcl());
-    EnumSet.noneOf(HdfsFileStatus.Flags.class);
-    return new HdfsFileStatus.Builder().atime(dirStatus.getAccessTime())
-        .blocksize(dirStatus.getBlockSize()).children(children)
-        .ecPolicy(dirStatus.getErasureCodingPolicy())
-        .feInfo(dirStatus.getFileEncryptionInfo()).fileId(dirStatus.getFileId())
-        .group(dirStatus.getGroup()).isdir(dirStatus.isDir())
-        .length(dirStatus.getLen()).mtime(dirStatus.getModificationTime())
-        .owner(dirStatus.getOwner()).path(dirStatus.getLocalNameInBytes())
-        .perm(dirStatus.getPermission()).replication(dirStatus.getReplication())
-        .storagePolicy(dirStatus.getStoragePolicy())
-        .symlink(dirStatus.getSymlinkInBytes()).flags(flags).build();
-  }
-
-  /**
-   * Creates an instance of an RouterRpcFairnessPolicyController
-   * from the configuration.
-   *
-   * @param conf Configuration that defines the fairness controller class.
-   * @return Fairness policy controller.
-   */
-  public static RouterRpcFairnessPolicyController newFairnessPolicyController(
-      Configuration conf) {
-    Class<? extends RouterRpcFairnessPolicyController> clazz = conf.getClass(
-        RBFConfigKeys.DFS_ROUTER_FAIRNESS_POLICY_CONTROLLER_CLASS,
-        RBFConfigKeys.DFS_ROUTER_FAIRNESS_POLICY_CONTROLLER_CLASS_DEFAULT,
-        RouterRpcFairnessPolicyController.class);
-    return newInstance(conf, null, null, clazz);
-  }
-
-  /**
-   * Collect all configured nameservices.
-   *
-   * @param conf
-   * @return Set of name services in config
-   * @throws IllegalArgumentException
-   */
-  public static Set<String> getAllConfiguredNS(Configuration conf)
-      throws IllegalArgumentException {
-    // Get all name services configured
-    Collection<String> namenodes = conf.getTrimmedStringCollection(
-        DFS_ROUTER_MONITOR_NAMENODE);
-
-    Set<String> nameservices = new HashSet();
-    for (String namenode : namenodes) {
-      String[] namenodeSplit = namenode.split("\\.");
-      String nsId;
-      if (namenodeSplit.length == 2) {
-        nsId = namenodeSplit[0];
-      } else if (namenodeSplit.length == 1) {
-        nsId = namenode;
-      } else {
-        String errorMsg = "Wrong name service specified : " + namenode;
-        throw new IllegalArgumentException(
-            errorMsg);
-      }
-      nameservices.add(nsId);
+  public static boolean isParentEntry(final String path, final String parent) {
+    if (!path.startsWith(parent)) {
+      return false;
     }
-    return nameservices;
+
+    if (path.equals(parent)) {
+      return true;
+    }
+
+    return path.charAt(parent.length()) == Path.SEPARATOR_CHAR
+        || parent.equals(Path.SEPARATOR);
   }
 }

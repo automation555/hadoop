@@ -24,11 +24,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -83,8 +83,8 @@ public final class CombinedHostsFileReader {
 
     if (hostFile.length() > 0) {
       try (Reader input =
-          new InputStreamReader(
-              Files.newInputStream(hostFile.toPath()), "UTF-8")) {
+                   new InputStreamReader(new FileInputStream(hostFile),
+                       StandardCharsets.UTF_8)) {
         allDNs = objectMapper.readValue(input, DatanodeAdminProperties[].class);
       } catch (JsonMappingException jme) {
         // The old format doesn't have json top-level token to enclose
@@ -102,8 +102,8 @@ public final class CombinedHostsFileReader {
       JsonFactory jsonFactory = new JsonFactory();
       List<DatanodeAdminProperties> all = new ArrayList<>();
       try (Reader input =
-          new InputStreamReader(Files.newInputStream(Paths.get(hostsFilePath)),
-                  "UTF-8")) {
+          new InputStreamReader(new FileInputStream(hostsFilePath),
+              StandardCharsets.UTF_8)) {
         Iterator<DatanodeAdminProperties> iterator =
             objectReader.readValues(jsonFactory.createParser(input));
         while (iterator.hasNext()) {

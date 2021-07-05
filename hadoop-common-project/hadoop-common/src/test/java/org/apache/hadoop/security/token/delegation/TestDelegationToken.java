@@ -23,6 +23,7 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,7 +51,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.*;
 
 public class TestDelegationToken {
@@ -261,29 +261,6 @@ public class TestDelegationToken {
   }
 
   @Test
-  public void testDelegationTokenCount() throws Exception {
-    final TestDelegationTokenSecretManager dtSecretManager =
-        new TestDelegationTokenSecretManager(24*60*60*1000,
-            3*1000, 1*1000, 3600000);
-    try {
-      dtSecretManager.startThreads();
-      assertThat(dtSecretManager.getCurrentTokensSize()).isZero();
-      final Token<TestDelegationTokenIdentifier> token1 =
-          generateDelegationToken(dtSecretManager, "SomeUser", "JobTracker");
-      assertThat(dtSecretManager.getCurrentTokensSize()).isOne();
-      final Token<TestDelegationTokenIdentifier> token2 =
-          generateDelegationToken(dtSecretManager, "SomeUser", "JobTracker");
-      assertThat(dtSecretManager.getCurrentTokensSize()).isEqualTo(2);
-      dtSecretManager.cancelToken(token1, "JobTracker");
-      assertThat(dtSecretManager.getCurrentTokensSize()).isOne();
-      dtSecretManager.cancelToken(token2, "JobTracker");
-      assertThat(dtSecretManager.getCurrentTokensSize()).isZero();
-    } finally {
-      dtSecretManager.stopThreads();
-    }
-  }
-
-  @Test
   public void testDelegationTokenSecretManager() throws Exception {
     final TestDelegationTokenSecretManager dtSecretManager = 
       new TestDelegationTokenSecretManager(24*60*60*1000,
@@ -387,7 +364,7 @@ public class TestDelegationToken {
 
       //after rolling, the length of the keys list must increase
       int currNumKeys = dtSecretManager.getAllKeys().length;
-      assertThat(currNumKeys - prevNumKeys).isGreaterThanOrEqualTo(1);
+      Assert.assertEquals((currNumKeys - prevNumKeys) >= 1, true);
       
       //after rolling, the token that was generated earlier must
       //still be valid (retrievePassword will fail if the token
@@ -559,9 +536,12 @@ public class TestDelegationToken {
 
   @Test
   public void testDelegationKeyEqualAndHash() {
-    DelegationKey key1 = new DelegationKey(1111, 2222, "keyBytes".getBytes());
-    DelegationKey key2 = new DelegationKey(1111, 2222, "keyBytes".getBytes());
-    DelegationKey key3 = new DelegationKey(3333, 2222, "keyBytes".getBytes());
+    DelegationKey key1 = new DelegationKey(1111, 2222,
+        "keyBytes".getBytes(StandardCharsets.UTF_8));
+    DelegationKey key2 = new DelegationKey(1111, 2222,
+        "keyBytes".getBytes(StandardCharsets.UTF_8));
+    DelegationKey key3 = new DelegationKey(3333, 2222,
+        "keyBytes".getBytes(StandardCharsets.UTF_8));
     Assert.assertEquals(key1, key2);
     Assert.assertFalse(key2.equals(key3));
   }

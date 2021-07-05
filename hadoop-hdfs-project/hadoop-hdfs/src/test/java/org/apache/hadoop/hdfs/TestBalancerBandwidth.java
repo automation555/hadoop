@@ -23,17 +23,17 @@ import static org.junit.Assert.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.concurrent.TimeoutException;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.ToolRunner;
 import org.junit.Test;
 
 /**
@@ -46,7 +46,6 @@ public class TestBalancerBandwidth {
   final static private int DEFAULT_BANDWIDTH = 1024*1024;
   public static final Logger LOG =
       LoggerFactory.getLogger(TestBalancerBandwidth.class);
-  private static final Charset UTF8 = Charset.forName("UTF-8");
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final PrintStream outStream = new PrintStream(outContent);
 
@@ -103,13 +102,6 @@ public class TestBalancerBandwidth {
       runGetBalancerBandwidthCmd(admin, args, newBandwidth);
       args = new String[] { "-getBalancerBandwidth", dn2Address };
       runGetBalancerBandwidthCmd(admin, args, newBandwidth);
-
-      // test maximum bandwidth allowed
-      assertEquals(0, ToolRunner.run(admin,
-          new String[] {"-setBalancerBandwidth", "1t"}));
-
-      assertEquals(-1, ToolRunner.run(admin,
-          new String[] {"-setBalancerBandwidth", "1e"}));
     }
   }
 
@@ -134,7 +126,8 @@ public class TestBalancerBandwidth {
       assertEquals("DFSAdmin should return 0", 0, exitCode);
       String bandwidthOutMsg = "Balancer bandwidth is " + expectedBandwidth
           + " bytes per second.";
-      String strOut = new String(outContent.toByteArray(), UTF8);
+      String strOut =
+          new String(outContent.toByteArray(), StandardCharsets.UTF_8);
       assertTrue("Wrong balancer bandwidth!", strOut.contains(bandwidthOutMsg));
     } finally {
       System.setOut(initialStdOut);
