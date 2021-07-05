@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.TimeoutException;
 
-import java.util.function.Supplier;
+import com.google.common.base.Supplier;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -59,10 +59,10 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
+import org.apache.log4j.Level;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 /**
  * This class tests the internals of PendingReconstructionBlocks.java, as well
@@ -137,7 +137,7 @@ public class TestPendingReconstruction {
     //
     // verify that nothing has timed out so far
     //
-    assertNull(pendingReconstructions.getTimedOutBlocks());
+    assertNull(pendingReconstructions.clearTimedOutBlocks());
     assertEquals(0L, pendingReconstructions.getNumTimedOuts());
 
     //
@@ -175,7 +175,7 @@ public class TestPendingReconstruction {
     //
     assertEquals("Size of pendingReconstructions ", 0, pendingReconstructions.size());
     assertEquals(15L, pendingReconstructions.getNumTimedOuts());
-    Block[] timedOut = pendingReconstructions.getTimedOutBlocks();
+    Block[] timedOut = pendingReconstructions.clearTimedOutBlocks();
     assertNotNull(timedOut);
     assertEquals(15, timedOut.length);
     // Verify the number is not reset
