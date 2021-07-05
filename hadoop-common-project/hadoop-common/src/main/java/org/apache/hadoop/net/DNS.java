@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.net;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.net.InetAddresses;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -59,7 +58,7 @@ public class DNS {
    * The cached hostname -initially null.
    */
 
-  private static String cachedHostname = resolveLocalHostname();
+  private static final String cachedHostname = resolveLocalHostname();
   private static final String cachedHostAddress = resolveLocalHostIPAddress();
   private static final String LOCALHOST = "localhost";
 
@@ -73,7 +72,7 @@ public class DNS {
    * @return The host name associated with the provided IP
    * @throws NamingException If a NamingException is encountered
    */
-  public static String reverseDns(InetAddress hostIp, @Nullable String ns)
+  public static String reverseDns(InetAddress hostIp, String ns)
     throws NamingException {
     //
     // Builds the reverse IP lookup form
@@ -242,7 +241,7 @@ public class DNS {
    * @throws UnknownHostException if the given interface is invalid
    */
   public static String[] getHosts(String strInterface,
-                                  @Nullable String nameserver,
+                                  String nameserver,
                                   boolean tryfallbackResolution)
       throws UnknownHostException {
     final List<String> hosts = new Vector<String>();
@@ -351,8 +350,8 @@ public class DNS {
    * @throws UnknownHostException
    *             If one is encountered while querying the default interface
    */
-  public static String getDefaultHost(@Nullable String strInterface,
-                                      @Nullable String nameserver,
+  public static String getDefaultHost(String strInterface,
+                                      String nameserver,
                                       boolean tryfallbackResolution)
     throws UnknownHostException {
     if (strInterface == null || "default".equals(strInterface)) {
@@ -379,7 +378,7 @@ public class DNS {
    * @throws UnknownHostException
    *             If one is encountered while querying the default interface
    */
-  public static String getDefaultHost(@Nullable String strInterface)
+  public static String getDefaultHost(String strInterface)
     throws UnknownHostException {
     return getDefaultHost(strInterface, null, false);
   }
@@ -395,8 +394,8 @@ public class DNS {
    * @throws UnknownHostException
    *             If one is encountered while querying the default interface
    */
-  public static String getDefaultHost(@Nullable String strInterface,
-                                      @Nullable String nameserver)
+  public static String getDefaultHost(String strInterface,
+                                      String nameserver)
       throws UnknownHostException {
     return getDefaultHost(strInterface, nameserver, false);
   }
@@ -448,15 +447,5 @@ public class DNS {
       allAddrs.removeAll(getSubinterfaceInetAddrs(netIf));
     }
     return new Vector<InetAddress>(allAddrs);
-  }
-
-  @VisibleForTesting
-  static String getCachedHostname() {
-    return cachedHostname;
-  }
-
-  @VisibleForTesting
-  static void setCachedHostname(String hostname) {
-    cachedHostname = hostname;
   }
 }

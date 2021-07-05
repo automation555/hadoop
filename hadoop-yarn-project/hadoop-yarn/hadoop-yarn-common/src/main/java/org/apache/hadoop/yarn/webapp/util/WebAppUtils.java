@@ -20,11 +20,11 @@ package org.apache.hadoop.yarn.webapp.util;
 import static org.apache.hadoop.yarn.util.StringHelper.PATH_JOINER;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -49,6 +49,7 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.container.ContainerRequestContext;
 
 @Private
 @Evolving
@@ -98,17 +99,24 @@ public class WebAppUtils {
    */
   public static <T, R> R execOnActiveRM(Configuration conf,
       ThrowingBiFunction<String, T, R> func, T arg) throws Exception {
-    int haIndex = 0;
-    if (HAUtil.isHAEnabled(conf)) {
-      String activeRMId = RMHAUtils.findActiveRMHAId(conf);
-      if (activeRMId != null) {
-        haIndex = new ArrayList<>(HAUtil.getRMHAIds(conf)).indexOf(activeRMId);
-      } else {
-        throw new ConnectException("No Active RM available");
+    String rm1Address = getRMWebAppURLWithScheme(conf, 0);
+    try {
+      return func.apply(rm1Address, arg);
+    } catch (Exception e) {
+      if (HAUtil.isHAEnabled(conf)) {
+        int rms = HAUtil.getRMHAIds(conf).size();
+        for (int i=1; i<rms; i++) {
+          try {
+            rm1Address = getRMWebAppURLWithScheme(conf, i);
+            return func.apply(rm1Address, arg);
+          } catch (Exception e1) {
+            // ignore and try next one when RM is down
+            e = e1;
+          }
+        }
       }
+      throw e;
     }
-    String rm1Address = getRMWebAppURLWithScheme(conf, haIndex);
-    return func.apply(rm1Address, arg);
   }
 
   /** A BiFunction which throws on Exception. */
@@ -556,6 +564,20 @@ public class WebAppUtils {
     return null;
   }
 
+  private static String getURLEncodedQueryString(ContainerRequestContext request,
+                                                 String parameterToRemove) {
+    String queryString = request.getUriInfo().getPath();
+    if (queryString != null && !queryString.isEmpty()) {
+      List<NameValuePair> params = URLEncodedUtils.parse(queryString,
+          StandardCharsets.ISO_8859_1);
+      if (parameterToRemove != null && !parameterToRemove.isEmpty()) {
+        params.removeIf(current -> current.getName().equals(parameterToRemove));
+      }
+      return URLEncodedUtils.format(params, StandardCharsets.ISO_8859_1);
+    }
+    return null;
+  }
+
   /**
    * Get a query string.
    * @param request HttpServletRequest with the request details
@@ -573,6 +595,20 @@ public class WebAppUtils {
       List<NameValuePair> params = URLEncodedUtils.parse(queryString,
           encoding);
       return params;
+    }
+    return null;
+  }
+
+  /**
+   * Get a query string.
+   * @param request ContainerRequestContext with the request details
+   * @return the query parameter string
+   */
+  public static List<NameValuePair> getURLEncodedQueryParam(
+      ContainerRequestContext request) {
+    String queryString = request.getUriInfo().getPath();
+    if (queryString != null && !queryString.isEmpty()) {
+      return URLEncodedUtils.parse(queryString, StandardCharsets.ISO_8859_1);
     }
     return null;
   }
@@ -611,6 +647,22 @@ public class WebAppUtils {
    */
   public static String appendQueryParams(HttpServletRequest request,
       String targetUri) {
+    String ret = targetUri;
+    String urlEncodedQueryString = getURLEncodedQueryString(request, null);
+    if (urlEncodedQueryString != null) {
+      ret += "?" + urlEncodedQueryString;
+    }
+    return ret;
+  }
+
+  /**
+   * Add the query params from a ContainerRequestContext to the target uri passed.
+   * @param request ContainerRequestContext with the request details
+   * @param targetUri the uri to which the query params must be added
+   * @return URL encoded string containing the targetUri + "?" + query string
+   */
+  public static String appendQueryParams(ContainerRequestContext request,
+                                         String targetUri) {
     String ret = targetUri;
     String urlEncodedQueryString = getURLEncodedQueryString(request, null);
     if (urlEncodedQueryString != null) {
