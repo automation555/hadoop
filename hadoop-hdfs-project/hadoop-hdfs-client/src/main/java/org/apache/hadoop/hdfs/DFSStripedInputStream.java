@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ReadOption;
 import org.apache.hadoop.hdfs.protocol.BlockType;
@@ -70,8 +70,7 @@ public class DFSStripedInputStream extends DFSInputStream {
   private final int groupSize;
   /** the buffer for a complete stripe. */
   private ByteBuffer curStripeBuf;
-  @VisibleForTesting
-  protected ByteBuffer parityBuf;
+  private ByteBuffer parityBuf;
   private final ErasureCodingPolicy ecPolicy;
   private RawErasureDecoder decoder;
 
@@ -110,7 +109,9 @@ public class DFSStripedInputStream extends DFSInputStream {
         dataBlkNum, parityBlkNum);
     decoder = CodecUtil.createRawDecoder(dfsClient.getConfiguration(),
         ecPolicy.getCodecName(), coderOptions);
-    DFSClient.LOG.debug("Creating an striped input stream for file {}", src);
+    if (DFSClient.LOG.isDebugEnabled()) {
+      DFSClient.LOG.debug("Creating an striped input stream for file " + src);
+    }
   }
 
   private boolean useDirectBuffer() {
@@ -128,7 +129,7 @@ public class DFSStripedInputStream extends DFSInputStream {
     curStripeRange = new StripeRange(0, 0);
   }
 
-  protected synchronized ByteBuffer getParityBuffer() {
+  protected ByteBuffer getParityBuffer() {
     if (parityBuf == null) {
       parityBuf = BUFFER_POOL.getBuffer(useDirectBuffer(),
           cellSize * parityBlkNum);
@@ -463,8 +464,10 @@ public class DFSStripedInputStream extends DFSInputStream {
         break;
       }
     }
-    DFSClient.LOG.debug("refreshLocatedBlock for striped blocks, offset={}." +
-        " Obtained block {}, idx={}", block.getStartOffset(), lb, idx);
+    if (DFSClient.LOG.isDebugEnabled()) {
+      DFSClient.LOG.debug("refreshLocatedBlock for striped blocks, offset="
+          + block.getStartOffset() + ". Obtained block " + lb + ", idx=" + idx);
+    }
     return StripedBlockUtil.constructInternalBlock(
         lsb, i, cellSize, dataBlkNum, idx);
   }
@@ -522,7 +525,7 @@ public class DFSStripedInputStream extends DFSInputStream {
       if (!warnedNodes.containsAll(dnUUIDs)) {
         DFSClient.LOG.warn(Arrays.toString(nodes) + " are unavailable and " +
             "all striping blocks on them are lost. " +
-            "IgnoredNodes = {}", ignoredNodes);
+            "IgnoredNodes = " + ignoredNodes);
         warnedNodes.addAll(dnUUIDs);
       }
     } else {
@@ -546,18 +549,5 @@ public class DFSStripedInputStream extends DFSInputStream {
   public synchronized void releaseBuffer(ByteBuffer buffer) {
     throw new UnsupportedOperationException(
         "Not support enhanced byte buffer access.");
-  }
-
-  @Override
-  public synchronized void unbuffer() {
-    super.unbuffer();
-    if (curStripeBuf != null) {
-      BUFFER_POOL.putBuffer(curStripeBuf);
-      curStripeBuf = null;
-    }
-    if (parityBuf != null) {
-      BUFFER_POOL.putBuffer(parityBuf);
-      parityBuf = null;
-    }
   }
 }
