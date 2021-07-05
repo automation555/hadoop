@@ -86,8 +86,6 @@ import org.apache.hadoop.hdfs.server.datanode.VolumeScanner;
 import org.apache.hadoop.hdfs.server.namenode.ImageServlet;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.hadoop.util.Lists;
-import org.apache.hadoop.util.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -149,6 +147,8 @@ import org.apache.hadoop.util.ToolRunner;
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Sets;
 
 /**
  * This class creates a single-process DFS cluster for junit testing.
@@ -2262,6 +2262,8 @@ public class MiniDFSCluster implements AutoCloseable {
     nn.getHttpServer()
         .setAttribute(ImageServlet.RECENT_IMAGE_CHECK_ENABLED, false);
     info.nameNode = nn;
+    info.nameserviceId = info.conf.get(DFS_NAMESERVICE_ID);
+    info.nnId = info.conf.get(DFS_HA_NAMENODE_ID_KEY);
     info.setStartOpt(startOpt);
     if (waitActive) {
       waitClusterUp();
