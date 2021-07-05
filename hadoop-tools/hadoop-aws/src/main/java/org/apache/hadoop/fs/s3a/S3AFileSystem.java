@@ -52,6 +52,7 @@ import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.SdkBaseException;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.Headers;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
@@ -356,6 +357,19 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
   private AuditManagerS3A auditManager =
       AuditIntegration.stubAuditManager();
 
+  /**
+   * S3 client side encryption adds padding to the content length of constant
+   * length of 16 bytes(at the moment, since we have only 1 content
+   * encryption algorithm). Use this to subtract while listing the content
+   * length when certain conditions are met.
+   */
+  public static final int CSE_PADDING_LENGTH = 16;
+
+  /**
+   * Is this S3AFS instance using S3 client side encryption?
+   */
+  private boolean isCSEEnabled;
+
   /** Add any deprecated keys. */
   @SuppressWarnings("deprecation")
   private static void addDeprecatedKeys() {
@@ -415,6 +429,8 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
           getEncryptionAlgorithm(bucket, conf),
           getServerSideEncryptionKey(bucket, getConf())));
 
+      // If CSE method is set then CSE is enabled.
+      isCSEEnabled = conf.get(CLIENT_SIDE_ENCRYPTION_METHOD) != null;
       invoker = new Invoker(new S3ARetryPolicy(getConf()), onRetry);
       instrumentation = new S3AInstrumentation(uri);
       initializeStatisticsBinding();
@@ -508,6 +524,10 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
       blockFactory = S3ADataBlocks.createFactory(this, blockOutputBuffer);
       blockOutputActiveBlocks = intOption(conf,
           FAST_UPLOAD_ACTIVE_BLOCKS, DEFAULT_FAST_UPLOAD_ACTIVE_BLOCKS, 1);
+      // If CSE is enabled, do multipart uploads serially.
+      if(isCSEEnabled) {
+        blockOutputActiveBlocks = 1;
+      }
       LOG.debug("Using S3ABlockOutputStream with buffer = {}; block={};" +
               " queue limit={}",
           blockOutputBuffer, partSize, blockOutputActiveBlocks);
@@ -540,7 +560,8 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
 
       pageSize = intOption(getConf(), BULK_DELETE_PAGE_SIZE,
           BULK_DELETE_PAGE_SIZE_DEFAULT, 0);
-      listing = new Listing(listingOperationCallbacks, createStoreContext());
+      listing = new Listing(listingOperationCallbacks, createStoreContext(),
+          isCSEEnabled);
     } catch (AmazonClientException e) {
       // amazon client exception: stop all services then throw the translation
       cleanupWithLogger(LOG, span);
@@ -552,7 +573,6 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
       stopAllServices();
       throw e;
     }
-
   }
 
   /**
@@ -710,16 +730,6 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
   @VisibleForTesting
   public S3AInstrumentation getInstrumentation() {
     return instrumentation;
-  }
-
-  /**
-   * Get FS Statistic for this S3AFS instance.
-   *
-   * @return FS statistic instance.
-   */
-  @VisibleForTesting
-  public FileSystem.Statistics getFsStatistics() {
-    return statistics;
   }
 
   /**
@@ -1449,13 +1459,10 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
    * using FS state as well as the status.
    * @param fileStatus file status.
    * @param seekPolicy input policy for this operation
-   * @param changePolicy change policy for this operation.
    * @param readAheadRange readahead value.
-   * @param auditSpan audit span.
    * @return a context for read and select operations.
    */
-  @VisibleForTesting
-  protected S3AReadOpContext createReadContext(
+  private S3AReadOpContext createReadContext(
       final FileStatus fileStatus,
       final S3AInputPolicy seekPolicy,
       final ChangeDetectionPolicy changePolicy,
@@ -1616,7 +1623,8 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
         .withDowngradeSyncableExceptions(
             getConf().getBoolean(
                 DOWNGRADE_SYNCABLE_EXCEPTIONS,
-                DOWNGRADE_SYNCABLE_EXCEPTIONS_DEFAULT));
+                DOWNGRADE_SYNCABLE_EXCEPTIONS_DEFAULT))
+        .withCSEEnabled(isCSEEnabled);
     return new FSDataOutputStream(
         new S3ABlockOutputStream(builder),
         null);
@@ -3668,7 +3676,14 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
         // look for the simple file
         ObjectMetadata meta = getObjectMetadata(key);
         LOG.debug("Found exact file: normal file {}", key);
-        return new S3AFileStatus(meta.getContentLength(),
+        long contentLength = meta.getContentLength();
+        // check if CSE is enabled, then strip padded length.
+        if (isCSEEnabled
+            && meta.getUserMetaDataOf(Headers.CRYPTO_CEK_ALGORITHM) != null
+            && contentLength >= CSE_PADDING_LENGTH) {
+          contentLength -= CSE_PADDING_LENGTH;
+        }
+        return new S3AFileStatus(contentLength,
             dateToLong(meta.getLastModified()),
             path,
             getDefaultBlockSize(path),
@@ -4270,7 +4285,7 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
         key, length, eTag, versionId);
     Path p = keyToQualifiedPath(key);
     Preconditions.checkArgument(length >= 0, "content length is negative");
-    final boolean isDir = objectRepresentsDirectory(key, length);
+    final boolean isDir = objectRepresentsDirectory(key);
     // kick off an async delete
     CompletableFuture<?> deletion;
     if (!keepDirectoryMarkers(p)) {
@@ -5088,8 +5103,11 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
       return isMagicCommitEnabled();
 
     case SelectConstants.S3_SELECT_CAPABILITY:
-      // select is only supported if enabled
-      return SelectBinding.isSelectEnabled(getConf());
+      // select is only supported if enabled and client side encryption is
+      // disabled
+      if(!isCSEEnabled) {
+        return SelectBinding.isSelectEnabled(getConf());
+      }
 
     case CommonPathCapabilities.FS_CHECKSUMS:
       // capability depends on FS configuration
@@ -5097,8 +5115,10 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
           ETAG_CHECKSUM_ENABLED_DEFAULT);
 
     case CommonPathCapabilities.ABORTABLE_STREAM:
-    case CommonPathCapabilities.FS_MULTIPART_UPLOADER:
       return true;
+    case CommonPathCapabilities.FS_MULTIPART_UPLOADER:
+      // client side encryption doesn't support multipart uploader.
+      return !isCSEEnabled;
 
     // this client is safe to use with buckets
     // containing directory markers anywhere in
@@ -5357,6 +5377,10 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
   public S3AMultipartUploaderBuilder createMultipartUploader(
       final Path basePath)
       throws IOException {
+    if(isCSEEnabled) {
+      throw new UnsupportedOperationException("Multi-part uploader not "
+          + "supported for Client side encryption.");
+    }
     final Path path = makeQualified(basePath);
     try (AuditSpan span = entryPoint(MULTIPART_UPLOAD_INSTANTIATED, path)) {
       StoreContext ctx = createStoreContext();
@@ -5463,5 +5487,13 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
     public RequestFactory getRequestFactory() {
       return S3AFileSystem.this.getRequestFactory();
     }
+  }
+
+  /**
+   * a method to know if Client side encryption is enabled or not.
+   * @return a boolean stating if CSE is enabled.
+   */
+  public boolean isCSEEnabled() {
+    return isCSEEnabled;
   }
 }

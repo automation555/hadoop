@@ -1088,9 +1088,14 @@ public final class Constants {
   public static final String AWS_REGION = "fs.s3a.endpoint.region";
 
   /**
-   * The special S3 region which can be used to talk to any bucket.
-   * Value {@value}.
+   * S3 client-side encryption(CSE) method.
    */
-  public static final String AWS_S3_CENTRAL_REGION = "us-east-1";
+  public static final String CLIENT_SIDE_ENCRYPTION_METHOD =
+      "fs.s3a.cse.method";
 
+  /**
+   * Key ID for KMS S3 CSE method.
+   */
+  public static final String CLIENT_SIDE_ENCRYPTION_KMS_KEY_ID =
+      "fs.s3a.cse.kms.keyId";
 }

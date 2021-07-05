@@ -187,6 +187,7 @@ public class ITestS3AMiscOperations extends AbstractS3ATestBase {
    */
   private void assumeNoDefaultEncryption() throws IOException {
     try {
+      ifCSEThenSkip();
       Assume.assumeThat(getDefaultEncryption(), nullValue());
     } catch (AccessDeniedException e) {
       // if the user can't check the default encryption, assume that it is
