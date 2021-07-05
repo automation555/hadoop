@@ -20,12 +20,14 @@ package org.apache.hadoop.fs.s3a;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.stream.Stream;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ListObjectsV2Request;
 import com.amazonaws.services.s3.model.ListObjectsV2Result;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
@@ -38,11 +40,9 @@ import org.apache.hadoop.fs.s3a.s3guard.DDBPathMetadata;
 import org.apache.hadoop.fs.s3a.s3guard.DynamoDBMetadataStore;
 import org.apache.hadoop.fs.s3a.s3guard.MetadataStore;
 import org.apache.hadoop.fs.s3a.s3guard.NullMetadataStore;
-import org.apache.hadoop.fs.store.audit.AuditSpan;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertRenameOutcome;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
-import static org.apache.hadoop.fs.s3a.Statistic.INVOCATION_MKDIRS;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.assume;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.assumeFilesystemHasMetadatastore;
@@ -59,6 +59,10 @@ import static org.apache.hadoop.fs.s3a.S3ATestUtils.getStatusWithEmptyDirFlag;
  */
 public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
 
+  public ITestS3GuardEmptyDirs() {
+    setS3GuardRequired(true);
+  }
+
   /**
    * Rename an empty directory, verify that the empty dir
    * marker moves in both S3Guard and in the S3A FS.
@@ -73,9 +77,7 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
     String destDirMarker = fs.pathToKey(destDir) + "/";
     // set things up.
     mkdirs(sourceDir);
-    // create a span for all the low level operations
-    span();
-    // there's source directory marker+
+    // there's source directory marker
     fs.getObjectMetadata(sourceDirMarker);
     S3AFileStatus srcStatus = getEmptyDirStatus(sourceDir);
     assertEquals("Must be an empty dir: " + srcStatus, Tristate.TRUE,
@@ -91,7 +93,6 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
     // and verify that there's no dir marker hidden under a tombstone
     intercept(FileNotFoundException.class,
         () -> Invoker.once("HEAD", sourceDirMarker, () -> {
-          span();
           ObjectMetadata md = fs.getObjectMetadata(sourceDirMarker);
           return String.format("Object %s of length %d",
               sourceDirMarker, md.getInstanceLength());
@@ -102,14 +103,11 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
     assertEquals("Must not be an empty dir: " + baseStatus, Tristate.FALSE,
         baseStatus.isEmptyDirectory());
     // and verify the dest dir has a marker
-    span();
     fs.getObjectMetadata(destDirMarker);
   }
 
   private S3AFileStatus getEmptyDirStatus(Path dir) throws IOException {
-    try (AuditSpan span = span()) {
-      return getFileSystem().innerGetFileStatus(dir, true, StatusProbeEnum.ALL);
-    }
+    return getFileSystem().innerGetFileStatus(dir, true, StatusProbeEnum.ALL);
   }
 
   @Test
@@ -134,7 +132,7 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
       fs.setMetadataStore(configuredMs);  // "start cluster"
       Path newFile = path("existing-dir/new-file");
       touch(fs, newFile);
-      span();
+
       S3AFileStatus status = fs.innerGetFileStatus(existingDir, true,
           StatusProbeEnum.ALL);
       assertEquals("Should not be empty dir", Tristate.FALSE,
@@ -143,7 +141,6 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
       // 3. Assert that removing the only file the MetadataStore witnessed
       // being created doesn't cause it to think the directory is now empty.
       fs.delete(newFile, false);
-      span();
       status = fs.innerGetFileStatus(existingDir, true, StatusProbeEnum.ALL);
       assertEquals("Should not be empty dir", Tristate.FALSE,
           status.isEmptyDirectory());
@@ -151,7 +148,6 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
       // 4. Assert that removing the final file, that existed "before"
       // MetadataStore started, *does* cause the directory to be marked empty.
       fs.delete(existingFile, false);
-      span();
       status = fs.innerGetFileStatus(existingDir, true, StatusProbeEnum.ALL);
       assertEquals("Should be empty dir now", Tristate.TRUE,
           status.isEmptyDirectory());
@@ -206,9 +202,11 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
       createEmptyObject(fs, childKey);
 
       // Do a list
-      span();
-      ListObjectsV2Request listReq = ctx.getRequestFactory()
-          .newListObjectsV2Request(baseKey, "/", 10);
+      ListObjectsV2Request listReq = new ListObjectsV2Request()
+          .withBucketName(bucket)
+          .withPrefix(baseKey)
+          .withMaxKeys(10)
+          .withDelimiter("/");
       ListObjectsV2Result listing = s3.listObjectsV2(listReq);
 
       // the listing has the first path as a prefix, because of the child
@@ -249,7 +247,6 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
 
     } finally {
       // try to recover from the defective state.
-      span();
       s3.deleteObject(bucket, childKey);
       fs.delete(lastPath, true);
       ddbMs.forgetMetadata(firstPath);
@@ -279,13 +276,19 @@ public class ITestS3GuardEmptyDirs extends AbstractS3ATestBase {
    * @param fs filesystem
    * @param key key
    */
-  private void createEmptyObject(S3AFileSystem fs, String key)
-      throws IOException {
+  private void createEmptyObject(S3AFileSystem fs, String key) {
+    final InputStream im = new InputStream() {
+      @Override
+      public int read() {
+        return -1;
+      }
+    };
 
-    try (AuditSpan span = fs.getAuditSpanSource()
-        .createSpan(INVOCATION_MKDIRS.getSymbol(), key, null)) {
-      fs.createMkdirOperationCallbacks().createFakeDirectory(key);
-    }
+    PutObjectRequest putObjectRequest = fs.newPutObjectRequest(key,
+        fs.newObjectMetadata(0L),
+        im);
+    AmazonS3 s3 = fs.getAmazonS3ClientForTesting("PUT");
+    s3.putObject(putObjectRequest);
   }
 
   @Test
