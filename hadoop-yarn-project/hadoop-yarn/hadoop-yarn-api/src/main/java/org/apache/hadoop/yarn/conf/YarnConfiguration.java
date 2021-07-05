@@ -120,8 +120,6 @@ public class YarnConfiguration extends Configuration {
             CommonConfigurationKeys.ZK_TIMEOUT_MS),
         new DeprecationDelta(RM_ZK_RETRY_INTERVAL_MS,
             CommonConfigurationKeys.ZK_RETRY_INTERVAL_MS),
-        new DeprecationDelta(HADOOP_HTTP_WEBAPP_SCHEDULER_PAGE,
-            YARN_HTTP_WEBAPP_SCHEDULER_PAGE)
     });
     Configuration.addDeprecations(new DeprecationDelta[] {
         new DeprecationDelta("yarn.resourcemanager.display.per-user-apps",
@@ -1954,10 +1952,7 @@ public class YarnConfiguration extends Configuration {
           false;
   public static final String APPLICATION_TAG_BASED_PLACEMENT_USER_WHITELIST =
           APPLICATION_TAG_BASED_PLACEMENT_PREFIX + ".username.whitelist";
-  public static final String APPLICATION_TAG_FORCE_LOWERCASE_CONVERSION =
-      APPLICATION_TAG_BASED_PLACEMENT_PREFIX + ".force-lowercase";
-  public static final boolean DEFAULT_APPLICATION_TAG_FORCE_LOWERCASE_CONVERSION =
-          true;
+
   /** Enable switch for container log monitoring. */
   public static final String NM_CONTAINER_LOG_MONITOR_ENABLED =
       NM_PREFIX + "container-log-monitor.enable";
@@ -2346,6 +2341,29 @@ public class YarnConfiguration extends Configuration {
    */
   public static final int DEFAULT_NUM_MANIFESTS_TO_CACHE = 10;
 
+  /**
+   * Optional cache to enable for the image tag to manifest plugin.
+   */
+  public static final String NM_RUNC_MANIFEST_CACHE_ENABLED =
+      IMAGE_TAG_TO_MANIFEST_PLUGIN_PREFIX + "manifest-cache-enabled";
+
+  /**
+   * The manifest cache is enabled by default.
+   */
+  public static final boolean DEFAULT_NM_RUNC_MANIFEST_CACHE_ENABLED = true;
+
+  /**
+   * The HDFS image namespace location that stores the runc image property
+   * files.
+   */
+  public static final String NM_RUNC_IMAGE_META_NAMESPACE =
+      RUNC_CONTAINER_RUNTIME_PREFIX + "image-meta-namespace";
+
+  /**
+   * The default HDFS image namespace that stores the image property files.
+   */
+  public static final String DEFAULT_NM_RUNC_IMAGE_META_NAMESPACE = "library";
+
   /** Prefix for hdfs manifest hash to local resources plugin used with the
    * RuncContainerRuntime.
    */
@@ -2491,14 +2509,6 @@ public class YarnConfiguration extends Configuration {
 
   public static final String YARN_HTTP_WEBAPP_EXTERNAL_CLASSES =
       "yarn.http.rmwebapp.external.classes";
-
-  /**
-   * @deprecated This field is deprecated for
-   * {@link #YARN_HTTP_WEBAPP_SCHEDULER_PAGE}
-   */
-  @Deprecated
-  public static final String HADOOP_HTTP_WEBAPP_SCHEDULER_PAGE =
-      "hadoop.http.rmwebapp.scheduler.page.class";
 
   public static final String YARN_HTTP_WEBAPP_SCHEDULER_PAGE =
       "yarn.http.rmwebapp.scheduler.page.class";
@@ -2670,20 +2680,6 @@ public class YarnConfiguration extends Configuration {
       RM_PREFIX + "application-https.policy";
 
   public static final String DEFAULT_RM_APPLICATION_HTTPS_POLICY = "NONE";
-
-
-  // If the proxy connection time enabled.
-  public static final String RM_PROXY_TIMEOUT_ENABLED =
-      RM_PREFIX + "proxy.timeout.enabled";
-
-  public static final boolean DEFALUT_RM_PROXY_TIMEOUT_ENABLED =
-      true;
-
-  public static final String RM_PROXY_CONNECTION_TIMEOUT =
-      RM_PREFIX + "proxy.connection.timeout";
-
-  public static final int DEFAULT_RM_PROXY_CONNECTION_TIMEOUT =
-      60000;
 
   /**
    * Interval of time the linux container executor should try cleaning up
@@ -2929,18 +2925,6 @@ public class YarnConfiguration extends Configuration {
           YARN_PREFIX + "dispatcher.print-events-info.threshold";
   public static final int
           DEFAULT_YARN_DISPATCHER_PRINT_EVENTS_INFO_THRESHOLD = 5000;
-
-  /** Resource manager dispatcher thread monitor sampling rate.
-   * Units are samples per minute.  This controls how often to sample
-   * the cpu utilization of the resource manager dispatcher thread.
-   * The cpu utilization is displayed on the RM UI as scheduler busy %.
-   * Set to zero to disable the dispatcher thread monitor.
-   */
-  public static final String
-      YARN_DISPATCHER_CPU_MONITOR_SAMPLES_PER_MIN =
-      YARN_PREFIX + "dispatcher.cpu-monitor.samples-per-min";
-  public static final int
-      DEFAULT_YARN_DISPATCHER_CPU_MONITOR_SAMPLES_PER_MIN = 60;
 
   /**
    * CLASSPATH for YARN applications. A comma-separated list of CLASSPATH
