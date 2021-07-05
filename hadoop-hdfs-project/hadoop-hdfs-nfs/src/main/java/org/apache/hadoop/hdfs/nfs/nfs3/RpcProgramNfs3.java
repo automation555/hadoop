@@ -28,11 +28,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.EnumSet;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.DirectoryListingStartAfterNotFoundException;
@@ -43,6 +38,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.nfs.conf.NfsConfigKeys;
 import org.apache.hadoop.hdfs.nfs.conf.NfsConfiguration;
@@ -134,15 +130,18 @@ import org.apache.hadoop.security.ShellBasedIdMapping;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
+import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelHandlerContext;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * RPC program corresponding to nfs daemon. See {@link Nfs3}.
  */
-@ChannelHandler.Sharable
 public class RpcProgramNfs3 extends RpcProgram implements Nfs3Interface {
   public static final int DEFAULT_UMASK = 0022;
   public static final FsPermission umask = new FsPermission(
@@ -990,10 +989,14 @@ public class RpcProgramNfs3 extends RpcProgram implements Nfs3Interface {
           EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE) : 
           EnumSet.of(CreateFlag.CREATE);
 
-      fos = dfsClient.createWrappedOutputStream(
-          dfsClient.create(fileIdPath, permission, flag, false, replication,
-              blockSize, null, bufferSize, null),
-          null);
+      final DFSOutputStream dfsos = dfsClient.create(fileIdPath, permission, flag,
+          false, replication, blockSize, null, bufferSize, null);
+      try {
+        fos = dfsClient.createWrappedOutputStream(dfsos, null);
+      } catch (IOException ex) {
+        dfsos.close();
+        throw ex;
+      }
 
       if ((createMode == Nfs3Constant.CREATE_UNCHECKED)
           || (createMode == Nfs3Constant.CREATE_GUARDED)) {
@@ -2182,7 +2185,7 @@ public class RpcProgramNfs3 extends RpcProgram implements Nfs3Interface {
             RpcDeniedReply.RejectState.AUTH_ERROR, new VerifierNone());
         rdr.write(reply);
 
-        ByteBuf buf = Unpooled.wrappedBuffer(reply.asReadOnlyWrap()
+        ChannelBuffer buf = ChannelBuffers.wrappedBuffer(reply.asReadOnlyWrap()
             .buffer());
         RpcResponse rsp = new RpcResponse(buf, info.remoteAddress());
         RpcUtil.sendRpcResponse(ctx, rsp);
@@ -2293,7 +2296,7 @@ public class RpcProgramNfs3 extends RpcProgram implements Nfs3Interface {
     }
     // TODO: currently we just return VerifierNone
     out = response.serialize(out, xid, new VerifierNone());
-    ByteBuf buf = Unpooled.wrappedBuffer(out.asReadOnlyWrap()
+    ChannelBuffer buf = ChannelBuffers.wrappedBuffer(out.asReadOnlyWrap()
         .buffer());
     RpcResponse rsp = new RpcResponse(buf, info.remoteAddress());
 
