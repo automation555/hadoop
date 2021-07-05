@@ -30,6 +30,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import org.apache.hadoop.thirdparty.protobuf.CodedInputStream;
+import org.apache.hadoop.thirdparty.protobuf.InvalidProtocolBufferException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.permission.AclEntry;
@@ -52,14 +58,8 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.LimitInputStream;
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
-import org.apache.hadoop.thirdparty.protobuf.CodedInputStream;
-import org.apache.hadoop.thirdparty.protobuf.InvalidProtocolBufferException;
-
-import org.apache.hadoop.util.Lists;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * FSImageLoader loads fsimage and provide methods to return JSON formatted
@@ -110,15 +110,16 @@ class FSImageLoader {
    */
   static FSImageLoader load(String inputFile) throws IOException {
     Configuration conf = new Configuration();
-    RandomAccessFile file = new RandomAccessFile(inputFile, "r");
-    if (!FSImageUtil.checkFileFormat(file)) {
-      throw new IOException("Unrecognized FSImage");
-    }
 
-    FsImageProto.FileSummary summary = FSImageUtil.loadSummary(file);
+    try (RandomAccessFile file = new RandomAccessFile(inputFile, "r");
+         FileInputStream fin = new FileInputStream(file.getFD())) {
 
+      if (!FSImageUtil.checkFileFormat(file)) {
+        throw new IOException("Unrecognized FSImage");
+      }
 
-    try (FileInputStream fin = new FileInputStream(file.getFD())) {
+      FsImageProto.FileSummary summary = FSImageUtil.loadSummary(file);
+    
       // Map to record INodeReference to the referred id
       ImmutableList<Long> refIdList = null;
       SerialNumberManager.StringTable stringTable = null;
@@ -126,39 +127,39 @@ class FSImageLoader {
       Map<Long, long[]> dirmap = null;
 
       ArrayList<FsImageProto.FileSummary.Section> sections =
-          Lists.newArrayList(summary.getSectionsList());
+              Lists.newArrayList(summary.getSectionsList());
       Collections.sort(sections,
-          new Comparator<FsImageProto.FileSummary.Section>() {
-            @Override
-            public int compare(FsImageProto.FileSummary.Section s1,
-                               FsImageProto.FileSummary.Section s2) {
-              FSImageFormatProtobuf.SectionName n1 =
-                  FSImageFormatProtobuf.SectionName.fromString(s1.getName());
-              FSImageFormatProtobuf.SectionName n2 =
-                  FSImageFormatProtobuf.SectionName.fromString(s2.getName());
-              if (n1 == null) {
-                return n2 == null ? 0 : -1;
-              } else if (n2 == null) {
-                return -1;
-              } else {
-                return n1.ordinal() - n2.ordinal();
-              }
-            }
-          });
+              new Comparator<FsImageProto.FileSummary.Section>() {
+                @Override
+                public int compare(FsImageProto.FileSummary.Section s1,
+                                   FsImageProto.FileSummary.Section s2) {
+                  FSImageFormatProtobuf.SectionName n1 =
+                          FSImageFormatProtobuf.SectionName.fromString(s1.getName());
+                  FSImageFormatProtobuf.SectionName n2 =
+                          FSImageFormatProtobuf.SectionName.fromString(s2.getName());
+                  if (n1 == null) {
+                    return n2 == null ? 0 : -1;
+                  } else if (n2 == null) {
+                    return -1;
+                  } else {
+                    return n1.ordinal() - n2.ordinal();
+                  }
+                }
+              });
 
       for (FsImageProto.FileSummary.Section s : sections) {
         fin.getChannel().position(s.getOffset());
         InputStream is = FSImageUtil.wrapInputStreamForCompression(conf,
-            summary.getCodec(), new BufferedInputStream(new LimitInputStream(
-            fin, s.getLength())));
+                summary.getCodec(), new BufferedInputStream(new LimitInputStream(
+                        fin, s.getLength())));
 
         if (LOG.isDebugEnabled()) {
           LOG.debug("Loading section " + s.getName() + " length: " + s.getLength
-              ());
+                  ());
         }
 
         FSImageFormatProtobuf.SectionName sectionName
-            = FSImageFormatProtobuf.SectionName.fromString(s.getName());
+                = FSImageFormatProtobuf.SectionName.fromString(s.getName());
         if (sectionName == null) {
           throw new IOException("Unrecognized section " + s.getName());
         }
@@ -181,6 +182,7 @@ class FSImageLoader {
       }
       return new FSImageLoader(stringTable, inodes, dirmap);
     }
+
   }
 
   private static Map<Long, long[]> loadINodeDirectorySection
