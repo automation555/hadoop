@@ -23,17 +23,13 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListeningExecutorService;
 
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.MoreExecutors;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.api.RequestFactory;
-import org.apache.hadoop.fs.s3a.audit.AuditSpanS3A;
 import org.apache.hadoop.fs.s3a.Invoker;
 import org.apache.hadoop.fs.s3a.S3AFileStatus;
 import org.apache.hadoop.fs.s3a.S3AInputPolicy;
@@ -42,9 +38,7 @@ import org.apache.hadoop.fs.s3a.Statistic;
 import org.apache.hadoop.fs.s3a.statistics.S3AStatisticsContext;
 import org.apache.hadoop.fs.s3a.s3guard.ITtlTimeProvider;
 import org.apache.hadoop.fs.s3a.s3guard.MetadataStore;
-import org.apache.hadoop.fs.store.audit.ActiveThreadSpanSource;
-import org.apache.hadoop.fs.store.audit.AuditSpan;
-import org.apache.hadoop.fs.store.audit.AuditSpanSource;
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.LambdaUtils;
 import org.apache.hadoop.util.SemaphoredDelegatingExecutor;
@@ -64,7 +58,7 @@ import org.apache.hadoop.util.SemaphoredDelegatingExecutor;
  */
 @InterfaceAudience.LimitedPrivate("S3A Filesystem and extensions")
 @InterfaceStability.Unstable
-public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
+public class StoreContext {
 
   /** Filesystem URI. */
   private final URI fsURI;
@@ -122,23 +116,26 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
   /**
    * Source of time.
    */
-
-  /** Time source for S3Guard TTLs. */
   private final ITtlTimeProvider timeProvider;
 
-  /** Operation Auditor. */
-  private final AuditSpanSource<AuditSpanS3A> auditor;
+  /**
+   * Factory for AWS requests.
+   */
+  private final RequestFactory requestFactory;
+
+  private final DurationTrackerFactory durationTrackerFactory;
 
   /**
    * Instantiate.
+   * @deprecated as public method: use {@link StoreContextBuilder}.
    */
-  StoreContext(
+  public StoreContext(
       final URI fsURI,
       final String bucket,
       final Configuration configuration,
       final String username,
       final UserGroupInformation owner,
-      final ExecutorService executor,
+      final ListeningExecutorService executor,
       final int executorCapacity,
       final Invoker invoker,
       final S3AStatisticsContext instrumentation,
@@ -150,16 +147,14 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
       final boolean useListV1,
       final ContextAccessors contextAccessors,
       final ITtlTimeProvider timeProvider,
-      final AuditSpanSource<AuditSpanS3A> auditor) {
+      final RequestFactory requestFactory,
+      final DurationTrackerFactory durationTrackerFactory) {
     this.fsURI = fsURI;
     this.bucket = bucket;
     this.configuration = configuration;
     this.username = username;
     this.owner = owner;
-    // some mock tests have a null executor pool
-    this.executor = executor !=null
-        ? MoreExecutors.listeningDecorator(executor)
-        : null;
+    this.executor = executor;
     this.executorCapacity = executorCapacity;
     this.invoker = invoker;
     this.instrumentation = instrumentation;
@@ -171,7 +166,13 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
     this.useListV1 = useListV1;
     this.contextAccessors = contextAccessors;
     this.timeProvider = timeProvider;
-    this.auditor = auditor;
+    this.requestFactory = requestFactory;
+    this.durationTrackerFactory = durationTrackerFactory;
+  }
+
+  @Override
+  protected Object clone() throws CloneNotSupportedException {
+    return super.clone();
   }
 
   public URI getFsURI() {
@@ -190,7 +191,7 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
     return username;
   }
 
-  public ExecutorService getExecutor() {
+  public ListeningExecutorService getExecutor() {
     return executor;
   }
 
@@ -225,6 +226,14 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
 
   public boolean isUseListV1() {
     return useListV1;
+  }
+
+  public RequestFactory getRequestFactory() {
+    return requestFactory;
+  }
+
+  public DurationTrackerFactory getDurationTrackerFactory() {
+    return durationTrackerFactory;
   }
 
   public ContextAccessors getContextAccessors() {
@@ -321,7 +330,7 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
    * @param capacity maximum capacity of this executor.
    * @return an executor for submitting work.
    */
-  public ExecutorService createThrottledExecutor(int capacity) {
+  public ListeningExecutorService createThrottledExecutor(int capacity) {
     return new SemaphoredDelegatingExecutor(executor,
         capacity, true);
   }
@@ -331,7 +340,7 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
    * {@link #executorCapacity}.
    * @return a new executor for exclusive use by the caller.
    */
-  public ExecutorService createThrottledExecutor() {
+  public ListeningExecutorService createThrottledExecutor() {
     return createThrottledExecutor(executorCapacity);
   }
 
@@ -401,32 +410,4 @@ public class StoreContext implements ActiveThreadSpanSource<AuditSpan> {
     return future;
   }
 
-  /**
-   * Get the auditor.
-   * @return auditor.
-   */
-  public AuditSpanSource<AuditSpanS3A> getAuditor() {
-    return auditor;
-  }
-
-  /**
-   * Return the active audit span.
-   * This is thread local -it MUST be passed into workers.
-   * To ensure the correct span is used, it SHOULD be
-   * collected as early as possible, ideally during construction/
-   * or service init/start.
-   * @return active audit span.
-   */
-  @Override
-  public AuditSpan getActiveAuditSpan() {
-    return contextAccessors.getActiveAuditSpan();
-  }
-
-  /**
-   * Get the request factory.
-   * @return the factory for requests.
-   */
-  public RequestFactory getRequestFactory() {
-    return contextAccessors.getRequestFactory();
-  }
 }

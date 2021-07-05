@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.amazonaws.services.s3.model.PartETag;
-import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -116,7 +116,9 @@ public class ITestCommitOperations extends AbstractCommitITest {
   public void testCreateTrackerNormalPath() throws Throwable {
     S3AFileSystem fs = getFileSystem();
     MagicCommitIntegration integration
-        = new MagicCommitIntegration(fs, true);
+        = new MagicCommitIntegration(fs.createStoreContext(),
+        fs.getWriteOperationHelper(), true
+    );
     String filename = "notdelayed.txt";
     Path destFile = methodPath(filename);
     String origKey = fs.pathToKey(destFile);
@@ -133,7 +135,9 @@ public class ITestCommitOperations extends AbstractCommitITest {
   public void testCreateTrackerMagicPath() throws Throwable {
     S3AFileSystem fs = getFileSystem();
     MagicCommitIntegration integration
-        = new MagicCommitIntegration(fs, true);
+        = new MagicCommitIntegration(fs.createStoreContext(),
+        fs.getWriteOperationHelper(), true
+    );
     String filename = "delayed.txt";
     Path destFile = methodPath(filename);
     String origKey = fs.pathToKey(destFile);
@@ -175,7 +179,6 @@ public class ITestCommitOperations extends AbstractCommitITest {
     Path destFile = methodPath(filename);
     Path pendingFilePath = makeMagic(destFile);
     touch(fs, pendingFilePath);
-    waitForConsistency();
     validateIntermediateAndFinalPaths(pendingFilePath, destFile);
     Path pendingDataPath = validatePendingCommitData(filename,
         pendingFilePath);
@@ -195,8 +198,7 @@ public class ITestCommitOperations extends AbstractCommitITest {
     setThrottling(FULL_THROTTLE, STANDARD_FAILURE_LIMIT);
   }
 
-  private CommitOperations newCommitOperations()
-      throws IOException {
+  private CommitOperations newCommitOperations() {
     return new CommitOperations(getFileSystem());
   }
 
@@ -674,7 +676,7 @@ public class ITestCommitOperations extends AbstractCommitITest {
     Path subdir = new Path(destDir, "subdir");
     // file 2
     Path destFile2 = new Path(subdir, "file2");
-    Path destFile3 = new Path(subdir, "file3 with space");
+    Path destFile3 = new Path(subdir, "file3");
     List<Path> destinations = Lists.newArrayList(destFile1, destFile2,
         destFile3);
     List<SinglePendingCommit> commits = new ArrayList<>(3);

@@ -24,10 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.Statistic;
+import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitTracker;
-import org.apache.hadoop.fs.s3a.impl.AbstractStoreOperation;
+import org.apache.hadoop.fs.s3a.impl.StoreContext;
 
 import static org.apache.hadoop.fs.s3a.commit.MagicCommitPaths.*;
 
@@ -45,22 +45,28 @@ import static org.apache.hadoop.fs.s3a.commit.MagicCommitPaths.*;
  * <p>Important</p>: must not directly or indirectly import a class which
  * uses any datatype in hadoop-mapreduce.
  */
-public class MagicCommitIntegration extends AbstractStoreOperation {
+public class MagicCommitIntegration {
   private static final Logger LOG =
       LoggerFactory.getLogger(MagicCommitIntegration.class);
-  private final S3AFileSystem owner;
   private final boolean magicCommitEnabled;
+
+  private final StoreContext storeContext;
+
+  private final WriteOperationHelper writeOperationHelper;
 
   /**
    * Instantiate.
-   * @param owner owner class
+   * @param storeContext store context
+   * @param writeOperationHelper helper
    * @param magicCommitEnabled is magic commit enabled.
    */
-  public MagicCommitIntegration(S3AFileSystem owner,
-      boolean magicCommitEnabled) {
-    super(owner.createStoreContext());
-    this.owner = owner;
+  public MagicCommitIntegration(
+      final StoreContext storeContext,
+      final WriteOperationHelper writeOperationHelper,
+      final boolean magicCommitEnabled) {
     this.magicCommitEnabled = magicCommitEnabled;
+    this.storeContext = storeContext;
+    this.writeOperationHelper = writeOperationHelper;
   }
 
   /**
@@ -83,9 +89,6 @@ public class MagicCommitIntegration extends AbstractStoreOperation {
    * Given a path and a key to that same path, create a tracker for it.
    * This specific tracker will be chosen based on whether or not
    * the path is a magic one.
-   * Auditing: the span used to invoke
-   * this method will be the one used to create the write operation helper
-   * for the commit tracker.
    * @param path path of nominal write
    * @param key key of path of nominal write
    * @return the tracker for this operation.
@@ -99,14 +102,14 @@ public class MagicCommitIntegration extends AbstractStoreOperation {
       if (isMagicCommitPath(elements)) {
         final String destKey = keyOfFinalDestination(elements, key);
         String pendingsetPath = key + CommitConstants.PENDING_SUFFIX;
-        getStoreContext().incrementStatistic(
+        storeContext.incrementStatistic(
             Statistic.COMMITTER_MAGIC_FILES_CREATED);
         tracker = new MagicCommitTracker(path,
-            getStoreContext().getBucket(),
+            storeContext.getBucket(),
             key,
             destKey,
             pendingsetPath,
-            owner.getWriteOperationHelper());
+            writeOperationHelper);
         LOG.debug("Created {}", tracker);
       } else {
         LOG.warn("File being created has a \"magic\" path, but the filesystem"

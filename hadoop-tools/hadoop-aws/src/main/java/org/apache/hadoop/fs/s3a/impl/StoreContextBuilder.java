@@ -19,17 +19,17 @@
 package org.apache.hadoop.fs.s3a.impl;
 
 import java.net.URI;
-import java.util.concurrent.ExecutorService;
+
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListeningExecutorService;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.s3a.Invoker;
 import org.apache.hadoop.fs.s3a.S3AInputPolicy;
 import org.apache.hadoop.fs.s3a.S3AStorageStatistics;
-import org.apache.hadoop.fs.s3a.audit.AuditSpanS3A;
 import org.apache.hadoop.fs.s3a.statistics.S3AStatisticsContext;
 import org.apache.hadoop.fs.s3a.s3guard.ITtlTimeProvider;
 import org.apache.hadoop.fs.s3a.s3guard.MetadataStore;
-import org.apache.hadoop.fs.store.audit.AuditSpanSource;
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -47,7 +47,7 @@ public class StoreContextBuilder {
 
   private UserGroupInformation owner;
 
-  private ExecutorService executor;
+  private ListeningExecutorService executor;
 
   private int executorCapacity;
 
@@ -71,7 +71,9 @@ public class StoreContextBuilder {
 
   private ITtlTimeProvider timeProvider;
 
-  private AuditSpanSource<AuditSpanS3A> auditor;
+  private RequestFactory requestFactory;
+
+  private DurationTrackerFactory durationTrackerFactory;
 
   public StoreContextBuilder setFsURI(final URI fsURI) {
     this.fsURI = fsURI;
@@ -99,7 +101,7 @@ public class StoreContextBuilder {
   }
 
   public StoreContextBuilder setExecutor(
-      final ExecutorService ex) {
+      final ListeningExecutorService ex) {
     this.executor = ex;
     return this;
   }
@@ -169,14 +171,15 @@ public class StoreContextBuilder {
     return this;
   }
 
-  /**
-   * Set builder value.
-   * @param value new value
-   * @return the builder
-   */
-  public StoreContextBuilder setAuditor(
-      final AuditSpanSource<AuditSpanS3A> value) {
-    auditor = value;
+  public StoreContextBuilder setRequestFactory(
+      final RequestFactory requestFactory) {
+    this.requestFactory = requestFactory;
+    return this;
+  }
+
+  public StoreContextBuilder setDurationTrackerFactory(
+      final DurationTrackerFactory durationTrackerFactory) {
+    this.durationTrackerFactory = durationTrackerFactory;
     return this;
   }
 
@@ -199,6 +202,7 @@ public class StoreContextBuilder {
         useListV1,
         contextAccessors,
         timeProvider,
-        auditor);
+        requestFactory,
+        durationTrackerFactory);
   }
 }

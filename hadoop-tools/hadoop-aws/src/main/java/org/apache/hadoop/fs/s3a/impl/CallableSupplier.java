@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.s3a.impl;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.io.InterruptedIOException;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -32,7 +33,6 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.fs.store.audit.AuditSpan;
 import org.apache.hadoop.util.DurationInfo;
 
 import static org.apache.hadoop.fs.impl.FutureIOSupport.raiseInnerCause;
@@ -42,7 +42,7 @@ import static org.apache.hadoop.fs.impl.FutureIOSupport.raiseInnerCause;
  * raised by the callable and wrapping them as appropriate.
  * @param <T> return type.
  */
-public final class CallableSupplier<T> implements Supplier<T> {
+public final class CallableSupplier<T> implements Supplier {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CallableSupplier.class);
@@ -50,40 +50,16 @@ public final class CallableSupplier<T> implements Supplier<T> {
   private final Callable<T> call;
 
   /**
-   * Audit Span; may be null.
-   */
-  private final AuditSpan auditSpan;
-
-  /**
    * Create.
    * @param call call to invoke.
    */
   public CallableSupplier(final Callable<T> call) {
-    this(null, call);
-  }
-
-  /**
-   * Create.
-   * @param auditSpan audit span (or null)
-   * @param call call to invoke.
-   */
-  public CallableSupplier(
-      final AuditSpan auditSpan,
-      final Callable<T> call) {
     this.call = call;
-    this.auditSpan = auditSpan;
   }
 
-  /**
-   * Active any span and then call the supplied callable.
-   * @return the result.
-   */
   @Override
-  public T get() {
+  public Object get() {
     try {
-      if (auditSpan != null) {
-        auditSpan.activate();
-      }
       return call.call();
     } catch (RuntimeException e) {
       throw e;
@@ -111,32 +87,11 @@ public final class CallableSupplier<T> implements Supplier<T> {
     return CompletableFuture.supplyAsync(
         new CallableSupplier<T>(call), executor);
   }
-  /**
-   * Submit a callable into a completable future.
-   * RTEs are rethrown.
-   * Non RTEs are caught and wrapped; IOExceptions to
-   * {@code RuntimeIOException} instances.
-   * @param executor executor.
-   * @param auditSpan audit span (or null)
-   * @param call call to invoke
-   * @param <T> type
-   * @return the future to wait for
-   */
-  @SuppressWarnings("unchecked")
-  public static <T> CompletableFuture<T> submit(
-      final Executor executor,
-      final AuditSpan auditSpan,
-      final Callable<T> call) {
-    return CompletableFuture.supplyAsync(
-        new CallableSupplier<T>(auditSpan, call),
-        executor);
-  }
 
   /**
    * Wait for a list of futures to complete. If the list is empty,
    * return immediately.
    * @param futures list of futures.
-   * @param <T> type
    * @throws IOException if one of the called futures raised an IOE.
    * @throws RuntimeException if one of the futures raised one.
    */
@@ -154,7 +109,6 @@ public final class CallableSupplier<T> implements Supplier<T> {
   /**
    * Wait for a single of future to complete, extracting IOEs afterwards.
    * @param future future to wait for.
-   * @param <T> type
    * @throws IOException if one of the called futures raised an IOE.
    * @throws RuntimeException if one of the futures raised one.
    */
@@ -165,7 +119,8 @@ public final class CallableSupplier<T> implements Supplier<T> {
             new DurationInfo(LOG, false, "Waiting for task completion")) {
       future.join();
     } catch (CancellationException e) {
-      throw new IOException(e);
+      throw (InterruptedIOException)
+          new InterruptedIOException(e.toString()).initCause(e);
     } catch (CompletionException e) {
       raiseInnerCause(e);
     }
@@ -174,7 +129,6 @@ public final class CallableSupplier<T> implements Supplier<T> {
   /**
    * Wait for a single of future to complete, ignoring exceptions raised.
    * @param future future to wait for.
-   * @param <T> type
    */
   public static <T> void waitForCompletionIgnoringExceptions(
       @Nullable final CompletableFuture<T> future) {

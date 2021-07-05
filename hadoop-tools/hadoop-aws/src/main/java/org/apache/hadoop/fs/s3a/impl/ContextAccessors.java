@@ -22,10 +22,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 
+import com.amazonaws.services.s3.model.ObjectMetadata;
+
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.Retries;
-import org.apache.hadoop.fs.s3a.api.RequestFactory;
-import org.apache.hadoop.fs.store.audit.AuditSpan;
+import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 
 /**
  * An interface to implement for providing accessors to
@@ -85,16 +86,13 @@ public interface ContextAccessors {
   Path makeQualified(Path path);
 
   /**
-   * Return the active audit span.
-   * This is thread local -it MUST be picked up and passed into workers.
-   * Collect and cache the value during construction.
-   * @return active audit span.
+   * Retrieve the object metadata.
+   *
+   * @param key key to retrieve.
+   * @return metadata
+   * @throws IOException IO and object access problems.
    */
-  AuditSpan getActiveAuditSpan();
+  @Retries.RetryTranslated
+  ObjectMetadata getObjectMetadata(String key) throws IOException;
 
-  /**
-   * Get the request factory.
-   * @return the factory for requests.
-   */
-  RequestFactory getRequestFactory();
 }
