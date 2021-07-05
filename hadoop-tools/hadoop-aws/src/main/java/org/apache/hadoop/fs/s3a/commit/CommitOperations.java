@@ -48,11 +48,10 @@ import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3AUtils;
-import org.apache.hadoop.fs.s3a.WriteOperations;
+import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.PendingSet;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
-import org.apache.hadoop.fs.s3a.impl.AbstractStoreOperation;
 import org.apache.hadoop.fs.s3a.impl.HeaderProcessing;
 import org.apache.hadoop.fs.s3a.impl.InternalConstants;
 import org.apache.hadoop.fs.s3a.s3guard.BulkOperationState;
@@ -66,13 +65,11 @@ import org.apache.hadoop.util.Progressable;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
-import static org.apache.hadoop.fs.s3a.Statistic.COMMITTER_COMMIT_JOB;
 import static org.apache.hadoop.fs.s3a.Statistic.COMMITTER_MATERIALIZE_FILE;
 import static org.apache.hadoop.fs.s3a.Statistic.COMMITTER_STAGE_FILE_UPLOAD;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
-import static org.apache.hadoop.util.functional.RemoteIterators.cleanupRemoteIterator;
 
 /**
  * The implementation of the various actions a committer needs.
@@ -84,8 +81,7 @@ import static org.apache.hadoop.util.functional.RemoteIterators.cleanupRemoteIte
  * duplicate that work.
  *
  */
-public class CommitOperations extends AbstractStoreOperation
-    implements IOStatisticsSource {
+public class CommitOperations implements IOStatisticsSource {
   private static final Logger LOG = LoggerFactory.getLogger(
       CommitOperations.class);
 
@@ -100,7 +96,7 @@ public class CommitOperations extends AbstractStoreOperation
   /**
    * Write operations for the destination fs.
    */
-  private final WriteOperations writeOperations;
+  private final WriteOperationHelper writeOperations;
 
   /**
    * Filter to find all {code .pendingset} files.
@@ -117,29 +113,21 @@ public class CommitOperations extends AbstractStoreOperation
   /**
    * Instantiate.
    * @param fs FS to bind to
-   * @throws IOException failure to bind.
    */
-  public CommitOperations(S3AFileSystem fs) throws IOException {
+  public CommitOperations(S3AFileSystem fs) {
     this(requireNonNull(fs), fs.newCommitterStatistics());
   }
 
   /**
-   * Instantiate. This creates a new audit span for
-   * the commit operations.
+   * Instantiate.
    * @param fs FS to bind to
    * @param committerStatistics committer statistics
-   * @throws IOException failure to bind.
    */
   public CommitOperations(S3AFileSystem fs,
-      CommitterStatistics committerStatistics) throws IOException {
-    super(requireNonNull(fs).createStoreContext());
-    this.fs = fs;
+      CommitterStatistics committerStatistics) {
+    this.fs = requireNonNull(fs);
     statistics = requireNonNull(committerStatistics);
-    // create a span
-    writeOperations = fs.createWriteOperationHelper(
-        fs.getAuditSpanSource().createSpan(
-            COMMITTER_COMMIT_JOB.getSymbol(),
-            "/", null));
+    writeOperations = fs.getWriteOperationHelper();
   }
 
   /**
@@ -278,7 +266,7 @@ public class CommitOperations extends AbstractStoreOperation
     List<Pair<LocatedFileStatus, IOException>> failures = new ArrayList<>(1);
     for (LocatedFileStatus status : statusList) {
       try {
-        commits.add(SinglePendingCommit.load(fs, status.getPath()));
+        commits.add(SinglePendingCommit.load(fs, status.getPath(), status));
       } catch (IOException e) {
         LOG.warn("Failed to load commit file {}", status.getPath(), e);
         failures.add(Pair.of(status, e));
@@ -361,10 +349,12 @@ public class CommitOperations extends AbstractStoreOperation
       LOG.debug("No files to abort under {}", pendingDir);
     }
     while (pendingFiles.hasNext()) {
-      Path pendingFile = pendingFiles.next().getPath();
+      LocatedFileStatus status = pendingFiles.next();
+      Path pendingFile = status.getPath();
       if (pendingFile.getName().endsWith(CommitConstants.PENDING_SUFFIX)) {
         try {
-          abortSingleCommit(SinglePendingCommit.load(fs, pendingFile));
+          abortSingleCommit(SinglePendingCommit.load(fs, pendingFile,
+              status));
         } catch (FileNotFoundException e) {
           LOG.debug("listed file already deleted: {}", pendingFile);
         } catch (IOException | IllegalArgumentException e) {
@@ -377,7 +367,6 @@ public class CommitOperations extends AbstractStoreOperation
         }
       }
     }
-    cleanupRemoteIterator(pendingFiles);
     return outcome;
   }
 
@@ -401,7 +390,7 @@ public class CommitOperations extends AbstractStoreOperation
    */
   public List<MultipartUpload> listPendingUploadsUnderPath(Path dest)
       throws IOException {
-    return writeOperations.listMultipartUploads(fs.pathToKey(dest));
+    return fs.listMultipartUploads(fs.pathToKey(dest));
   }
 
   /**

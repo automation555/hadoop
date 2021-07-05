@@ -40,9 +40,6 @@ public final class StoreStatisticNames {
   /** {@value}. */
   public static final String OP_ABORT = "op_abort";
 
-  /** access() API call {@value}. */
-  public static final String OP_ACCESS = "op_access";
-
   /** {@value}. */
   public static final String OP_APPEND = "op_append";
 
@@ -115,6 +112,9 @@ public final class StoreStatisticNames {
   /** {@value}. */
   public static final String OP_OPEN = "op_open";
 
+  /** Call to openFile() {@value}. */
+  public static final String OP_OPENFILE = "op_openfile";
+
   /** {@value}. */
   public static final String OP_REMOVE_ACL = "op_remove_acl";
 
@@ -163,10 +163,6 @@ public final class StoreStatisticNames {
   /** {@value}. */
   public static final String DELEGATION_TOKENS_ISSUED
       = "delegation_tokens_issued";
-
-  /** Probe for store existing: {@value}. */
-  public static final String STORE_EXISTS_PROBE
-      = "store_exists_probe";
 
   /** Requests throttled and retried: {@value}. */
   public static final String STORE_IO_THROTTLED
@@ -318,6 +314,12 @@ public final class StoreStatisticNames {
       "action_executor_acquired";
 
   /**
+   * A file was opened: {@value}.
+   */
+  public static final String ACTION_FILE_OPENED
+      = "action_file_opened";
+
+  /**
    * An HTTP HEAD request was made: {@value}.
    */
   public static final String ACTION_HTTP_HEAD_REQUEST
@@ -385,9 +387,6 @@ public final class StoreStatisticNames {
 
   public static final String MULTIPART_UPLOAD_STARTED
       = "multipart_upload_started";
-
-  public static final String MULTIPART_UPLOAD_LIST
-      = "multipart_upload_list";
 
   private StoreStatisticNames() {
   }

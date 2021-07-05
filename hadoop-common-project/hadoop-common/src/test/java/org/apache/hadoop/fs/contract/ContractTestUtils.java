@@ -399,7 +399,9 @@ public class ContractTestUtils extends Assert {
       IOException {
     if (fileSystem != null) {
       rejectRootOperation(path, allowRootDelete);
-      return fileSystem.delete(path, recursive);
+      if (fileSystem.exists(path)) {
+        return fileSystem.delete(path, recursive);
+      }
     }
     return false;
 
@@ -726,10 +728,8 @@ public class ContractTestUtils extends Assert {
       assertPathExists(fs, "about to be deleted file", file);
     }
     boolean deleted = fs.delete(file, recursive);
-    if (!deleted) {
-      String dir = ls(fs, file.getParent());
-      assertTrue("Delete failed on " + file + ": " + dir, deleted);
-    }
+    String dir = ls(fs, file.getParent());
+    assertTrue("Delete failed on " + file + ": " + dir, deleted);
     assertPathDoesNotExist(fs, "Deleted file", file);
   }
 
@@ -1642,17 +1642,22 @@ public class ContractTestUtils extends Assert {
 
   /**
    * Read a whole stream; downgrades an IOE to a runtime exception.
+   * Closes the stream afterwards.
    * @param in input
    * @return the number of bytes read.
    * @throws AssertionError on any IOException
    */
   public static long readStream(InputStream in) {
-    long count = 0;
+    try {
+      long count = 0;
 
-    while (read(in) >= 0) {
-      count++;
+      while (read(in) >= 0) {
+        count++;
+      }
+      return count;
+    } finally {
+      IOUtils.cleanupWithLogger(LOG, in);
     }
-    return count;
   }
 
 

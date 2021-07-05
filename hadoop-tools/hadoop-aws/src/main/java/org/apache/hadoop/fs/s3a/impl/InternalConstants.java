@@ -18,15 +18,17 @@
 
 package org.apache.hadoop.fs.s3a.impl;
 
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.s3a.Constants;
+
+import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS;
 
 /**
  * Internal constants private only to the S3A codebase.
@@ -36,16 +38,6 @@ import org.apache.hadoop.fs.s3a.Constants;
  * public and stable entries.
  */
 public final class InternalConstants {
-
-  /**
-   * This declared delete as idempotent.
-   * This is an "interesting" topic in past Hadoop FS work.
-   * Essentially: with a single caller, DELETE is idempotent
-   * but in a shared filesystem, it is is very much not so.
-   * Here, on the basis that isn't a filesystem with consistency guarantees,
-   * retryable results in files being deleted.
-  */
-  public static final boolean DELETE_CONSIDERED_IDEMPOTENT = true;
 
   private InternalConstants() {
   }
@@ -89,11 +81,16 @@ public final class InternalConstants {
    * used becomes that of the select operation.
    */
   @InterfaceStability.Unstable
-  public static final Set<String> STANDARD_OPENFILE_KEYS =
-      Collections.unmodifiableSet(
-          new HashSet<>(
-              Arrays.asList(Constants.INPUT_FADVISE,
-                  Constants.READAHEAD_RANGE)));
+  public static final Set<String> S3A_OPENFILE_KEYS;
+
+  static {
+    Set<String> keys = Stream.of(
+        Constants.INPUT_FADVISE,
+        Constants.READAHEAD_RANGE)
+        .collect(Collectors.toSet());
+    keys.addAll(FS_OPTION_OPENFILE_STANDARD_OPTIONS);
+    S3A_OPENFILE_KEYS = Collections.unmodifiableSet(keys);
+  }
 
   /** 404 error code. */
   public static final int SC_404 = 404;
@@ -120,10 +117,5 @@ public final class InternalConstants {
    * Value: {@value}.
    */
   public static final int DEFAULT_UPLOAD_PART_COUNT_LIMIT = 10000;
-
-  /**
-   * The system property used by the AWS SDK to identify the region.
-   */
-  public static final String AWS_REGION_SYSPROP = "aws.region";
 
 }

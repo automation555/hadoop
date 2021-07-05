@@ -20,11 +20,14 @@ package org.apache.hadoop.fs.s3a;
 
 import javax.annotation.Nullable;
 
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
+import com.amazonaws.services.s3.model.SSECustomerKey;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.CanSetReadahead;
@@ -42,7 +45,6 @@ import org.apache.hadoop.fs.statistics.DurationTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -99,7 +101,7 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   private S3Object object;
   private S3ObjectInputStream wrappedStream;
   private final S3AReadOpContext context;
-  private final InputStreamCallbacks client;
+  private final AmazonS3 client;
   private final String bucket;
   private final String key;
   private final String pathStr;
@@ -108,6 +110,8 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   private static final Logger LOG =
       LoggerFactory.getLogger(S3AInputStream.class);
   private final S3AInputStreamStatistics streamStatistics;
+  private S3AEncryptionMethods serverSideEncryptionAlgorithm;
+  private String serverSideEncryptionKey;
   private S3AInputPolicy inputPolicy;
   private long readahead = Constants.DEFAULT_READAHEAD_RANGE;
 
@@ -143,10 +147,12 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
    * @param ctx operation context
    * @param s3Attributes object attributes
    * @param client S3 client to use
+   * @param streamStatistics statistics for this stream
    */
   public S3AInputStream(S3AReadOpContext ctx,
       S3ObjectAttributes s3Attributes,
-      InputStreamCallbacks client) {
+      AmazonS3 client,
+      S3AInputStreamStatistics streamStatistics) {
     Preconditions.checkArgument(isNotEmpty(s3Attributes.getBucket()),
         "No Bucket");
     Preconditions.checkArgument(isNotEmpty(s3Attributes.getKey()), "No Key");
@@ -155,13 +161,15 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
     this.context = ctx;
     this.bucket = s3Attributes.getBucket();
     this.key = s3Attributes.getKey();
-    this.pathStr = ctx.dstFileStatus.getPath().toString();
+    this.pathStr = s3Attributes.getPath().toString();
     this.contentLength = l;
     this.client = client;
     this.uri = "s3a://" + this.bucket + "/" + this.key;
-    this.streamStatistics = ctx.getS3AStatisticsContext()
-        .newInputStreamStatistics();
-    this.ioStatistics = streamStatistics.getIOStatistics();
+    this.streamStatistics = streamStatistics;
+    this.ioStatistics = this.streamStatistics.getIOStatistics();
+    this.serverSideEncryptionAlgorithm =
+        s3Attributes.getServerSideEncryptionAlgorithm();
+    this.serverSideEncryptionKey = s3Attributes.getServerSideEncryptionKey();
     this.changeTracker = new ChangeTracker(uri,
         ctx.getChangeDetectionPolicy(),
         streamStatistics.getChangeTrackerStatistics(),
@@ -204,13 +212,16 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
         inputPolicy);
 
     long opencount = streamStatistics.streamOpened();
-    GetObjectRequest request = client.newGetRequest(key)
+    GetObjectRequest request = new GetObjectRequest(bucket, key)
         .withRange(targetPos, contentRangeFinish - 1);
+    if (S3AEncryptionMethods.SSE_C.equals(serverSideEncryptionAlgorithm) &&
+        StringUtils.isNotBlank(serverSideEncryptionKey)){
+      request.setSSECustomerKey(new SSECustomerKey(serverSideEncryptionKey));
+    }
     String operation = opencount == 0 ? OPERATION_OPEN : OPERATION_REOPEN;
     String text = String.format("%s %s at %d",
         operation, uri, targetPos);
     changeTracker.maybeApplyConstraint(request);
-
     DurationTracker tracker = streamStatistics.initiateGetRequest();
     try {
       object = Invoker.once(text, uri,
@@ -333,7 +344,7 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
       streamStatistics.seekBackwards(diff);
       // if the stream is in "Normal" mode, switch to random IO at this
       // point, as it is indicative of columnar format IO
-      if (inputPolicy.equals(S3AInputPolicy.Normal)) {
+      if (inputPolicy.isAdaptive()) {
         LOG.info("Switching to Random IO seek policy");
         setInputPolicy(S3AInputPolicy.Random);
       }
@@ -424,10 +435,10 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
             return -1;
           } catch (SocketTimeoutException e) {
             onReadFailure(e, 1, true);
-            throw e;
+            b = wrappedStream.read();
           } catch (IOException e) {
             onReadFailure(e, 1, false);
-            throw e;
+            b = wrappedStream.read();
           }
           return b;
         });
@@ -513,10 +524,10 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
             return -1;
           } catch (SocketTimeoutException e) {
             onReadFailure(e, len, true);
-            throw e;
+            bytes = wrappedStream.read(buf, off, len);
           } catch (IOException e) {
             onReadFailure(e, len, false);
-            throw e;
+            bytes= wrappedStream.read(buf, off, len);
           }
           return bytes;
         });
@@ -557,8 +568,6 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
         // close or abort the stream
         closeStream("close() operation", this.contentRangeFinish, false);
         LOG.debug("Statistics of stream {}\n{}", key, streamStatistics);
-        // end the client+audit span.
-        client.close();
         // this is actually a no-op
         super.close();
       } finally {
@@ -900,27 +909,4 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   public IOStatistics getIOStatistics() {
     return ioStatistics;
   }
-
-  /**
-   * Callbacks for input stream IO.
-   */
-  public interface InputStreamCallbacks extends Closeable {
-
-    /**
-     * Create a GET request.
-     * @param key object key
-     * @return the request
-     */
-    GetObjectRequest newGetRequest(String key);
-
-    /**
-     * Execute the request.
-     * @param request the request
-     * @return the response
-     */
-    @Retries.OnceRaw
-    S3Object getObject(GetObjectRequest request);
-
-  }
-
 }
