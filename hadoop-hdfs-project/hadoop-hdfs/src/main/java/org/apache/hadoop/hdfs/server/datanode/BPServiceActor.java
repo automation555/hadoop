@@ -219,6 +219,11 @@ class BPServiceActor implements Runnable {
   }
 
   @VisibleForTesting
+  String getNnId() {
+    return nnId;
+  }
+
+  @VisibleForTesting
   DatanodeProtocolClientSideTranslatorPB getNameNodeProxy() {
     return bpNamenode;
   }
@@ -413,7 +418,7 @@ class BPServiceActor implements Runnable {
         // Below split threshold, send all reports in a single message.
         DatanodeCommand cmd = bpNamenode.blockReport(
             bpRegistration, bpos.getBlockPoolId(), reports,
-            new BlockReportContext(1, 0, reportId, fullBrLeaseId));
+              new BlockReportContext(1, 0, reportId, fullBrLeaseId, true));
         blockReportSizes.add(
             calculateBlockReportPBSize(useBlocksBuffer, reports));
         numRPCs = 1;
@@ -428,7 +433,7 @@ class BPServiceActor implements Runnable {
           DatanodeCommand cmd = bpNamenode.blockReport(
               bpRegistration, bpos.getBlockPoolId(), singleReport,
               new BlockReportContext(reports.length, r, reportId,
-                  fullBrLeaseId));
+                  fullBrLeaseId, true));
           blockReportSizes.add(
               calculateBlockReportPBSize(useBlocksBuffer, singleReport));
           numReportsSent++;
