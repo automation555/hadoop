@@ -96,8 +96,11 @@ public class LogsCLI extends Configured implements Tool {
 
   private static final String CONTAINER_ID_OPTION = "containerId";
   private static final String APPLICATION_ID_OPTION = "applicationId";
+<<<<<<< HEAD
   private static final String APPLICATION_ATTEMPT_ID_OPTION =
           "applicationAttemptId";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private static final String CLUSTER_ID_OPTION = "clusterId";
   private static final String NODE_ADDRESS_OPTION = "nodeAddress";
   private static final String APP_OWNER_OPTION = "appOwner";
@@ -138,7 +141,25 @@ public class LogsCLI extends Configured implements Tool {
   @Override
   public int run(String[] args) throws Exception {
     try {
+<<<<<<< HEAD
       webServiceClient = WebServiceClient.getWebServiceClient().createClient();
+=======
+      webServiceClient = new Client(new URLConnectionClientHandler(
+          new HttpURLConnectionFactory() {
+          @Override
+          public HttpURLConnection getHttpURLConnection(URL url)
+              throws IOException {
+            AuthenticatedURL.Token token = new AuthenticatedURL.Token();
+            HttpURLConnection conn = null;
+            try {
+              conn = new AuthenticatedURL().openConnection(url, token);
+            } catch (AuthenticationException e) {
+              throw new IOException(e);
+            }
+            return conn;
+          }
+        }));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return runCommand(args);
     } finally {
       if (yarnClient != null) {
@@ -163,7 +184,10 @@ public class LogsCLI extends Configured implements Tool {
     }
     CommandLineParser parser = new GnuParser();
     String appIdStr = null;
+<<<<<<< HEAD
     String appAttemptIdStr = null;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     String clusterIdStr = null;
     String containerIdStr = null;
     String nodeAddress = null;

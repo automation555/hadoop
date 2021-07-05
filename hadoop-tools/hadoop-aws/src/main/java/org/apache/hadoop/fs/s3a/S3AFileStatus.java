@@ -59,6 +59,7 @@ public class S3AFileStatus extends FileStatus {
   public S3AFileStatus(Tristate isemptydir,
       Path path,
       String owner) {
+<<<<<<< HEAD
     this(path,
         true,
         isemptydir,
@@ -69,6 +70,14 @@ public class S3AFileStatus extends FileStatus {
         null,
         null
     );
+=======
+    super(0, true, 1, 0, 0, 0,
+        null, null, null, null,
+        path, false, true, false);
+    isEmptyDirectory = isemptydir;
+    setOwner(owner);
+    setGroup(owner);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -82,6 +91,7 @@ public class S3AFileStatus extends FileStatus {
    * @param versionId versionId of the S3 object if available, else null
    */
   public S3AFileStatus(long length, long modification_time, Path path,
+<<<<<<< HEAD
       long blockSize, String owner, String eTag, String versionId) {
     this(path,
         false,
@@ -122,6 +132,15 @@ public class S3AFileStatus extends FileStatus {
     this.isEmptyDirectory = isemptydir;
     this.eTag = eTag;
     this.versionId = versionId;
+=======
+      long blockSize, String owner) {
+    super(length, false, 1, blockSize, modification_time, 0,
+        null, null, null, null,
+        path, false, true, false);
+    isEmptyDirectory = Tristate.FALSE;
+    setOwner(owner);
+    setGroup(owner);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

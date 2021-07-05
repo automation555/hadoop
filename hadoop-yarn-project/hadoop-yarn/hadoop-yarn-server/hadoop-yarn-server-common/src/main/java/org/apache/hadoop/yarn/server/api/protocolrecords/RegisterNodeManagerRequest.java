@@ -54,15 +54,23 @@ public abstract class RegisterNodeManagerRequest {
       Resource physicalResource) {
     return newInstance(nodeId, httpPort, resource, nodeManagerVersionId,
         containerStatuses, runningApplications, nodeLabels, physicalResource,
+<<<<<<< HEAD
         null, null);
+=======
+        null);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
       List<ApplicationId> runningApplications, Set<NodeLabel> nodeLabels,
+<<<<<<< HEAD
       Resource physicalResource, Set<NodeAttribute> nodeAttributes,
       NodeStatus nodeStatus) {
+=======
+      Resource physicalResource, Set<NodeAttribute> nodeAttributes) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     RegisterNodeManagerRequest request =
         Records.newRecord(RegisterNodeManagerRequest.class);
     request.setHttpPort(httpPort);
@@ -74,7 +82,10 @@ public abstract class RegisterNodeManagerRequest {
     request.setNodeLabels(nodeLabels);
     request.setPhysicalResource(physicalResource);
     request.setNodeAttributes(nodeAttributes);
+<<<<<<< HEAD
     request.setNodeStatus(nodeStatus);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return request;
   }
   
@@ -136,6 +147,7 @@ public abstract class RegisterNodeManagerRequest {
   public abstract Set<NodeAttribute> getNodeAttributes();
 
   public abstract void setNodeAttributes(Set<NodeAttribute> nodeAttributes);
+<<<<<<< HEAD
 
   /**
    * Get the status of the node.
@@ -148,4 +160,6 @@ public abstract class RegisterNodeManagerRequest {
    * @param nodeStatus The status of the node.
    */
   public abstract void setNodeStatus(NodeStatus nodeStatus);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

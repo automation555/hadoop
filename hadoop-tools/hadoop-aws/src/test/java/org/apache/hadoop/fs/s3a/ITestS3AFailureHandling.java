@@ -20,9 +20,12 @@ package org.apache.hadoop.fs.s3a;
 
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import com.amazonaws.services.s3.model.MultiObjectDeleteException;
+<<<<<<< HEAD
 import org.apache.hadoop.util.Lists;
 import org.assertj.core.api.Assertions;
 import org.junit.Assume;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -48,7 +51,11 @@ import static org.apache.hadoop.fs.s3a.impl.TestPartialDeleteFailures.keysToDele
 import static org.apache.hadoop.test.LambdaTestUtils.*;
 
 /**
+<<<<<<< HEAD
  * ITest for failure handling, primarily multipart deletion.
+=======
+ * Test S3A Failure translation.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
  */
 public class ITestS3AFailureHandling extends AbstractS3ATestBase {
   private static final Logger LOG =

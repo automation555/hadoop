@@ -613,8 +613,11 @@ public class ClientRMService extends AbstractService implements
       throw RPCUtil.getRemoteException(ie);
     }
 
+<<<<<<< HEAD
     checkTags(submissionContext.getApplicationTags());
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (timelineServiceV2Enabled) {
       // Sanity check for flow run
       String value = null;
@@ -700,15 +703,23 @@ public class ClientRMService extends AbstractService implements
           " submitted by user " + user);
       RMAuditLogger.logSuccess(user, AuditConstants.SUBMIT_APP_REQUEST,
           "ClientRMService", applicationId, callerContext,
+<<<<<<< HEAD
           submissionContext.getQueue(),
           submissionContext.getNodeLabelExpression());
+=======
+          submissionContext.getQueue());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } catch (YarnException e) {
       LOG.info("Exception in submitting " + applicationId, e);
       RMAuditLogger.logFailure(user, AuditConstants.SUBMIT_APP_REQUEST,
           e.getMessage(), "ClientRMService",
           "Exception in submitting application", applicationId, callerContext,
+<<<<<<< HEAD
           submissionContext.getQueue(),
           submissionContext.getNodeLabelExpression());
+=======
+          submissionContext.getQueue());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw e;
     }
 

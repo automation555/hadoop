@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+=======
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -42,7 +47,10 @@ import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+<<<<<<< HEAD
 import java.lang.reflect.Method;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -63,6 +71,7 @@ public class ResourcePluginManager {
   private Map<String, ResourcePlugin> configuredPlugins =
           Collections.emptyMap();
 
+<<<<<<< HEAD
   private DeviceMappingManager deviceMappingManager = null;
 
   public void initialize(Context context)
@@ -70,11 +79,20 @@ public class ResourcePluginManager {
     Configuration conf = context.getConf();
     String[] plugins = getPluginsFromConfig(conf);
 
+=======
+  public void initialize(Context context)
+      throws YarnException {
+    Configuration conf = context.getConf();
+
+    String[] plugins = getPluginsFromConfig(conf);
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Map<String, ResourcePlugin> pluginMap = Maps.newHashMap();
     if (plugins != null) {
       pluginMap = initializePlugins(conf, context, plugins);
     }
 
+<<<<<<< HEAD
     // Try to load pluggable device plugins
     boolean pluggableDeviceFrameworkEnabled = conf.getBoolean(
         YarnConfiguration.NM_PLUGGABLE_DEVICE_FRAMEWORK_ENABLED,
@@ -101,6 +119,22 @@ public class ResourcePluginManager {
     return plugins;
   }
 
+=======
+    configuredPlugins = Collections.unmodifiableMap(pluginMap);
+  }
+
+  private String[] getPluginsFromConfig(Configuration conf) {
+    String[] plugins = conf.getStrings(YarnConfiguration.NM_RESOURCE_PLUGINS);
+    if (plugins == null || plugins.length == 0) {
+      LOG.info("No Resource plugins found from configuration!");
+    }
+    LOG.info("Found Resource plugins from configuration: "
+        + Arrays.toString(plugins));
+
+    return plugins;
+  }
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private Map<String, ResourcePlugin> initializePlugins(Configuration conf,
       Context context, String[] plugins) throws YarnException {
     Map<String, ResourcePlugin> pluginMap = Maps.newHashMap();
@@ -132,6 +166,7 @@ public class ResourcePluginManager {
     }
     return pluginMap;
   }
+<<<<<<< HEAD
 
   private void ensurePluginIsSupported(String resourceName)
       throws YarnException {
@@ -284,6 +319,18 @@ public class ResourcePluginManager {
         ResourceUtils.getResourceTypes();
     if (!configuredResourceTypes.containsKey(resourceName)) {
       return false;
+=======
+
+  private void ensurePluginIsSupported(String resourceName)
+      throws YarnException {
+    if (!SUPPORTED_RESOURCE_PLUGINS.contains(resourceName)) {
+      String msg =
+          "Trying to initialize resource plugin with name=" + resourceName
+              + ", it is not supported, list of supported plugins:"
+              + StringUtils.join(",", SUPPORTED_RESOURCE_PLUGINS);
+      LOG.error(msg);
+      throw new YarnException(msg);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     return true;
   }
@@ -298,6 +345,20 @@ public class ResourcePluginManager {
     return deviceMappingManager;
   }
 
+<<<<<<< HEAD
+=======
+  private boolean isPluginDuplicate(Map<String, ResourcePlugin> pluginMap,
+      String resourceName) {
+    if (pluginMap.containsKey(resourceName)) {
+      LOG.warn("Ignoring duplicate Resource plugin definition: " +
+          resourceName);
+      return true;
+    }
+    return false;
+  }
+
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void cleanup() throws YarnException {
     for (ResourcePlugin plugin : configuredPlugins.values()) {
       plugin.cleanup();

@@ -148,9 +148,12 @@ public class LoadBalancingKMSClientProvider extends KeyProvider implements
       selectDelegationToken(Credentials creds) {
     Token<? extends TokenIdentifier> token =
         KMSClientProvider.selectDelegationToken(creds, canonicalService);
+<<<<<<< HEAD
     if (token == null) {
       token = KMSClientProvider.selectDelegationToken(creds, dtService);
     }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // fallback to querying each sub-provider.
     if (token == null) {
       for (KMSClientProvider provider : getProviders()) {

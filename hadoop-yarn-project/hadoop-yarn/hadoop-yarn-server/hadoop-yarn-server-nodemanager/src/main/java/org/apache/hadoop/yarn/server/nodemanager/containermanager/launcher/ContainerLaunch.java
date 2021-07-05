@@ -114,9 +114,12 @@ public class ContainerLaunch implements Callable<Integer> {
 
   public static final String FINAL_CONTAINER_TOKENS_FILE = "container_tokens";
   public static final String SYSFS_DIR = "sysfs";
+<<<<<<< HEAD
 
   public static final String KEYSTORE_FILE = "yarn_provided.keystore";
   public static final String TRUSTSTORE_FILE = "yarn_provided.truststore";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private static final String PID_FILE_NAME_FMT = "%s.pid";
   static final String EXIT_CODE_FILE_SUFFIX = ".exitcode";
@@ -1024,8 +1027,15 @@ public class ContainerLaunch implements Callable<Integer> {
     String containerIdStr = 
         container.getContainerId().toString();
     String processId;
+<<<<<<< HEAD
     LOG.debug("Accessing pid for container {} from pid file {}",
         containerIdStr, pidFilePath);
+=======
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Accessing pid for container " + containerIdStr
+          + " from pid file " + pidFilePath);
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     int sleepCounter = 0;
     final int sleepInterval = 100;
 

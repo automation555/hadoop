@@ -342,8 +342,13 @@ public class TestCopyCommitter {
       Path listingFile = new Path("/tmp1/" + String.valueOf(rand.nextLong()));
       listing.buildListing(listingFile, context);
 
+<<<<<<< HEAD
       conf.set(CONF_LABEL_TARGET_WORK_PATH, targetBase);
       conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+=======
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       Path sourceListing = new Path(
               conf.get(DistCpConstants.CONF_LABEL_LISTING_FILE_PATH));
@@ -549,8 +554,13 @@ public class TestCopyCommitter {
           + String.valueOf(rand.nextLong()));
       listing.buildListing(listingFile, context);
 
+<<<<<<< HEAD
       conf.set(CONF_LABEL_TARGET_WORK_PATH, targetBase);
       conf.set(CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+=======
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_WORK_PATH, targetBase);
+      conf.set(DistCpConstants.CONF_LABEL_TARGET_FINAL_PATH, targetBase);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       OutputCommitter committer = new CopyCommitter(
           null, taskAttemptContext);
@@ -559,12 +569,18 @@ public class TestCopyCommitter {
         if (!skipCrc) {
           Assert.fail("Expected commit to fail");
         }
+<<<<<<< HEAD
         Path sourcePath = new Path(sourceBase + srcFilename);
         CopyListingFileStatus sourceCurrStatus =
                 new CopyListingFileStatus(fs.getFileStatus(sourcePath));
         Assert.assertFalse(DistCpUtils.checksumsAreEqual(
             fs, new Path(sourceBase + srcFilename), null,
             fs, new Path(targetBase + srcFilename), sourceCurrStatus.getLen()));
+=======
+        Assert.assertFalse(DistCpUtils.checksumsAreEqual(
+            fs, new Path(sourceBase + srcFilename), null,
+            fs, new Path(targetBase + srcFilename)));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       } catch(IOException exception) {
         if (skipCrc) {
           LOG.error("Unexpected exception is found", exception);

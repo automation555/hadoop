@@ -223,7 +223,10 @@ public class ConfigFile implements Serializable {
     return Objects.equals(this.type, configFile.type)
         && Objects.equals(this.destFile, configFile.destFile)
         && Objects.equals(this.srcFile, configFile.srcFile)
+<<<<<<< HEAD
         && Objects.equals(this.visibility, configFile.visibility)
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         && Objects.equals(this.properties, configFile.properties);
   }
 

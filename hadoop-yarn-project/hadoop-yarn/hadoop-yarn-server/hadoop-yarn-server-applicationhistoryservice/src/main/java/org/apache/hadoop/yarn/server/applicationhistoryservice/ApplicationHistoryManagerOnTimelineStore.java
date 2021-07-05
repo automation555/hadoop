@@ -250,7 +250,10 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     String type = null;
     boolean unmanagedApplication = false;
     long createdTime = 0;
+<<<<<<< HEAD
     long launchTime = 0;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     long submittedTime = 0;
     long finishedTime = 0;
     float progress = 0.0f;
@@ -458,8 +461,12 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return new ApplicationReportExt(ApplicationReport.newInstance(
         ApplicationId.fromString(entity.getEntityId()),
         latestApplicationAttemptId, user, queue, name, null, -1, null, state,
+<<<<<<< HEAD
         diagnosticsInfo, null, createdTime,
         submittedTime, launchTime, finishedTime,
+=======
+        diagnosticsInfo, null, createdTime, submittedTime, 0, finishedTime,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         finalStatus, appResources, null, progress, type, null, appTags,
         unmanagedApplication, Priority.newInstance(applicationPriority),
         appNodeLabelExpression, amNodeLabelExpression), appViewACLs);

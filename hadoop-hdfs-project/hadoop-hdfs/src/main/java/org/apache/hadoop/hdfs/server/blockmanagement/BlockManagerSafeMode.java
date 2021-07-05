@@ -312,6 +312,7 @@ class BlockManagerSafeMode {
     }
 
     if (datanodeThreshold > 0) {
+<<<<<<< HEAD
       if (isBlockThresholdMet) {
         int numLive = blockManager.getDatanodeManager().getNumLiveDataNodes();
         if (numLive < datanodeThreshold) {
@@ -330,6 +331,21 @@ class BlockManagerSafeMode {
       }
     } else {
       msg.append("The minimum number of live datanodes is not required. ");
+=======
+      int numLive = blockManager.getDatanodeManager().getNumLiveDataNodes();
+      if (numLive < datanodeThreshold) {
+        msg += String.format(
+            "The number of live datanodes %d needs an additional %d live "
+                + "datanodes to reach the minimum number %d.%n",
+            numLive, (datanodeThreshold - numLive), datanodeThreshold);
+      } else {
+        msg += String.format("The number of live datanodes %d has reached "
+                + "the minimum number %d. ",
+            numLive, datanodeThreshold);
+      }
+    } else {
+      msg += "The minimum number of live datanodes is not required. ";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     if (getBytesInFuture() > 0) {
@@ -583,9 +599,16 @@ class BlockManagerSafeMode {
     assert namesystem.hasWriteLock();
     // Calculating the number of live datanodes is time-consuming
     // in large clusters. Skip it when datanodeThreshold is zero.
+<<<<<<< HEAD
     // We need to evaluate getNumLiveDataNodes only when
     // (blockSafe >= blockThreshold) is true and hence moving evaluation
     // of datanodeNum conditional to isBlockThresholdMet as well
+=======
+    int datanodeNum = 0;
+    if (datanodeThreshold > 0) {
+      datanodeNum = blockManager.getDatanodeManager().getNumLiveDataNodes();
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     synchronized (this) {
       boolean isBlockThresholdMet = (blockSafe >= blockThreshold);
       boolean isDatanodeThresholdMet = true;

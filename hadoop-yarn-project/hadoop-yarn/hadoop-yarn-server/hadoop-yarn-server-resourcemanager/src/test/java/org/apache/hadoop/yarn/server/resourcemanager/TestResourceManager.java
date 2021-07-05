@@ -26,6 +26,12 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.TimeoutException;
 
+<<<<<<< HEAD
+=======
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
@@ -57,8 +63,11 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+<<<<<<< HEAD
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 public class TestResourceManager {
   private static final Logger LOG =
@@ -68,7 +77,10 @@ public class TestResourceManager {
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
+<<<<<<< HEAD
   private FSConfigConverterTestCommons converterTestCommons;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   @Before
   public void setUp() throws Exception {
@@ -384,4 +396,8 @@ public class TestResourceManager {
       dummyResourceManager.stop();
     }
   }
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

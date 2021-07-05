@@ -21,6 +21,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystemTestHelper;
@@ -31,6 +32,15 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.security.token.Token;
+=======
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileSystemTestHelper;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferClient;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferServer;
+import org.apache.hadoop.hdfs.protocol.datatransfer.sasl.SaslDataTransferTestCase;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Before;
 import org.junit.Test;
 
@@ -81,6 +91,7 @@ public class TestMultipleNNPortQOP extends SaslDataTransferTestCase {
   }
 
   /**
+<<<<<<< HEAD
    * Test that when NameNode returns back its established QOP,
    * it only does this for auxiliary port(s), not the primary port.
    *
@@ -160,6 +171,8 @@ public class TestMultipleNNPortQOP extends SaslDataTransferTestCase {
   }
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Test accessing NameNode from three different ports.
    *
    * @throws Exception
@@ -250,6 +263,7 @@ public class TestMultipleNNPortQOP extends SaslDataTransferTestCase {
       clientConf.set(HADOOP_RPC_PROTECTION, "privacy");
       FileSystem fsPrivacy = FileSystem.get(uriPrivacyPort, clientConf);
       doTest(fsPrivacy, PATH1);
+<<<<<<< HEAD
       long count = dataNodes.stream()
           .map(dn -> dn.getSaslClient().getTargetQOP())
           .filter("auth"::equals)
@@ -259,24 +273,52 @@ public class TestMultipleNNPortQOP extends SaslDataTransferTestCase {
       // Note that it is not necessarily the case for all datanodes,
       // since a datanode may be always at the last position in pipelines.
       assertTrue("At least two qops should be auth", count >= 2);
+=======
+      // add a wait so that data has reached not only first DN,
+      // but also the rest
+      Thread.sleep(100);
+      for (int i = 0; i < 2; i++) {
+        DataNode dn = dataNodes.get(i);
+        SaslDataTransferClient saslClient = dn.getSaslClient();
+        assertEquals("auth", saslClient.getTargetQOP());
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       clientConf.set(HADOOP_RPC_PROTECTION, "integrity");
       FileSystem fsIntegrity = FileSystem.get(uriIntegrityPort, clientConf);
       doTest(fsIntegrity, PATH2);
+<<<<<<< HEAD
       count = dataNodes.stream()
           .map(dn -> dn.getSaslClient().getTargetQOP())
           .filter("auth"::equals)
           .count();
       assertTrue("At least two qops should be auth", count >= 2);
+=======
+      Thread.sleep(100);
+      for (int i = 0; i < 2; i++) {
+        DataNode dn = dataNodes.get(i);
+        SaslDataTransferClient saslClient = dn.getSaslClient();
+        assertEquals("auth", saslClient.getTargetQOP());
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       clientConf.set(HADOOP_RPC_PROTECTION, "authentication");
       FileSystem fsAuth = FileSystem.get(uriAuthPort, clientConf);
       doTest(fsAuth, PATH3);
+<<<<<<< HEAD
       count = dataNodes.stream()
           .map(dn -> dn.getSaslServer().getNegotiatedQOP())
           .filter("auth"::equals)
           .count();
       assertEquals("All qops should be auth", 3, count);
+=======
+      Thread.sleep(100);
+      for (int i = 0; i < 3; i++) {
+        DataNode dn = dataNodes.get(i);
+        SaslDataTransferServer saslServer = dn.getSaslServer();
+        assertEquals("auth", saslServer.getNegotiatedQOP());
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } finally {
       if (cluster != null) {
         cluster.shutdown();

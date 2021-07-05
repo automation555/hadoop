@@ -15,12 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+<<<<<<< HEAD
 
 package org.apache.hadoop.fs.contract.s3a;
+=======
+package org.apache.hadoop.fs.contract.s3a;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractMultipartUploaderTest;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.contract.AbstractFSContract;
+=======
+import org.apache.hadoop.fs.contract.ContractTestUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
@@ -36,7 +47,10 @@ import static org.apache.hadoop.fs.s3a.scale.AbstractSTestS3AHugeFiles.DEFAULT_H
 
 /**
  * Test MultipartUploader with S3A.
+<<<<<<< HEAD
  * <p></p>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
  * Although not an S3A Scale test subclass, it uses the -Dscale option
  * to enable it, and partition size option to control the size of
  * parts uploaded.
@@ -134,7 +148,37 @@ public class ITestS3AContractMultipartUploader extends
   }
 
   @Override
+<<<<<<< HEAD
   public void testMultipartUploadReverseOrder() throws Exception {
     skip("skipped for speed");
+=======
+  public void teardown() throws Exception {
+    Path teardown = path("teardown").getParent();
+    S3AFileSystem fs = getFileSystem();
+    if (fs != null) {
+      WriteOperationHelper helper = fs.getWriteOperationHelper();
+      try {
+        LOG.info("Teardown: aborting outstanding uploads under {}", teardown);
+        int count = helper.abortMultipartUploadsUnderPath(
+            fs.pathToKey(teardown));
+        LOG.info("Found {} incomplete uploads", count);
+      } catch (Exception e) {
+        LOG.warn("Exeception in teardown", e);
+      }
+    }
+    super.teardown();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
+  }
+
+  /**
+   * S3 has no concept of directories, so this test does not apply.
+   */
+  public void testDirectoryInTheWay() throws Exception {
+    // no-op
+  }
+
+  @Override
+  public void testMultipartUploadReverseOrder() throws Exception {
+    ContractTestUtils.skip("skipped for speed");
   }
 }

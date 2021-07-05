@@ -224,8 +224,15 @@ public abstract class TimelineCollector extends CompositeService {
    */
   public void putEntitiesAsync(TimelineEntities entities,
       UserGroupInformation callerUgi) throws IOException {
+<<<<<<< HEAD
     LOG.debug("putEntitiesAsync(entities={}, callerUgi={})", entities,
         callerUgi);
+=======
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("putEntitiesAsync(entities=" + entities + ", callerUgi=" +
+          callerUgi + ")");
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     pool.execute(new Runnable() {
       @Override public void run() {

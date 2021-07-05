@@ -171,6 +171,7 @@ public abstract class AbstractAbfsIntegrationTest extends
     //Create filesystem first to make sure getWasbFileSystem() can return an existing filesystem.
     createFileSystem();
 
+<<<<<<< HEAD
     // Only live account without namespace support can run ABFS&WASB
     // compatibility tests
     if (!isIPAddress && (abfsConfig.getAuthType(accountName) != AuthType.SAS)
@@ -178,6 +179,11 @@ public abstract class AbstractAbfsIntegrationTest extends
             getFileSystem(), false))) {
       final URI wasbUri = new URI(
           abfsUrlToWasbUrl(getTestUrl(), abfsConfig.isHttpsAlwaysUsed()));
+=======
+    // Only live account without namespace support can run ABFS&WASB compatibility tests
+    if (!isIPAddress && !abfs.getIsNamespaceEnabled()) {
+      final URI wasbUri = new URI(abfsUrlToWasbUrl(getTestUrl()));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       final AzureNativeFileSystemStore azureNativeFileSystemStore =
           new AzureNativeFileSystemStore();
 

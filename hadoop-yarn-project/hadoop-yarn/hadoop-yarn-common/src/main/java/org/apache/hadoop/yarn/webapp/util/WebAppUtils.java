@@ -98,6 +98,7 @@ public class WebAppUtils {
    */
   public static <T, R> R execOnActiveRM(Configuration conf,
       ThrowingBiFunction<String, T, R> func, T arg) throws Exception {
+<<<<<<< HEAD
     int haIndex = 0;
     if (HAUtil.isHAEnabled(conf)) {
       String activeRMId = RMHAUtils.findActiveRMHAId(conf);
@@ -109,6 +110,26 @@ public class WebAppUtils {
     }
     String rm1Address = getRMWebAppURLWithScheme(conf, haIndex);
     return func.apply(rm1Address, arg);
+=======
+    String rm1Address = getRMWebAppURLWithScheme(conf, 0);
+    try {
+      return func.apply(rm1Address, arg);
+    } catch (Exception e) {
+      if (HAUtil.isHAEnabled(conf)) {
+        int rms = HAUtil.getRMHAIds(conf).size();
+        for (int i=1; i<rms; i++) {
+          try {
+            rm1Address = getRMWebAppURLWithScheme(conf, i);
+            return func.apply(rm1Address, arg);
+          } catch (Exception e1) {
+            // ignore and try next one when RM is down
+            e = e1;
+          }
+        }
+      }
+      throw e;
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /** A BiFunction which throws on Exception. */

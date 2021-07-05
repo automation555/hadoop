@@ -96,8 +96,11 @@ public final class FSImageFormatPBINode {
   private static final Logger LOG =
       LoggerFactory.getLogger(FSImageFormatPBINode.class);
 
+<<<<<<< HEAD
   private static final int DIRECTORY_ENTRY_BATCH_SIZE = 1000;
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   // the loader must decode all fields referencing serial number based fields
   // via to<Item> methods with the string table.
   public final static class Loader {

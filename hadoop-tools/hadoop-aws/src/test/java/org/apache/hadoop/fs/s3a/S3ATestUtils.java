@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.s3a.auth.MarshalledCredentialBinding;
 import org.apache.hadoop.fs.s3a.auth.MarshalledCredentials;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 
+<<<<<<< HEAD
 import org.apache.hadoop.fs.s3a.impl.ChangeDetectionPolicy;
 import org.apache.hadoop.fs.s3a.impl.ContextAccessors;
 import org.apache.hadoop.fs.s3a.impl.StatusProbeEnum;
@@ -59,6 +60,11 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.functional.CallableRaisingIOE;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
+=======
+import org.apache.hadoop.service.Service;
+import org.apache.hadoop.service.ServiceOperations;
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.hamcrest.core.Is;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -81,9 +87,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+<<<<<<< HEAD
 import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+=======
+import static com.google.common.base.Preconditions.checkNotNull;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 import static org.apache.hadoop.fs.impl.FutureIOSupport.awaitFuture;
 import static org.apache.hadoop.fs.s3a.FailureInjectionPolicy.*;
@@ -637,6 +647,7 @@ public final class S3ATestUtils {
   }
 
   /**
+<<<<<<< HEAD
    * Clear any Hadoop credential provider path.
    * This is needed if people's test setups switch to credential providers,
    * and the test case is altering FS login details: changes made in the
@@ -745,6 +756,8 @@ public final class S3ATestUtils {
   }
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Get the name of the test bucket.
    * @param conf configuration to scan.
    * @return the bucket name from the config.
@@ -757,6 +770,7 @@ public final class S3ATestUtils {
   }
 
   /**
+<<<<<<< HEAD
    * Get the prefix for DynamoDB table names used in tests.
    * @param conf configuration to scan.
    * @return the table name prefix
@@ -767,6 +781,8 @@ public final class S3ATestUtils {
   }
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Remove any values from a bucket.
    * @param bucket bucket whose overrides are to be removed. Can be null/empty
    * @param conf config
@@ -783,6 +799,7 @@ public final class S3ATestUtils {
     for (String option : options) {
       final String stripped = option.substring("fs.s3a.".length());
       String target = bucketPrefix + stripped;
+<<<<<<< HEAD
       String v = conf.get(target);
       if (v != null) {
         LOG.debug("Removing option {}; was {}", target, v);
@@ -793,6 +810,12 @@ public final class S3ATestUtils {
         LOG.debug("Removing option {}", extended);
         conf.unset(extended);
       }
+=======
+      if (conf.get(target) != null) {
+        LOG.debug("Removing option {}", target);
+        conf.unset(target);
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 
@@ -812,6 +835,7 @@ public final class S3ATestUtils {
   }
 
   /**
+<<<<<<< HEAD
    * Remove any values from the test bucket and the base values too.
    * @param conf config
    * @param options list of fs.s3a options to remove
@@ -846,6 +870,33 @@ public final class S3ATestUtils {
       final CallableRaisingIOE<T> operation) {
     try {
       operation.apply();
+=======
+   * Call a function; any exception raised is logged at info.
+   * This is for test teardowns.
+   * @param log log to use.
+   * @param operation operation to invoke
+   * @param <T> type of operation.
+   */
+  public static <T> void callQuietly(final Logger log,
+      final Invoker.Operation<T> operation) {
+    try {
+      operation.execute();
+    } catch (Exception e) {
+      log.info(e.toString(), e);
+    }
+  }
+
+  /**
+   * Call a void operation; any exception raised is logged at info.
+   * This is for test teardowns.
+   * @param log log to use.
+   * @param operation operation to invoke
+   */
+  public static void callQuietly(final Logger log,
+      final Invoker.VoidOperation operation) {
+    try {
+      operation.execute();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } catch (Exception e) {
       log.info(e.toString(), e);
     }
@@ -880,6 +931,7 @@ public final class S3ATestUtils {
   }
 
   /**
+<<<<<<< HEAD
    * Get a file status from S3A with the {@code needEmptyDirectoryFlag}
    * state probed.
    * This accesses a package-private method in the
@@ -940,6 +992,8 @@ public final class S3ATestUtils {
   }
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Helper class to do diffs of metrics.
    */
   public static final class MetricDiff {

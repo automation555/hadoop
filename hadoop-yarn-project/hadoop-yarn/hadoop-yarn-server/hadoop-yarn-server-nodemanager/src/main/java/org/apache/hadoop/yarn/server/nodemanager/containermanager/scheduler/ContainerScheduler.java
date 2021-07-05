@@ -188,8 +188,11 @@ public class ContainerScheduler extends AbstractService implements
       break;
     case RECOVERY_COMPLETED:
       startPendingContainers(maxOppQueueLength <= 0);
+<<<<<<< HEAD
       metrics.setQueuedContainers(queuedOpportunisticContainers.size(),
           queuedGuaranteedContainers.size());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       break;
     default:
       LOG.error("Unknown event arrived at ContainerScheduler: "

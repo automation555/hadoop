@@ -37,7 +37,12 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.FSInputStream;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.statistics.DurationTracker;
+=======
+import org.apache.hadoop.fs.PathIOException;
+import org.apache.hadoop.fs.s3a.impl.ChangeTracker;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,11 +74,15 @@ import static org.apache.hadoop.util.StringUtils.toLowerCase;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
+<<<<<<< HEAD
 public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
         CanUnbuffer, StreamCapabilities, IOStatisticsSource {
 
   public static final String E_NEGATIVE_READAHEAD_VALUE
       = "Negative readahead value";
+=======
+public class S3AInputStream extends FSInputStream implements CanSetReadahead {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public static final String OPERATION_OPEN = "open";
   public static final String OPERATION_REOPEN = "re-open";
@@ -131,11 +140,14 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
   /** change tracker. */
   private final ChangeTracker changeTracker;
 
+<<<<<<< HEAD
   /**
    * IOStatistics report.
    */
   private final IOStatistics ioStatistics;
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Create the stream.
    * This does not attempt to open it; that is only done on the first
@@ -146,7 +158,12 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
    */
   public S3AInputStream(S3AReadOpContext ctx,
       S3ObjectAttributes s3Attributes,
+<<<<<<< HEAD
       InputStreamCallbacks client) {
+=======
+      long contentLength,
+      AmazonS3 client) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Preconditions.checkArgument(isNotEmpty(s3Attributes.getBucket()),
         "No Bucket");
     Preconditions.checkArgument(isNotEmpty(s3Attributes.getKey()), "No Key");
@@ -159,6 +176,7 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
     this.contentLength = l;
     this.client = client;
     this.uri = "s3a://" + this.bucket + "/" + this.key;
+<<<<<<< HEAD
     this.streamStatistics = ctx.getS3AStatisticsContext()
         .newInputStreamStatistics();
     this.ioStatistics = streamStatistics.getIOStatistics();
@@ -166,6 +184,15 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
         ctx.getChangeDetectionPolicy(),
         streamStatistics.getChangeTrackerStatistics(),
         s3Attributes);
+=======
+    this.streamStatistics = ctx.instrumentation.newInputStreamStatistics();
+    this.serverSideEncryptionAlgorithm =
+        s3Attributes.getServerSideEncryptionAlgorithm();
+    this.serverSideEncryptionKey = s3Attributes.getServerSideEncryptionKey();
+    this.changeTracker = new ChangeTracker(uri,
+        ctx.getChangeDetectionPolicy(),
+        streamStatistics.getVersionMismatchCounter());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     setInputPolicy(ctx.getInputPolicy());
     setReadahead(ctx.getReadahead());
   }
@@ -226,6 +253,15 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
       // set the failed flag.
       tracker.close();
     }
+<<<<<<< HEAD
+=======
+    String operation = opencount == 0 ? OPERATION_OPEN : OPERATION_REOPEN;
+    String text = String.format("%s %s at %d",
+        operation, uri, targetPos);
+    changeTracker.maybeApplyConstraint(request);
+    S3Object object = Invoker.once(text, uri,
+        () -> client.getObject(request));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     changeTracker.processResponse(object, operation,
         targetPos);
@@ -737,7 +773,11 @@ public class S3AInputStream extends FSInputStream implements  CanSetReadahead,
       sb.append(" contentRangeFinish=").append(contentRangeFinish);
       sb.append(" remainingInCurrentRequest=")
           .append(remainingInCurrentRequest());
+<<<<<<< HEAD
       sb.append(" ").append(changeTracker);
+=======
+      sb.append(changeTracker);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       sb.append('\n').append(s);
       sb.append('}');
       return sb.toString();

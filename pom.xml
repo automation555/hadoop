@@ -18,7 +18,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.hadoop</groupId>
   <artifactId>hadoop-main</artifactId>
+<<<<<<< HEAD
   <version>3.4.0-SNAPSHOT</version>
+=======
+  <version>3.2.1</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <description>Apache Hadoop Main</description>
   <name>Apache Hadoop Main</name>
   <packaging>pom</packaging>
@@ -80,7 +84,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
 
   <properties>
     <!-- required as child projects with different version can't use ${project.version} -->
+<<<<<<< HEAD
     <hadoop.version>3.4.0-SNAPSHOT</hadoop.version>
+=======
+    <hadoop.version>3.2.1</hadoop.version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
@@ -111,15 +119,23 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
     <clover-maven-plugin.version>4.4.1</clover-maven-plugin.version>
     <maven-bundle-plugin.version>2.5.0</maven-bundle-plugin.version>
     <lifecycle-mapping.version>1.0.0</lifecycle-mapping.version>
+<<<<<<< HEAD
     <maven-checkstyle-plugin.version>3.1.0</maven-checkstyle-plugin.version>
     <checkstyle.version>8.29</checkstyle.version>
+=======
+    <maven-checkstyle-plugin.version>3.0.0</maven-checkstyle-plugin.version>
+    <checkstyle.version>8.19</checkstyle.version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <dependency-check-maven.version>1.4.3</dependency-check-maven.version>
     <spotbugs.version>4.2.2</spotbugs.version>
     <spotbugs-maven-plugin.version>4.2.0</spotbugs-maven-plugin.version>
 
     <shell-executable>bash</shell-executable>
 
+<<<<<<< HEAD
     <leveldbjni.group>org.fusesource.leveldbjni</leveldbjni.group>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   </properties>
 
   <modules>
@@ -462,10 +478,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
             <exclude>**/build/**</exclude>
             <exclude>**/patchprocess/**</exclude>
             <exclude>**/*.js</exclude>
+<<<<<<< HEAD
             <exclude>licenses/**</exclude>
             <exclude>licenses-binary/**</exclude>
             <exclude>dev-support/docker/pkg-resolver/packages.json</exclude>
             <exclude>dev-support/docker/pkg-resolver/platforms.json</exclude>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
          </excludes>
        </configuration>
       </plugin>
@@ -647,8 +666,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         </plugins>
       </build>
     </profile>
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <profile>
       <id>sign</id>
       <build>
@@ -742,6 +764,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         </plugins>
       </build>
     </profile>
+<<<<<<< HEAD
     <profile>
       <id>aarch64</id>
       <properties>
@@ -755,5 +778,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
       </activation>
     </profile>
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   </profiles>
 </project>

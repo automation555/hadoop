@@ -291,10 +291,26 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int     DFS_NAMENODE_REPLICATION_MAX_STREAMS_DEFAULT = 2;
   public static final String  DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_KEY = "dfs.namenode.replication.max-streams-hard-limit";
   public static final int     DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_DEFAULT = 4;
+<<<<<<< HEAD
+=======
+  public static final String DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_INTERVAL_MS_KEY
+      = "dfs.namenode.storageinfo.defragment.interval.ms";
+  public static final int
+      DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_INTERVAL_MS_DEFAULT = 10 * 60 * 1000;
+  public static final String DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_TIMEOUT_MS_KEY
+      = "dfs.namenode.storageinfo.defragment.timeout.ms";
+  public static final int
+      DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_TIMEOUT_MS_DEFAULT = 4;
+  public static final String DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_RATIO_KEY
+      = "dfs.namenode.storageinfo.defragment.ratio";
+  public static final double
+      DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_RATIO_DEFAULT = 0.75;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public static final String DFS_NAMENODE_BLOCKREPORT_QUEUE_SIZE_KEY
       = "dfs.namenode.blockreport.queue.size";
   public static final int    DFS_NAMENODE_BLOCKREPORT_QUEUE_SIZE_DEFAULT
       = 1024;
+<<<<<<< HEAD
   public static final String DFS_NAMENODE_BLOCKREPORT_MAX_LOCK_HOLD_TIME
       = "dfs.namenode.blockreport.max.lock.hold.time";
   public static final long
@@ -306,6 +322,15 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final boolean
       DFS_NAMENODE_CORRUPT_BLOCK_DELETE_IMMEDIATELY_ENABLED_DEFAULT = true;
 
+=======
+  public static final String  DFS_WEBHDFS_AUTHENTICATION_FILTER_KEY = "dfs.web.authentication.filter";
+  /* Phrased as below to avoid javac inlining as a constant, to match the behavior when
+     this was AuthFilter.class.getName(). Note that if you change the import for AuthFilter, you
+     need to update the literal here as well as TestDFSConfigKeys.
+   */
+  public static final String  DFS_WEBHDFS_AUTHENTICATION_FILTER_DEFAULT =
+      "org.apache.hadoop.hdfs.web.AuthFilter";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Deprecated
   public static final String  DFS_WEBHDFS_USER_PATTERN_KEY =
       HdfsClientConfigKeys.DFS_WEBHDFS_USER_PATTERN_KEY;
@@ -658,6 +683,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final long
           DFS_DATANODE_PEER_METRICS_MIN_OUTLIER_DETECTION_SAMPLES_DEFAULT =
       1000;
+<<<<<<< HEAD
   public static final String DFS_DATANODE_MIN_OUTLIER_DETECTION_NODES_KEY =
       "dfs.datanode.min.outlier.detection.nodes";
   public static final long DFS_DATANODE_MIN_OUTLIER_DETECTION_NODES_DEFAULT =
@@ -682,6 +708,8 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.datanode.max.disks.to.report";
   public static final int DFS_DATANODE_MAX_DISKS_TO_REPORT_DEFAULT =
       5;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public static final String  DFS_DATANODE_HOST_NAME_KEY =
       HdfsClientConfigKeys.DeprecatedKeys.DFS_DATANODE_HOST_NAME_KEY;
   public static final String  DFS_NAMENODE_CHECKPOINT_DIR_KEY =
@@ -1560,6 +1588,7 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.namenode.send.qop.enabled";
   public static final boolean DFS_NAMENODE_SEND_QOP_ENABLED_DEFAULT = false;
 
+<<<<<<< HEAD
   public static final String DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY =
       "dfs.namenode.state.context.enabled";
   public static final boolean DFS_NAMENODE_STATE_CONTEXT_ENABLED_DEFAULT = false;
@@ -1601,6 +1630,9 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       DFS_DATANODE_SAME_DISK_TIERING_CAPACITY_RATIO_PERCENTAGE_DEFAULT = "";
 
   // dfs.client.retry confs are moved to HdfsClientConfigKeys.Retry
+=======
+  // dfs.client.retry confs are moved to HdfsClientConfigKeys.Retry 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Deprecated
   public static final String  DFS_CLIENT_RETRY_POLICY_ENABLED_KEY
       = HdfsClientConfigKeys.Retry.POLICY_ENABLED_KEY;

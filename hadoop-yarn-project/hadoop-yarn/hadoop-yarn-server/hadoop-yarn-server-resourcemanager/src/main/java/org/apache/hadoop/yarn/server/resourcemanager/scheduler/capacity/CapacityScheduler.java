@@ -1711,6 +1711,7 @@ public class CapacityScheduler extends
     if (calculator.computeAvailableContainers(Resources
             .add(node.getUnallocatedResource(), node.getTotalKillableResources()),
         minimumAllocation) <= 0) {
+<<<<<<< HEAD
       LOG.debug("This node " + node.getNodeID() + " doesn't have sufficient "
           + "available or preemptible resource for minimum allocation");
       ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
@@ -1719,6 +1720,12 @@ public class CapacityScheduler extends
               INIT_CHECK_SINGLE_NODE_RESOURCE_INSUFFICIENT);
       ActivitiesLogger.NODE.finishSkippedNodeAllocation(activitiesManager,
           node);
+=======
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("This node or node partition doesn't have available or" +
+            " preemptible resource");
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return null;
     }
 
@@ -2331,6 +2338,27 @@ public class CapacityScheduler extends
     LeafQueue queue = (LeafQueue) application.getQueue();
     queue.completedContainer(getClusterResource(), application, node,
         rmContainer, containerStatus, event, null, true);
+<<<<<<< HEAD
+=======
+    if (ContainerExitStatus.PREEMPTED == containerStatus.getExitStatus()) {
+      updateQueuePreemptionMetrics(queue, rmContainer);
+    }
+  }
+
+  private void updateQueuePreemptionMetrics(
+      CSQueue queue, RMContainer rmc) {
+    QueueMetrics qMetrics = queue.getMetrics();
+    long usedMillis = rmc.getFinishTime() - rmc.getCreationTime();
+    Resource containerResource = rmc.getAllocatedResource();
+    qMetrics.preemptContainer();
+    long mbSeconds = (containerResource.getMemorySize() * usedMillis)
+        / DateUtils.MILLIS_PER_SECOND;
+    long vcSeconds = (containerResource.getVirtualCores() * usedMillis)
+        / DateUtils.MILLIS_PER_SECOND;
+    qMetrics.updatePreemptedMemoryMBSeconds(mbSeconds);
+    qMetrics.updatePreemptedVcoreSeconds(vcSeconds);
+    qMetrics.updatePreemptedResources(containerResource);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Lock(Lock.NoLock.class)

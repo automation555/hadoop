@@ -112,7 +112,11 @@ public class TestReplicaMap {
 
   @Test
   public void testMergeAll() {
+<<<<<<< HEAD
     ReplicaMap temReplicaMap = new ReplicaMap(new ReentrantReadWriteLock());
+=======
+    ReplicaMap temReplicaMap = new ReplicaMap(new AutoCloseableLock());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Block tmpBlock = new Block(5678, 5678, 5678);
     temReplicaMap.add(bpid, new FinalizedReplica(tmpBlock, null, null));
 
@@ -123,7 +127,11 @@ public class TestReplicaMap {
 
   @Test
   public void testAddAll() {
+<<<<<<< HEAD
     ReplicaMap temReplicaMap = new ReplicaMap(new ReentrantReadWriteLock());
+=======
+    ReplicaMap temReplicaMap = new ReplicaMap(new AutoCloseableLock());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Block tmpBlock = new Block(5678, 5678, 5678);
     temReplicaMap.add(bpid, new FinalizedReplica(tmpBlock, null, null));
 

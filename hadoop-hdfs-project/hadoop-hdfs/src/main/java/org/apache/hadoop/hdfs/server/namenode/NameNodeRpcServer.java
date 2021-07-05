@@ -27,8 +27,11 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LIFELINE_HANDLER
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_AUXILIARY_KEY;
+<<<<<<< HEAD
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STATE_CONTEXT_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.MAX_PATH_DEPTH;
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.MAX_PATH_LENGTH;
 import static org.apache.hadoop.util.Time.now;
@@ -44,6 +47,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+<<<<<<< HEAD
+=======
+
+import com.google.common.collect.Lists;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -461,7 +469,11 @@ public class NameNodeRpcServer implements NamenodeProtocols {
         .setNumHandlers(handlerCount)
         .setVerbose(false)
         .setSecretManager(namesystem.getDelegationTokenSecretManager())
+<<<<<<< HEAD
         .setAlignmentContext(stateIdContext)
+=======
+        .setAlignmentContext(new GlobalStateIdContext(namesystem))
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         .build();
 
     // Add all the RPC protocols that the namenode implements
@@ -1903,6 +1915,17 @@ public class NameNodeRpcServer implements NamenodeProtocols {
       clientMachine = "";
     }
     return clientMachine;
+  }
+
+  /**
+   * Return the QOP of the client that the current handler thread
+   * is handling. Assuming the negotiation is done at this point,
+   * otherwise returns null.
+   *
+   * @return the established QOP of this client.
+   */
+  public static String getEstablishedClientQOP() {
+    return Server.getEstablishedQOP();
   }
 
   @Override

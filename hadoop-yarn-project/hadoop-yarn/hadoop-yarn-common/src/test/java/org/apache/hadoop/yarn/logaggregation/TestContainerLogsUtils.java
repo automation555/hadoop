@@ -83,12 +83,18 @@ public final class TestContainerLogsUtils {
 
     createContainerLogInLocalDir(appLogsDir, containerToContent, fs, fileName);
     // upload container logs to remote log dir
+<<<<<<< HEAD
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     LogAggregationFileControllerFactory factory =
         new LogAggregationFileControllerFactory(conf);
     LogAggregationFileController fileController =
         factory.getFileControllerForWrite();
+<<<<<<< HEAD
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Path path = fileController.getRemoteAppLogDir(appId, user);
 
     if (fs.exists(path) && deleteRemoteLogDir) {

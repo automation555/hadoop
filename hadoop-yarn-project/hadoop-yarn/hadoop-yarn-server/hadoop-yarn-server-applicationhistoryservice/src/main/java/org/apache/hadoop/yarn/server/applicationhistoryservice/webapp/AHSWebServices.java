@@ -32,8 +32,17 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+<<<<<<< HEAD
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
+import javax.ws.rs.core.Response.ResponseBuilder;
+import javax.ws.rs.core.Response.Status;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.sun.jersey.api.client.ClientHandlerException;
+import com.sun.jersey.api.client.UniformInterfaceException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -43,7 +52,12 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.ApplicationBaseProtocol;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineAbout;
+<<<<<<< HEAD
 import org.apache.hadoop.yarn.server.webapp.LogServlet;
+=======
+import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileControllerFactory;
+import org.apache.hadoop.yarn.server.webapp.LogWebServiceUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.server.webapp.WebServices;
 import org.apache.hadoop.yarn.server.webapp.WrappedLogMetaRequest;
 import org.apache.hadoop.yarn.server.webapp.YarnWebServiceParams;
@@ -55,8 +69,18 @@ import org.apache.hadoop.yarn.server.webapp.dao.ContainerInfo;
 import org.apache.hadoop.yarn.server.webapp.dao.ContainersInfo;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.yarn.webapp.BadRequestException;
+<<<<<<< HEAD
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+=======
+import org.apache.hadoop.yarn.webapp.NotFoundException;
+import com.google.common.base.Joiner;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import org.codehaus.jettison.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 @Singleton
 @Path("/ws/v1/applicationhistory")
@@ -229,11 +253,89 @@ public class AHSWebServices extends WebServices {
       @DefaultValue("false") boolean manualRedirection) {
     initForReadableEndpoints(res);
 
+<<<<<<< HEAD
     WrappedLogMetaRequest.Builder logMetaRequestBuilder =
         LogServlet.createRequestFromContainerId(containerIdStr);
 
     return logServlet.getContainerLogsInfo(req, logMetaRequestBuilder, nmId,
         redirectedFromNode, null, manualRedirection);
+=======
+    ApplicationId appId = containerId.getApplicationAttemptId()
+        .getApplicationId();
+    AppInfo appInfo;
+    try {
+      appInfo = super.getApp(req, res, appId.toString());
+    } catch (Exception ex) {
+      // directly find logs from HDFS.
+      return LogWebServiceUtils
+          .getContainerLogMeta(factory, appId, null, null, containerIdStr,
+              false);
+    }
+    // if the application finishes, directly find logs
+    // from HDFS.
+    if (LogWebServiceUtils.isFinishedState(appInfo.getAppState())) {
+      return LogWebServiceUtils
+          .getContainerLogMeta(factory, appId, null, null, containerIdStr,
+              false);
+    }
+    if (LogWebServiceUtils.isRunningState(appInfo.getAppState())) {
+      String appOwner = appInfo.getUser();
+      String nodeHttpAddress = null;
+      if (nmId != null && !nmId.isEmpty()) {
+        try {
+          nodeHttpAddress = getNMWebAddressFromRM(conf, nmId);
+        } catch (Exception ex) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(ex.getMessage());
+          }
+        }
+      }
+      if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()) {
+        ContainerInfo containerInfo;
+        try {
+          containerInfo = super.getContainer(
+              req, res, appId.toString(),
+              containerId.getApplicationAttemptId().toString(),
+              containerId.toString());
+        } catch (Exception ex) {
+          // return log meta for the aggregated logs if exists.
+          // It will also return empty log meta for the local logs.
+          return LogWebServiceUtils
+              .getContainerLogMeta(factory, appId, appOwner, null,
+                  containerIdStr, true);
+        }
+        nodeHttpAddress = containerInfo.getNodeHttpAddress();
+        // make sure nodeHttpAddress is not null and not empty. Otherwise,
+        // we would only get log meta for aggregated logs instead of
+        // re-directing the request
+        if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()
+            || redirected_from_node) {
+          // return log meta for the aggregated logs if exists.
+          // It will also return empty log meta for the local logs.
+          // If this is the redirect request from NM, we should not
+          // re-direct the request back. Simply output the aggregated log meta.
+          return LogWebServiceUtils
+              .getContainerLogMeta(factory, appId, appOwner, null,
+                  containerIdStr, true);
+        }
+      }
+      String uri = "/" + containerId.toString() + "/logs";
+      String resURI = JOINER.join(
+          LogWebServiceUtils.getAbsoluteNMWebAddress(conf, nodeHttpAddress),
+          NM_DOWNLOAD_URI_STR, uri);
+      String query = req.getQueryString();
+      if (query != null && !query.isEmpty()) {
+        resURI += "?" + query;
+      }
+      ResponseBuilder response = Response.status(
+          HttpServletResponse.SC_TEMPORARY_REDIRECT);
+      response.header("Location", resURI);
+      return response.build();
+    } else {
+      throw new NotFoundException(
+          "The application is not at Running or Finished State.");
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -298,6 +400,7 @@ public class AHSWebServices extends WebServices {
       @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
       @DefaultValue("false") boolean manualRedirection) {
     initForReadableEndpoints(res);
+<<<<<<< HEAD
     return logServlet.getLogFile(req, containerIdStr, filename, format, size,
         nmId, redirectedFromNode, null, manualRedirection);
   }
@@ -312,5 +415,97 @@ public class AHSWebServices extends WebServices {
   @InterfaceAudience.Private
   void setLogServlet(LogServlet logServlet) {
     this.logServlet = logServlet;
+=======
+    ContainerId containerId;
+    try {
+      containerId = ContainerId.fromString(containerIdStr);
+    } catch (IllegalArgumentException ex) {
+      return LogWebServiceUtils.createBadResponse(Status.NOT_FOUND,
+          "Invalid ContainerId: " + containerIdStr);
+    }
+
+    final long length = LogWebServiceUtils.parseLongParam(size);
+
+    ApplicationId appId = containerId.getApplicationAttemptId()
+        .getApplicationId();
+    AppInfo appInfo;
+    try {
+      appInfo = super.getApp(req, res, appId.toString());
+    } catch (Exception ex) {
+      // directly find logs from HDFS.
+      return LogWebServiceUtils
+          .sendStreamOutputResponse(factory, appId, null, null, containerIdStr,
+              filename, format, length, false);
+    }
+    String appOwner = appInfo.getUser();
+    if (LogWebServiceUtils.isFinishedState(appInfo.getAppState())) {
+      // directly find logs from HDFS.
+      return LogWebServiceUtils
+          .sendStreamOutputResponse(factory, appId, appOwner, null,
+              containerIdStr, filename, format, length, false);
+    }
+
+    if (LogWebServiceUtils.isRunningState(appInfo.getAppState())) {
+      String nodeHttpAddress = null;
+      if (nmId != null && !nmId.isEmpty()) {
+        try {
+          nodeHttpAddress = getNMWebAddressFromRM(conf, nmId);
+        } catch (Exception ex) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(ex.getMessage());
+          }
+        }
+      }
+      if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()) {
+        ContainerInfo containerInfo;
+        try {
+          containerInfo = super.getContainer(
+              req, res, appId.toString(),
+              containerId.getApplicationAttemptId().toString(),
+              containerId.toString());
+        } catch (Exception ex) {
+          // output the aggregated logs
+          return LogWebServiceUtils
+              .sendStreamOutputResponse(factory, appId, appOwner, null,
+                  containerIdStr, filename, format, length, true);
+        }
+        nodeHttpAddress = containerInfo.getNodeHttpAddress();
+        // make sure nodeHttpAddress is not null and not empty. Otherwise,
+        // we would only get aggregated logs instead of re-directing the
+        // request.
+        // If this is the redirect request from NM, we should not re-direct the
+        // request back. Simply output the aggregated logs.
+        if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()
+            || redirected_from_node) {
+          // output the aggregated logs
+          return LogWebServiceUtils
+              .sendStreamOutputResponse(factory, appId, appOwner, null,
+                  containerIdStr, filename, format, length, true);
+        }
+      }
+      String uri = "/" + containerId.toString() + "/logs/" + filename;
+      String resURI = JOINER.join(
+          LogWebServiceUtils.getAbsoluteNMWebAddress(conf, nodeHttpAddress),
+          NM_DOWNLOAD_URI_STR, uri);
+      String query = req.getQueryString();
+      if (query != null && !query.isEmpty()) {
+        resURI += "?" + query;
+      }
+      ResponseBuilder response = Response.status(
+          HttpServletResponse.SC_TEMPORARY_REDIRECT);
+      response.header("Location", resURI);
+      return response.build();
+    } else {
+      return LogWebServiceUtils.createBadResponse(Status.NOT_FOUND,
+          "The application is not at Running or Finished State.");
+    }
+  }
+
+  @VisibleForTesting @InterfaceAudience.Private
+  public String getNMWebAddressFromRM(Configuration configuration,
+      String nodeId)
+      throws ClientHandlerException, UniformInterfaceException, JSONException {
+    return LogWebServiceUtils.getNMWebAddressFromRM(configuration, nodeId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

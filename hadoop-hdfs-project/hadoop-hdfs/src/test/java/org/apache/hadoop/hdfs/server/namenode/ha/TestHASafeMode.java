@@ -499,6 +499,7 @@ public class TestHASafeMode {
   private static void assertSafeMode(NameNode nn, int safe, int total,
     int numNodes, int nodeThresh) {
     String status = nn.getNamesystem().getSafemode();
+<<<<<<< HEAD
     if (total == 0 && nodeThresh == 0) {
       assertTrue("Bad safemode status: '" + status + "'",
           status.isEmpty()
@@ -508,6 +509,9 @@ public class TestHASafeMode {
               "mode extension. Safe mode will be turned off automatically " +
               "in 0 seconds."));
     } else if (safe == total) {
+=======
+    if (safe == total) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       if (nodeThresh == 0) {
         assertTrue("Bad safemode status: '" + status + "'",
             status.startsWith("Safe mode is ON. The reported blocks " + safe

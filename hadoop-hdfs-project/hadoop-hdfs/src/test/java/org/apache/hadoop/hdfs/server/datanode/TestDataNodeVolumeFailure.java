@@ -38,7 +38,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+<<<<<<< HEAD
 import java.util.concurrent.CountDownLatch;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -919,6 +922,7 @@ public class TestDataNodeVolumeFailure {
       }
     }
   }
+<<<<<<< HEAD
 
   /*
    * Verify the failed volume can be cheched during dn startup
@@ -973,4 +977,6 @@ public class TestDataNodeVolumeFailure {
     long volumeFailures = getLongCounter("VolumeFailures", rb);
     assertEquals(2, volumeFailures);
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

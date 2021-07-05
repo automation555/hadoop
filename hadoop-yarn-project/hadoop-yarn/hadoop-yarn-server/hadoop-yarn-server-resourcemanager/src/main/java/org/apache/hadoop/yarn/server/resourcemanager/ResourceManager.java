@@ -718,7 +718,10 @@ public class ResourceManager extends CompositeService
     private boolean fromActive = false;
     private StandByTransitionRunnable standByTransitionRunnable;
     private RMNMInfo rmnmInfo;
+<<<<<<< HEAD
     private ScheduledThreadPoolExecutor eventQueueMetricExecutor;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     RMActiveServices(ResourceManager rm) {
       super("RMActiveServices");
@@ -919,10 +922,13 @@ public class ResourceManager extends CompositeService
         LOG.info("Initialized Federation membership.");
       }
 
+<<<<<<< HEAD
       proxyCAManager = new ProxyCAManager(new ProxyCA(), rmContext);
       addService(proxyCAManager);
       rmContext.setProxyCAManager(proxyCAManager);
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       rmnmInfo = new RMNMInfo(rmContext, scheduler);
 
       if (conf.getBoolean(YarnConfiguration.YARN_API_SERVICES_ENABLE,

@@ -700,12 +700,22 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
 
   @Test
   public void testAppLogDirCreation() throws Exception {
+<<<<<<< HEAD
     final String inputSuffix = "logs-tfile";
+=======
+    final String configuredSuffix = "logs";
+    final String actualSuffix = "logs-tfile";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.conf.set(YarnConfiguration.NM_LOG_DIRS,
         localLogDir.getAbsolutePath());
     this.conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR,
         this.remoteRootLogDir.getAbsolutePath());
+<<<<<<< HEAD
     this.conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, "logs");
+=======
+    this.conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX,
+        configuredSuffix);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     InlineDispatcher dispatcher = new InlineDispatcher();
     dispatcher.init(this.conf);
@@ -738,6 +748,7 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     ApplicationId appId = BuilderUtils.newApplicationId(1, 1);
     Path userDir = fs.makeQualified(new Path(
         remoteRootLogDir.getAbsolutePath(), this.user));
+<<<<<<< HEAD
     Path bucketDir = fs.makeQualified(LogAggregationUtils.getRemoteBucketDir(
         new Path(remoteRootLogDir.getAbsolutePath()),
             this.user, inputSuffix, appId));
@@ -745,6 +756,10 @@ public class TestLogAggregationService extends BaseContainerManagerTest {
     Path appDir = fs.makeQualified(LogAggregationUtils.getRemoteAppLogDir(
         new Path(remoteRootLogDir.getAbsolutePath()), appId,
             this.user, inputSuffix));
+=======
+    Path suffixDir = new Path(userDir, actualSuffix);
+    Path appDir = new Path(suffixDir, appId.toString());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     LogAggregationContext contextWithAllContainers =
         Records.newRecord(LogAggregationContext.class);
     contextWithAllContainers.setLogAggregationPolicyClassName(

@@ -52,17 +52,25 @@ import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.Collection;
+<<<<<<< HEAD
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+=======
+import java.util.Iterator;
+import java.util.Map;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.Random;
 
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.QuotaUsage;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.DFSOpsCountStatistics;
 import org.apache.hadoop.test.LambdaTestUtils;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -145,8 +153,13 @@ import org.mockito.Mockito;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.MapType;
 
+<<<<<<< HEAD
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+=======
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
@@ -457,6 +470,57 @@ public class TestWebHDFS {
       } catch (Exception e) {
         // discard exception from close
       }
+    }
+  }
+
+  /**
+   * Test client receives correct DSQuotaExceededException.
+   */
+  @Test
+  public void testExceedingFileSpaceQuota() throws Exception {
+    final Configuration conf = WebHdfsTestUtil.createConf();
+    long spaceQuota = 50L << 20;
+    long fileLength = 80L << 20;
+
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(3)
+        .build();
+
+    try {
+      cluster.waitActive();
+
+      final FileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf,
+          WebHdfsConstants.WEBHDFS_SCHEME);
+      final Path dir = new Path("/test/largeFile");
+      assertTrue(fs.mkdirs(dir));
+
+      final byte[] data = new byte[1 << 20];
+      RANDOM.nextBytes(data);
+
+      cluster.getFileSystem().setQuota(dir, HdfsConstants.QUOTA_DONT_SET,
+          spaceQuota);
+
+      final Path p = new Path(dir, "file");
+
+      FSDataOutputStream out = fs.create(p);
+      try {
+        for (long remaining = fileLength; remaining > 0;) {
+          final int n = (int) Math.min(remaining, data.length);
+          out.write(data, 0, n);
+          remaining -= n;
+        }
+        fail("should have thrown exception during the write");
+      } catch (DSQuotaExceededException e) {
+        //expected
+      } finally {
+        try {
+          out.close();
+        } catch (Exception e) {
+          // discard exception from close
+        }
+      }
+    } finally {
+      cluster.shutdown();
     }
   }
 
@@ -1119,6 +1183,7 @@ public class TestWebHDFS {
   }
 
   @Test
+<<<<<<< HEAD
   public void testSetQuota() throws Exception {
     final Configuration conf = WebHdfsTestUtil.createConf();
     final Path path = new Path("/TestDir");
@@ -1172,6 +1237,48 @@ public class TestWebHDFS {
   }
 
 
+=======
+  public void testQuotaUsage() throws Exception {
+    MiniDFSCluster cluster = null;
+    final Configuration conf = WebHdfsTestUtil.createConf();
+    final Path path = new Path("/TestDir");
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+      final WebHdfsFileSystem webHdfs = WebHdfsTestUtil.getWebHdfsFileSystem(
+          conf, WebHdfsConstants.WEBHDFS_SCHEME);
+      final DistributedFileSystem dfs = cluster.getFileSystem();
+
+      final long nsQuota = 100;
+      final long spaceQuota = 600 * 1024 * 1024;
+      final long diskQuota = 100000;
+      final byte[] bytes = {0x0, 0x1, 0x2, 0x3};
+
+      dfs.mkdirs(path);
+      dfs.setQuota(path, nsQuota, spaceQuota);
+      for (int i = 0; i < 10; i++) {
+        dfs.createNewFile(new Path(path, "test_file_" + i));
+      }
+      FSDataOutputStream out = dfs.create(new Path(path, "test_file"));
+      out.write(bytes);
+      out.close();
+
+      dfs.setQuotaByStorageType(path, StorageType.DISK, diskQuota);
+
+      QuotaUsage quotaUsage = webHdfs.getQuotaUsage(path);
+      assertEquals(12, quotaUsage.getFileAndDirectoryCount());
+      assertEquals(nsQuota, quotaUsage.getQuota());
+      assertEquals(bytes.length * dfs.getDefaultReplication(), quotaUsage.getSpaceConsumed());
+      assertEquals(spaceQuota, quotaUsage.getSpaceQuota());
+      assertEquals(diskQuota, quotaUsage.getTypeQuota(StorageType.DISK));
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+
+  }
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test
   public void testWebHdfsPread() throws Exception {
     final Configuration conf = WebHdfsTestUtil.createConf();
@@ -1334,6 +1441,150 @@ public class TestWebHDFS {
 
     // Expected an empty array of BlockLocation
     verifyEquals(new BlockLocation[] {}, locationArray5);
+  }
+
+  private BlockLocation[] toBlockLocationArray(String json)
+      throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    MapType subType = mapper.getTypeFactory().constructMapType(
+        Map.class,
+        String.class,
+        BlockLocation[].class);
+    MapType rootType = mapper.getTypeFactory().constructMapType(
+        Map.class,
+        mapper.constructType(String.class),
+        mapper.constructType(subType));
+
+    Map<String, Map<String, BlockLocation[]>> jsonMap = mapper
+        .readValue(json, rootType);
+    Map<String, BlockLocation[]> locationMap = jsonMap
+        .get("BlockLocations");
+    BlockLocation[] locationArray = locationMap.get(
+        BlockLocation.class.getSimpleName());
+    return locationArray;
+  }
+
+  private void verifyEquals(BlockLocation[] locations1,
+      BlockLocation[] locations2) throws IOException {
+    for(int i=0; i<locations1.length; i++) {
+      BlockLocation location1 = locations1[i];
+      BlockLocation location2 = locations2[i];
+      Assert.assertEquals(location1.getLength(),
+          location2.getLength());
+      Assert.assertEquals(location1.getOffset(),
+          location2.getOffset());
+      Assert.assertArrayEquals(location1.getCachedHosts(),
+          location2.getCachedHosts());
+      Assert.assertArrayEquals(location1.getHosts(),
+          location2.getHosts());
+      Assert.assertArrayEquals(location1.getNames(),
+          location2.getNames());
+      Assert.assertArrayEquals(location1.getTopologyPaths(),
+          location2.getTopologyPaths());
+      Assert.assertArrayEquals(location1.getStorageTypes(),
+          location2.getStorageTypes());
+    }
+  }
+
+  private static String getResponse(URL url, String httpRequestType)
+      throws IOException {
+    HttpURLConnection conn = null;
+    try {
+      conn = (HttpURLConnection) url.openConnection();
+      conn.setRequestMethod(httpRequestType);
+      conn.setInstanceFollowRedirects(false);
+      return IOUtils.toString(conn.getInputStream(),
+          StandardCharsets.UTF_8);
+    } finally {
+      if(conn != null) {
+        conn.disconnect();
+      }
+    }
+  }
+
+  @Test
+  public void testWebHdfsGetBlockLocations() throws Exception{
+    MiniDFSCluster cluster = null;
+    final Configuration conf = WebHdfsTestUtil.createConf();
+    final int offset = 42;
+    final int length = 512;
+    final Path path = new Path("/foo");
+    byte[] contents = new byte[1024];
+    RANDOM.nextBytes(contents);
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      final WebHdfsFileSystem fs = WebHdfsTestUtil.getWebHdfsFileSystem(conf,
+          WebHdfsConstants.WEBHDFS_SCHEME);
+      try (OutputStream os = fs.create(path)) {
+        os.write(contents);
+      }
+      BlockLocation[] locations = fs.getFileBlockLocations(path, offset,
+          length);
+
+      // Query webhdfs REST API to get block locations
+      InetSocketAddress addr = cluster.getNameNode().getHttpAddress();
+
+      // Case 1
+      // URL without length or offset parameters
+      URL url1 = new URL("http", addr.getHostString(), addr.getPort(),
+          WebHdfsFileSystem.PATH_PREFIX + "/foo?op=GETFILEBLOCKLOCATIONS");
+
+      String response1 = getResponse(url1, "GET");
+      // Parse BlockLocation array from json output using object mapper
+      BlockLocation[] locationArray1 = toBlockLocationArray(response1);
+
+      // Verify the result from rest call is same as file system api
+      verifyEquals(locations, locationArray1);
+
+      // Case 2
+      // URL contains length and offset parameters
+      URL url2 = new URL("http", addr.getHostString(), addr.getPort(),
+          WebHdfsFileSystem.PATH_PREFIX + "/foo?op=GETFILEBLOCKLOCATIONS"
+              + "&length=" + length + "&offset=" + offset);
+
+      String response2 = getResponse(url2, "GET");
+      BlockLocation[] locationArray2 = toBlockLocationArray(response2);
+
+      verifyEquals(locations, locationArray2);
+
+      // Case 3
+      // URL contains length parameter but without offset parameters
+      URL url3 = new URL("http", addr.getHostString(), addr.getPort(),
+          WebHdfsFileSystem.PATH_PREFIX + "/foo?op=GETFILEBLOCKLOCATIONS"
+              + "&length=" + length);
+
+      String response3 = getResponse(url3, "GET");
+      BlockLocation[] locationArray3 = toBlockLocationArray(response3);
+
+      verifyEquals(locations, locationArray3);
+
+      // Case 4
+      // URL contains offset parameter but without length parameter
+      URL url4 = new URL("http", addr.getHostString(), addr.getPort(),
+          WebHdfsFileSystem.PATH_PREFIX + "/foo?op=GETFILEBLOCKLOCATIONS"
+              + "&offset=" + offset);
+
+      String response4 = getResponse(url4, "GET");
+      BlockLocation[] locationArray4 = toBlockLocationArray(response4);
+
+      verifyEquals(locations, locationArray4);
+
+      // Case 5
+      // URL specifies offset exceeds the file length
+      URL url5 = new URL("http", addr.getHostString(), addr.getPort(),
+          WebHdfsFileSystem.PATH_PREFIX + "/foo?op=GETFILEBLOCKLOCATIONS"
+              + "&offset=1200");
+
+      String response5 = getResponse(url5, "GET");
+      BlockLocation[] locationArray5 = toBlockLocationArray(response5);
+
+      // Expected an empty array of BlockLocation
+      verifyEquals(new BlockLocation[] {}, locationArray5);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
   }
 
   private BlockLocation[] toBlockLocationArray(String json)
@@ -1840,6 +2091,61 @@ public class TestWebHDFS {
           30000, dfs);
     } finally {
       sps.stopGracefully();
+    }
+  }
+
+  private void checkECPolicyState(Collection<ErasureCodingPolicyInfo> policies,
+      String ecpolicy, String state) {
+    Iterator<ErasureCodingPolicyInfo> itr = policies.iterator();
+    boolean found = false;
+    while (policies.iterator().hasNext()) {
+      ErasureCodingPolicyInfo policy = itr.next();
+      if (policy.getPolicy().getName().equals(ecpolicy)) {
+        found = true;
+        if (state.equals("disable")) {
+          Assert.assertTrue(policy.isDisabled());
+        } else if (state.equals("enable")) {
+          Assert.assertTrue(policy.isEnabled());
+        }
+        break;
+      }
+    }
+    Assert.assertTrue(found);
+  }
+
+  // Test For Enable/Disable EC Policy in DFS.
+  @Test
+  public void testECPolicyCommands() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    try (MiniDFSCluster cluster =
+        new MiniDFSCluster.Builder(conf).numDataNodes(0).build()) {
+      cluster.waitActive();
+      final DistributedFileSystem dfs = cluster.getFileSystem();
+      final WebHdfsFileSystem webHdfs = WebHdfsTestUtil
+          .getWebHdfsFileSystem(conf, WebHdfsConstants.WEBHDFS_SCHEME);
+      String policy = "RS-10-4-1024k";
+      // Check for Enable EC policy via WEBHDFS.
+      dfs.disableErasureCodingPolicy(policy);
+      checkECPolicyState(dfs.getAllErasureCodingPolicies(), policy, "disable");
+      webHdfs.enableECPolicy(policy);
+      checkECPolicyState(dfs.getAllErasureCodingPolicies(), policy, "enable");
+      Path dir = new Path("/tmp");
+      dfs.mkdirs(dir);
+      // Check for Set EC policy via WEBHDFS
+      assertNull(dfs.getErasureCodingPolicy(dir));
+      webHdfs.setErasureCodingPolicy(dir, policy);
+      assertEquals(policy, dfs.getErasureCodingPolicy(dir).getName());
+
+      // Check for Get EC policy via WEBHDFS
+      assertEquals(policy, webHdfs.getErasureCodingPolicy(dir).getName());
+
+      // Check for Unset EC policy via WEBHDFS
+      webHdfs.unsetErasureCodingPolicy(dir);
+      assertNull(dfs.getErasureCodingPolicy(dir));
+
+      // Check for Disable EC policy via WEBHDFS.
+      webHdfs.disableECPolicy(policy);
+      checkECPolicyState(dfs.getAllErasureCodingPolicies(), policy, "disable");
     }
   }
 

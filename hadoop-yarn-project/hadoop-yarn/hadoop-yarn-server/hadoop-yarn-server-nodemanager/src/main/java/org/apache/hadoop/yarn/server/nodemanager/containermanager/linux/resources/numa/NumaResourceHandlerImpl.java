@@ -39,8 +39,13 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resource
  */
 public class NumaResourceHandlerImpl implements ResourceHandler {
 
+<<<<<<< HEAD
   private static final Logger LOG = LoggerFactory
       .getLogger(NumaResourceHandlerImpl.class);
+=======
+  private static final Log LOG = LogFactory
+      .getLog(NumaResourceHandlerImpl.class);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private final NumaResourceAllocator numaResourceAllocator;
   private final String numaCtlCmd;
 

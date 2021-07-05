@@ -209,8 +209,19 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.tracing.TraceUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
+<<<<<<< HEAD
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.hadoop.tracing.Tracer;
+=======
+import org.apache.hadoop.util.GenericOptionsParser;
+import org.apache.hadoop.util.JvmPauseMonitor;
+import org.apache.hadoop.util.ServicePlugin;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+import org.apache.hadoop.util.Timer;
+import org.apache.hadoop.util.VersionInfo;
+import org.apache.htrace.core.Tracer;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.eclipse.jetty.util.ajax.JSON;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
@@ -1713,7 +1724,15 @@ public class DataNode extends ReconfigurableBase
     }
     // HDFS-14993: check disk after add the block pool info.
     checkDiskError();
+<<<<<<< HEAD
 
+=======
+    try {
+      data.addBlockPool(nsInfo.getBlockPoolID(), getConf());
+    } catch (AddBlockPoolException e) {
+      handleAddBlockPoolError(e);
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     blockScanner.enableBlockPoolId(bpos.getBlockPoolId());
     initDirectoryScanner(getConf());
     initDiskBalancer(data, getConf());
@@ -3550,6 +3569,32 @@ public class DataNode extends ReconfigurableBase
    *          method only when it's sure that the block is corrupt.
    */
   void handleBadBlock(ExtendedBlock block, IOException e, boolean fromScanner) {
+<<<<<<< HEAD
+=======
+
+    boolean isBadBlock = fromScanner || (e instanceof DiskFileCorruptException
+        || e instanceof CorruptMetaHeaderException);
+
+    if (!isBadBlock) {
+      return;
+    }
+    if (!fromScanner && blockScanner.isEnabled()) {
+      blockScanner.markSuspectBlock(data.getVolume(block).getStorageID(),
+          block);
+    } else {
+      try {
+        reportBadBlocks(block);
+      } catch (IOException ie) {
+        LOG.warn("report bad block {} failed", block, ie);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  public long getLastDiskErrorCheck() {
+    return lastDiskErrorCheck;
+  }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     boolean isBadBlock = fromScanner || (e instanceof DiskFileCorruptException
         || e instanceof CorruptMetaHeaderException);

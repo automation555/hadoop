@@ -31,7 +31,10 @@ import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+<<<<<<< HEAD
 import org.apache.hadoop.util.Lists;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;

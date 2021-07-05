@@ -55,7 +55,10 @@ import org.apache.hadoop.fs.http.server.HttpFSParametersProvider.XAttrEncodingPa
 import org.apache.hadoop.fs.http.server.HttpFSParametersProvider.XAttrNameParam;
 import org.apache.hadoop.fs.http.server.HttpFSParametersProvider.XAttrSetFlagParam;
 import org.apache.hadoop.fs.http.server.HttpFSParametersProvider.XAttrValueParam;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.permission.FsAction;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hadoop.http.JettyUtils;
 import org.apache.hadoop.lib.service.FileSystemAccess;
@@ -285,7 +288,11 @@ public class HttpFSServer {
             }
           });
         } catch (InterruptedException ie) {
+<<<<<<< HEAD
           LOG.warn("Open interrupted.", ie);
+=======
+          LOG.info("Open interrupted.", ie);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
           Thread.currentThread().interrupt();
         }
         Long offset = params.get(OffsetParam.NAME, OffsetParam.class);
@@ -349,6 +356,14 @@ public class HttpFSServer {
           new FSOperations.FSQuotaUsage(path);
       Map json = fsExecute(user, command);
       AUDIT_LOG.info("Quota Usage for [{}]", path);
+      response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();
+      break;
+    }
+    case GETQUOTAUSAGE: {
+      FSOperations.FSQuotaUsage command =
+          new FSOperations.FSQuotaUsage(path);
+      Map json = fsExecute(user, command);
+      AUDIT_LOG.info("[{}]", path);
       response = Response.ok(json).type(MediaType.APPLICATION_JSON).build();
       break;
     }
@@ -458,6 +473,7 @@ public class HttpFSServer {
       response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       break;
     }
+<<<<<<< HEAD
     case GETSNAPSHOTLIST: {
       FSOperations.FSGetSnapshotListing command =
           new FSOperations.FSGetSnapshotListing(path);
@@ -492,6 +508,8 @@ public class HttpFSServer {
       response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
       break;
     }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     default: {
       throw new IOException(
           MessageFormat.format("Invalid HTTP GET operation [{0}]", op.value()));
@@ -638,6 +656,7 @@ public class HttpFSServer {
     switch (op.value()) {
       case APPEND: {
         Boolean hasData = params.get(DataParam.NAME, DataParam.class);
+<<<<<<< HEAD
         URI redirectURL = createUploadRedirectionURL(uriInfo,
             HttpFSFileSystem.Operation.APPEND);
         Boolean noRedirect =
@@ -646,6 +665,20 @@ public class HttpFSServer {
             final String js = JsonUtil.toJsonString("Location", redirectURL);
             response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
         } else if (hasData) {
+=======
+        if (!hasData) {
+          URI redirectURL = createUploadRedirectionURL(
+              uriInfo, HttpFSFileSystem.Operation.APPEND);
+          Boolean noRedirect = params.get(
+              NoRedirectParam.NAME, NoRedirectParam.class);
+          if (noRedirect) {
+            final String js = JsonUtil.toJsonString("Location", redirectURL);
+            response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
+          } else {
+            response = Response.temporaryRedirect(redirectURL).build();
+          }
+        } else {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
           FSOperations.FSAppend command =
             new FSOperations.FSAppend(is, path);
           fsExecute(user, command);
@@ -779,6 +812,7 @@ public class HttpFSServer {
     switch (op.value()) {
       case CREATE: {
         Boolean hasData = params.get(DataParam.NAME, DataParam.class);
+<<<<<<< HEAD
         URI redirectURL = createUploadRedirectionURL(uriInfo,
             HttpFSFileSystem.Operation.CREATE);
         Boolean noRedirect =
@@ -787,6 +821,20 @@ public class HttpFSServer {
             final String js = JsonUtil.toJsonString("Location", redirectURL);
             response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
         } else if (hasData) {
+=======
+        if (!hasData) {
+          URI redirectURL = createUploadRedirectionURL(
+              uriInfo, HttpFSFileSystem.Operation.CREATE);
+          Boolean noRedirect = params.get(
+              NoRedirectParam.NAME, NoRedirectParam.class);
+          if (noRedirect) {
+            final String js = JsonUtil.toJsonString("Location", redirectURL);
+            response = Response.ok(js).type(MediaType.APPLICATION_JSON).build();
+          } else {
+            response = Response.temporaryRedirect(redirectURL).build();
+          }
+        } else {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
           Short permission = params.get(PermissionParam.NAME,
                                          PermissionParam.class);
           Short unmaskedPermission = params.get(UnmaskedPermissionParam.NAME,
@@ -810,8 +858,11 @@ public class HttpFSServer {
               "Location", uriInfo.getAbsolutePath());
           response = Response.created(uriInfo.getAbsolutePath())
               .type(MediaType.APPLICATION_JSON).entity(js).build();
+<<<<<<< HEAD
         } else {
           response = Response.temporaryRedirect(redirectURL).build();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         }
         break;
       }

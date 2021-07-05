@@ -36,9 +36,17 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.LongAccumulator;
+<<<<<<< HEAD
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 
+=======
+
+import com.google.common.base.Function;
+import com.google.common.base.Joiner;
+import com.google.common.collect.Iterables;
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -208,6 +216,7 @@ public abstract class HATestUtil {
   public static MiniQJMHACluster setUpObserverCluster(
       Configuration conf, int numObservers, int numDataNodes,
       boolean fastTailing) throws IOException {
+<<<<<<< HEAD
     return setUpObserverCluster(conf, numObservers, numDataNodes,
         fastTailing, null, null);
   }
@@ -216,6 +225,8 @@ public abstract class HATestUtil {
       Configuration conf, int numObservers, int numDataNodes,
       boolean fastTailing, long[] simulatedCapacities,
       String[] racks) throws IOException {
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // disable block scanner
     conf.setInt(DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_KEY, -1);
 
@@ -231,9 +242,13 @@ public abstract class HATestUtil {
 
     MiniQJMHACluster.Builder qjmBuilder = new MiniQJMHACluster.Builder(conf)
         .setNumNameNodes(2 + numObservers);
+<<<<<<< HEAD
     qjmBuilder.getDfsBuilder().numDataNodes(numDataNodes)
         .simulatedCapacities(simulatedCapacities)
         .racks(racks);
+=======
+    qjmBuilder.getDfsBuilder().numDataNodes(numDataNodes);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     MiniQJMHACluster qjmhaCluster = qjmBuilder.build();
     MiniDFSCluster dfsCluster = qjmhaCluster.getDfsCluster();
 
@@ -302,11 +317,23 @@ public abstract class HATestUtil {
   public static <P extends FailoverProxyProvider<?>> void
       setFailoverConfigurations(Configuration conf, String logicalName,
       List<InetSocketAddress> nnAddresses, Class<P> classFPP) {
+<<<<<<< HEAD
     final List<String> addresses = new ArrayList();
     nnAddresses.forEach(
         addr -> addresses.add(
             "hdfs://" + addr.getHostName() + ":" + addr.getPort()));
     setFailoverConfigurations(conf, logicalName, addresses, classFPP);
+=======
+    setFailoverConfigurations(conf, logicalName,
+        Iterables.transform(nnAddresses, new Function<InetSocketAddress, String>() {
+
+          // transform the inet address to a simple string
+          @Override
+          public String apply(InetSocketAddress addr) {
+            return "hdfs://" + addr.getHostName() + ":" + addr.getPort();
+          }
+        }), classFPP);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public static <P extends FailoverProxyProvider<?>>
@@ -372,6 +399,7 @@ public abstract class HATestUtil {
     lastSeenStateId.accumulate(stateId);
     return currentStateId;
   }
+<<<<<<< HEAD
 
   /**
    * Get last seen stateId from the client AlignmentContext.
@@ -384,4 +412,6 @@ public abstract class HATestUtil {
     ClientGSIContext ac = (ClientGSIContext)(provider.getAlignmentContext());
     return ac.getLastSeenStateId();
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

@@ -103,7 +103,10 @@ import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.server.namenode.FSDirStatAndListingOp.*;
 import static org.apache.hadoop.ha.HAServiceProtocol.HAServiceState.ACTIVE;
+<<<<<<< HEAD
 import static org.apache.hadoop.ha.HAServiceProtocol.HAServiceState.STANDBY;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.ha.HAServiceProtocol.HAServiceState.OBSERVER;
 
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
@@ -316,7 +319,11 @@ import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.CallerContext;
+<<<<<<< HEAD
 import org.apache.hadoop.ipc.RemoteException;
+=======
+import org.apache.hadoop.ipc.ObserverRetryOnActiveException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.RetryCache;
 import org.apache.hadoop.ipc.Server;
@@ -1186,9 +1193,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
     // Make sure there is at least one logger installed.
     if (auditLoggers.isEmpty()) {
+<<<<<<< HEAD
       FSNamesystemAuditLogger fsNamesystemAuditLogger = new FSNamesystemAuditLogger();
       fsNamesystemAuditLogger.initialize(conf);
       auditLoggers.add(fsNamesystemAuditLogger);
+=======
+      DefaultAuditLogger defaultAuditLogger = new DefaultAuditLogger();
+      defaultAuditLogger.initialize(conf);
+      auditLoggers.add(defaultAuditLogger);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     // Add audit logger to calculate top users
@@ -1915,6 +1928,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     String operationName = "metaSave";
     checkSuperuserPrivilege(operationName);
     checkOperation(OperationCategory.READ);
+<<<<<<< HEAD
     readLock();
     try {
       checkOperation(OperationCategory.READ);
@@ -1927,6 +1941,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         out.flush();
         out.close();
       }
+=======
+    writeLock();
+    try {
+      checkOperation(OperationCategory.READ);
+      File file = new File(System.getProperty("hadoop.log.dir"), filename);
+      PrintWriter out = new PrintWriter(new BufferedWriter(
+          new OutputStreamWriter(new FileOutputStream(file), Charsets.UTF_8)));
+      metaSave(out);
+      out.flush();
+      out.close();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } finally {
       readUnlock(operationName, getLockReportInfoSupplier(null));
     }
@@ -2132,6 +2157,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     FSPermissionChecker.setOperationType(operationName);
     final INode inode;
     try {
+<<<<<<< HEAD
       readLock();
       try {
         checkOperation(OperationCategory.READ);
@@ -2164,6 +2190,34 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         }
       } finally {
         readUnlock(operationName, getLockReportInfoSupplier(srcArg));
+=======
+      checkOperation(OperationCategory.READ);
+      res = FSDirStatAndListingOp.getBlockLocations(
+          dir, pc, srcArg, offset, length, true);
+      if (isInSafeMode()) {
+        for (LocatedBlock b : res.blocks.getLocatedBlocks()) {
+          // if safemode & no block locations yet then throw safemodeException
+          if ((b.getLocations() == null) || (b.getLocations().length == 0)) {
+            SafeModeException se = newSafemodeException(
+                "Zero blocklocations for " + srcArg);
+            if (haEnabled && haContext != null &&
+                (haContext.getState().getServiceState() == ACTIVE ||
+                    haContext.getState().getServiceState() == OBSERVER)) {
+              throw new RetriableException(se);
+            } else {
+              throw se;
+            }
+          }
+        }
+      } else if (haEnabled && haContext != null &&
+          haContext.getState().getServiceState() == OBSERVER) {
+        for (LocatedBlock b : res.blocks.getLocatedBlocks()) {
+          if (b.getLocations() == null || b.getLocations().length == 0) {
+            throw new ObserverRetryOnActiveException("Zero blocklocations for "
+                + srcArg);
+          }
+        }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     } catch (AccessControlException e) {
       logAuditEvent(false, operationName, srcArg);
@@ -8208,6 +8262,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     final String operationName = "removeErasureCodingPolicy";
     checkOperation(OperationCategory.WRITE);
     checkErasureCodingSupported(operationName);
+<<<<<<< HEAD
+=======
+    boolean success = false;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     writeLock();
     try {
       checkOperation(OperationCategory.WRITE);

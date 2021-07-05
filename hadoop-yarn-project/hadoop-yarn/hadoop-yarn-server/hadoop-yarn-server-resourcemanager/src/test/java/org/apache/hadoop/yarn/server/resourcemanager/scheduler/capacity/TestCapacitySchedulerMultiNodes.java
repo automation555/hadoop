@@ -40,9 +40,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRMAppSubmissionData;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRMAppSubmitter;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.MultiNodeSorter;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.MultiNodeSortingManager;
 import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
@@ -189,6 +192,7 @@ public class TestCapacitySchedulerMultiNodes extends CapacitySchedulerTestBase {
     rm.stop();
   }
 
+<<<<<<< HEAD
   @Test (timeout=30000)
   public void testExcessReservationWillBeUnreserved() throws Exception {
     CapacitySchedulerConfiguration newConf =
@@ -275,6 +279,8 @@ public class TestCapacitySchedulerMultiNodes extends CapacitySchedulerTestBase {
     rm1.close();
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test(timeout=30000)
   public void testAllocateForReservedContainer() throws Exception {
     CapacitySchedulerConfiguration newConf =
@@ -292,6 +298,7 @@ public class TestCapacitySchedulerMultiNodes extends CapacitySchedulerTestBase {
     MockNM nm2 = rm1.registerNode("h2:1234", 8 * GB);
 
     // launch an app to queue, AM container should be launched in nm1
+<<<<<<< HEAD
     RMApp app1 = MockRMAppSubmitter.submit(rm1,
         MockRMAppSubmissionData.Builder.createWithMemory(5 * GB, rm1)
             .withAppName("app")
@@ -309,6 +316,13 @@ public class TestCapacitySchedulerMultiNodes extends CapacitySchedulerTestBase {
             .withAcls(null)
             .withQueue("default")
             .build());
+=======
+    RMApp app1 = rm1.submitApp(5 * GB, "app", "user", null, "default");
+    MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
+
+    // launch another app to queue, AM container should be launched in nm2
+    RMApp app2 = rm1.submitApp(5 * GB, "app", "user", null, "default");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     MockAM am2 = MockRM.launchAndRegisterAM(app2, rm1, nm2);
 
     CapacityScheduler cs = (CapacityScheduler) rm1.getResourceScheduler();
@@ -323,13 +337,21 @@ public class TestCapacitySchedulerMultiNodes extends CapacitySchedulerTestBase {
      * after node has sufficient resource.
      */
     // Ask a container with 6GB memory size for app2,
+<<<<<<< HEAD
     // nm2 will reserve a container for app2
     // Last Node from Node Iterator will be RESERVED
+=======
+    // nm1 will reserve a container for app2
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     am2.allocate("*", 6 * GB, 1, new ArrayList<>());
     cs.handle(new NodeUpdateSchedulerEvent(rmNode1));
 
     // Check containers of app1 and app2.
+<<<<<<< HEAD
     Assert.assertNotNull(cs.getNode(nm2.getNodeId()).getReservedContainer());
+=======
+    Assert.assertNotNull(cs.getNode(nm1.getNodeId()).getReservedContainer());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Assert.assertEquals(1, schedulerApp1.getLiveContainers().size());
     Assert.assertEquals(1, schedulerApp2.getLiveContainers().size());
     Assert.assertEquals(1, schedulerApp2.getReservedContainers().size());
@@ -344,6 +366,7 @@ public class TestCapacitySchedulerMultiNodes extends CapacitySchedulerTestBase {
 
     rm1.close();
   }
+<<<<<<< HEAD
 
   @Test(timeout=30000)
   public void testAllocateOfReservedContainerFromAnotherNode()
@@ -475,4 +498,6 @@ public class TestCapacitySchedulerMultiNodes extends CapacitySchedulerTestBase {
     rm.stop();
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

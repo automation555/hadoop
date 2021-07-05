@@ -116,6 +116,7 @@ for both files and directories, MUST always return `true` to the `isEncrypted()`
 predicate. This can be done by setting the `encrypted` flag to true when creating
 the `FileStatus` instance.
 
+<<<<<<< HEAD
 
 ### `msync()`
 
@@ -146,6 +147,8 @@ its latest journal transaction ID. For more details see HDFS documentation
 [Consistent Reads from HDFS Observer NameNode](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/ObserverNameNode.html)
 
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 ### `Path getHomeDirectory()`
 
 The function `getHomeDirectory` returns the home directory for the FileSystem

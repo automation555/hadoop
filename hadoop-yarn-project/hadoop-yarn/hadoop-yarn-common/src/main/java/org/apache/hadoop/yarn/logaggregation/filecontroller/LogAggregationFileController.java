@@ -381,6 +381,20 @@ public abstract class LogAggregationFileController {
           + "] does not exist. Attempting to create it.");
       try {
         remoteFS.mkdirs(qualified, new FsPermission(TLDIR_PERMISSIONS));
+<<<<<<< HEAD
+=======
+
+        // Not possible to query FileSystem API to check if it supports
+        // chmod, chown etc. Hence resorting to catching exceptions here.
+        // Remove when FS APi is ready
+        try {
+          remoteFS.setPermission(qualified, new FsPermission(TLDIR_PERMISSIONS));
+        } catch ( UnsupportedOperationException use) {
+          LOG.info("Unable to set permissions for configured filesystem since"
+              + " it does not support this", remoteFS.getScheme());
+          fsSupportsChmod = false;
+        }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
         // Not possible to query FileSystem API to check if it supports
         // chmod, chown etc. Hence resorting to catching exceptions here.
@@ -507,6 +521,10 @@ public abstract class LogAggregationFileController {
 
   protected void createDir(FileSystem fs, Path path, FsPermission fsPerm)
       throws IOException {
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (fsSupportsChmod) {
       FsPermission dirPerm = new FsPermission(fsPerm);
       fs.mkdirs(path, dirPerm);
@@ -643,6 +661,7 @@ public abstract class LogAggregationFileController {
   public boolean isFsSupportsChmod() {
     return fsSupportsChmod;
   }
+<<<<<<< HEAD
 
   protected boolean belongsToAppAttempt(ApplicationAttemptId appAttemptId,
       String containerIdStr) {
@@ -657,4 +676,6 @@ public abstract class LogAggregationFileController {
     }
     return false;
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

@@ -584,6 +584,17 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
 
   }
 
+  @VisibleForTesting
+  public void setCapacity(String queue, String absoluteResourceCapacity) {
+    if (queue.equals("root")) {
+      throw new IllegalArgumentException(
+          "Cannot set capacity, root queue has a fixed capacity");
+    }
+    set(getQueuePrefix(queue) + CAPACITY, absoluteResourceCapacity);
+    LOG.debug("CSConf - setCapacity: queuePrefix=" + getQueuePrefix(queue)
+        + ", capacity=" + absoluteResourceCapacity);
+  }
+
   public float getNonLabeledQueueMaximumCapacity(String queue) {
     String configuredCapacity = get(getQueuePrefix(queue) + MAXIMUM_CAPACITY);
     boolean matcher = (configuredCapacity != null)
@@ -791,11 +802,17 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
       String suffix, float defaultValue) {
     String capacityPropertyName = getNodeLabelPrefix(queue, label) + suffix;
     String configuredCapacity = get(capacityPropertyName);
+<<<<<<< HEAD
     boolean absoluteResourceConfigured =
         (configuredCapacity != null) && RESOURCE_PATTERN.matcher(
             configuredCapacity).find();
     if (absoluteResourceConfigured || configuredWeightAsCapacity(
         configuredCapacity)) {
+=======
+    boolean matcher = (configuredCapacity != null)
+        && RESOURCE_PATTERN.matcher(configuredCapacity).find();
+    if (matcher) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       // Return capacity in percentage as 0 for non-root queues and 100 for
       // root.From AbstractCSQueue, absolute resource, and weight will be parsed
       // and updated separately. Once nodes are added/removed in cluster,

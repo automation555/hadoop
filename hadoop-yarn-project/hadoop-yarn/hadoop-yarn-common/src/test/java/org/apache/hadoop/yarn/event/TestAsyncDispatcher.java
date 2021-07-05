@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.event;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+<<<<<<< HEAD
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -35,6 +36,12 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.yarn.metrics.GenericEventTypeMetrics;
 import org.slf4j.Logger;
+=======
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import org.apache.commons.logging.Log;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -109,6 +116,7 @@ public class TestAsyncDispatcher {
   }
 
   private static class TestHandler implements EventHandler<Event> {
+<<<<<<< HEAD
 
     private long sleepTime = 1500;
 
@@ -119,18 +127,29 @@ public class TestAsyncDispatcher {
       this.sleepTime = sleepTime;
     }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     @Override
     public void handle(Event event) {
       try {
         // As long as 10000 events queued
+<<<<<<< HEAD
         Thread.sleep(this.sleepTime);
       } catch (InterruptedException e) {
       }
+=======
+        Thread.sleep(1500);
+      } catch (InterruptedException e) {}
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 
   private enum TestEnum {
+<<<<<<< HEAD
     TestEventType, TestEventType2
+=======
+    TestEventType
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -159,6 +178,50 @@ public class TestAsyncDispatcher {
     disp.close();
     assertEquals(0, queue.size());
   }
+<<<<<<< HEAD
+=======
+
+  //Test print dispatcher details when the blocking queue is heavy
+  @Test(timeout = 10000)
+  public void testPrintDispatcherEventDetails() throws Exception {
+    YarnConfiguration conf = new YarnConfiguration();
+    conf.setInt(YarnConfiguration.
+            YARN_DISPATCHER_PRINT_EVENTS_INFO_THRESHOLD, 5000);
+    Log log = mock(Log.class);
+    AsyncDispatcher dispatcher = new AsyncDispatcher();
+    dispatcher.init(conf);
+
+    Field logger = AsyncDispatcher.class.getDeclaredField("LOG");
+    logger.setAccessible(true);
+    Field modifiers = Field.class.getDeclaredField("modifiers");
+    modifiers.setAccessible(true);
+    modifiers.setInt(logger, logger.getModifiers() & ~Modifier.FINAL);
+    Object oldLog = logger.get(null);
+
+    try {
+      logger.set(null, log);
+      dispatcher.register(TestEnum.class, new TestHandler());
+      dispatcher.start();
+
+      for (int i = 0; i < 10000; ++i) {
+        Event event = mock(Event.class);
+        when(event.getType()).thenReturn(TestEnum.TestEventType);
+        dispatcher.getEventHandler().handle(event);
+      }
+      verify(log, atLeastOnce()).info("Event type: TestEventType, " +
+              "Event record counter: 5000");
+      Thread.sleep(2000);
+      //Make sure more than one event to take
+      verify(log, atLeastOnce()).
+              info("Latest dispatch event type: TestEventType");
+      dispatcher.stop();
+    } finally {
+      //... restore logger object
+      logger.set(null, oldLog);
+    }
+  }
+}
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   //Test print dispatcher details when the blocking queue is heavy
   @Test(timeout = 10000)

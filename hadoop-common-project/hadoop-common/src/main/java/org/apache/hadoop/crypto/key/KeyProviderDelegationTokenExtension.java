@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.crypto.key;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
+import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.Credentials;

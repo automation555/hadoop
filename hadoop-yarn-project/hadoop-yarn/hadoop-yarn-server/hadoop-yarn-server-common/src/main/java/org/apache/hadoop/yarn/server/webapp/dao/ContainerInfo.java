@@ -161,10 +161,13 @@ public class ContainerInfo {
     return Collections.unmodifiableMap(allocatedResources);
   }
 
+<<<<<<< HEAD
   public String getExposedPorts() {
     return exposedPorts;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public boolean hasCustomResources() {
     return allocatedResources.size() > 2;
   }

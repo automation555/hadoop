@@ -31,7 +31,10 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.server.datanode.DataNodeFaultInjector;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.hdfs.util.StripedBlockUtil.BlockReadStats;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
@@ -192,7 +195,10 @@ class StripedBlockReader {
    * Perform actual reading of bytes from block.
    */
   private BlockReadStats actualReadFromBlock() throws IOException {
+<<<<<<< HEAD
     DataNodeFaultInjector.get().delayBlockReader();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     int len = buffer.remaining();
     int n = 0;
     while (n < len) {

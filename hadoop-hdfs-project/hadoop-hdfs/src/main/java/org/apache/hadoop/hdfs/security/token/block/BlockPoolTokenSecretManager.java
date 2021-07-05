@@ -106,6 +106,7 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
+<<<<<<< HEAD
    * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
    * String, ExtendedBlock, BlockTokenIdentifier.AccessMode)}.
    */
@@ -126,6 +127,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * See {@link BlockTokenSecretManager#checkAccess(Token, String,
    *                ExtendedBlock, BlockTokenIdentifier.AccessMode,
    *                StorageType[], String[])}

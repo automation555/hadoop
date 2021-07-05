@@ -701,6 +701,10 @@ public class SimulatedFSDataset implements FsDatasetSpi<FsVolumeSpi> {
     return storages;
   }
 
+  public List<SimulatedStorage> getStorages() {
+    return storages;
+  }
+
   public SimulatedFSDataset(DataStorage storage, Configuration conf) {
     this(null, storage, conf);
   }

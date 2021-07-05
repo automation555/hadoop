@@ -64,7 +64,11 @@ public class TestListCorruptFileBlocks {
   @Test (timeout=300000)
   public void testListCorruptFilesCorruptedBlock() throws Exception {
     MiniDFSCluster cluster = null;
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     try {
       Configuration conf = new HdfsConfiguration();
 

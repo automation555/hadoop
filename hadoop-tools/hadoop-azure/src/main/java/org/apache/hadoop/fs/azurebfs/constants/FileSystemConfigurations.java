@@ -101,6 +101,7 @@ public final class FileSystemConfigurations {
   public static final boolean DEFAULT_ENABLE_HTTPS = true;
 
   public static final boolean DEFAULT_USE_UPN = false;
+<<<<<<< HEAD
   public static final boolean DEFAULT_ENABLE_CHECK_ACCESS = true;
   public static final boolean DEFAULT_ABFS_LATENCY_TRACK = false;
   public static final long DEFAULT_SAS_TOKEN_RENEW_PERIOD_FOR_STREAMS_IN_SECONDS = 120;
@@ -113,6 +114,8 @@ public final class FileSystemConfigurations {
 
   public static final int STREAM_ID_LEN = 12;
   public static final boolean DEFAULT_ENABLE_ABFS_LIST_ITERATOR = true;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private FileSystemConfigurations() {}
 }

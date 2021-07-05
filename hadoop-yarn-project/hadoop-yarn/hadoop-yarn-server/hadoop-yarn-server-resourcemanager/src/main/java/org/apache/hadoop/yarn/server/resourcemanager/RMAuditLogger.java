@@ -401,8 +401,12 @@ public class RMAuditLogger {
   static String createFailureLog(String user, String operation, String perm,
       String target, String description, ApplicationId appId,
       ApplicationAttemptId attemptId, ContainerId containerId,
+<<<<<<< HEAD
       Resource resource, CallerContext callerContext, String queueName,
       String partition) {
+=======
+      Resource resource, CallerContext callerContext, String queueName) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     StringBuilder b = createStringBuilderForFailureLog(user,
         operation, target, description, perm);
     if (appId != null) {
@@ -421,10 +425,13 @@ public class RMAuditLogger {
     if (queueName != null) {
       add(Keys.QUEUENAME, queueName, b);
     }
+<<<<<<< HEAD
     if (partition != null) {
       add(Keys.NODELABEL, partition, b);
     }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return b.toString();
   }
 
@@ -435,7 +442,11 @@ public class RMAuditLogger {
       String target, String description, ApplicationId appId,
       ApplicationAttemptId attemptId, ContainerId containerId, Resource resource) {
     return createFailureLog(user, operation, perm, target, description, appId,
+<<<<<<< HEAD
         attemptId, containerId, resource, null, null, null);
+=======
+        attemptId, containerId, resource, null, null);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -507,7 +518,11 @@ public class RMAuditLogger {
       CallerContext callerContext) {
     if (LOG.isWarnEnabled()) {
       LOG.warn(createFailureLog(user, operation, perm, target, description,
+<<<<<<< HEAD
           appId, null, null, null, callerContext, null, null));
+=======
+          appId, null, null, null, callerContext, null));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 
@@ -516,7 +531,11 @@ public class RMAuditLogger {
       CallerContext callerContext, String queueName) {
     if (LOG.isWarnEnabled()) {
       LOG.warn(createFailureLog(user, operation, perm, target, description,
+<<<<<<< HEAD
           appId, null, null, null, callerContext, queueName, null));
+=======
+          appId, null, null, null, callerContext, queueName));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 
@@ -548,7 +567,11 @@ public class RMAuditLogger {
       String queueName) {
     if (LOG.isWarnEnabled()) {
       LOG.warn(createFailureLog(user, operation, perm, target, description,
+<<<<<<< HEAD
           appId, null, null, null, null, queueName, null));
+=======
+          appId, null, null, null, null, queueName));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
+<<<<<<< HEAD
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter.getServiceState;
 import static org.apache.hadoop.hdfs.server.namenode.ha.ObserverReadProxyProvider.*;
@@ -30,10 +31,23 @@ import static org.mockito.Mockito.doAnswer;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+=======
+import static org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter.getServiceState;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
+
+import java.io.File;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+<<<<<<< HEAD
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -42,12 +56,19 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+=======
+
+import org.apache.hadoop.conf.Configuration;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.ServiceFailedException;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.DFSTestUtil;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -58,6 +79,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.qjournal.MiniQJMHACluster;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.server.namenode.FSEditLog;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
@@ -66,6 +88,10 @@ import org.apache.hadoop.hdfs.tools.GetGroups;
 import org.apache.hadoop.ipc.ObserverRetryOnActiveException;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
+=======
+import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
+import org.apache.hadoop.hdfs.server.namenode.TestFsck;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -92,12 +118,16 @@ public class TestObserverNode {
   @BeforeClass
   public static void startUpCluster() throws Exception {
     conf = new Configuration();
+<<<<<<< HEAD
     conf.setBoolean(DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY, true);
     // Set observer probe retry period to 0. Required by the tests that restart
     // Observer and immediately try to read from it.
     conf.setTimeDuration(
         OBSERVER_PROBE_RETRY_PERIOD_KEY, 0, TimeUnit.MILLISECONDS);
     qjmhaCluster = HATestUtil.setUpObserverCluster(conf, 1, 1, true);
+=======
+    qjmhaCluster = HATestUtil.setUpObserverCluster(conf, 1, 0, true);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     dfsCluster = qjmhaCluster.getDfsCluster();
   }
 
@@ -134,6 +164,7 @@ public class TestObserverNode {
     fail("active cannot be transitioned to observer");
   }
 
+<<<<<<< HEAD
   /**
    * Test that non-ClientProtocol proxies such as
    * {@link org.apache.hadoop.tools.GetUserMappingsProtocol} still work
@@ -145,6 +176,8 @@ public class TestObserverNode {
     assertEquals(0, getGroups.run(new String[0]));
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test
   public void testNoObserverToActive() throws Exception {
     try {
@@ -384,6 +417,7 @@ public class TestObserverNode {
     assertTrue(result.contains("Status: HEALTHY"));
   }
 
+<<<<<<< HEAD
   /**
    * Test that, if a write happens happens to go to Observer,
    * Observer would throw {@link ObserverRetryOnActiveException},
@@ -608,6 +642,8 @@ public class TestObserverNode {
         HATestUtil.isSentToAnyOfNameNodes(fs, dfsCluster, nnIdx));
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private void assertSentTo(int nnIdx) throws IOException {
     assertTrue("Request was not sent to the expected namenode " + nnIdx,
         HATestUtil.isSentToAnyOfNameNodes(dfs, dfsCluster, nnIdx));

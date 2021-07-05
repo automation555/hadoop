@@ -26,7 +26,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
@@ -149,6 +148,7 @@ public class LogAggregationUtils {
     return new Path(remoteRootLogDir, user);
   }
 
+<<<<<<< HEAD
   /**
    * Gets the remote log user's bucket dir.
    * @param remoteRootLogDir the aggregated log remote root log dir
@@ -184,6 +184,8 @@ public class LogAggregationUtils {
     return BUCKET_SUFFIX;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   
   /**
    * Converts a nodeId to a form used in the app log file name.
@@ -200,6 +202,10 @@ public class LogAggregationUtils {
     return nodeId.toString().replace(":", "_");
   }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Return the remote application log directory.
    * @param conf the configuration
@@ -309,6 +315,7 @@ public class LogAggregationUtils {
     }
     return nodeFilesCur;
   }
+<<<<<<< HEAD
 
   /**
    * Get all available log files under remote app log directory.
@@ -449,4 +456,6 @@ public class LogAggregationUtils {
 
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

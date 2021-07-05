@@ -51,10 +51,15 @@ import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 import org.apache.hadoop.hdfs.protocol.FsPermissionExtension;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
+=======
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.hdfs.web.JsonUtilClient;
 import org.apache.hadoop.lib.wsrs.EnumSetParam;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -193,7 +198,10 @@ public class HttpFSFileSystem extends FileSystem
   public static final String FILE_ID_JSON = "fileId";
   public static final String REPLICATION_JSON = "replication";
   public static final String STORAGEPOLICY_JSON = "storagePolicy";
+<<<<<<< HEAD
   public static final String ECPOLICYNAME_JSON = "ecPolicy";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public static final String XATTRS_JSON = "XAttrs";
   public static final String XATTR_NAME_JSON = "name";
   public static final String XATTR_VALUE_JSON = "value";
@@ -264,10 +272,14 @@ public class HttpFSFileSystem extends FileSystem
     ALLOWSNAPSHOT(HTTP_PUT), DISALLOWSNAPSHOT(HTTP_PUT),
     CREATESNAPSHOT(HTTP_PUT), DELETESNAPSHOT(HTTP_DELETE),
     RENAMESNAPSHOT(HTTP_PUT), GETSNAPSHOTDIFF(HTTP_GET),
+<<<<<<< HEAD
     GETSNAPSHOTTABLEDIRECTORYLIST(HTTP_GET), GETSNAPSHOTLIST(HTTP_GET),
     GETSERVERDEFAULTS(HTTP_GET),
     CHECKACCESS(HTTP_GET), SETECPOLICY(HTTP_PUT), GETECPOLICY(
         HTTP_GET), UNSETECPOLICY(HTTP_POST), SATISFYSTORAGEPOLICY(HTTP_PUT);
+=======
+    GETSNAPSHOTTABLEDIRECTORYLIST(HTTP_GET);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     private String httpMethod;
 
@@ -1169,8 +1181,12 @@ public class HttpFSFileSystem extends FileSystem
     ContentSummary.Builder builder = new ContentSummary.Builder()
         .length((Long) json.get(CONTENT_SUMMARY_LENGTH_JSON))
         .fileCount((Long) json.get(CONTENT_SUMMARY_FILE_COUNT_JSON))
+<<<<<<< HEAD
         .directoryCount((Long) json.get(CONTENT_SUMMARY_DIRECTORY_COUNT_JSON))
         .erasureCodingPolicy((String) json.get(CONTENT_SUMMARY_ECPOLICY_JSON));
+=======
+        .directoryCount((Long) json.get(CONTENT_SUMMARY_DIRECTORY_COUNT_JSON));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     builder = buildQuotaUsage(builder, json, ContentSummary.Builder.class);
     return builder.build();
   }
@@ -1589,6 +1605,7 @@ public class HttpFSFileSystem extends FileSystem
     return JsonUtilClient.toSnapshottableDirectoryList(json);
   }
 
+<<<<<<< HEAD
   public SnapshotStatus[] getSnapshotListing(Path snapshotRoot)
       throws IOException {
     Map<String, String> params = new HashMap<String, String>();
@@ -1692,4 +1709,6 @@ public class HttpFSFileSystem extends FileSystem
         Operation.SATISFYSTORAGEPOLICY.getMethod(), params, path, true);
     HttpExceptionUtils.validateResponse(conn, HttpURLConnection.HTTP_OK);
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

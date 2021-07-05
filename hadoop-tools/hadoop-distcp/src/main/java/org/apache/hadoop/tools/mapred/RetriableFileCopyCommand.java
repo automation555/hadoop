@@ -152,9 +152,14 @@ public class RetriableFileCopyCommand extends RetriableCommand {
           offset, context, fileAttributes, sourceChecksum, sourceStatus);
 
       if (!source.isSplit()) {
+<<<<<<< HEAD
         DistCpUtils.compareFileLengthsAndChecksums(source.getLen(), sourceFS,
                 sourcePath, sourceChecksum, targetFS,
                 targetPath, skipCrc, source.getLen());
+=======
+        DistCpUtils.compareFileLengthsAndChecksums(sourceFS, sourcePath,
+            sourceChecksum, targetFS, targetPath, skipCrc);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
       // it's not append or direct write (preferred for s3a) case, thus we first
       // write to a temporary file, then rename it to the target path.
@@ -264,8 +269,12 @@ public class RetriableFileCopyCommand extends RetriableCommand {
     Path root = target.equals(targetWorkPath) ? targetWorkPath.getParent()
         : targetWorkPath;
     Path tempFile = new Path(root, ".distcp.tmp." +
+<<<<<<< HEAD
         context.getTaskAttemptID().toString() +
         "." + String.valueOf(System.currentTimeMillis()));
+=======
+        context.getTaskAttemptID().toString());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     LOG.info("Creating temp file: {}", tempFile);
     return tempFile;
   }

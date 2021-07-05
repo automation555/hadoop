@@ -141,22 +141,38 @@ public class TestRMServerUtils {
     List<RMNode> result = RMServerUtils.queryRMNodes(rmContext,
         EnumSet.of(NodeState.SHUTDOWN));
     Assert.assertTrue(result.size() != 0);
+<<<<<<< HEAD
     assertThat(result.get(0)).isEqualTo(rmNode1);
+=======
+    Assert.assertEquals(result.get(0), rmNode1);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     when(rmNode1.getState()).thenReturn(NodeState.DECOMMISSIONED);
     result = RMServerUtils.queryRMNodes(rmContext,
         EnumSet.of(NodeState.DECOMMISSIONED));
     Assert.assertTrue(result.size() != 0);
+<<<<<<< HEAD
     assertThat(result.get(0)).isEqualTo(rmNode1);
+=======
+    Assert.assertEquals(result.get(0), rmNode1);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     when(rmNode1.getState()).thenReturn(NodeState.LOST);
     result = RMServerUtils.queryRMNodes(rmContext,
         EnumSet.of(NodeState.LOST));
     Assert.assertTrue(result.size() != 0);
+<<<<<<< HEAD
     assertThat(result.get(0)).isEqualTo(rmNode1);
+=======
+    Assert.assertEquals(result.get(0), rmNode1);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     when(rmNode1.getState()).thenReturn(NodeState.REBOOTED);
     result = RMServerUtils.queryRMNodes(rmContext,
         EnumSet.of(NodeState.REBOOTED));
     Assert.assertTrue(result.size() != 0);
+<<<<<<< HEAD
     assertThat(result.get(0)).isEqualTo(rmNode1);
+=======
+    Assert.assertEquals(result.get(0), rmNode1);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Test

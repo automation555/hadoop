@@ -698,6 +698,7 @@ public interface ClientProtocol {
       boolean needLocation) throws IOException;
 
   /**
+<<<<<<< HEAD
    * Get a partial listing of the input directories
    *
    * @param srcs the input directories
@@ -716,6 +717,8 @@ public interface ClientProtocol {
       boolean needLocation) throws IOException;
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Get the list of snapshottable directories that are owned
    * by the current user. Return all the snapshottable directories if the
    * current user is a super user.

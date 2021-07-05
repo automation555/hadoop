@@ -140,6 +140,10 @@ New configuration parameters that are introduced with v.2 are marked bold.
 | **`yarn.timeline-service.hbase.coprocessor.app-final-value-retention-milliseconds`** | The setting that controls how long the final value of a metric of a completed app is retained before merging into the flow sum. Defaults to `259200000` (3 days). This should be set in the HBase cluster. |
 | **`yarn.rm.system-metrics-publisher.emit-container-events`** | The setting that controls whether yarn container metrics is published to the timeline server or not by RM. This configuration setting is for ATS V2. Defaults to `false`. |
 | **`yarn.nodemanager.emit-container-events`** | The setting that controls whether yarn container metrics is published to the timeline server or not by NM. This configuration setting is for ATS V2. Defaults to `true`. |
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 #### <a name="Security_Configuration"></a>Security Configuration
 
 
@@ -328,6 +332,7 @@ Following are the basic configurations to start Timeline service v.2:
   <name>yarn.system-metrics-publisher.enabled</name>
   <value>true</value>
 </property>
+<<<<<<< HEAD
 ```
 
 If using an aux services manifest instead of setting aux services through the Configuration, ensure that the manifest services array includes the timeline\_collector service as follows:
@@ -344,6 +349,8 @@ If using an aux services manifest instead of setting aux services through the Co
     }
   ]
 }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 ```
 
 In addition, you may want to set the YARN cluster name to a reasonably unique value in case you

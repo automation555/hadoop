@@ -148,6 +148,12 @@ public class ContainerLocalizer {
     return new YarnConfiguration();
   }
 
+  @VisibleForTesting
+  @Private
+  Configuration initConfiguration() {
+    return new YarnConfiguration();
+  }
+
   @Private
   @VisibleForTesting
   public LocalizationProtocol getProxy(final InetSocketAddress nmAddr) {

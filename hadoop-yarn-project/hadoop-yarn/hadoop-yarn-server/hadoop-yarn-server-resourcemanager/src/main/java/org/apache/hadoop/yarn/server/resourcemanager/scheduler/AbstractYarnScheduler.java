@@ -218,10 +218,14 @@ public abstract class AbstractYarnScheduler
     nodeTracker.setConfiguredMaxAllocationWaitTime(
         configuredMaximumAllocationWaitTime);
     maxClusterLevelAppPriority = getMaxPriorityFromConf(conf);
+<<<<<<< HEAD
     if (!migration) {
       this.releaseCache = new Timer("Pending Container Clear Timer");
     }
 
+=======
+    this.releaseCache = new Timer("Pending Container Clear Timer");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     autoUpdateContainers =
         conf.getBoolean(YarnConfiguration.RM_AUTO_UPDATE_CONTAINERS,
             YarnConfiguration.DEFAULT_RM_AUTO_UPDATE_CONTAINERS);
@@ -246,7 +250,12 @@ public abstract class AbstractYarnScheduler
       schedulingMonitorManager.startAll();
       createReleaseCache();
     }
+<<<<<<< HEAD
 
+=======
+    schedulingMonitorManager.startAll();
+    createReleaseCache();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     super.serviceStart();
   }
 
@@ -729,7 +738,14 @@ public abstract class AbstractYarnScheduler
       if (node != null) {
         node.releaseContainer(rmContainer.getContainerId(), false);
       }
+<<<<<<< HEAD
       OpportunisticSchedulerMetrics.getMetrics().incrReleasedOppContainers(1);
+=======
+      SchedulerNode node = getSchedulerNode(rmContainer.getNodeId());
+      if (node != null) {
+        node.releaseContainer(rmContainer.getContainerId(), false);
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     // If the container is getting killed in ACQUIRED state, the requester (AM

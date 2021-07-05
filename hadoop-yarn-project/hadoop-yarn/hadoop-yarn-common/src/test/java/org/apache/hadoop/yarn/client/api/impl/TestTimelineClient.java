@@ -535,6 +535,7 @@ public class TestTimelineClient {
     Assert.assertFalse("Reloader is still alive", reloaderStillAlive);
   }
 
+<<<<<<< HEAD
   @Test
   public void testTimelineConnectorDestroy() {
     YarnConfiguration conf = new YarnConfiguration();
@@ -546,6 +547,8 @@ public class TestTimelineClient {
     verify(mockJerseyClient, times(1)).destroy();
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private void setupSSLConfig(YarnConfiguration conf) throws Exception {
     keystoresDir = TestGenericTestUtils.getTestDir().getAbsolutePath();
     sslConfDir =

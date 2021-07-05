@@ -116,8 +116,11 @@ import static org.apache.hadoop.yarn.api.records.ContainerExitStatus
 import static org.apache.hadoop.yarn.service.api.ServiceApiConstants.*;
 import static org.apache.hadoop.yarn.service.component.ComponentEventType.*;
 import static org.apache.hadoop.yarn.service.component.instance.ComponentInstanceEventType.START;
+<<<<<<< HEAD
 import static org.apache.hadoop.yarn.service.conf.YarnServiceConstants
     .CONTAINER_STATE_REPORT_AS_SERVICE_STATE;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.yarn.service.exceptions.LauncherExitCodes
     .EXIT_FALSE;
 import static org.apache.hadoop.yarn.service.exceptions.LauncherExitCodes

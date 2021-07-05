@@ -21,7 +21,11 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSF
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_CIPHER_SUITES_KEY;
 import static org.apache.hadoop.hdfs.protocol.datatransfer.sasl.DataTransferSaslUtil.*;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
+import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

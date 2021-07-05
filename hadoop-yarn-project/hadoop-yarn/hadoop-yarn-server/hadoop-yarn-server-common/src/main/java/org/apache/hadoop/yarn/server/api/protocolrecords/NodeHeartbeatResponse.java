@@ -116,6 +116,7 @@ public abstract class NodeHeartbeatResponse {
 
   public abstract void setAreNodeAttributesAcceptedByRM(
       boolean areNodeAttributesAcceptedByRM);
+<<<<<<< HEAD
 
   public abstract void setTokenSequenceNo(long tokenSequenceNo);
 
@@ -128,4 +129,6 @@ public abstract class NodeHeartbeatResponse {
 
   public abstract Collection<SystemCredentialsForAppsProto>
       getSystemCredentialsForApps();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

@@ -62,6 +62,7 @@ public class ClusterMetrics {
   @Metric("AM register delay") MutableRate aMRegisterDelay;
   @Metric("AM container allocation delay")
   private MutableRate aMContainerAllocationDelay;
+<<<<<<< HEAD
   @Metric("Memory Utilization") MutableGaugeLong utilizedMB;
   @Metric("Vcore Utilization") MutableGaugeLong utilizedVirtualCores;
   @Metric("Memory Capability") MutableGaugeLong capabilityMB;
@@ -78,6 +79,8 @@ public class ClusterMetrics {
     MutableGaugeInt schedulerDispatcherEventQueueSize;
 
   private boolean rmEventProcMonitorEnable = false;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private static final MetricsInfo RECORD_INFO = info("ClusterMetrics",
   "Metrics for the Yarn Cluster");
@@ -281,6 +284,7 @@ public class ClusterMetrics {
     aMRegisterDelay.add(delay);
   }
 
+<<<<<<< HEAD
   public long getCapabilityMB() {
     return capabilityMB.value();
   }
@@ -317,6 +321,8 @@ public class ClusterMetrics {
     }
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void addAMContainerAllocationDelay(long delay) {
     aMContainerAllocationDelay.add(delay);
   }
@@ -324,6 +330,7 @@ public class ClusterMetrics {
   public MutableRate getAMContainerAllocationDelay() {
     return aMContainerAllocationDelay;
   }
+<<<<<<< HEAD
 
   public long getUtilizedMB() {
     return utilizedMB.value();
@@ -376,4 +383,6 @@ public class ClusterMetrics {
   public void setSchedulerEventQueueSize(int schedulerEventQueueSize) {
     this.schedulerDispatcherEventQueueSize.set(schedulerEventQueueSize);
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

@@ -118,10 +118,13 @@ public final class ConfigurationKeys {
   public static final String FS_AZURE_CLUSTER_NAME = "fs.azure.cluster.name";
   public static final String FS_AZURE_CLUSTER_TYPE = "fs.azure.cluster.type";
   public static final String FS_AZURE_SSL_CHANNEL_MODE_KEY = "fs.azure.ssl.channel.mode";
+<<<<<<< HEAD
   /** Provides a config to enable/disable the checkAccess API.
    *  By default this will be
    *  FileSystemConfigurations.DEFAULT_ENABLE_CHECK_ACCESS. **/
   public static final String FS_AZURE_ENABLE_CHECK_ACCESS = "fs.azure.enable.check.access";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public static final String FS_AZURE_USE_UPN = "fs.azure.use.upn";
   /** User principal names (UPNs) have the format “{alias}@{domain}”. If true,
    *  only {alias} is included when a UPN would otherwise appear in the output

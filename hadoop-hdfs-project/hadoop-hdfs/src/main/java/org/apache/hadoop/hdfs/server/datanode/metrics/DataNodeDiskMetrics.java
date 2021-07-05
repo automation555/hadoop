@@ -61,6 +61,7 @@ public class DataNodeDiskMetrics {
   // code, status should not be overridden by daemon thread.
   private boolean overrideStatus = true;
 
+<<<<<<< HEAD
   /**
    * Minimum number of disks to run outlier detection.
    */
@@ -72,6 +73,9 @@ public class DataNodeDiskMetrics {
 
   public DataNodeDiskMetrics(DataNode dn, long diskOutlierDetectionIntervalMs,
       Configuration conf) {
+=======
+  public DataNodeDiskMetrics(DataNode dn, long diskOutlierDetectionIntervalMs) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.dn = dn;
     this.detectionInterval = diskOutlierDetectionIntervalMs;
     minOutlierDetectionDisks =

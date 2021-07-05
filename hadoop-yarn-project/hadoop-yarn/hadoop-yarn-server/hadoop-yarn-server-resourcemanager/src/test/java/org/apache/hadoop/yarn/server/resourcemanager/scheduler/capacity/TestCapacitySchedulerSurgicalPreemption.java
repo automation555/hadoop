@@ -204,11 +204,17 @@ public class TestCapacitySchedulerSurgicalPreemption
         4, cs.getQueue("root").getMetrics().getAggregatePreemptedContainers());
 
     Assert.assertEquals("Amount of preempted memory incorrectly recorded:",
+<<<<<<< HEAD
         4 * GB,
         cs.getQueue("root").getMetrics().getAggregateMemoryMBPreempted());
 
     Assert.assertEquals("Number of preempted vcores incorrectly recorded:", 4,
         cs.getQueue("root").getMetrics().getAggregateVcoresPreempted());
+=======
+	4 * GB, cs.getQueue("root").getMetrics().getAggregateMemoryMBPreempted());
+    Assert.assertEquals("Number of preempted vcores incorrectly recorded:",
+	4, cs.getQueue("root").getMetrics().getAggregateVcoresPreempted());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     rm1.close();
   }

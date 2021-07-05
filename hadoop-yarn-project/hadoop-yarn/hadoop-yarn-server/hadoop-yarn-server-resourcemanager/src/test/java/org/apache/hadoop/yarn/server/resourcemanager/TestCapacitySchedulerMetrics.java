@@ -104,9 +104,12 @@ public class TestCapacitySchedulerMetrics {
       // Verify HB metrics updated
       GenericTestUtils.waitFor(()
           -> csMetrics.getNumOfNodeUpdate() == 4, 100, 3000);
+<<<<<<< HEAD
       GenericTestUtils
           .waitFor(() -> csMetrics.getNumOfSchedulerNodeHBInterval() == 4,
               100, 3000);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       // For async mode, the number of alloc might be bigger than 1
       Assert.assertTrue(csMetrics.getNumOfAllocates() > 0);
       // But there will be only 2 successful commit (1 AM + 1 task)

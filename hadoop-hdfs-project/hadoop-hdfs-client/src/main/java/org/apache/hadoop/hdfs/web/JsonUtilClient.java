@@ -434,6 +434,7 @@ public class JsonUtilClient {
     final long length = ((Number) m.get("length")).longValue();
     final long fileCount = ((Number) m.get("fileCount")).longValue();
     final long directoryCount = ((Number) m.get("directoryCount")).longValue();
+<<<<<<< HEAD
     final String ecPolicy = ((String) m.get("ecPolicy"));
     ContentSummary.Builder builder = new ContentSummary.Builder()
         .length(length)
@@ -460,6 +461,13 @@ public class JsonUtilClient {
           ((Number) m.get("snapshotSpaceConsumed")).longValue();
       builder.snapshotSpaceConsumed(snapshotSpaceConsumed);
     }
+=======
+    ContentSummary.Builder builder = new ContentSummary.Builder()
+        .length(length)
+        .fileCount(fileCount)
+        .directoryCount(directoryCount);
+    builder = buildQuotaUsage(builder, m, ContentSummary.Builder.class);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return builder.build();
   }
 
@@ -736,9 +744,12 @@ public class JsonUtilClient {
   }
 
   public static ErasureCodingPolicy toECPolicy(Map<?, ?> m) {
+<<<<<<< HEAD
     if (m == null) {
       return null;
     }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     byte id = ((Number) m.get("id")).byteValue();
     String name = (String) m.get("name");
     String codec = (String) m.get("codecName");

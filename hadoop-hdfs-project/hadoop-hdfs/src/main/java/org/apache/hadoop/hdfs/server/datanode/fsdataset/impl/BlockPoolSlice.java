@@ -202,6 +202,7 @@ class BlockPoolSlice {
 
     // Use cached value initially if available. Or the following call will
     // block until the initial du command completes.
+<<<<<<< HEAD
     this.dfsUsage = new FSCachingGetSpaceUsed.Builder().setBpid(bpid)
             .setVolume(volume)
             .setPath(bpDir)
@@ -213,6 +214,15 @@ class BlockPoolSlice {
     if (addReplicaThreadPool == null) {
       // initialize add replica fork join pool
       initializeAddReplicaPool(conf, (FsDatasetImpl) volume.getDataset());
+=======
+    this.dfsUsage = new CachingGetSpaceUsed.Builder().setPath(bpDir)
+                                                     .setConf(conf)
+                                                     .setInitialUsed(loadDfsUsed())
+                                                     .build();
+    if (addReplicaThreadPool == null) {
+      // initialize add replica fork join pool
+      initializeAddReplicaPool(conf);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     // Make the dfs usage to be saved during shutdown.
     shutdownHook = new Runnable() {

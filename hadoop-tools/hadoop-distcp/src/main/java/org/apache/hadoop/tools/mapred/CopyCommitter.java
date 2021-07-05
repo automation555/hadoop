@@ -252,7 +252,11 @@ public class CopyCommitter extends FileOutputCommitter {
           // This is the last chunk of the splits, consolidate allChunkPaths
           try {
             concatFileChunks(conf, srcFileStatus.getPath(), targetFile,
+<<<<<<< HEAD
                 allChunkPaths, srcFileStatus);
+=======
+                allChunkPaths);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
           } catch (IOException e) {
             // If the concat failed because a chunk file doesn't exist,
             // then we assume that the CopyMapper has skipped copying this
@@ -610,8 +614,12 @@ public class CopyCommitter extends FileOutputCommitter {
    * Concat the passed chunk files into one and rename it the targetFile.
    */
   private void concatFileChunks(Configuration conf, Path sourceFile,
+<<<<<<< HEAD
                                 Path targetFile, LinkedList<Path> allChunkPaths,
                                 CopyListingFileStatus srcFileStatus)
+=======
+                                Path targetFile, LinkedList<Path> allChunkPaths)
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throws IOException {
     if (allChunkPaths.size() == 1) {
       return;
@@ -639,9 +647,14 @@ public class CopyCommitter extends FileOutputCommitter {
       LOG.debug("concat: result: " + dstfs.getFileStatus(firstChunkFile));
     }
     rename(dstfs, firstChunkFile, targetFile);
+<<<<<<< HEAD
     DistCpUtils.compareFileLengthsAndChecksums(srcFileStatus.getLen(),
         srcfs, sourceFile, null, dstfs,
             targetFile, skipCrc, srcFileStatus.getLen());
+=======
+    DistCpUtils.compareFileLengthsAndChecksums(
+        srcfs, sourceFile, null, dstfs, targetFile, skipCrc);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

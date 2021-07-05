@@ -536,6 +536,22 @@ public class BlockManager implements BlockStatsMXBean {
         DFSConfigKeys.DFS_NAMENODE_REDUNDANCY_INTERVAL_SECONDS_KEY,
         DFSConfigKeys.DFS_NAMENODE_REDUNDANCY_INTERVAL_SECONDS_DEFAULT,
         TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
+<<<<<<< HEAD
+=======
+
+    this.storageInfoDefragmentInterval =
+      conf.getLong(
+          DFSConfigKeys.DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_INTERVAL_MS_KEY,
+          DFSConfigKeys.DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_INTERVAL_MS_DEFAULT);
+    this.storageInfoDefragmentTimeout =
+      conf.getLong(
+          DFSConfigKeys.DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_TIMEOUT_MS_KEY,
+          DFSConfigKeys.DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_TIMEOUT_MS_DEFAULT);
+    this.storageInfoDefragmentRatio =
+      conf.getDouble(
+          DFSConfigKeys.DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_RATIO_KEY,
+          DFSConfigKeys.DFS_NAMENODE_STORAGEINFO_DEFRAGMENT_RATIO_DEFAULT);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     this.encryptDataTransfer =
         conf.getBoolean(DFSConfigKeys.DFS_ENCRYPT_DATA_TRANSFER_KEY,
@@ -597,10 +613,13 @@ public class BlockManager implements BlockStatsMXBean {
         DFSConfigKeys.DFS_NAMENODE_BLOCKREPORT_QUEUE_SIZE_DEFAULT);
     blockReportThread = new BlockReportProcessingThread(queueSize);
 
+<<<<<<< HEAD
     this.deleteCorruptReplicaImmediately =
         conf.getBoolean(DFS_NAMENODE_CORRUPT_BLOCK_DELETE_IMMEDIATELY_ENABLED,
             DFS_NAMENODE_CORRUPT_BLOCK_DELETE_IMMEDIATELY_ENABLED_DEFAULT);
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     LOG.info("defaultReplication         = {}", defaultReplication);
     LOG.info("maxReplication             = {}", maxReplication);
     LOG.info("minReplication             = {}", minReplication);
@@ -880,8 +899,13 @@ public class BlockManager implements BlockStatsMXBean {
     }
     // source node returned is not used
     chooseSourceDatanodes(blockInfo, containingNodes,
+<<<<<<< HEAD
         containingLiveReplicasNodes, numReplicas, new ArrayList<Byte>(),
         new ArrayList<Byte>(), LowRedundancyBlocks.LEVEL);
+=======
+        containingLiveReplicasNodes, numReplicas,
+        new LinkedList<Byte>(), LowRedundancyBlocks.LEVEL);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     
     // containingLiveReplicasNodes can include READ_ONLY_SHARED replicas which are 
     // not included in the numReplicas.liveReplicas() count
@@ -1606,6 +1630,7 @@ public class BlockManager implements BlockStatsMXBean {
     // getNumLiveDataNodes() is very expensive and we minimize its use by
     // comparing with minReplication first.
     return liveReplicas >= getDatanodeManager().getNumLiveDataNodes();
+<<<<<<< HEAD
   }
 
   private boolean isHotBlock(BlockInfo blockInfo, long time) {
@@ -1620,6 +1645,8 @@ public class BlockManager implements BlockStatsMXBean {
       return true;
     }
     return false;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /** Get all blocks with location information from a datanode. */

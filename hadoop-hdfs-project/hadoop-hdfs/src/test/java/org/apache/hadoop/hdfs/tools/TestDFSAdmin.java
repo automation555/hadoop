@@ -430,12 +430,18 @@ public class TestDFSAdmin {
     final List<String> outs = Lists.newArrayList();
     final List<String> errs = Lists.newArrayList();
     getReconfigurableProperties("namenode", address, outs, errs);
+<<<<<<< HEAD
     assertEquals(13, outs.size());
     assertEquals(DFS_BLOCK_PLACEMENT_EC_CLASSNAME_KEY, outs.get(1));
     assertEquals(DFS_BLOCK_REPLICATOR_CLASSNAME_KEY, outs.get(2));
     assertEquals(DFS_HEARTBEAT_INTERVAL_KEY, outs.get(3));
     assertEquals(DFS_IMAGE_PARALLEL_LOAD_KEY, outs.get(4));
     assertEquals(DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, outs.get(5));
+=======
+    assertEquals(10, outs.size());
+    assertEquals(DFS_HEARTBEAT_INTERVAL_KEY, outs.get(1));
+    assertEquals(DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY, outs.get(2));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertEquals(errs.size(), 0);
   }
 

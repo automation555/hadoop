@@ -447,6 +447,7 @@ public abstract class Storage extends StorageInfo {
         throw new IOException("Cannot create directory " + curDir);
       }
       if (permission != null) {
+<<<<<<< HEAD
         try {
           Set<PosixFilePermission> permissions =
               PosixFilePermissions.fromString(permission.toString());
@@ -455,6 +456,11 @@ public abstract class Storage extends StorageInfo {
           // Default to FileUtil for non posix file systems
           FileUtil.setPermission(curDir, permission);
         }
+=======
+        Set<PosixFilePermission> permissions =
+            PosixFilePermissions.fromString(permission.toString());
+        Files.setPosixFilePermissions(curDir.toPath(), permissions);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     }
 

@@ -741,6 +741,7 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
           // were created before "prior" will be covered by the later 
           // cleanSubtreeRecursively call.
           if (priorCreated != null) {
+<<<<<<< HEAD
             // The nodes in priorCreated must be destroyed if
             //   (1) this is the last reference, and
             //   (2) prior is the last snapshot, and
@@ -757,6 +758,17 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
                   currentINode.removeChild(cNode);
                   priorDiff.diff.removeCreated(cNode);
                 } else {
+=======
+            if (currentINode.isLastReference()) {
+              // if this is the last reference, the created list can be
+              // destroyed.
+              priorDiff.getChildrenDiff().destroyCreatedList(
+                  reclaimContext, currentINode);
+            } else {
+              // we only check the node originally in prior's created list
+              for (INode cNode : priorDiff.diff.getCreatedUnmodifiable()) {
+                if (priorCreated.containsKey(cNode)) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                   cNode.cleanSubtree(reclaimContext, snapshot, NO_SNAPSHOT_ID);
                 }
               }

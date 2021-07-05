@@ -846,6 +846,7 @@ public class ApiServer {
       public Integer run() throws YarnException, IOException {
         int result = 0;
         ServiceClient sc = new ServiceClient();
+<<<<<<< HEAD
         try {
           sc.init(YARN_CONFIG);
           sc.start();
@@ -855,6 +856,14 @@ public class ApiServer {
         } finally {
           sc.close();
         }
+=======
+        sc.init(YARN_CONFIG);
+        sc.start();
+        result = sc
+            .actionDecommissionInstances(appName, instances);
+        sc.close();
+        return Integer.valueOf(result);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     });
     if (result == EXIT_SUCCESS) {

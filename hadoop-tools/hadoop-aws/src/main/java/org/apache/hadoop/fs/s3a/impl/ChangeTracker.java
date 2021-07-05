@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.impl;
 
+<<<<<<< HEAD
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.SdkBaseException;
 import com.amazonaws.services.s3.model.CopyObjectRequest;
@@ -27,6 +28,15 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.transfer.model.CopyResult;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
+import java.util.concurrent.atomic.AtomicLong;
+
+import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.S3Object;
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.s3a.NoVersionAttributeException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +44,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.PathIOException;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.s3a.NoVersionAttributeException;
 import org.apache.hadoop.fs.s3a.RemoteFileChangedException;
 import org.apache.hadoop.fs.s3a.S3ObjectAttributes;
@@ -46,6 +57,16 @@ import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.
  * tracked and compared on open/re-open.  An initial version ID or etag may or
  * may not be available, depending on usage (e.g. if S3Guard is utilized).
  *
+=======
+import org.apache.hadoop.fs.s3a.RemoteFileChangedException;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+
+/**
+ * Change tracking for input streams: the revision ID/etag
+ * the previous request is recorded and when the next request comes in,
+ * it is compared.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
  * Self-contained for testing and use in different streams.
  */
 @InterfaceAudience.Private
@@ -55,9 +76,13 @@ public class ChangeTracker {
   private static final Logger LOG =
       LoggerFactory.getLogger(ChangeTracker.class);
 
+<<<<<<< HEAD
   /** {@code 412 Precondition Failed} (HTTP/1.1 - RFC 2616) */
   public static final int SC_PRECONDITION_FAILED = 412;
   public static final String CHANGE_REPORTED_BY_S3 = "Change reported by S3";
+=======
+  public static final String CHANGE_REPORTED_BY_S3 = "reported by S3";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   /** Policy to use. */
   private final ChangeDetectionPolicy policy;
@@ -71,7 +96,11 @@ public class ChangeTracker {
    * Mismatch counter; expected to be wired up to StreamStatistics except
    * during testing.
    */
+<<<<<<< HEAD
   private final ChangeTrackerStatistics versionMismatches;
+=======
+  private final AtomicLong versionMismatches;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   /**
    * Revision identifier (e.g. eTag or versionId, depending on change
@@ -84,6 +113,7 @@ public class ChangeTracker {
    * @param uri URI of object being tracked
    * @param policy policy to track.
    * @param versionMismatches reference to the version mismatch counter
+<<<<<<< HEAD
    * @param s3ObjectAttributes attributes of the object, potentially including
    * an eTag or versionId to match depending on {@code policy}
    */
@@ -99,6 +129,15 @@ public class ChangeTracker {
       LOG.debug("Tracker {} has revision ID for object at {}: {}",
           policy, uri, revisionId);
     }
+=======
+   */
+  public ChangeTracker(final String uri,
+      final ChangeDetectionPolicy policy,
+      final AtomicLong versionMismatches) {
+    this.policy = checkNotNull(policy);
+    this.uri = uri;
+    this.versionMismatches = versionMismatches;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public String getRevisionId() {
@@ -110,8 +149,13 @@ public class ChangeTracker {
   }
 
   @VisibleForTesting
+<<<<<<< HEAD
   public long getVersionMismatches() {
     return versionMismatches.getVersionMismatches();
+=======
+  public AtomicLong getVersionMismatches() {
+    return versionMismatches;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -131,6 +175,7 @@ public class ChangeTracker {
     return false;
   }
 
+<<<<<<< HEAD
   /**
    * Apply any revision control set by the policy if it is to be
    * enforced on the server.
@@ -158,6 +203,8 @@ public class ChangeTracker {
     }
     return false;
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   /**
    * Process the response from the server for validation against the
@@ -176,6 +223,7 @@ public class ChangeTracker {
       if (revisionId != null) {
         // the requirements of the change detection policy wasn't met: the
         // object was not returned.
+<<<<<<< HEAD
         versionMismatches.versionMismatchError();
         throw new RemoteFileChangedException(uri, operation,
             String.format(CHANGE_REPORTED_BY_S3
@@ -185,12 +233,24 @@ public class ChangeTracker {
                 operation,
                 pos,
                 getSource(),
+=======
+        versionMismatches.incrementAndGet();
+        throw new RemoteFileChangedException(uri, operation,
+            String.format("%s change "
+                    + CHANGE_REPORTED_BY_S3
+                    + " while reading"
+                    + " at position %s."
+                    + " Version %s was unavailable",
+                getSource(),
+                pos,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                 getRevisionId()));
       } else {
         throw new PathIOException(uri, "No data returned from GET request");
       }
     }
 
+<<<<<<< HEAD
     processMetadata(object.getObjectMetadata(), operation);
   }
 
@@ -270,14 +330,23 @@ public class ChangeTracker {
    */
   private void processNewRevision(final String newRevisionId,
       final String operation, final long pos) throws PathIOException {
+=======
+    final ObjectMetadata metadata = object.getObjectMetadata();
+    final String newRevisionId = policy.getRevisionId(metadata, uri);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (newRevisionId == null && policy.isRequireVersion()) {
       throw new NoVersionAttributeException(uri, String.format(
           "Change detection policy requires %s",
           policy.getSource()));
     }
     if (revisionId == null) {
+<<<<<<< HEAD
       // revisionId may be null on first (re)open. Pin it so change can be
       // detected if object has been updated
+=======
+      // revisionId is null on first (re)open. Pin it so change can be detected
+      // if object has been updated
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       LOG.debug("Setting revision ID for object at {}: {}",
           uri, newRevisionId);
       revisionId = newRevisionId;
@@ -291,10 +360,17 @@ public class ChangeTracker {
               uri,
               pos,
               operation,
+<<<<<<< HEAD
               versionMismatches.getVersionMismatches());
       if (pair.left) {
         // an mismatch has occurred: note it.
         versionMismatches.versionMismatchError();
+=======
+              versionMismatches.get());
+      if (pair.left) {
+        // an mismatch has occurred: note it.
+        versionMismatches.incrementAndGet();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
       if (pair.right != null) {
         // there's an exception to raise: do it
@@ -307,7 +383,11 @@ public class ChangeTracker {
   public String toString() {
     final StringBuilder sb = new StringBuilder(
         "ChangeTracker{");
+<<<<<<< HEAD
     sb.append(policy);
+=======
+    sb.append("changeDetectionPolicy=").append(policy);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     sb.append(", revisionId='").append(revisionId).append('\'');
     sb.append('}');
     return sb.toString();

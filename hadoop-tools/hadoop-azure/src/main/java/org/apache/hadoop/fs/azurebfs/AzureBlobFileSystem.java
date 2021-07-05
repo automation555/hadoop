@@ -42,17 +42,25 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+<<<<<<< HEAD
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+=======
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.fs.azurebfs.services.AbfsClient;
 import org.apache.hadoop.fs.azurebfs.services.AbfsClientThrottlingIntercept;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.azurebfs.services.AbfsListStatusRemoteIterator;
 import org.apache.hadoop.fs.RemoteIterator;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -88,8 +96,11 @@ import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -135,6 +146,7 @@ public class AzureBlobFileSystem extends FileSystem
     LOG.debug("Initializing AzureBlobFileSystem for {}", uri);
 
     this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
+<<<<<<< HEAD
     abfsCounters = new AbfsCountersImpl(uri);
     this.abfsStore = new AzureBlobFileSystemStore(uri, this.isSecureScheme(),
         configuration, abfsCounters);
@@ -145,6 +157,11 @@ public class AzureBlobFileSystem extends FileSystem
     clientCorrelationId = TracingContext.validateClientCorrelationID(
         abfsConfiguration.getClientCorrelationId());
     tracingHeaderFormat = abfsConfiguration.getTracingHeaderFormat();
+=======
+    this.abfsStore = new AzureBlobFileSystemStore(uri, this.isSecureScheme(), configuration);
+    final AbfsConfiguration abfsConfiguration = abfsStore.getAbfsConfiguration();
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.setWorkingDirectory(this.getHomeDirectory());
 
     if (abfsConfiguration.getCreateRemoteFileSystemDuringInitialization()) {
@@ -159,7 +176,10 @@ public class AzureBlobFileSystem extends FileSystem
       }
     }
 
+<<<<<<< HEAD
     LOG.trace("Initiate check for delegation token manager");
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (UserGroupInformation.isSecurityEnabled()) {
       this.delegationTokenEnabled = abfsConfiguration.isDelegationTokenManagerEnabled();
 
@@ -247,7 +267,10 @@ public class AzureBlobFileSystem extends FileSystem
         overwrite,
         blockSize);
 
+<<<<<<< HEAD
     statIncrement(CALL_CREATE);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     trailingPeriodCheck(f);
 
     Path qualifiedPath = makeQualified(f);
@@ -341,6 +364,8 @@ public class AzureBlobFileSystem extends FileSystem
 
     trailingPeriodCheck(dst);
 
+    trailingPeriodCheck(dst);
+
     Path parentFolder = src.getParent();
     if (parentFolder == null) {
       return false;
@@ -348,12 +373,18 @@ public class AzureBlobFileSystem extends FileSystem
     Path qualifiedSrcPath = makeQualified(src);
     Path qualifiedDstPath = makeQualified(dst);
 
+<<<<<<< HEAD
     TracingContext tracingContext = new TracingContext(clientCorrelationId,
         fileSystemId, FSOperationType.RENAME, true, tracingHeaderFormat,
         listener);
     // rename under same folder;
     if(makeQualified(parentFolder).equals(qualifiedDstPath)) {
       return tryGetFileStatus(qualifiedSrcPath, tracingContext) != null;
+=======
+    // rename under same folder;
+    if(makeQualified(parentFolder).equals(qualifiedDstPath)) {
+      return tryGetFileStatus(qualifiedSrcPath) != null;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     FileStatus dstFileStatus = null;
@@ -362,7 +393,11 @@ public class AzureBlobFileSystem extends FileSystem
       // - if it doesn't exist, return false
       // - if it is file, return true
       // - if it is dir, return false.
+<<<<<<< HEAD
       dstFileStatus = tryGetFileStatus(qualifiedDstPath, tracingContext);
+=======
+      dstFileStatus = tryGetFileStatus(qualifiedDstPath);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       if (dstFileStatus == null) {
         return false;
       }
@@ -370,8 +405,13 @@ public class AzureBlobFileSystem extends FileSystem
     }
 
     // Non-HNS account need to check dst status on driver side.
+<<<<<<< HEAD
     if (!abfsStore.getIsNamespaceEnabled(tracingContext) && dstFileStatus == null) {
       dstFileStatus = tryGetFileStatus(qualifiedDstPath, tracingContext);
+=======
+    if (!abfsStore.getIsNamespaceEnabled() && dstFileStatus == null) {
+      dstFileStatus = tryGetFileStatus(qualifiedDstPath);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     try {
@@ -386,6 +426,10 @@ public class AzureBlobFileSystem extends FileSystem
       }
 
       qualifiedDstPath = makeQualified(adjustedDst);
+<<<<<<< HEAD
+=======
+      performAbfsAuthCheck(FsAction.READ_WRITE, qualifiedSrcPath, qualifiedDstPath);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       abfsStore.rename(qualifiedSrcPath, qualifiedDstPath, tracingContext);
       return true;
@@ -453,6 +497,7 @@ public class AzureBlobFileSystem extends FileSystem
   }
 
   /**
+<<<<<<< HEAD
    * Increment of an Abfs statistic.
    *
    * @param statistic AbfsStatistic that needs increment.
@@ -473,6 +518,8 @@ public class AzureBlobFileSystem extends FileSystem
   }
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Performs a check for (.) until root in the path to throw an exception.
    * The purpose is to differentiate between dir/dir1 and dir/dir1.
    * Without the exception the behavior seen is dir1. will appear
@@ -502,6 +549,8 @@ public class AzureBlobFileSystem extends FileSystem
     LOG.debug(
         "AzureBlobFileSystem.mkdirs path: {} permissions: {}", f, permission);
     statIncrement(CALL_MKDIRS);
+    trailingPeriodCheck(f);
+
     trailingPeriodCheck(f);
 
     final Path parentFolder = f.getParent();
@@ -760,11 +809,15 @@ public class AzureBlobFileSystem extends FileSystem
       throws IOException {
     LOG.debug(
         "AzureBlobFileSystem.setOwner path: {}", path);
+<<<<<<< HEAD
     TracingContext tracingContext = new TracingContext(clientCorrelationId,
         fileSystemId, FSOperationType.SET_OWNER, true, tracingHeaderFormat,
         listener);
 
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       super.setOwner(path, owner, group);
       return;
     }
@@ -878,10 +931,14 @@ public class AzureBlobFileSystem extends FileSystem
   public void setPermission(final Path path, final FsPermission permission)
       throws IOException {
     LOG.debug("AzureBlobFileSystem.setPermission path: {}", path);
+<<<<<<< HEAD
     TracingContext tracingContext = new TracingContext(clientCorrelationId,
         fileSystemId, FSOperationType.SET_PERMISSION, true, tracingHeaderFormat, listener);
 
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       super.setPermission(path, permission);
       return;
     }
@@ -917,7 +974,11 @@ public class AzureBlobFileSystem extends FileSystem
         fileSystemId, FSOperationType.MODIFY_ACL, true, tracingHeaderFormat,
         listener);
 
+<<<<<<< HEAD
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw new UnsupportedOperationException(
           "modifyAclEntries is only supported by storage accounts with the "
           + "hierarchical namespace enabled.");
@@ -952,7 +1013,11 @@ public class AzureBlobFileSystem extends FileSystem
         fileSystemId, FSOperationType.REMOVE_ACL_ENTRIES, true,
         tracingHeaderFormat, listener);
 
+<<<<<<< HEAD
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw new UnsupportedOperationException(
           "removeAclEntries is only supported by storage accounts with the "
           + "hierarchical namespace enabled.");
@@ -984,7 +1049,11 @@ public class AzureBlobFileSystem extends FileSystem
         fileSystemId, FSOperationType.REMOVE_DEFAULT_ACL, true,
         tracingHeaderFormat, listener);
 
+<<<<<<< HEAD
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw new UnsupportedOperationException(
           "removeDefaultAcl is only supported by storage accounts with the "
           + "hierarchical namespace enabled.");
@@ -1014,7 +1083,11 @@ public class AzureBlobFileSystem extends FileSystem
         fileSystemId, FSOperationType.REMOVE_ACL, true, tracingHeaderFormat,
         listener);
 
+<<<<<<< HEAD
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw new UnsupportedOperationException(
           "removeAcl is only supported by storage accounts with the "
           + "hierarchical namespace enabled.");
@@ -1047,7 +1120,11 @@ public class AzureBlobFileSystem extends FileSystem
         fileSystemId, FSOperationType.SET_ACL, true, tracingHeaderFormat,
         listener);
 
+<<<<<<< HEAD
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw new UnsupportedOperationException(
           "setAcl is only supported by storage accounts with the hierarchical "
           + "namespace enabled.");
@@ -1079,7 +1156,11 @@ public class AzureBlobFileSystem extends FileSystem
     TracingContext tracingContext = new TracingContext(clientCorrelationId,
         fileSystemId, FSOperationType.GET_ACL_STATUS, true, tracingHeaderFormat, listener);
 
+<<<<<<< HEAD
     if (!getIsNamespaceEnabled(tracingContext)) {
+=======
+    if (!getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw new UnsupportedOperationException(
           "getAclStatus is only supported by storage account with the "
           + "hierarchical namespace enabled.");
@@ -1108,6 +1189,7 @@ public class AzureBlobFileSystem extends FileSystem
    * @throws IOException                   see specific implementation
    */
   @Override
+<<<<<<< HEAD
   public void access(final Path path, final FsAction mode) throws IOException {
     LOG.debug("AzureBlobFileSystem.access path : {}, mode : {}", path, mode);
     Path qualifiedPath = makeQualified(path);
@@ -1151,6 +1233,14 @@ public class AzureBlobFileSystem extends FileSystem
   }
 
   private FileStatus tryGetFileStatus(final Path f, TracingContext tracingContext) {
+=======
+  public void access(final Path path, FsAction mode) throws IOException {
+    // TODO: make it no-op to unblock hive permission issue for now.
+    // Will add a long term fix similar to the implementation in AdlFileSystem.
+  }
+
+  private FileStatus tryGetFileStatus(final Path f) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     try {
       return getFileStatus(f, tracingContext);
     } catch (IOException ex) {
@@ -1413,6 +1503,7 @@ public class AzureBlobFileSystem extends FileSystem
    * @return the DT manager or null.
    */
   @VisibleForTesting
+<<<<<<< HEAD
   AbfsDelegationTokenManager getDelegationTokenManager() {
     return delegationTokenManager;
   }
@@ -1421,6 +1512,10 @@ public class AzureBlobFileSystem extends FileSystem
   boolean getIsNamespaceEnabled(TracingContext tracingContext)
       throws AzureBlobFileSystemException {
     return abfsStore.getIsNamespaceEnabled(tracingContext);
+=======
+  boolean getIsNamespaceEnabled() throws AzureBlobFileSystemException {
+    return abfsStore.getIsNamespaceEnabled();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

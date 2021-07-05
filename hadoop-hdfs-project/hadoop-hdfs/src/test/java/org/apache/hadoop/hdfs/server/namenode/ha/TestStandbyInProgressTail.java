@@ -51,7 +51,13 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+=======
+import com.google.common.base.Joiner;
+import com.google.common.base.Supplier;
+import com.google.common.collect.Lists;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * Test cases for in progress tailing edit logs by
@@ -74,8 +80,11 @@ public class TestStandbyInProgressTail {
     conf.setBoolean(DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_KEY, true);
     conf.setInt(DFSConfigKeys.DFS_QJOURNAL_SELECT_INPUT_STREAMS_TIMEOUT_KEY,
         500);
+<<<<<<< HEAD
     // Set very samll limit of transactions per a journal rpc call
     conf.setInt(QJM_RPC_MAX_TXNS_KEY, 3);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     HAUtil.setAllowStandbyReads(conf, true);
     qjmhaCluster = new MiniQJMHACluster.Builder(conf).build();
     cluster = qjmhaCluster.getDfsCluster();
@@ -302,6 +311,7 @@ public class TestStandbyInProgressTail {
 
     // StandbyNameNode should tail the finalized edit and the new in-progress
     waitForFileInfo(nn1, "/test", "/test2", "/test3");
+<<<<<<< HEAD
   }
 
   /**
@@ -327,6 +337,8 @@ public class TestStandbyInProgressTail {
     cluster.transitionToActive(1);
     cluster.waitActive(1);
     waitForFileInfo(nn1, p + 0, p + 1, p + 14);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Test

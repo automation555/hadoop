@@ -851,8 +851,11 @@ public class AppSchedulingInfo {
       this.readLock.unlock();
     }
   }
+<<<<<<< HEAD
 
   public RMContext getRMContext() {
     return this.rmContext;
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

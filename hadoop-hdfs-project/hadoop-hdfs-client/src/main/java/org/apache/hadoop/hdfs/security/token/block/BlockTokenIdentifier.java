@@ -143,7 +143,10 @@ public class BlockTokenIdentifier extends TokenIdentifier {
   }
 
   public void setHandshakeMsg(byte[] bytes) {
+<<<<<<< HEAD
     cache = null; // invalidate the cache
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     handshakeMsg = bytes;
   }
 
@@ -276,6 +279,16 @@ public class BlockTokenIdentifier extends TokenIdentifier {
     }
 
     useProto = false;
+
+    try {
+      int handshakeMsgLen = WritableUtils.readVInt(in);
+      if (handshakeMsgLen != 0) {
+        handshakeMsg = new byte[handshakeMsgLen];
+        in.readFully(handshakeMsg);
+      }
+    } catch (EOFException eof) {
+
+    }
   }
 
   @VisibleForTesting
@@ -346,6 +359,10 @@ public class BlockTokenIdentifier extends TokenIdentifier {
       for (String id : storageIds) {
         WritableUtils.writeString(out, id);
       }
+    }
+    if (handshakeMsg != null && handshakeMsg.length > 0) {
+      WritableUtils.writeVInt(out, handshakeMsg.length);
+      out.write(handshakeMsg);
     }
     if (handshakeMsg != null && handshakeMsg.length > 0) {
       WritableUtils.writeVInt(out, handshakeMsg.length);

@@ -89,7 +89,11 @@ class CGroupsHandlerImpl implements CGroupsHandler {
     // Remove leading and trialing slash(es)
     this.cGroupPrefix = conf.get(YarnConfiguration.
         NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn")
+<<<<<<< HEAD
         .replaceAll("^/+", "").replaceAll("/+$", "");
+=======
+        .replaceAll("^/", "").replaceAll("$/", "");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.cGroupsMountConfig = new CGroupsMountConfig(conf);
     this.deleteCGroupTimeout = conf.getLong(
         YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT,

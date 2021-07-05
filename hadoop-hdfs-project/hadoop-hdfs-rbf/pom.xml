@@ -20,11 +20,19 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-project-dist</artifactId>
+<<<<<<< HEAD
     <version>3.4.0-SNAPSHOT</version>
     <relativePath>../../hadoop-project-dist</relativePath>
   </parent>
   <artifactId>hadoop-hdfs-rbf</artifactId>
   <version>3.4.0-SNAPSHOT</version>
+=======
+    <version>3.2.1</version>
+    <relativePath>../../hadoop-project-dist</relativePath>
+  </parent>
+  <artifactId>hadoop-hdfs-rbf</artifactId>
+  <version>3.2.1</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <description>Apache Hadoop HDFS-RBF</description>
   <name>Apache Hadoop HDFS-RBF</name>
   <packaging>jar</packaging>
@@ -307,6 +315,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </plugin>
     </plugins>
   </build>
+<<<<<<< HEAD
   <profiles>
     <profile>
       <id>parallel-tests</id>
@@ -355,4 +364,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </build>
     </profile>
     </profiles>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 </project>

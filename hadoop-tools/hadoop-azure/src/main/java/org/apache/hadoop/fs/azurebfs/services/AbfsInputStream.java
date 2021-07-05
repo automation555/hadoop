@@ -22,7 +22,10 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.HttpURLConnection;
+<<<<<<< HEAD
 import java.util.UUID;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
@@ -35,8 +38,11 @@ import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem.Statistics;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.azurebfs.constants.FSOperationType;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsRestOperationException;
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AzureBlobFileSystemException;
 import org.apache.hadoop.fs.azurebfs.utils.CachedSASToken;
@@ -114,6 +120,7 @@ public class AbfsInputStream extends FSInputStream implements CanUnbuffer,
   private IOStatistics ioStatistics;
 
   public AbfsInputStream(
+<<<<<<< HEAD
           final AbfsClient client,
           final Statistics statistics,
           final String path,
@@ -121,13 +128,29 @@ public class AbfsInputStream extends FSInputStream implements CanUnbuffer,
           final AbfsInputStreamContext abfsInputStreamContext,
           final String eTag,
           TracingContext tracingContext) {
+=======
+      final AbfsClient client,
+      final Statistics statistics,
+      final String path,
+      final long contentLength,
+      final int bufferSize,
+      final int readAheadQueueDepth,
+      final boolean tolerateOobAppends,
+      final String eTag) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.client = client;
     this.statistics = statistics;
     this.path = path;
     this.contentLength = contentLength;
+<<<<<<< HEAD
     this.bufferSize = abfsInputStreamContext.getReadBufferSize();
     this.readAheadQueueDepth = abfsInputStreamContext.getReadAheadQueueDepth();
     this.tolerateOobAppends = abfsInputStreamContext.isTolerateOobAppends();
+=======
+    this.bufferSize = bufferSize;
+    this.readAheadQueueDepth = (readAheadQueueDepth >= 0) ? readAheadQueueDepth : Runtime.getRuntime().availableProcessors();
+    this.tolerateOobAppends = tolerateOobAppends;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.eTag = eTag;
     this.readAheadEnabled = true;
     this.alwaysReadBufferSize

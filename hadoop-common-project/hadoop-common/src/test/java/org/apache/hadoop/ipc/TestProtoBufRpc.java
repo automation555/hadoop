@@ -35,9 +35,12 @@ import org.apache.hadoop.ipc.protobuf.TestRpcServiceProtosLegacy;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.test.GenericTestUtils;
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.protobuf.BlockingService;
 import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -47,8 +50,11 @@ import org.junit.runners.Parameterized.Parameters;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.Collection;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.test.MetricsAsserts.assertCounterGt;
@@ -353,8 +359,11 @@ public class TestProtoBufRpc extends TestRpcBase {
   @Test(timeout = 12000)
   public void testLogSlowRPC() throws IOException, ServiceException,
       TimeoutException, InterruptedException {
+<<<<<<< HEAD
     //No test with legacy
     assumeFalse(testWithLegacy);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     TestRpcService2 client = getClient2();
     // make 10 K fast calls
     for (int x = 0; x < 10000; x++) {

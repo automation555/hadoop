@@ -40,8 +40,11 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.Arrays;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -72,6 +75,26 @@ public class TestResourceUtils {
 
   @Rule
   public ExpectedException expexted = ExpectedException.none();
+<<<<<<< HEAD
+=======
+
+  public static void addNewTypesToResources(String... resourceTypes) {
+    // Initialize resource map
+    Map<String, ResourceInformation> riMap = new HashMap<>();
+
+    // Initialize mandatory resources
+    riMap.put(ResourceInformation.MEMORY_URI, ResourceInformation.MEMORY_MB);
+    riMap.put(ResourceInformation.VCORES_URI, ResourceInformation.VCORES);
+
+    for (String newResource : resourceTypes) {
+      riMap.put(newResource, ResourceInformation
+          .newInstance(newResource, "", 0, ResourceTypes.COUNTABLE, 0,
+              Integer.MAX_VALUE));
+    }
+
+    ResourceUtils.initializeResourcesFromResourceInformationMap(riMap);
+  }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   @Before
   public void setup() {
@@ -92,6 +115,7 @@ public class TestResourceUtils {
       throws Exception {
     File source = new File(
         conf.getClassLoader().getResource(filename).getFile());
+<<<<<<< HEAD
     File dest = new File(source.getParent(), "resource-types.xml");
     FileUtils.copyFile(source, dest);
     try {
@@ -126,6 +150,42 @@ public class TestResourceUtils {
       throw new IllegalArgumentException(
           "Source file does not exist: " + srcFileName);
     }
+=======
+    File dest = new File(source.getParent(), "resource-types.xml");
+    FileUtils.copyFile(source, dest);
+    try {
+      ResourceUtils.getResourceTypes();
+    } catch (Exception e) {
+      if (!dest.delete()) {
+        LOG.error("Could not delete {}", dest);
+      }
+      throw e;
+    }
+    return dest.getAbsolutePath();
+  }
+
+  private Map<String, ResourceInformation> setupResourceTypesInternal(
+      Configuration conf, String srcFileName) throws IOException {
+    URL srcFileUrl = conf.getClassLoader().getResource(srcFileName);
+    if (srcFileUrl == null) {
+      throw new IllegalArgumentException(
+          "Source file does not exist: " + srcFileName);
+    }
+    File source = new File(srcFileUrl.getFile());
+    File dest = new File(source.getParent(), "resource-types.xml");
+    FileUtils.copyFile(source, dest);
+    this.resourceTypesFile = dest;
+    return ResourceUtils.getResourceTypes();
+  }
+
+  private Map<String, ResourceInformation> setupNodeResources(
+      Configuration conf, String srcFileName) throws IOException {
+    URL srcFileUrl = conf.getClassLoader().getResource(srcFileName);
+    if (srcFileUrl == null) {
+      throw new IllegalArgumentException(
+          "Source file does not exist: " + srcFileName);
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     File source = new File(srcFileUrl.getFile());
     File dest = new File(source.getParent(), "node-resources.xml");
     FileUtils.copyFile(source, dest);
@@ -195,6 +255,7 @@ public class TestResourceUtils {
   }
 
   @Test
+<<<<<<< HEAD
   public void testGetRequestedResourcesFromConfig() {
     Configuration conf = new Configuration();
 
@@ -236,6 +297,8 @@ public class TestResourceUtils {
   }
 
   @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testGetResourceTypesConfigErrors() throws IOException {
     Configuration conf = new YarnConfiguration();
 
@@ -483,6 +546,7 @@ public class TestResourceUtils {
       }
     }
   }
+<<<<<<< HEAD
 
   @Test
   public void testResourceUnitParsing() throws Exception {
@@ -600,4 +664,6 @@ public class TestResourceUtils {
     assertThat(mulResource.getResourceInformation("yarn.io/test-volume").
         getValue()).isEqualTo(2);
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

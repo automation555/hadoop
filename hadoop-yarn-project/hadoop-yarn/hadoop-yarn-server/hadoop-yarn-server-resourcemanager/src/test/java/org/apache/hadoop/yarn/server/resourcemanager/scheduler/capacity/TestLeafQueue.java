@@ -5022,7 +5022,11 @@ public class TestLeafQueue {
         app.getResourceUsageReport().getClusterUsagePercentage(), 0.01f);
 
     // test that queueUsagePercentage returns neither NaN nor Infinite
+<<<<<<< HEAD
     AbstractCSQueue zeroQueue = createQueue("test2.2", "root.test2.2", null,
+=======
+    AbstractCSQueue zeroQueue = createQueue("test2.2", null,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         Float.MIN_VALUE, Float.MIN_VALUE,
         Resources.multiply(res, Float.MIN_VALUE));
     app = new FiCaSchedulerApp(appAttId, user, zeroQueue,

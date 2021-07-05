@@ -224,12 +224,17 @@ class Delete {
 
     public static final String NAME = "expunge";
     public static final String USAGE =
+<<<<<<< HEAD
         "[-immediate] [-" + OPTION_FILESYSTEM + " <path>]";
+=======
+        "[-immediate]";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     public static final String DESCRIPTION =
         "Delete files from the trash that are older " +
             "than the retention threshold";
 
     private boolean emptyImmediately = false;
+<<<<<<< HEAD
     private String fsArgument;
 
     @Override
@@ -239,6 +244,15 @@ class Delete {
       cf.parse(args);
       emptyImmediately = cf.getOpt("immediate");
       fsArgument = cf.getOptValue(OPTION_FILESYSTEM);
+=======
+
+    // TODO: should probably allow path arguments for the filesystems
+    @Override
+    protected void processOptions(LinkedList<String> args) throws IOException {
+      CommandFormat cf = new CommandFormat(0, 1, "immediate");
+      cf.parse(args);
+      emptyImmediately = cf.getOpt("immediate");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     @Override

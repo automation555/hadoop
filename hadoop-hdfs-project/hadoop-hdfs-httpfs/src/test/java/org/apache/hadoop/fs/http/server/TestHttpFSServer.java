@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
@@ -37,6 +38,11 @@ import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hadoop.lib.service.FileSystemAccess;
+=======
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
+import org.apache.hadoop.hdfs.web.JsonUtil;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
 import org.apache.hadoop.security.authentication.util.StringSignerSecretProviderCreator;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
@@ -74,8 +80,11 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.XAttrCodec;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.http.client.HttpFSUtils;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem.Operation;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.http.server.HttpFSParametersProvider.DataParam;
 import org.apache.hadoop.fs.http.server.HttpFSParametersProvider.NoRedirectParam;
 import org.apache.hadoop.fs.permission.AclEntry;
@@ -1553,6 +1562,7 @@ public class TestHttpFSServer extends HFSTestCase {
     Assert.assertEquals(dirLst, JsonUtil.toJsonString(dfsDirLst));
   }
 
+<<<<<<< HEAD
   private void verifyGetSnapshotList(DistributedFileSystem dfs, Path path)
       throws Exception {
     // Send a request
@@ -1570,6 +1580,8 @@ public class TestHttpFSServer extends HFSTestCase {
     Assert.assertEquals(dirLst, JsonUtil.toJsonString(dfsDirLst));
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test
   @TestDir
   @TestJetty
@@ -1605,6 +1617,7 @@ public class TestHttpFSServer extends HFSTestCase {
     verifyGetSnapshottableDirectoryList(dfs);
   }
 
+<<<<<<< HEAD
 
   @Test
   @TestDir
@@ -1634,6 +1647,8 @@ public class TestHttpFSServer extends HFSTestCase {
     verifyGetSnapshotList(dfs, path);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test
   @TestDir
   @TestJetty
@@ -1659,7 +1674,11 @@ public class TestHttpFSServer extends HFSTestCase {
         new InputStreamReader(conn.getInputStream()));
     String location = (String)json.get("Location");
     Assert.assertTrue(location.contains(DataParam.NAME));
+<<<<<<< HEAD
     Assert.assertFalse(location.contains(NoRedirectParam.NAME));
+=======
+    Assert.assertTrue(location.contains(NoRedirectParam.NAME));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Assert.assertTrue(location.contains("CREATE"));
     Assert.assertTrue("Wrong location: " + location,
         location.startsWith(TestJettyHelper.getJettyURL().toString()));
@@ -1747,6 +1766,7 @@ public class TestHttpFSServer extends HFSTestCase {
     Assert.assertEquals(28L, checksum.get("length"));
     Assert.assertEquals("MD5-of-0MD5-of-512CRC32C", checksum.get("algorithm"));
   }
+<<<<<<< HEAD
 
   private void verifyGetServerDefaults(DistributedFileSystem dfs)
       throws Exception {
@@ -2002,4 +2022,6 @@ public class TestHttpFSServer extends HFSTestCase {
         () -> HttpFSUtils.jsonParse(conn));
     conn.disconnect();
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

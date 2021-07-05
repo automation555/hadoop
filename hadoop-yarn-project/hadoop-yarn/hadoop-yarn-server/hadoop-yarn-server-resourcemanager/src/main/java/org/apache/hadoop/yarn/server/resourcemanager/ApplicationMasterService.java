@@ -218,7 +218,10 @@ public class ApplicationMasterService extends AbstractService implements
                                server.getListenerAddress());
     this.timelineServiceV2Enabled = YarnConfiguration.
         timelineServiceV2Enabled(conf);
+<<<<<<< HEAD
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     super.serviceStart();
   }
 

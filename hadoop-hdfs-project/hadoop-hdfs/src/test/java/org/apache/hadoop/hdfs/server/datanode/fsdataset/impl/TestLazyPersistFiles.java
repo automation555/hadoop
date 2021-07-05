@@ -154,7 +154,17 @@ public class TestLazyPersistFiles extends LazyPersistTestCase {
     cluster.restartNameNodes();
 
     // wait for the redundancy monitor to mark the file as corrupt.
+<<<<<<< HEAD
     waitForCorruptBlock(1L);
+=======
+    Long corruptBlkCount;
+    do {
+      Thread.sleep(DFS_NAMENODE_REDUNDANCY_INTERVAL_SECONDS_DEFAULT * 1000);
+      corruptBlkCount = (long) Iterators.size(cluster.getNameNode()
+          .getNamesystem().getBlockManager().getCorruptReplicaBlockIterator());
+    } while (corruptBlkCount != 1L);
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // Ensure path1 exist.
     waitForFile(path1, true);
   }

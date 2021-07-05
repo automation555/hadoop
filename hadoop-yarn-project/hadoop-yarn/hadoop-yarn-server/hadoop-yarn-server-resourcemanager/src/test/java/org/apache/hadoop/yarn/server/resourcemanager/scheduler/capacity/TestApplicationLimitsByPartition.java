@@ -980,6 +980,7 @@ public class TestApplicationLimitsByPartition {
 
     Resource amResource = Resource.newInstance(GB, 1);
 
+<<<<<<< HEAD
     MockRMAppSubmitter.submit(rm,
         MockRMAppSubmissionData.Builder.createWithResource(amResource, rm)
             .withAppName("app-1")
@@ -1004,6 +1005,14 @@ public class TestApplicationLimitsByPartition {
             .withAcls(null)
             .withQueue(queueName)
             .build());
+=======
+    rm.submitApp(amResource, "app-1", userName, null, queueName);
+    rm.submitApp(amResource, "app-2", userName, null, queueName);
+
+    // app-3 should not be activated as amLimit will be reached
+    // for memory
+    rm.submitApp(amResource, "app-3", userName, null, queueName);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     Assert.assertEquals("PendingApplications should be 1", 1,
         queueA.getNumPendingApplications());

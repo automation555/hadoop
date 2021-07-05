@@ -950,6 +950,7 @@ public final class Constants {
    * Default change detection require version: true.
    */
   public static final boolean CHANGE_DETECT_REQUIRE_VERSION_DEFAULT = true;
+<<<<<<< HEAD
 
   /**
    * Number of times to retry any repeatable S3 client request on failure,
@@ -1093,4 +1094,6 @@ public final class Constants {
    */
   public static final String AWS_S3_CENTRAL_REGION = "us-east-1";
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

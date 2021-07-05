@@ -848,6 +848,7 @@ hierarchical namespace enabled, and set the following configuration settings:
     </property>
    -->
 
+<<<<<<< HEAD
 ```
 To run Delegation SAS test cases you must use a storage account with the
 hierarchical namespace enabled and set the following configuration settings:
@@ -978,6 +979,8 @@ create the test FS instance.
     </description>
   </property>
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 ```
 
 If running tests against an endpoint that uses the URL format

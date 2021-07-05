@@ -41,8 +41,11 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.SaslRpcServer.QualityOfProtection;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
+<<<<<<< HEAD
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.client.util.YarnClientUtils;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -141,7 +144,11 @@ public class TestSecureApiServiceClient extends KerberosSecurityTestcase {
     props = new HashMap<String, String>();
     props.put(Sasl.QOP, QualityOfProtection.AUTHENTICATION.saslQop);
     server = new Server(8088);
+<<<<<<< HEAD
     ((QueuedThreadPool)server.getThreadPool()).setMaxThreads(20);
+=======
+    ((QueuedThreadPool)server.getThreadPool()).setMaxThreads(10);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ServletContextHandler context = new ServletContextHandler();
     context.setContextPath("/app");
     server.setHandler(context);
@@ -153,7 +160,10 @@ public class TestSecureApiServiceClient extends KerberosSecurityTestcase {
     rmServers.add("localhost:8088");
     testConf.set("yarn.resourcemanager.webapp.address",
         "localhost:8088");
+<<<<<<< HEAD
     testConf.setBoolean(YarnConfiguration.RM_HA_ENABLED, true);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     asc = new ApiServiceClient() {
       @Override
       List<String> getRMHAWebAddresses(Configuration conf) {
@@ -172,7 +182,12 @@ public class TestSecureApiServiceClient extends KerberosSecurityTestcase {
   public void testHttpSpnegoChallenge() throws Exception {
     UserGroupInformation.loginUserFromKeytab(clientPrincipal, keytabFile
         .getCanonicalPath());
+<<<<<<< HEAD
     String challenge = YarnClientUtils.generateToken("localhost");
+=======
+    asc = new ApiServiceClient();
+    String challenge = asc.generateToken("localhost");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertNotNull(challenge);
   }
 

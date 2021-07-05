@@ -179,7 +179,10 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   private long launchAMEndTime = 0;
   private long scheduledTime = 0;
   private long containerAllocatedTime = 0;
+<<<<<<< HEAD
   private boolean nonWorkPreservingAMContainerFinished = false;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   // Set to null initially. Will eventually get set
   // if an RMAppAttemptUnregistrationEvent occurs

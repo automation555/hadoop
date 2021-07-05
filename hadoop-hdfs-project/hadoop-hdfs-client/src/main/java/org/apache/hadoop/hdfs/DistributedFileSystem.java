@@ -233,8 +233,12 @@ public class DistributedFileSystem extends FileSystem
 
   @Override
   public Path getHomeDirectory() {
+<<<<<<< HEAD
     return makeQualified(
         new Path(DFSUtilClient.getHomeDirectory(getConf(), dfs.ugi)));
+=======
+    return makeQualified(DFSUtilClient.getHomeDirectory(getConf(), dfs.ugi));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

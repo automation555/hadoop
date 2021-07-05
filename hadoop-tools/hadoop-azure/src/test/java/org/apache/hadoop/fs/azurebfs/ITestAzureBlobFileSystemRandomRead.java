@@ -114,10 +114,15 @@ public class ITestAzureBlobFileSystemRandomRead extends
   @Test
   public void testRandomRead() throws Exception {
     Assume.assumeFalse("This test does not support namespace enabled account",
+<<<<<<< HEAD
         getIsNamespaceEnabled(getFileSystem()));
     Path testPath = new Path(TEST_FILE_PREFIX + "_testRandomRead");
     assumeHugeFileExists(testPath);
 
+=======
+            this.getFileSystem().getIsNamespaceEnabled());
+    assumeHugeFileExists();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     try (
             FSDataInputStream inputStreamV1
                     = this.getFileSystem().open(testPath);
@@ -445,9 +450,15 @@ public class ITestAzureBlobFileSystemRandomRead extends
   @Ignore("HADOOP-16915")
   public void testRandomReadPerformance() throws Exception {
     Assume.assumeFalse("This test does not support namespace enabled account",
+<<<<<<< HEAD
         getIsNamespaceEnabled(getFileSystem()));
     Path testPath = new Path(TEST_FILE_PREFIX + "_testRandomReadPerformance");
     assumeHugeFileExists(testPath);
+=======
+            this.getFileSystem().getIsNamespaceEnabled());
+    createTestFile();
+    assumeHugeFileExists();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     final AzureBlobFileSystem abFs = this.getFileSystem();
     final NativeAzureFileSystem wasbFs = this.getWasbFileSystem();
@@ -653,6 +664,7 @@ public class ITestAzureBlobFileSystemRandomRead extends
     return bytes / 1000.0 * 8 / milliseconds;
   }
 
+<<<<<<< HEAD
   private long createTestFile(Path testPath) throws Exception {
     createTestFile(testPath,
         TEST_FILE_SIZE,
@@ -678,6 +690,14 @@ public class ITestAzureBlobFileSystemRandomRead extends
       FileStatus status = fs.getFileStatus(testFilePath);
       if (status.getLen() == testFileSize) {
         return fs;
+=======
+  private void createTestFile() throws Exception {
+    final AzureBlobFileSystem fs = this.getFileSystem();
+    if (fs.exists(TEST_FILE_PATH)) {
+      FileStatus status = fs.getFileStatus(TEST_FILE_PATH);
+      if (status.getLen() >= TEST_FILE_SIZE) {
+        return;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     }
 

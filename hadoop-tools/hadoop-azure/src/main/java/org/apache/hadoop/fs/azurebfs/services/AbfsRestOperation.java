@@ -34,8 +34,12 @@ import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsRestOperationExcep
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AzureBlobFileSystemException;
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.InvalidAbfsRestOperationException;
 import org.apache.hadoop.fs.azurebfs.constants.HttpHeaderConfigurations;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.azurebfs.utils.TracingContext;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
+=======
+import org.apache.hadoop.fs.azurebfs.oauth2.AzureADAuthenticator.HttpException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * The AbfsRestOperation for Rest AbfsClient.
@@ -298,6 +302,10 @@ public class AbfsRestOperation {
       }
       return false;
     } catch (IOException ex) {
+      if (ex instanceof UnknownHostException) {
+        LOG.warn(String.format("Unknown host name: %s. Retrying to resolve the host name...", httpOperation.getUrl().getHost()));
+      }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("HttpRequestFailure: {}, {}", httpOperation.toString(), ex);
       }
@@ -306,6 +314,16 @@ public class AbfsRestOperation {
         throw new InvalidAbfsRestOperationException(ex);
       }
 
+<<<<<<< HEAD
+=======
+      // once HttpException is thrown by AzureADAuthenticator,
+      // it indicates the policy in AzureADAuthenticator determined
+      // retry is not needed
+      if (ex instanceof HttpException) {
+        throw new AbfsRestOperationException((HttpException) ex);
+      }
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return false;
     } finally {
       AbfsClientThrottlingIntercept.updateMetrics(operationType, httpOperation);

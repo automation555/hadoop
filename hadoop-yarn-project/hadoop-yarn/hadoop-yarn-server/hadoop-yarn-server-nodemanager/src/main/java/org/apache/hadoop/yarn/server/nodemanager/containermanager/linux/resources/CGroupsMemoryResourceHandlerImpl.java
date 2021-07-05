@@ -176,4 +176,9 @@ public class CGroupsMemoryResourceHandlerImpl implements MemoryResourceHandler {
   public String toString() {
     return CGroupsMemoryResourceHandlerImpl.class.getName();
   }
+
+  @Override
+  public String toString() {
+    return CGroupsMemoryResourceHandlerImpl.class.getName();
+  }
 }

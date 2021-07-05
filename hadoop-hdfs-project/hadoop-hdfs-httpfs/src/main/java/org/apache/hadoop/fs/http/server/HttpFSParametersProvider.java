@@ -116,6 +116,7 @@ public class HttpFSParametersProvider extends ParametersProvider {
         new Class[] {OldSnapshotNameParam.class,
             SnapshotNameParam.class});
     PARAMS_DEF.put(Operation.GETSNAPSHOTTABLEDIRECTORYLIST, new Class[] {});
+<<<<<<< HEAD
     PARAMS_DEF.put(Operation.GETSNAPSHOTLIST, new Class[] {});
     PARAMS_DEF.put(Operation.GETSERVERDEFAULTS, new Class[] {});
     PARAMS_DEF.put(Operation.CHECKACCESS, new Class[] {FsActionParam.class});
@@ -123,6 +124,8 @@ public class HttpFSParametersProvider extends ParametersProvider {
     PARAMS_DEF.put(Operation.GETECPOLICY, new Class[] {});
     PARAMS_DEF.put(Operation.UNSETECPOLICY, new Class[] {});
     PARAMS_DEF.put(Operation.SATISFYSTORAGEPOLICY, new Class[] {});
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public HttpFSParametersProvider() {

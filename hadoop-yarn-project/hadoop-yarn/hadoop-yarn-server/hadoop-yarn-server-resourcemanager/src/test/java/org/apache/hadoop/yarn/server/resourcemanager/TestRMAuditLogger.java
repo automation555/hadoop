@@ -302,8 +302,12 @@ public class TestRMAuditLogger {
         String queueName, String partition, RMAuditLogger.ArgsBuilder args) {
     String fLog = args == null ?
       RMAuditLogger.createFailureLog(USER, OPERATION, PERM, TARGET, DESC,
+<<<<<<< HEAD
           appId, attemptId, containerId, resource, callerContext,
           queueName, partition) :
+=======
+          appId, attemptId, containerId, resource, callerContext, null) :
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         RMAuditLogger.createFailureLog(USER, OPERATION, PERM, TARGET, DESC,
             args);
     StringBuilder expLog = new StringBuilder();

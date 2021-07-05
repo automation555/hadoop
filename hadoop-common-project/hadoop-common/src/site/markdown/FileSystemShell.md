@@ -258,7 +258,11 @@ Displays a summary of file lengths.
 expunge
 -------
 
+<<<<<<< HEAD
 Usage: `hadoop fs -expunge [-immediate] [-fs <path>]`
+=======
+Usage: `hadoop fs -expunge [-immediate]`
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 Permanently delete files in checkpoints older than the retention threshold
 from trash directory, and create new checkpoint.
@@ -276,6 +280,7 @@ This value should be smaller or equal to `fs.trash.interval`.
 If the `-immediate` option is passed, all files in the trash for the current
 user are immediately deleted, ignoring the `fs.trash.interval` setting.
 
+<<<<<<< HEAD
 If the `-fs` option is passed, the supplied filesystem will be expunged,
 rather than the default filesystem and checkpoint is created.
 
@@ -285,6 +290,8 @@ For example
 hadoop fs -expunge --immediate -fs s3a://landsat-pds/
 ```
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 Refer to the
 [HDFS Architecture guide](../hadoop-hdfs/HdfsDesign.html#File_Deletes_and_Undeletes)
 for more information about trash feature of HDFS.

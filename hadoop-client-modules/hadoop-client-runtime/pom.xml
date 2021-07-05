@@ -18,11 +18,19 @@
 <parent>
    <groupId>org.apache.hadoop</groupId>
    <artifactId>hadoop-project</artifactId>
+<<<<<<< HEAD
    <version>3.4.0-SNAPSHOT</version>
    <relativePath>../../hadoop-project</relativePath>
 </parent>
   <artifactId>hadoop-client-runtime</artifactId>
   <version>3.4.0-SNAPSHOT</version>
+=======
+   <version>3.2.1</version>
+   <relativePath>../../hadoop-project</relativePath>
+</parent>
+  <artifactId>hadoop-client-runtime</artifactId>
+  <version>3.2.1</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <packaging>jar</packaging>
 
   <description>Apache Hadoop Client</description>
@@ -150,9 +158,12 @@
                       <!-- the jdk ships part of the javax.annotation namespace, so if we want to relocate this we'll have to care it out by class :( -->
                       <exclude>com.google.code.findbugs:jsr305</exclude>
                       <exclude>io.dropwizard.metrics:metrics-core</exclude>
+<<<<<<< HEAD
                       <exclude>org.eclipse.jetty:jetty-servlet</exclude>
                       <exclude>org.eclipse.jetty:jetty-security</exclude>
                       <exclude>org.ow2.asm:*</exclude>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                       <!-- Leave bouncycastle unshaded because it's signed with a special Oracle certificate so it can be a custom JCE security provider -->
                       <exclude>org.bouncycastle:*</exclude>
                     </excludes>

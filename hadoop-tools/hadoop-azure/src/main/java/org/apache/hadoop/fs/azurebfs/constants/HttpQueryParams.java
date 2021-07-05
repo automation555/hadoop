@@ -36,10 +36,15 @@ public final class HttpQueryParams {
   public static final String QUERY_PARAM_POSITION = "position";
   public static final String QUERY_PARAM_TIMEOUT = "timeout";
   public static final String QUERY_PARAM_RETAIN_UNCOMMITTED_DATA = "retainUncommittedData";
+<<<<<<< HEAD
   public static final String QUERY_PARAM_FLUSH = "flush";
   public static final String QUERY_PARAM_CLOSE = "close";
   public static final String QUERY_PARAM_UPN = "upn";
   public static final String QUERY_PARAM_BLOBTYPE = "blobtype";
+=======
+  public static final String QUERY_PARAM_CLOSE = "close";
+  public static final String QUERY_PARAM_UPN = "upn";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private HttpQueryParams() {}
 }

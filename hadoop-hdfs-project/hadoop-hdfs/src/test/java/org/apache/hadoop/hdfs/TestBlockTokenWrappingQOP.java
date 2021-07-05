@@ -17,17 +17,26 @@
  */
 package org.apache.hadoop.hdfs;
 
+<<<<<<< HEAD
 import java.net.URI;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+=======
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
@@ -80,6 +89,7 @@ public class TestBlockTokenWrappingQOP extends SaslDataTransferTestCase {
   @Before
   public void setup() throws Exception {
     conf = createSecureConfig(this.configKey);
+<<<<<<< HEAD
     conf.set(DFS_NAMENODE_RPC_ADDRESS_AUXILIARY_KEY, "12000");
     // explicitly setting service rpc for datanode. This because
     // DFSUtil.getNNServiceRpcAddressesForCluster looks up client facing port
@@ -93,12 +103,15 @@ public class TestBlockTokenWrappingQOP extends SaslDataTransferTestCase {
         "org.apache.hadoop.security.IngressPortBasedResolver");
     conf.set("ingress.port.sasl.configured.ports", "12000");
     conf.set("ingress.port.sasl.prop.12000", this.configKey);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     conf.setBoolean(DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY, true);
     conf.setBoolean(DFS_NAMENODE_SEND_QOP_ENABLED, true);
     conf.set(HADOOP_RPC_PROTECTION, this.configKey);
     cluster = null;
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.waitActive();
+<<<<<<< HEAD
 
     HdfsConfiguration clientConf = new HdfsConfiguration(conf);
     clientConf.unset(
@@ -107,6 +120,8 @@ public class TestBlockTokenWrappingQOP extends SaslDataTransferTestCase {
     URI uriAuxiliary = new URI(currentURI.getScheme() +
         "://" + currentURI.getHost() + ":12000");
     dfs = (DistributedFileSystem) FileSystem.get(uriAuxiliary, conf);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @After
@@ -121,6 +136,10 @@ public class TestBlockTokenWrappingQOP extends SaslDataTransferTestCase {
     final String src = "/testAddBlockWrappingQOP";
     final Path path = new Path(src);
 
+<<<<<<< HEAD
+=======
+    dfs = cluster.getFileSystem();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     dfs.create(path);
 
     DFSClient client = dfs.getClient();
@@ -137,6 +156,10 @@ public class TestBlockTokenWrappingQOP extends SaslDataTransferTestCase {
     final String src = "/testAppendWrappingQOP";
     final Path path = new Path(src);
 
+<<<<<<< HEAD
+=======
+    dfs = cluster.getFileSystem();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     FSDataOutputStream out = dfs.create(path);
     // NameNode append call returns a last block instance. If there is nothing
     // it returns as a null. So write something, so that lastBlock has
@@ -160,6 +183,10 @@ public class TestBlockTokenWrappingQOP extends SaslDataTransferTestCase {
     final String src = "/testGetBlockLocationWrappingQOP";
     final Path path = new Path(src);
 
+<<<<<<< HEAD
+=======
+    dfs = cluster.getFileSystem();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     FSDataOutputStream out = dfs.create(path);
     // if the file is empty, there will be no blocks returned. Write something
     // so that getBlockLocations actually returns some block.

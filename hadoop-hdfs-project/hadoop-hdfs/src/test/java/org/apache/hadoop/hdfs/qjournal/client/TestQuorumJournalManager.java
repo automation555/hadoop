@@ -96,11 +96,16 @@ public class TestQuorumJournalManager {
   @Before
   public void setup() throws Exception {
     conf = new Configuration();
+<<<<<<< HEAD
     if (!name.getMethodName().equals("testSelectThreadCounts")) {
       // Don't retry connections - it just slows down the tests.
       conf.setInt(
           CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
     }
+=======
+    // Don't retry connections - it just slows down the tests.
+    conf.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // Turn off IPC client caching to handle daemon restarts.
     conf.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
@@ -1049,6 +1054,7 @@ public class TestQuorumJournalManager {
   }
 
   @Test
+<<<<<<< HEAD
   public void testSelectThreadCounts() throws Exception {
     EditLogOutputStream stm =
         qjm.startLogSegment(1, NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION);
@@ -1070,6 +1076,8 @@ public class TestQuorumJournalManager {
   }
 
   @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testSelectViaRpcTwoJNsError() throws Exception {
     EditLogOutputStream stm =
         qjm.startLogSegment(1, NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION);

@@ -714,7 +714,11 @@ public class TestAbsoluteResourceConfiguration {
     Assert.assertEquals("Effective Max resource for QUEUEC is not correct",
         QUEUE_C_MAXRES, qC.queueResourceQuotas.getEffectiveMaxResource());
     Assert.assertEquals("Absolute capacity for QUEUEC is not correct",
+<<<<<<< HEAD
         0.1, qC.getAbsoluteCapacity(), DELTA);
+=======
+        0.2, qC.getAbsoluteCapacity(), DELTA);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Assert.assertEquals("Absolute Max capacity for QUEUEC is not correct",
         0.6, qC.getAbsoluteMaximumCapacity(), DELTA);
 
@@ -781,7 +785,11 @@ public class TestAbsoluteResourceConfiguration {
     Assert.assertEquals("Effective Max resource for QUEUEC is not correct",
         QUEUE_C_MAXRES, qC.queueResourceQuotas.getEffectiveMaxResource());
     Assert.assertEquals("Absolute capacity for QUEUEC is not correct",
+<<<<<<< HEAD
         0.066, qC.getAbsoluteCapacity(), DELTA);
+=======
+        0.133, qC.getAbsoluteCapacity(), DELTA);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Assert.assertEquals("Absolute Max capacity for QUEUEC is not correct",
         0.4, qC.getAbsoluteMaximumCapacity(), DELTA);
 

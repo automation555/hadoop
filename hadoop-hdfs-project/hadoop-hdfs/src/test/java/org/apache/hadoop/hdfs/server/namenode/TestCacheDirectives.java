@@ -1626,6 +1626,7 @@ public class TestCacheDirectives {
             "testAddingCacheDirectiveInfosWhenCachingIsDisabled:2");
   }
 
+<<<<<<< HEAD
   /**
    * @return the dfs instance for nnIdx.
    */
@@ -1634,6 +1635,8 @@ public class TestCacheDirectives {
     return cluster.getFileSystem(0);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test(timeout=120000)
   public void testExpiryTimeConsistency() throws Exception {
     conf.setInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY, 1);
@@ -1644,7 +1647,11 @@ public class TestCacheDirectives {
             .build();
     dfsCluster.transitionToActive(0);
 
+<<<<<<< HEAD
     DistributedFileSystem fs = getDFS(dfsCluster, 0);
+=======
+    DistributedFileSystem fs = dfsCluster.getFileSystem(0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final NameNode ann = dfsCluster.getNameNode(0);
 
     final Path filename = new Path("/file");

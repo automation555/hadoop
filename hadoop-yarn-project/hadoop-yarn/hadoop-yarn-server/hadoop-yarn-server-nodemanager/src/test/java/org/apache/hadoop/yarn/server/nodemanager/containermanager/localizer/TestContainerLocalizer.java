@@ -247,8 +247,12 @@ public class TestContainerLocalizer {
     RecordFactory recordFactory = mock(RecordFactory.class);
     ContainerLocalizer localizer = new ContainerLocalizer(lfs,
         UserGroupInformation.getCurrentUser().getUserName(), "application_01",
+<<<<<<< HEAD
         "container_01", String.format(ContainerExecutor.TOKEN_FILE_NAME_FMT,
         "container_01"), new ArrayList<>(), recordFactory){
+=======
+        "container_01", new ArrayList<>(), recordFactory) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       @Override
       Configuration initConfiguration() {
         return conf;

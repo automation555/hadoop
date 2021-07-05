@@ -45,10 +45,13 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
+<<<<<<< HEAD
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_APPEND_BLOB_KEY;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasStreamCapabilities;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertLacksStreamCapabilities;
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 /**
  * Test flush operation.
  * This class cannot be run in parallel test mode--check comments in
@@ -226,7 +229,11 @@ public class ITestAzureBlobFileSystemFlush extends AbstractAbfsScaleTest {
     testFlush(true);
   }
 
+<<<<<<< HEAD
   private void testFlush(boolean disableOutputStreamFlush) throws Exception {
+=======
+  private void testFlush(boolean flushEnabled) throws Exception {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final AzureBlobFileSystem fs = (AzureBlobFileSystem) getFileSystem();
 
     // Simulate setting "fs.azure.disable.outputstream.flush" to true or false

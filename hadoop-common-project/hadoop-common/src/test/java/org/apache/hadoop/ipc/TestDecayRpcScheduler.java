@@ -157,11 +157,19 @@ public class TestDecayRpcScheduler {
   @SuppressWarnings("deprecation")
   public void testDecay() throws Exception {
     Configuration conf = new Configuration();
+<<<<<<< HEAD
     conf.setLong("ipc.11." // Never decay
         + DecayRpcScheduler.IPC_SCHEDULER_DECAYSCHEDULER_PERIOD_KEY, 999999999);
     conf.setDouble("ipc.11."
         + DecayRpcScheduler.IPC_SCHEDULER_DECAYSCHEDULER_FACTOR_KEY, 0.5);
     scheduler = new DecayRpcScheduler(1, "ipc.11", conf);
+=======
+    conf.setLong("ns." // Never decay
+        + DecayRpcScheduler.IPC_SCHEDULER_DECAYSCHEDULER_PERIOD_KEY, 999999999);
+    conf.setDouble("ns."
+        + DecayRpcScheduler.IPC_SCHEDULER_DECAYSCHEDULER_FACTOR_KEY, 0.5);
+    scheduler = new DecayRpcScheduler(1, "ns", conf);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     assertEquals(0, scheduler.getTotalCallSnapshot());
 
@@ -288,7 +296,11 @@ public class TestDecayRpcScheduler {
 
   @Test
   public void testUsingWeightedTimeCostProvider() {
+<<<<<<< HEAD
     scheduler = getSchedulerWithWeightedTimeCostProvider(3, "ipc.15");
+=======
+    scheduler = getSchedulerWithWeightedTimeCostProvider(3);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // 3 details in increasing order of cost. Although medium has a longer
     // duration, the shared lock is weighted less than the exclusive lock
@@ -338,7 +350,11 @@ public class TestDecayRpcScheduler {
 
   @Test
   public void testUsingWeightedTimeCostProviderWithZeroCostCalls() {
+<<<<<<< HEAD
     scheduler = getSchedulerWithWeightedTimeCostProvider(2, "ipc.16");
+=======
+    scheduler = getSchedulerWithWeightedTimeCostProvider(2);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     ProcessingDetails emptyDetails =
         new ProcessingDetails(TimeUnit.MILLISECONDS);
@@ -355,7 +371,11 @@ public class TestDecayRpcScheduler {
 
   @Test
   public void testUsingWeightedTimeCostProviderNoRequests() {
+<<<<<<< HEAD
     scheduler = getSchedulerWithWeightedTimeCostProvider(2, "ipc.18");
+=======
+    scheduler = getSchedulerWithWeightedTimeCostProvider(2);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
   }
@@ -365,6 +385,7 @@ public class TestDecayRpcScheduler {
    * normal decaying disabled.
    */
   private static DecayRpcScheduler getSchedulerWithWeightedTimeCostProvider(
+<<<<<<< HEAD
       int priorityLevels, String ns) {
     Configuration conf = new Configuration();
     conf.setClass(ns + "." + CommonConfigurationKeys.IPC_COST_PROVIDER_KEY,
@@ -476,5 +497,29 @@ public class TestDecayRpcScheduler {
     assertEquals(100, scheduler.getTotalServiceUserRawCallVolume());
     // test priority of normal user.
     assertEquals(level - 1, scheduler.getPriorityLevel(mockCall("user1")));
+=======
+      int priorityLevels) {
+    Configuration conf = new Configuration();
+    conf.setClass("ns." + CommonConfigurationKeys.IPC_COST_PROVIDER_KEY,
+        WeightedTimeCostProvider.class, CostProvider.class);
+    conf.setLong("ns."
+        + DecayRpcScheduler.IPC_SCHEDULER_DECAYSCHEDULER_PERIOD_KEY, 999999);
+    return new DecayRpcScheduler(priorityLevels, "ns", conf);
+  }
+
+  /**
+   * Get the priority and increment the call count, assuming that
+   * {@link DefaultCostProvider} is in use.
+   */
+  private int getPriorityIncrementCallCount(String callId) {
+    Schedulable mockCall = mockCall(callId);
+    int priority = scheduler.getPriorityLevel(mockCall);
+    // The DefaultCostProvider uses a cost of 1 for all calls, ignoring
+    // the processing details, so an empty one is fine
+    ProcessingDetails emptyProcessingDetails =
+        new ProcessingDetails(TimeUnit.MILLISECONDS);
+    scheduler.addResponseTime("ignored", mockCall, emptyProcessingDetails);
+    return priority;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

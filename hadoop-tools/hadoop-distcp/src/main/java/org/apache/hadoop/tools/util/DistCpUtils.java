@@ -601,6 +601,7 @@ public class DistCpUtils {
    * @param skipCrc The flag to indicate whether to skip checksums.
    * @throws IOException if there's a mismatch in file lengths or checksums.
    */
+<<<<<<< HEAD
   public static void compareFileLengthsAndChecksums(long srcLen,
              FileSystem sourceFS, Path source, FileChecksum sourceChecksum,
              FileSystem targetFS, Path target, boolean skipCrc,
@@ -609,14 +610,31 @@ public class DistCpUtils {
       throw new IOException(
           DistCpConstants.LENGTH_MISMATCH_ERROR_MSG + source + " (" + srcLen
               + ") and target:" + target + " (" + targetLen + ")");
+=======
+  public static void compareFileLengthsAndChecksums(
+      FileSystem sourceFS, Path source, FileChecksum sourceChecksum,
+      FileSystem targetFS, Path target, boolean skipCrc) throws IOException {
+    long srcLen = sourceFS.getFileStatus(source).getLen();
+    long tgtLen = targetFS.getFileStatus(target).getLen();
+    if (srcLen != tgtLen) {
+      throw new IOException(
+          "Mismatch in length of source:" + source + " (" + srcLen
+              + ") and target:" + target + " (" + tgtLen + ")");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     //At this point, src & dest lengths are same. if length==0, we skip checksum
     if ((srcLen != 0) && (!skipCrc)) {
       if (!checksumsAreEqual(sourceFS, source, sourceChecksum,
+<<<<<<< HEAD
           targetFS, target, srcLen)) {
         StringBuilder errorMessage =
             new StringBuilder(DistCpConstants.CHECKSUM_MISMATCH_ERROR_MSG)
+=======
+          targetFS, target)) {
+        StringBuilder errorMessage =
+            new StringBuilder("Checksum mismatch between ")
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                 .append(source).append(" and ").append(target).append(".");
         boolean addSkipHint = false;
         String srcScheme = sourceFS.getScheme();

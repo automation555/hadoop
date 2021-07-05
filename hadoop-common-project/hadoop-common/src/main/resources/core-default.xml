@@ -2114,6 +2114,7 @@
   <name>fs.s3a.change.detection.mode</name>
   <value>server</value>
   <description>
+<<<<<<< HEAD
     Determines how change detection is applied to alert to inconsistent S3
     objects read during or after an overwrite. Value 'server' indicates to apply
     the attribute constraint directly on GetObject requests to S3. Value 'client'
@@ -2123,6 +2124,17 @@
     'client' generate RemoteObjectChangedException when a mismatch is detected.
     Value 'warn' works like 'client' but generates only a warning.  Value 'none'
     will ignore change detection completely.
+=======
+    Determines how change detection is applied to alert to S3 objects
+    rewritten while being read. Value 'server' indicates to apply the attribute
+    constraint directly on GetObject requests to S3. Value 'client' means to do a
+    client-side comparison of the attribute value returned in the response.  Value
+    'server' would not work with third-party S3 implementations that do not
+    support these constraints on GetObject. Values 'server' and 'client' generate
+    RemoteObjectChangedException when a mismatch is detected.  Value 'warn' works
+    like 'client' but generates only a warning.  Value 'none' will ignore change
+    detection completely.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   </description>
 </property>
 
@@ -2139,6 +2151,7 @@
   </description>
 </property>
 
+<<<<<<< HEAD
 <property>
   <name>fs.s3a.ssl.channel.mode</name>
   <value>default_jsse</value>
@@ -2158,6 +2171,8 @@
   </description>
 </property>
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 <!-- Azure file system properties -->
 <property>
   <name>fs.AbstractFileSystem.wasb.impl</name>
@@ -2300,7 +2315,10 @@
   </description>
 </property>
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 <!-- ipc properties -->
 
 <property>

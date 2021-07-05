@@ -508,6 +508,7 @@ public class TestParam {
   }
 
   @Test
+<<<<<<< HEAD
   public void testNamespaceQuotaParam() {
     NameSpaceQuotaParam p =
         new NameSpaceQuotaParam(NameSpaceQuotaParam.DEFAULT);
@@ -535,6 +536,8 @@ public class TestParam {
   }
 
   @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testECPolicyParam() {
     ECPolicyParam p = new ECPolicyParam(ECPolicyParam.DEFAULT);
     Assert.assertEquals(null, p.getValue());

@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -53,6 +55,7 @@ import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.MultipartTestUtils.listMultipartUploads;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.S3AUtils.applyLocatedFiles;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToString;
 
@@ -444,6 +447,7 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
   /**
    * Load in the success data marker: this guarantees that an S3A
    * committer was used.
+<<<<<<< HEAD
    * @param outputPath path of job
    * @param committerName name of committer to match, or ""
    * @param fs filesystem
@@ -460,11 +464,40 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
       final int minimumFileCount,
       final String jobId) throws IOException {
     SuccessData successData = loadSuccessFile(fs, outputPath, origin);
+=======
+   * @param fs filesystem
+   * @param outputPath path of job
+   * @param committerName name of committer to match
+   * @return the success data
+   * @throws IOException IO failure
+   */
+  public static SuccessData validateSuccessFile(final S3AFileSystem fs,
+      final Path outputPath, final String committerName) throws IOException {
+    SuccessData successData = null;
+    try {
+      successData = loadSuccessFile(fs, outputPath);
+    } catch (FileNotFoundException e) {
+      // either the output path is missing or, if its the success file,
+      // somehow the relevant committer wasn't picked up.
+      String dest = outputPath.toString();
+      LOG.error("No _SUCCESS file found under {}", dest);
+      List<String> files = new ArrayList<>();
+      applyLocatedFiles(fs.listFiles(outputPath, true),
+          (status) -> {
+            files.add(status.getPath().toString());
+            LOG.error("{} {}", status.getPath(), status.getLen());
+          });
+      throw new AssertionError("No _SUCCESS file in " + dest
+          + "; found : " + files.stream().collect(Collectors.joining("\n")),
+          e);
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     String commitDetails = successData.toString();
     LOG.info("Committer name " + committerName + "\n{}",
         commitDetails);
     LOG.info("Committer statistics: \n{}",
         successData.dumpMetrics("  ", " = ", "\n"));
+<<<<<<< HEAD
     LOG.info("Job IOStatistics: \n{}",
         ioStatisticsToString(successData.getIOStatistics()));
     LOG.info("Diagnostics\n{}",
@@ -481,6 +514,12 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
           .describedAs("JobID in " + commitDetails)
           .isEqualTo(jobId);
     }
+=======
+    LOG.info("Diagnostics\n{}",
+        successData.dumpDiagnostics("  ", " = ", "\n"));
+    assertEquals("Wrong committer in " + commitDetails,
+        committerName, successData.getCommitter());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return successData;
   }
 
@@ -488,6 +527,7 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
    * Load a success file; fail if the file is empty/nonexistent.
    * @param fs filesystem
    * @param outputPath directory containing the success file.
+<<<<<<< HEAD
    * @param origin origin of the file
    * @return the loaded file.
    * @throws IOException failure to find/load the file
@@ -515,6 +555,18 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
     String body = ContractTestUtils.readUTF8(fs, success, -1);
     LOG.info("Loading committer success file {}. Actual contents=\n{}", success,
         body);
+=======
+   * @return the loaded file.
+   * @throws IOException failure to find/load the file
+   * @throws AssertionError file is 0-bytes long
+   */
+  public static SuccessData loadSuccessFile(final S3AFileSystem fs,
+      final Path outputPath) throws IOException {
+    Path success = new Path(outputPath, _SUCCESS);
+    FileStatus status = fs.getFileStatus(success);
+    assertTrue("0 byte success file - not a s3guard committer " + success,
+        status.getLen() > 0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return SuccessData.load(fs, success);
   }
 }

@@ -1276,9 +1276,12 @@ public class ParentQueue extends AbstractCSQueue {
       CSQueueUtils.updateConfiguredCapacityMetrics(resourceCalculator,
           labelManager.getResourceByLabel(null, clusterResource),
           RMNodeLabelsManager.NO_LABEL, this);
+<<<<<<< HEAD
     } catch (IOException e) {
       LOG.error("Fatal issue found: e", e);
       throw new YarnRuntimeException("Fatal issue during scheduling", e);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } finally {
       writeLock.unlock();
     }
@@ -1360,7 +1363,66 @@ public class ParentQueue extends AbstractCSQueue {
         }
       }
     }
+<<<<<<< HEAD
     return ImmutableMap.copyOf(effectiveMinRatioPerResource);
+=======
+    return effectiveMinRatioPerResource;
+  }
+
+  private void deriveCapacityFromAbsoluteConfigurations(String label,
+      Resource clusterResource, ResourceCalculator rc, CSQueue childQueue) {
+
+    /*
+     * In case when queues are configured with absolute resources, it is better
+     * to update capacity/max-capacity etc w.r.t absolute resource as well. In
+     * case of computation, these values wont be used any more. However for
+     * metrics and UI, its better these values are pre-computed here itself.
+     */
+
+    // 1. Update capacity as a float based on parent's minResource
+    childQueue.getQueueCapacities().setCapacity(label,
+        rc.divide(clusterResource,
+            childQueue.getQueueResourceQuotas().getEffectiveMinResource(label),
+            getQueueResourceQuotas().getEffectiveMinResource(label)));
+
+    // 2. Update max-capacity as a float based on parent's maxResource
+    childQueue.getQueueCapacities().setMaximumCapacity(label,
+        rc.divide(clusterResource,
+            childQueue.getQueueResourceQuotas().getEffectiveMaxResource(label),
+            getQueueResourceQuotas().getEffectiveMaxResource(label)));
+
+    // 3. Update absolute capacity as a float based on parent's minResource and
+    // cluster resource.
+    childQueue.getQueueCapacities().setAbsoluteCapacity(label,
+        childQueue.getQueueCapacities().getCapacity(label)
+            * getQueueCapacities().getAbsoluteCapacity(label));
+
+    // 4. Update absolute max-capacity as a float based on parent's maxResource
+    // and cluster resource.
+    childQueue.getQueueCapacities().setAbsoluteMaximumCapacity(label,
+        childQueue.getQueueCapacities().getMaximumCapacity(label)
+            * getQueueCapacities().getAbsoluteMaximumCapacity(label));
+
+    // Re-visit max applications for a queue based on absolute capacity if
+    // needed.
+    if (childQueue instanceof LeafQueue) {
+      LeafQueue leafQueue = (LeafQueue) childQueue;
+      CapacitySchedulerConfiguration conf = csContext.getConfiguration();
+      int maxApplications = (int) (conf.getMaximumSystemApplications()
+          * childQueue.getQueueCapacities().getAbsoluteCapacity(label));
+      leafQueue.setMaxApplications(maxApplications);
+
+      int maxApplicationsPerUser = Math.min(maxApplications,
+          (int) (maxApplications
+              * (leafQueue.getUsersManager().getUserLimit() / 100.0f)
+              * leafQueue.getUsersManager().getUserLimitFactor()));
+      leafQueue.setMaxApplicationsPerUser(maxApplicationsPerUser);
+      LOG.info("LeafQueue:" + leafQueue.getQueueName() + ", maxApplications="
+          + maxApplications + ", maxApplicationsPerUser="
+          + maxApplicationsPerUser + ", Abs Cap:"
+          + childQueue.getQueueCapacities().getAbsoluteCapacity(label));
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override

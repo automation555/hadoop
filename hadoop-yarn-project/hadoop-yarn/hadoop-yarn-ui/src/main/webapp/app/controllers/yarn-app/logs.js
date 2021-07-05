@@ -311,6 +311,7 @@ export default Ember.Controller.extend({
     return logAggregationStatus !== "SUCCEEDED";
   }),
 
+<<<<<<< HEAD
   fallbackToJHS: function() {
     // Let's fall back to JHS if ATS is not available, but JHS is.
     return this.model &&
@@ -331,4 +332,12 @@ export default Ember.Controller.extend({
     }
     return true;
   }.property('model.timelineHealth', 'model.isJHSHealthy')
+=======
+  isTimelineUnHealthy: function() {
+      if (this.model && this.model.timelineHealth) {
+        return this.model.timelineHealth.get('isTimelineUnHealthy');
+      }
+      return true;
+    }.property('model.timelineHealth')
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 });

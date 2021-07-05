@@ -617,6 +617,7 @@ public abstract class AbstractContractDistCpTest
     directWrite(localFS, localDir, remoteFS, remoteDir, false);
   }
 
+<<<<<<< HEAD
   @Test
   public void testDistCpWithIterator() throws Exception {
     describe("Build listing in distCp using the iterator option.");
@@ -659,6 +660,8 @@ public abstract class AbstractContractDistCpTest
     return totalFiles;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Executes a test with support for using direct write option.
    *
@@ -709,6 +712,7 @@ public abstract class AbstractContractDistCpTest
                     Collections.singletonList(srcDir), destDir)
                     .withDirectWrite(true)));
   }
+<<<<<<< HEAD
 
   @Test
   public void testDistCpWithFile() throws Exception {
@@ -765,4 +769,6 @@ public abstract class AbstractContractDistCpTest
     verifyFileContents(localFS, dest, block);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

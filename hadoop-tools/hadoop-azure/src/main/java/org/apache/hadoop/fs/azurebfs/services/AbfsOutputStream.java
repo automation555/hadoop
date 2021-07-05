@@ -24,6 +24,10 @@ import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.nio.ByteBuffer;
+<<<<<<< HEAD
+=======
+import java.util.Locale;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ExecutorCompletionService;
@@ -35,6 +39,7 @@ import java.util.UUID;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 
+<<<<<<< HEAD
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +68,14 @@ import static org.apache.hadoop.io.IOUtils.wrapException;
 import static org.apache.hadoop.fs.azurebfs.contracts.services.AppendRequestParameters.Mode.APPEND_MODE;
 import static org.apache.hadoop.fs.azurebfs.contracts.services.AppendRequestParameters.Mode.FLUSH_CLOSE_MODE;
 import static org.apache.hadoop.fs.azurebfs.contracts.services.AppendRequestParameters.Mode.FLUSH_MODE;
+=======
+import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsRestOperationException;
+import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AzureBlobFileSystemException;
+import org.apache.hadoop.io.ElasticByteBufferPool;
+import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.fs.Syncable;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * The BlobFsOutputStream for Rest AbfsClient.
@@ -94,6 +107,7 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
   private final ThreadPoolExecutor threadExecutor;
   private final ExecutorCompletionService<Void> completionService;
 
+<<<<<<< HEAD
   // SAS tokens can be re-used until they expire
   private CachedSASToken cachedSasToken;
   private final String outputStreamId;
@@ -103,12 +117,15 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
   private AbfsLease lease;
   private String leaseId;
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Queue storing buffers with the size of the Azure block ready for
    * reuse. The pool allows reusing the blocks instead of allocating new
    * blocks. After the data is sent to the service, the buffer is returned
    * back to the queue
    */
+<<<<<<< HEAD
   private ElasticByteBufferPool byteBufferPool
           = new ElasticByteBufferPool();
 
@@ -119,6 +136,11 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
   private static final Logger LOG =
       LoggerFactory.getLogger(AbfsOutputStream.class);
 
+=======
+  private final ElasticByteBufferPool byteBufferPool
+          = new ElasticByteBufferPool();
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public AbfsOutputStream(
           final AbfsClient client,
           final Statistics statistics,
@@ -139,7 +161,11 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
     this.isAppendBlob = abfsOutputStreamContext.isAppendBlob();
     this.lastError = null;
     this.lastFlushOffset = 0;
+<<<<<<< HEAD
     this.bufferSize = abfsOutputStreamContext.getWriteBufferSize();
+=======
+    this.bufferSize = bufferSize;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.buffer = byteBufferPool.getBuffer(false, bufferSize).array();
     this.bufferIndex = 0;
     this.numOfAppendsToServerSinceLastFlush = 0;
@@ -375,6 +401,7 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
 
     writeCurrentBufferToService();
     flushWrittenBytesToService(isClose);
+<<<<<<< HEAD
     numOfAppendsToServerSinceLastFlush = 0;
   }
 
@@ -385,6 +412,8 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
     shrinkWriteOperationQueue();
     maybeThrowLastError();
     numOfAppendsToServerSinceLastFlush = 0;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   private synchronized void flushInternalAsync() throws IOException {
@@ -454,10 +483,13 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
 
     final byte[] bytes = buffer;
     final int bytesLength = bufferIndex;
+<<<<<<< HEAD
     if (outputStreamStatistics != null) {
       outputStreamStatistics.writeCurrentBuffer();
       outputStreamStatistics.bytesToUpload(bytesLength);
     }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     buffer = byteBufferPool.getBuffer(false, bufferSize).array();
     bufferIndex = 0;
     final long offset = position;
@@ -473,6 +505,7 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
         waitForTaskToComplete();
       }
     }
+<<<<<<< HEAD
     final Future<Void> job = completionService.submit(() -> {
       AbfsPerfTracker tracker = client.getAbfsPerfTracker();
           try (AbfsPerfInfo perfInfo = new AbfsPerfInfo(tracker,
@@ -501,6 +534,16 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
         outputStreamStatistics.uploadFailed(bytesLength);
       } else {
         outputStreamStatistics.uploadSuccessful(bytesLength);
+=======
+
+    final Future<Void> job = completionService.submit(new Callable<Void>() {
+      @Override
+      public Void call() throws Exception {
+        client.append(path, offset, bytes, 0,
+            bytesLength);
+        byteBufferPool.putBuffer(ByteBuffer.wrap(bytes));
+        return null;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     }
     writeOperations.add(new WriteOperation(job, offset, bytesLength));
@@ -509,7 +552,11 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
     shrinkWriteOperationQueue();
   }
 
+<<<<<<< HEAD
   private synchronized void waitForAppendsToComplete() throws IOException {
+=======
+  private synchronized void flushWrittenBytesToService(boolean isClose) throws IOException {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     for (WriteOperation writeOperation : writeOperations) {
       try {
         writeOperation.task.get();
@@ -527,10 +574,13 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
         throw lastError;
       }
     }
+<<<<<<< HEAD
   }
 
   private synchronized void flushWrittenBytesToService(boolean isClose) throws IOException {
     waitForAppendsToComplete();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     flushWrittenBytesToServiceInternal(position, false, isClose);
   }
 
@@ -545,6 +595,7 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
 
   private synchronized void flushWrittenBytesToServiceInternal(final long offset,
       final boolean retainUncommitedData, final boolean isClose) throws IOException {
+<<<<<<< HEAD
     // flush is called for appendblob only on close
     if (this.isAppendBlob && !isClose) {
       return;
@@ -557,6 +608,10 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
           cachedSasToken.get(), leaseId, new TracingContext(tracingContext));
       cachedSasToken.update(op.getSasToken());
       perfInfo.registerResult(op.getResult()).registerSuccess(true);
+=======
+    try {
+      client.flush(path, offset, retainUncommitedData, isClose);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } catch (AzureBlobFileSystemException ex) {
       if (ex instanceof AbfsRestOperationException) {
         if (((AbfsRestOperationException) ex).getStatusCode() == HttpURLConnection.HTTP_NOT_FOUND) {

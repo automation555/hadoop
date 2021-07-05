@@ -2736,8 +2736,12 @@ public class MiniDFSCluster implements AutoCloseable {
   public void rollEditLogAndTail(int nnIndex) throws Exception {
     getNameNode(nnIndex).getRpcServer().rollEditLog();
     for (int i = 2; i < getNumNameNodes(); i++) {
+<<<<<<< HEAD
       long el = getNameNode(i).getNamesystem().getEditLogTailer().doTailEdits();
       LOG.info("editsLoaded {}", el);
+=======
+      getNameNode(i).getNamesystem().getEditLogTailer().doTailEdits();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 

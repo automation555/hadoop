@@ -46,7 +46,11 @@ import java.util.concurrent.Future;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+<<<<<<< HEAD
 import static org.mockito.ArgumentMatchers.any;
+=======
+import static org.mockito.Matchers.any;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 
@@ -97,13 +101,22 @@ public class TestBlockReportLease {
       DelayAnswer delayer = new DelayAnswer(BlockManager.LOG);
       doAnswer(delayer).when(spyBlockManager).processReport(
           any(DatanodeStorageInfo.class),
+<<<<<<< HEAD
           any(BlockListAsLongs.class));
+=======
+          any(BlockListAsLongs.class),
+          any(BlockReportContext.class));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       ExecutorService pool = Executors.newFixedThreadPool(1);
 
       // Trigger sendBlockReport
       BlockReportContext brContext = new BlockReportContext(1, 0,
+<<<<<<< HEAD
           rand.nextLong(), hbResponse.getFullBlockReportLeaseId());
+=======
+          rand.nextLong(), hbResponse.getFullBlockReportLeaseId(), true);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       Future<DatanodeCommand> sendBRfuturea = pool.submit(() -> {
         // Build every storage with 100 blocks for sending report
         DatanodeStorage[] datanodeStorages

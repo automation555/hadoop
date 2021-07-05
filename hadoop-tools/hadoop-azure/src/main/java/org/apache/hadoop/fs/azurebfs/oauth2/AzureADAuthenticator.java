@@ -126,16 +126,29 @@ public final class AzureADAuthenticator {
    * @return {@link AzureADToken} obtained using the creds
    * @throws IOException throws IOException if there is a failure in obtaining the token
    */
+<<<<<<< HEAD
   public static AzureADToken getTokenFromMsi(final String authEndpoint,
       final String tenantGuid, final String clientId, String authority,
       boolean bypassCache) throws IOException {
+=======
+  public static AzureADToken getTokenFromMsi(String tenantGuid, String clientId,
+                                             boolean bypassCache) throws IOException {
+    String authEndpoint = "http://169.254.169.254/metadata/identity/oauth2/token";
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     QueryParams qp = new QueryParams();
     qp.add("api-version", "2018-02-01");
     qp.add("resource", RESOURCE_NAME);
 
+<<<<<<< HEAD
     if (tenantGuid != null && tenantGuid.length() > 0) {
       authority = authority + tenantGuid;
       LOG.debug("MSI authority : {}", authority);
+=======
+
+    if (tenantGuid != null && tenantGuid.length() > 0) {
+      String authority = "https://login.microsoftonline.com/" + tenantGuid;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       qp.add("authority", authority);
     }
 
@@ -178,6 +191,7 @@ public final class AzureADAuthenticator {
     return getTokenCall(authEndpoint, qp.serialize(), null, null);
   }
 
+<<<<<<< HEAD
 
   /**
    * This exception class contains the http error code,
@@ -196,6 +210,20 @@ public final class AzureADAuthenticator {
 
     private final String body;
 
+=======
+
+  /**
+   * This exception class contains the http error code,
+   * requestId and error message, it is thrown when AzureADAuthenticator
+   * failed to get the Azure Active Directory token.
+   */
+  @InterfaceAudience.LimitedPrivate("authorization-subsystems")
+  @InterfaceStability.Unstable
+  public static class HttpException extends IOException {
+    private int httpErrorCode;
+    private String requestId;
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     /**
      * Gets Http error status code.
      * @return  http error code.
@@ -212,6 +240,7 @@ public final class AzureADAuthenticator {
       return this.requestId;
     }
 
+<<<<<<< HEAD
     protected HttpException(
         final int httpErrorCode,
         final String requestId,
@@ -219,6 +248,9 @@ public final class AzureADAuthenticator {
         final String url,
         final String contentType,
         final String body) {
+=======
+    protected HttpException(int httpErrorCode, String requestId, String message) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       super(message);
       this.httpErrorCode = httpErrorCode;
       this.requestId = requestId;
@@ -306,6 +338,11 @@ public final class AzureADAuthenticator {
         token = getTokenSingleCall(authEndpoint, body, headers, httpMethod, isMsi);
       } catch (HttpException e) {
         httperror = e.httpErrorCode;
+<<<<<<< HEAD
+=======
+        ex = e;
+      } catch (IOException e) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         ex = e;
       } catch (IOException e) {
         httperror = -1;
@@ -319,6 +356,7 @@ public final class AzureADAuthenticator {
       shouldRetry = !succeeded && isRecoverableFailure
           && tokenFetchRetryPolicy.shouldRetry(retryCount, httperror);
       retryCount++;
+<<<<<<< HEAD
       if (shouldRetry) {
         LOG.debug("Retrying getTokenSingleCall. RetryCount = {}", retryCount);
         try {
@@ -329,6 +367,9 @@ public final class AzureADAuthenticator {
       }
 
     } while (shouldRetry);
+=======
+    } while (!succeeded && retryPolicy.shouldRetry(retryCount, httperror));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (!succeeded) {
       throw ex;
     }
@@ -391,18 +432,23 @@ public final class AzureADAuthenticator {
         InputStream httpResponseStream = conn.getInputStream();
         token = parseTokenFromStream(httpResponseStream, isMsi);
       } else {
+<<<<<<< HEAD
         InputStream stream = conn.getErrorStream();
         if (stream == null) {
           // no error stream, try the original input stream
           stream = conn.getInputStream();
         }
         String responseBody = consumeInputStream(stream, 1024);
+=======
+        String responseBody = consumeInputStream(conn.getErrorStream(), 1024);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         String proxies = "none";
         String httpProxy = System.getProperty("http.proxy");
         String httpsProxy = System.getProperty("https.proxy");
         if (httpProxy != null || httpsProxy != null) {
           proxies = "http:" + httpProxy + "; https:" + httpsProxy;
         }
+<<<<<<< HEAD
         String operation = "AADToken: HTTP connection to " + authEndpoint
             + " failed for getting token from AzureAD.";
         String logMessage = operation
@@ -412,6 +458,16 @@ public final class AzureADAuthenticator {
                         + (responseBody.isEmpty()
                           ? ""
                           : ("\nFirst 1K of Body: " + responseBody));
+=======
+        String logMessage =
+                "AADToken: HTTP connection failed for getting token from AzureAD. Http response: "
+                        + httpResponseCode + " " + conn.getResponseMessage()
+                        + "\nContent-Type: " + responseContentType
+                        + " Content-Length: " + responseContentLength
+                        + " Request ID: " + requestId.toString()
+                        + " Proxies: " + proxies
+                        + "\nFirst 1K of Body: " + responseBody;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         LOG.debug(logMessage);
         if (httpResponseCode == HttpURLConnection.HTTP_OK) {
           // 200 is returned by some of the sign-on pages, but can also

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.net.ServerSocketUtil;
@@ -30,6 +31,13 @@ import org.apache.hadoop.yarn.server.api.ResourceTracker;
 import org.apache.hadoop.yarn.server.api.ServerRMProxy;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeToAttributes;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager.NodeEventDispatcher;
+=======
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.yarn.nodelabels.NodeAttributeStore;
+import org.apache.hadoop.yarn.nodelabels.NodeLabelUtil;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodeToAttributes;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.FileSystemNodeAttributeStore;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.MockNM.createMockNodeStatus;
@@ -1328,10 +1336,19 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertEquals(2, attrs.size());
     attrs.keySet().stream().forEach(e -> {
       Assert.assertEquals(NodeAttributeType.STRING, e.getAttributeType());
+<<<<<<< HEAD
       if (e.getAttributeKey().getAttributePrefix() == NodeAttribute.PREFIX_DISTRIBUTED) {
         Assert.assertEquals("host", e.getAttributeKey().getAttributeName());
         Assert.assertEquals("host4", e.getAttributeValue());
       } else if (e.getAttributeKey().getAttributePrefix() == NodeAttribute.PREFIX_CENTRALIZED) {
+=======
+      if (e.getAttributeKey().getAttributePrefix()
+          == NodeAttribute.PREFIX_DISTRIBUTED) {
+        Assert.assertEquals("host", e.getAttributeKey().getAttributeName());
+        Assert.assertEquals("host4", e.getAttributeValue());
+      } else if (e.getAttributeKey().getAttributePrefix()
+          == NodeAttribute.PREFIX_CENTRALIZED) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         Assert.assertEquals("centAttr", e.getAttributeKey().getAttributeName());
         Assert.assertEquals("x", e.getAttributeValue());
       }
@@ -2855,6 +2872,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertEquals(1, nodeHeartbeat.getResponseId());
   }
 
+<<<<<<< HEAD
   @Test
   public void testNMIpHostNameResolution() throws Exception {
     Configuration conf = new Configuration();
@@ -2899,6 +2917,10 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
 
   /**
    * A no-op implementation of NodeAttributeStore for testing
+=======
+  /**
+   * A no-op implementation of NodeAttributeStore for testing.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    */
   public static class NullNodeAttributeStore implements NodeAttributeStore {
 
@@ -2926,6 +2948,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     public void close() {
     }
   }
+<<<<<<< HEAD
 
   @Test(timeout = 5000)
   public void testSystemCredentialsAfterTokenSequenceNoChange()
@@ -3063,4 +3086,6 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
 
     resourceTrackerService.close();
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

@@ -2572,6 +2572,7 @@ public class TestKMS {
         };
 
     runServerWithZooKeeper(zkDTSM, zkSigner, c);
+<<<<<<< HEAD
   }
 
   @Test
@@ -2580,6 +2581,16 @@ public class TestKMS {
     doKMSWithZKWithDelegationToken(true, true, kmsSize);
   }
 
+=======
+  }
+
+  @Test
+  public void testKMSHAZooKeeperDelegationToken() throws Exception {
+    final int kmsSize = 2;
+    doKMSWithZKWithDelegationToken(true, true, kmsSize);
+  }
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private void doKMSWithZKWithDelegationToken(boolean zkDTSM, boolean zkSigner,
       int kmsSize) throws Exception {
     // Create a KMSCallable to execute requests after ZooKeeper and KMS are up.

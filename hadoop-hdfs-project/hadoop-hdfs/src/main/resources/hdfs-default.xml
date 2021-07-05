@@ -2352,6 +2352,7 @@
     </description>
   </property>
 
+<<<<<<< HEAD
 <property>
   <name>dfs.datanode.min.outlier.detection.nodes</name>
   <value>10</value>
@@ -2377,6 +2378,8 @@
   </description>
 </property>
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 <property>
   <name>dfs.datanode.outliers.report.interval</name>
   <value>30m</value>
@@ -3672,6 +3675,7 @@
     more up-to-date data. When using the QuorumJournalManager, this enables
     tailing of edit logs via the RPC-based mechanism, rather than streaming,
     which allows for much fresher data.
+<<<<<<< HEAD
   </description>
 </property>
 
@@ -3683,6 +3687,8 @@
     Setting this to true is required by Consistent Read from Standby feature.
     But for regular cases, this should be set to false to avoid the overhead
     of updating and maintaining this state.
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   </description>
 </property>
 
@@ -6041,6 +6047,7 @@
   </property>
 
   <property>
+<<<<<<< HEAD
     <name>dfs.namenode.blockreport.max.lock.hold.time</name>
     <value>4</value>
     <description>
@@ -6059,6 +6066,8 @@
   </property>
 
   <property>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <name>dfs.journalnode.edits.dir.perm</name>
     <value>700</value>
     <description>
@@ -6067,6 +6076,7 @@
       octal or symbolic.
     </description>
   </property>
+<<<<<<< HEAD
 
   <property>
     <name>dfs.namenode.lease-hard-limit-sec</name>
@@ -6195,4 +6205,6 @@
       namenode right way for received or deleted blocks after one round.
     </description>
   </property>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 </configuration>

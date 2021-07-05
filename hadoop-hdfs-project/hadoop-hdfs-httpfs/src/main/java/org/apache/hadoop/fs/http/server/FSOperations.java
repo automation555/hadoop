@@ -41,13 +41,21 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.web.JsonUtil;
+=======
+import org.apache.hadoop.hdfs.web.JsonUtil;
+import org.apache.hadoop.io.IOUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.lib.service.FileSystemAccess;
 import org.apache.hadoop.util.StringUtils;
 import org.json.simple.JSONArray;
@@ -157,6 +165,7 @@ public final class FSOperations {
           hdfsFileStatus.getFileId());
       json.put(HttpFSFileSystem.STORAGEPOLICY_JSON,
           hdfsFileStatus.getStoragePolicy());
+<<<<<<< HEAD
       if (hdfsFileStatus.getErasureCodingPolicy() != null) {
         json.put(HttpFSFileSystem.ECPOLICYNAME_JSON,
             hdfsFileStatus.getErasureCodingPolicy().getName());
@@ -164,6 +173,8 @@ public final class FSOperations {
             JsonUtil.getEcPolicyAsMap(
                 hdfsFileStatus.getErasureCodingPolicy()));
       }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     if (fileStatus.getPermission().getAclBit()) {
       json.put(HttpFSFileSystem.ACL_BIT_JSON, true);
@@ -303,8 +314,11 @@ public final class FSOperations {
     Map json = new LinkedHashMap();
     json.put(HttpFSFileSystem.CONTENT_SUMMARY_DIRECTORY_COUNT_JSON,
         contentSummary.getDirectoryCount());
+<<<<<<< HEAD
     json.put(HttpFSFileSystem.CONTENT_SUMMARY_ECPOLICY_JSON,
         contentSummary.getErasureCodingPolicy());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     json.put(HttpFSFileSystem.CONTENT_SUMMARY_FILE_COUNT_JSON,
         contentSummary.getFileCount());
     json.put(HttpFSFileSystem.CONTENT_SUMMARY_LENGTH_JSON,
@@ -1912,6 +1926,7 @@ public final class FSOperations {
       return JsonUtil.toJsonString(sds);
     }
   }
+<<<<<<< HEAD
 
   /**
    *  Executor that performs a getSnapshotListing operation.
@@ -2133,3 +2148,6 @@ public final class FSOperations {
     }
   }
 }
+=======
+}
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776

@@ -21,7 +21,10 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+<<<<<<< HEAD
 import java.util.Set;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -105,9 +108,12 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
   private YarnAuthorizationProvider authorizer;
   private boolean timelineServiceV2Enabled;
   private boolean nodeLabelsEnabled;
+<<<<<<< HEAD
   private Set<String> exclusiveEnforcedPartitions;
 
   private static final String USER_ID_PREFIX = "userid=";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public RMAppManager(RMContext context,
       YarnScheduler scheduler, ApplicationMasterService masterService,
@@ -132,8 +138,11 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
         timelineServiceV2Enabled(conf);
     this.nodeLabelsEnabled = YarnConfiguration
         .areNodeLabelsEnabled(rmContext.getYarnConfiguration());
+<<<<<<< HEAD
     this.exclusiveEnforcedPartitions = YarnConfiguration
         .getExclusiveEnforcedPartitions(rmContext.getYarnConfiguration());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -232,6 +241,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
                   metrics.getPreemptedResourceSecondsMap()))
           .add("applicationTags", StringHelper.CSV_JOINER.join(
               app.getApplicationTags() != null ? new TreeSet<>(
+<<<<<<< HEAD
                   app.getApplicationTags()) : Collections.<String>emptySet()))
           .add("applicationNodeLabel",
               app.getApplicationSubmissionContext().getNodeLabelExpression()
@@ -242,6 +252,9 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
           .add("diagnostics", app.getDiagnostics())
           .add("totalAllocatedContainers",
               metrics.getTotalAllocatedContainers());
+=======
+                  app.getApplicationTags()) : Collections.<String>emptySet()));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return summary;
     }
 

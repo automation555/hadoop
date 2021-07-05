@@ -83,7 +83,11 @@ public class AbfsClient implements Closeable {
 
   private final URL baseUrl;
   private final SharedKeyCredentials sharedKeyCredentials;
+<<<<<<< HEAD
   private final String xMsVersion = "2019-12-12";
+=======
+  private final String xMsVersion = "2018-11-09";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private final ExponentialRetryPolicy retryPolicy;
   private final String filesystem;
   private final AbfsConfiguration abfsConfiguration;
@@ -291,7 +295,10 @@ public class AbfsClient implements Closeable {
     abfsUriQueryBuilder.addQuery(QUERY_PARAM_CONTINUATION, continuation);
     abfsUriQueryBuilder.addQuery(QUERY_PARAM_MAXRESULTS, String.valueOf(listMaxResults));
     abfsUriQueryBuilder.addQuery(HttpQueryParams.QUERY_PARAM_UPN, String.valueOf(abfsConfiguration.isUpnUsed()));
+<<<<<<< HEAD
     appendSASTokenToQuery(relativePath, SASTokenProvider.LIST_OPERATION, abfsUriQueryBuilder);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     final URL url = createRequestUrl(abfsUriQueryBuilder.toString());
     final AbfsRestOperation op = new AbfsRestOperation(
@@ -634,6 +641,7 @@ public class AbfsClient implements Closeable {
     return op;
   }
 
+<<<<<<< HEAD
   // For AppendBlob its possible that the append succeeded in the backend but the request failed.
   // However a retry would fail with an InvalidQueryParameterValue
   // (as the current offset would be unacceptable).
@@ -660,6 +668,10 @@ public class AbfsClient implements Closeable {
       boolean retainUncommittedData, boolean isClose,
       final String cachedSasToken, final String leaseId,
       TracingContext tracingContext) throws AzureBlobFileSystemException {
+=======
+  public AbfsRestOperation flush(final String path, final long position, boolean retainUncommittedData, boolean isClose)
+      throws AzureBlobFileSystemException {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final List<AbfsHttpHeader> requestHeaders = createDefaultHeaders();
     addCustomerProvidedKeyHeaders(requestHeaders);
     // JDK7 does not support PATCH, so to workaround the issue we will use
@@ -675,9 +687,12 @@ public class AbfsClient implements Closeable {
     abfsUriQueryBuilder.addQuery(QUERY_PARAM_POSITION, Long.toString(position));
     abfsUriQueryBuilder.addQuery(QUERY_PARAM_RETAIN_UNCOMMITTED_DATA, String.valueOf(retainUncommittedData));
     abfsUriQueryBuilder.addQuery(QUERY_PARAM_CLOSE, String.valueOf(isClose));
+<<<<<<< HEAD
     // AbfsInputStream/AbfsOutputStream reuse SAS tokens for better performance
     String sasTokenForReuse = appendSASTokenToQuery(path, SASTokenProvider.WRITE_OPERATION,
         abfsUriQueryBuilder, cachedSasToken);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     final URL url = createRequestUrl(path, abfsUriQueryBuilder.toString());
     final AbfsRestOperation op = new AbfsRestOperation(
@@ -717,6 +732,7 @@ public class AbfsClient implements Closeable {
     return op;
   }
 
+<<<<<<< HEAD
   public AbfsRestOperation getPathStatus(final String path, final boolean includeProperties,
                                          TracingContext tracingContext) throws AzureBlobFileSystemException {
     final List<AbfsHttpHeader> requestHeaders = createDefaultHeaders();
@@ -734,6 +750,13 @@ public class AbfsClient implements Closeable {
     }
     abfsUriQueryBuilder.addQuery(HttpQueryParams.QUERY_PARAM_UPN, String.valueOf(abfsConfiguration.isUpnUsed()));
     appendSASTokenToQuery(path, operation, abfsUriQueryBuilder);
+=======
+  public AbfsRestOperation getPathStatus(final String path) throws AzureBlobFileSystemException {
+    final List<AbfsHttpHeader> requestHeaders = createDefaultHeaders();
+
+    final AbfsUriQueryBuilder abfsUriQueryBuilder = createDefaultUriQueryBuilder();
+    abfsUriQueryBuilder.addQuery(HttpQueryParams.QUERY_PARAM_UPN, String.valueOf(abfsConfiguration.isUpnUsed()));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     final URL url = createRequestUrl(path, abfsUriQueryBuilder.toString());
     final AbfsRestOperation op = new AbfsRestOperation(
@@ -937,6 +960,7 @@ public class AbfsClient implements Closeable {
     return op;
   }
 
+<<<<<<< HEAD
   public AbfsRestOperation getAclStatus(final String path, TracingContext tracingContext)
           throws AzureBlobFileSystemException {
     return getAclStatus(path, abfsConfiguration.isUpnUsed(), tracingContext);
@@ -944,12 +968,22 @@ public class AbfsClient implements Closeable {
 
   public AbfsRestOperation getAclStatus(final String path, final boolean useUPN,
                                         TracingContext tracingContext) throws AzureBlobFileSystemException {
+=======
+  public AbfsRestOperation getAclStatus(final String path) throws AzureBlobFileSystemException {
+    return getAclStatus(path, abfsConfiguration.isUpnUsed());
+  }
+
+  public AbfsRestOperation getAclStatus(final String path, final boolean useUPN) throws AzureBlobFileSystemException {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final List<AbfsHttpHeader> requestHeaders = createDefaultHeaders();
 
     final AbfsUriQueryBuilder abfsUriQueryBuilder = createDefaultUriQueryBuilder();
     abfsUriQueryBuilder.addQuery(HttpQueryParams.QUERY_PARAM_ACTION, AbfsHttpConstants.GET_ACCESS_CONTROL);
     abfsUriQueryBuilder.addQuery(HttpQueryParams.QUERY_PARAM_UPN, String.valueOf(useUPN));
+<<<<<<< HEAD
     appendSASTokenToQuery(path, SASTokenProvider.GET_ACL_OPERATION, abfsUriQueryBuilder);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     final URL url = createRequestUrl(path, abfsUriQueryBuilder.toString());
     final AbfsRestOperation op = new AbfsRestOperation(

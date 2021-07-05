@@ -1273,12 +1273,16 @@ public class TestAMRestart extends ParameterizedSchedulerTestBase {
     MockNM nm1 =
         new MockNM("127.0.0.1:1234", 8000, rm1.getResourceTrackerService());
     nm1.registerNode();
+<<<<<<< HEAD
 
     RMApp app1 = MockRMAppSubmitter.submit(rm1,
         MockRMAppSubmissionData.Builder.createWithMemory(200, rm1)
             .withAttemptFailuresValidityInterval(0)
             .withKeepContainers(true)
             .build());
+=======
+    RMApp app1 = rm1.submitApp(200, 0, true);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     RMAppAttempt attempt1 = app1.getCurrentAppAttempt();
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
     allocateContainers(nm1, am1, 1);
@@ -1316,6 +1320,7 @@ public class TestAMRestart extends ParameterizedSchedulerTestBase {
       Assert.assertEquals(0,
           queue.getQueueResourceUsage().getUsed().getVirtualCores());
     } else if (getSchedulerType() == SchedulerType.FAIR) {
+<<<<<<< HEAD
       // The default queue is not auto created after YARN-7769 so
       // user-as-default-queue option is used
       Collection<FSLeafQueue> queues = ((FairScheduler) scheduler)
@@ -1323,6 +1328,10 @@ public class TestAMRestart extends ParameterizedSchedulerTestBase {
       Assert.assertEquals(1, queues.size());
 
       FSLeafQueue queue = queues.iterator().next();
+=======
+      FSLeafQueue queue = ((FairScheduler) scheduler).getQueueManager()
+          .getLeafQueue("root.default", false);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       Assert.assertEquals(0, queue.getResourceUsage().getMemorySize());
       Assert.assertEquals(0, queue.getResourceUsage().getVirtualCores());
     }

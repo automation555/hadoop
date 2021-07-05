@@ -96,6 +96,7 @@ import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.Globber;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -141,6 +142,9 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.DurationInfo;
 import org.apache.hadoop.util.LambdaUtils;
+=======
+import org.apache.hadoop.fs.s3a.impl.ChangeDetectionPolicy;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -200,6 +204,7 @@ import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.Invoker.*;
 import static org.apache.hadoop.fs.s3a.Listing.toLocatedFileStatusIterator;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
+import static org.apache.hadoop.fs.s3a.S3AUtils.getServerSideEncryptionKey;
 import static org.apache.hadoop.fs.s3a.Statistic.*;
 import static org.apache.hadoop.fs.s3a.audit.S3AAuditConstants.INITIALIZE_SPAN;
 import static org.apache.hadoop.fs.s3a.auth.RolePolicies.STATEMENT_ALLOW_SSE_KMS_RW;
@@ -1137,11 +1142,18 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
 
   /**
    * Get the change detection policy for this FS instance.
+<<<<<<< HEAD
    * Only public to allow access in tests in other packages.
    * @return the change detection policy
    */
   @VisibleForTesting
   public ChangeDetectionPolicy getChangeDetectionPolicy() {
+=======
+   * @return the change detection policy
+   */
+  @VisibleForTesting
+  ChangeDetectionPolicy getChangeDetectionPolicy() {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return changeDetectionPolicy;
   }
 
@@ -1384,9 +1396,18 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
     }
     LOG.debug("Opening '{}'", readContext);
 
+    S3AReadOpContext readContext;
+    readContext = createReadContext(
+        fileStatus,
+        inputPolicy,
+        changeDetectionPolicy,
+        readAhead);
+    LOG.debug("Opening '{}'", readContext);
+
     return new FSDataInputStream(
         new S3AInputStream(
             readContext,
+<<<<<<< HEAD
             createObjectAttributes(fileStatus),
             createInputStreamCallbacks(auditSpan)));
   }
@@ -1442,6 +1463,14 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
         return s3.getObject(request);
       }
     }
+=======
+            new S3ObjectAttributes(bucket,
+                pathToKey(f),
+                serverSideEncryptionAlgorithm,
+                getServerSideEncryptionKey(bucket, getConf())),
+            fileStatus.getLen(),
+            s3));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -1449,6 +1478,7 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
    * using FS state as well as the status.
    * @param fileStatus file status.
    * @param seekPolicy input policy for this operation
+<<<<<<< HEAD
    * @param changePolicy change policy for this operation.
    * @param readAheadRange readahead value.
    * @param auditSpan audit span.
@@ -1461,11 +1491,22 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
       final ChangeDetectionPolicy changePolicy,
       final long readAheadRange,
       final AuditSpan auditSpan) {
+=======
+   * @param readAheadRange readahead value.
+   * @return a context for read and select operations.
+   */
+  private S3AReadOpContext createReadContext(
+      final FileStatus fileStatus,
+      final S3AInputPolicy seekPolicy,
+      final ChangeDetectionPolicy changePolicy,
+      final long readAheadRange) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return new S3AReadOpContext(fileStatus.getPath(),
         hasMetadataStore(),
         invoker,
         s3guardInvoker,
         statistics,
+<<<<<<< HEAD
         statisticsContext,
         fileStatus,
         seekPolicy,
@@ -1509,6 +1550,13 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
         fileStatus.getETag(),
         fileStatus.getVersionId(),
         fileStatus.getLen());
+=======
+        instrumentation,
+        fileStatus,
+        seekPolicy,
+        changePolicy,
+        readAheadRange);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -3794,6 +3842,7 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
   @AuditEntryPoint
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src,
       Path dst) throws IOException {
+<<<<<<< HEAD
     checkNotClosed();
     LOG.debug("Copying local file from {} to {}", src, dst);
     trackDurationAndSpan(INVOCATION_COPY_FROM_LOCAL_FILE, dst, () -> {
@@ -3801,6 +3850,12 @@ public class S3AFileSystem extends FileSystem implements StreamCapabilities,
       super.copyFromLocalFile(delSrc, overwrite, src, dst);
       return null;
     });
+=======
+    entryPoint(INVOCATION_COPY_FROM_LOCAL_FILE);
+    LOG.debug("Copying local file from {} to {}", src, dst);
+//    innerCopyFromLocalFile(delSrc, overwrite, src, dst);
+    super.copyFromLocalFile(delSrc, overwrite, src, dst);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

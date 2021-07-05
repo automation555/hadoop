@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.s3a;
 
 import java.io.FileNotFoundException;
+<<<<<<< HEAD
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -34,10 +35,16 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+=======
+import java.util.Arrays;
+import java.util.Collection;
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+<<<<<<< HEAD
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -244,11 +251,67 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
             false,
             Arrays.asList(
                 InteractionType.READ_AFTER_DELETE)}
+=======
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.impl.ChangeDetectionPolicy.Source;
+
+import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.writeDataset;
+import static org.apache.hadoop.fs.s3a.Constants.*;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.getTestBucketName;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.removeBucketOverrides;
+import static org.apache.hadoop.test.LambdaTestUtils.eventually;
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+
+/**
+ * Test S3A remote file change detection.
+ */
+@RunWith(Parameterized.class)
+public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ITestS3ARemoteFileChanged.class);
+
+  private final String changeDetectionSource;
+  private final String changeDetectionMode;
+  private final boolean expectChangeException;
+  private final boolean expectFileNotFoundException;
+
+  @Parameterized.Parameters
+  public static Collection<Object[]> params() {
+    return Arrays.asList(new Object[][]{
+        // make sure it works with invalid config
+        {"bogus", "bogus", true, true},
+
+        // test with etag
+        {CHANGE_DETECT_SOURCE_ETAG, CHANGE_DETECT_MODE_SERVER, true, true},
+        {CHANGE_DETECT_SOURCE_ETAG, CHANGE_DETECT_MODE_CLIENT, true, true},
+        {CHANGE_DETECT_SOURCE_ETAG, CHANGE_DETECT_MODE_WARN, false, true},
+        {CHANGE_DETECT_SOURCE_ETAG, CHANGE_DETECT_MODE_NONE, false, true},
+
+        // test with versionId
+        // when using server-side versionId, the exceptions shouldn't happen
+        // since the previous version will still be available
+        {CHANGE_DETECT_SOURCE_VERSION_ID, CHANGE_DETECT_MODE_SERVER, false,
+            false},
+
+        // with client-side versionId it will behave similar to client-side eTag
+        {CHANGE_DETECT_SOURCE_VERSION_ID, CHANGE_DETECT_MODE_CLIENT, true,
+            true},
+
+        {CHANGE_DETECT_SOURCE_VERSION_ID, CHANGE_DETECT_MODE_WARN, false, true},
+        {CHANGE_DETECT_SOURCE_VERSION_ID, CHANGE_DETECT_MODE_NONE, false, true}
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     });
   }
 
   public ITestS3ARemoteFileChanged(String changeDetectionSource,
       String changeDetectionMode,
+<<<<<<< HEAD
       boolean authMode,
       Collection<InteractionType> expectedExceptionInteractions) {
     this.changeDetectionSource = changeDetectionSource;
@@ -276,11 +339,20 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
       originalS3Client.ifPresent(fs::setAmazonS3Client);
     }
     super.teardown();
+=======
+      boolean expectException,
+      boolean expectFileNotFoundException) {
+    this.changeDetectionSource = changeDetectionSource;
+    this.changeDetectionMode = changeDetectionMode;
+    this.expectChangeException = expectException;
+    this.expectFileNotFoundException = expectFileNotFoundException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
+<<<<<<< HEAD
     removeBaseAndBucketOverrides(conf,
         CHANGE_DETECT_SOURCE,
         CHANGE_DETECT_MODE,
@@ -309,10 +381,19 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
       conf.setClass(S3_METADATA_STORE_IMPL,
           LocalMetadataStore.class, MetadataStore.class);
     }
+=======
+    String bucketName = getTestBucketName(conf);
+    removeBucketOverrides(bucketName, conf,
+        CHANGE_DETECT_SOURCE,
+        CHANGE_DETECT_MODE);
+    conf.set(CHANGE_DETECT_SOURCE, changeDetectionSource);
+    conf.set(CHANGE_DETECT_MODE, changeDetectionMode);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     S3ATestUtils.disableFilesystemCaching(conf);
     return conf;
   }
 
+<<<<<<< HEAD
   /**
    * Get the path of this method, including parameterized values.
    * @return a path unique to this method and parameters
@@ -339,15 +420,34 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
   public void testReadFileChangedStreamOpen() throws Throwable {
     describe("Tests reading a file that is changed while the reader's "
         + "InputStream is open.");
+=======
+  @Test
+  public void testReadFileChanged() throws Throwable {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final int originalLength = 8192;
     final byte[] originalDataset = dataset(originalLength, 'a', 32);
     final int newLength = originalLength + 1;
     final byte[] newDataset = dataset(newLength, 'A', 32);
+<<<<<<< HEAD
+=======
+    final S3AFileSystem fs = getFileSystem();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path testpath = path("readFileToChange.txt");
     // initial write
     writeDataset(fs, testpath, originalDataset, originalDataset.length,
         1024, false);
 
+<<<<<<< HEAD
+=======
+    if (fs.getChangeDetectionPolicy().getSource() == Source.VersionId) {
+      // skip versionId tests if the bucket doesn't have object versioning
+      // enabled
+      Assume.assumeTrue(
+          "Target filesystem does not support versioning",
+          fs.getObjectMetadata(fs.pathToKey(testpath)).getVersionId() != null);
+    }
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     try(FSDataInputStream instream = fs.open(testpath)) {
       // seek forward and read successfully
       instream.seek(1024);
@@ -375,8 +475,14 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
       // now check seek backward
       instream.seek(instream.getPos() - 100);
 
+<<<<<<< HEAD
       if (expectedExceptionInteractions.contains(InteractionType.READ)) {
         expectReadFailure(instream);
+=======
+      if (expectChangeException) {
+        intercept(RemoteFileChangedException.class, "", "read",
+            () -> instream.read());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       } else {
         instream.read();
       }
@@ -386,8 +492,14 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
       // seek backward
       instream.seek(0);
 
+<<<<<<< HEAD
       if (expectedExceptionInteractions.contains(InteractionType.READ)) {
         expectReadFailure(instream);
+=======
+      if (expectChangeException) {
+        intercept(RemoteFileChangedException.class, "", "read",
+            () -> instream.read(buf));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         intercept(RemoteFileChangedException.class, "", "read",
             () -> instream.read(0, buf, 0, buf.length));
         intercept(RemoteFileChangedException.class,  "", "readfully",
@@ -404,8 +516,12 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
       // seek backward
       instream.seek(0);
 
+<<<<<<< HEAD
       if (expectedExceptionInteractions.contains(
           InteractionType.READ_AFTER_DELETE)) {
+=======
+      if (expectFileNotFoundException) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         intercept(FileNotFoundException.class, "", "read()",
             () -> instream.read());
         intercept(FileNotFoundException.class, "", "readfully",
@@ -416,6 +532,7 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
       }
     }
   }
+<<<<<<< HEAD
 
   /**
    * Tests reading a file where the version visible in S3 does not match the
@@ -1546,4 +1663,6 @@ public class ITestS3ARemoteFileChanged extends AbstractS3ATestBase {
         matchingMetadataRequest(testpath));
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

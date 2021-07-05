@@ -58,6 +58,31 @@ public class CSQueueUtils {
           + ")");
   }
   }
+<<<<<<< HEAD
+=======
+  
+  /**
+   * Check sanity of capacities:
+   * - capacity <= maxCapacity
+   * - absCapacity <= absMaximumCapacity
+   */
+  private static void capacitiesSanityCheck(String queueName,
+      QueueCapacities queueCapacities) {
+    for (String label : queueCapacities.getExistingNodeLabels()) {
+      // The only thing we should care about is absolute capacity <=
+      // absolute max capacity otherwise the absolute max capacity is
+      // no longer an absolute maximum.
+      float absCapacity = queueCapacities.getAbsoluteCapacity(label);
+      float absMaxCapacity = queueCapacities.getAbsoluteMaximumCapacity(label);
+      if (absCapacity > absMaxCapacity) {
+        throw new IllegalArgumentException("Illegal queue capacity setting "
+            + "(abs-capacity=" + absCapacity + ") > (abs-maximum-capacity="
+            + absMaxCapacity + ") for queue=["
+            + queueName + "],label=[" + label + "]");
+      }
+    }
+  }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public static float computeAbsoluteMaximumCapacity(
       float maximumCapacity, CSQueue parent) {

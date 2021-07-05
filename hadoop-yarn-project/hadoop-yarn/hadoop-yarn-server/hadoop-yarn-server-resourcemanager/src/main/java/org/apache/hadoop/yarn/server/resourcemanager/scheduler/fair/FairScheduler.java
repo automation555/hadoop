@@ -18,6 +18,15 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+<<<<<<< HEAD
+=======
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.SettableFuture;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -2036,8 +2045,11 @@ public class FairScheduler extends
     throw new YarnException(
         "Update application priority is not supported in Fair Scheduler");
   }
+<<<<<<< HEAD
 
   public boolean isNoTerminalRuleCheck() {
     return noTerminalRuleCheck;
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

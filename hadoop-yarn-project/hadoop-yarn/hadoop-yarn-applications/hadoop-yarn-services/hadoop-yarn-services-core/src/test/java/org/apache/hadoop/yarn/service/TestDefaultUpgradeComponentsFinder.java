@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.yarn.service;
 
+<<<<<<< HEAD
 import org.apache.hadoop.util.Lists;
+=======
+import com.google.common.collect.Lists;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.service.api.records.Component;
 import org.apache.hadoop.yarn.service.api.records.ConfigFile;
 import org.apache.hadoop.yarn.service.api.records.Configuration;

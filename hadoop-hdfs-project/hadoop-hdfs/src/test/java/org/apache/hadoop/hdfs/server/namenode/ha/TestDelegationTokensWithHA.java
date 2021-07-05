@@ -123,7 +123,10 @@ public class TestDelegationTokensWithHA {
   public void testObserverReadProxyProviderWithDT() throws Exception {
     // Make the first node standby, so that the ORPP will try it first
     // instead of just using and succeeding on the active
+<<<<<<< HEAD
     conf.setInt(OBSERVER_PROBE_RETRY_PERIOD_KEY, 0);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     cluster.transitionToStandby(0);
     cluster.transitionToActive(1);
 
@@ -154,7 +157,11 @@ public class TestDelegationTokensWithHA {
       cluster.shutdownNameNode(0);
       logCapture.clearOutput();
       dfs.access(new Path("/"), FsAction.READ);
+<<<<<<< HEAD
       assertTrue(logCapture.getOutput().contains("Failed to connect to"));
+=======
+      assertTrue(logCapture.getOutput().contains("Assuming Standby state"));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } finally {
       logCapture.stopCapturing();
     }

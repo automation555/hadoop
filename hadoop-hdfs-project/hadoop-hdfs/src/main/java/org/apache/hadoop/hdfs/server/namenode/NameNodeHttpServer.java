@@ -102,11 +102,19 @@ public class NameNodeHttpServer {
     }
 
     // add webhdfs packages
+<<<<<<< HEAD
     final Map<String, String> params = new HashMap<>();
     params.put(ResourceConfig.FEATURE_MATCH_MATRIX_PARAMS, "true");
     httpServer2.addJerseyResourcePackage(
         jerseyResourcePackage + ";" + Param.class.getPackage().getName(),
         pathSpec, params);
+=======
+    final Map<String, String> resourceParams = new HashMap<>();
+    resourceParams.put(ResourceConfig.FEATURE_MATCH_MATRIX_PARAMS, "true");
+    httpServer2.addJerseyResourcePackage(
+        jerseyResourcePackage + ";" + Param.class.getPackage().getName(),
+        pathSpec, resourceParams);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

@@ -34,8 +34,11 @@ public class ContainerRuntimeConstants {
   @Private
   public static final String CONTAINER_RUNTIME_DOCKER =
       "docker";
+<<<<<<< HEAD
 
   @Private
   public static final String CONTAINER_RUNTIME_RUNC =
       "runc";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

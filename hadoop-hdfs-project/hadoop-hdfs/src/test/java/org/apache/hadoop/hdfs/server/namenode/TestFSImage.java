@@ -892,10 +892,17 @@ public class TestFSImage {
       // Test enable/disable/remove user customized erasure coding policy
       testChangeErasureCodingPolicyState(cluster, blockSize, newPolicy, false);
       // Test enable/disable default built-in erasure coding policy
+<<<<<<< HEAD
       testChangeErasureCodingPolicyState(cluster, blockSize,
           SystemErasureCodingPolicies.getByID((byte) 1), true);
       // Test enable/disable non-default built-in erasure coding policy
       testChangeErasureCodingPolicyState(cluster, blockSize,
+=======
+      testChangeErasureCodingPolicyState(cluster, blockSize,
+          SystemErasureCodingPolicies.getByID((byte) 1), true);
+      // Test enable/disable non-default built-in erasure coding policy
+      testChangeErasureCodingPolicyState(cluster, blockSize,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
           SystemErasureCodingPolicies.getByID((byte) 2), false);
     }
   }
@@ -1006,6 +1013,7 @@ public class TestFSImage {
     }
     throw new AssertionError("Policy is not found!");
   }
+<<<<<<< HEAD
 
   private ArrayList<Section> getSubSectionsOfName(ArrayList<Section> sections,
       FSImageFormatProtobuf.SectionName name) {
@@ -1214,3 +1222,6 @@ public class TestFSImage {
         preRestartTree, postRestartTree, true);
   }
 }
+=======
+}
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776

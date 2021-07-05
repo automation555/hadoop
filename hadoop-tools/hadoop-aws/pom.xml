@@ -19,11 +19,19 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-project</artifactId>
+<<<<<<< HEAD
     <version>3.4.0-SNAPSHOT</version>
     <relativePath>../../hadoop-project</relativePath>
   </parent>
   <artifactId>hadoop-aws</artifactId>
   <version>3.4.0-SNAPSHOT</version>
+=======
+    <version>3.2.1</version>
+    <relativePath>../../hadoop-project</relativePath>
+  </parent>
+  <artifactId>hadoop-aws</artifactId>
+  <version>3.2.1</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <name>Apache Hadoop Amazon Web Services support</name>
   <description>
     This module contains code to support integration with Amazon Web Services.
@@ -195,6 +203,7 @@
                     <exclude>**/ITestS3AHuge*.java</exclude>
                     <!-- this sets out to overlaod DynamoDB, so must be run standalone -->
                     <exclude>**/ITestDynamoDBMetadataStoreScale.java</exclude>
+<<<<<<< HEAD
                     <!-- Terasort MR jobs spawn enough processes that they use up all RAM -->
                     <exclude>**/ITestTerasort*.java</exclude>
                     <!-- Root marker tool tests -->
@@ -203,6 +212,9 @@
                     <exclude>**/ITestS3GuardDDBRootOperations.java</exclude>
                     <!-- leave this until the end for better statistics -->
                     <exclude>**/ITestAggregateIOStatistics.java</exclude>
+=======
+                    <exclude>**/ITestTerasort*.java</exclude>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                   </excludes>
                 </configuration>
               </execution>
@@ -243,6 +255,7 @@
                     <include>**/ITestDynamoDBMetadataStoreScale.java</include>
                     <!-- the terasort tests both work with a file in the same path in -->
                     <!--  the local FS. Running them sequentially guarantees isolation -->
+<<<<<<< HEAD
                     <!-- and that they don't conflict with the other MR jobs for RAM -->
                     <include>**/ITestTerasort*.java</include>
                     <!-- Root marker tool tests -->
@@ -254,6 +267,9 @@
                     <include>**/ITestS3GuardDDBRootOperations.java</include>
                     <!-- leave this until the end for better statistics -->
                     <include>**/ITestAggregateIOStatistics.java</include>
+=======
+                    <include>**/ITestTerasort*.java</include>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                   </includes>
                 </configuration>
               </execution>

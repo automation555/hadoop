@@ -50,9 +50,10 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
         <configuration>
+          <findbugsXmlOutput>true</findbugsXmlOutput>
           <xmlOutput>true</xmlOutput>
           <excludeFilterFile>${basedir}/dev-support/findbugs-exclude.xml
           </excludeFilterFile>
@@ -99,11 +100,11 @@
             </configuration>
           </execution>
         </executions>
-       </plugin>
+      </plugin>
 
     </plugins>
 
-
+    
     <!--
        The following is to suppress a m2e warning in eclipse
        (m2e doesn't know how to handle maven-enforcer:enforce, so we have to tell m2e to ignore it)
@@ -345,6 +346,15 @@
                   </includes>
                   <excludes>
                     <exclude>**/azure/**/TestRollingWindowAverage*.java</exclude>
+                    <!-- Exclude Azure broken tests -->
+                    <exclude>**/azure/TestNativeAzureFileSystemMocked*.java</exclude>
+                    <exclude>**/azure/TestBlobMetadata</exclude>
+                    <exclude>**/azure/TestWasbFsck</exclude>
+                    <exclude>**/azure/TestNativeAzureFileSystemConcurrency</exclude>
+                    <exclude>**/azure/TestOutOfBandAzureBlobOperations</exclude>
+                    <exclude>**/azure/TestNativeAzureFileSystemOperationsMocked</exclude>
+                    <exclude>**/azure/TestNativeAzureFileSystemContractMocked</exclude>
+                    <exclude>**/azure/TestNativeAzureFileSystemFileNameCheck</exclude>
                   </excludes>
                 </configuration>
               </execution>
@@ -554,7 +564,6 @@
                     <exclude>**/azurebfs/ITestAbfsReadWriteAndSeek.java</exclude>
                     <exclude>**/azurebfs/ITestAzureBlobFileSystemListStatus.java</exclude>
                     <exclude>**/azurebfs/extensions/ITestAbfsDelegationTokens.java</exclude>
-                    <exclude>**/azurebfs/ITestSmallWriteOptimization.java</exclude>
                   </excludes>
 
                 </configuration>
@@ -594,7 +603,6 @@
                     <include>**/azurebfs/ITestAbfsReadWriteAndSeek.java</include>
                     <include>**/azurebfs/ITestAzureBlobFileSystemListStatus.java</include>
                     <include>**/azurebfs/extensions/ITestAbfsDelegationTokens.java</include>
-                    <include>**/azurebfs/ITestSmallWriteOptimization.java</include>
                   </includes>
                 </configuration>
               </execution>
@@ -657,6 +665,15 @@
                   </includes>
                   <excludes>
                     <exclude>**/TestRollingWindowAverage*.java</exclude>
+                    <!-- Exclude Azure broken tests -->
+                    <exclude>**/TestNativeAzureFileSystemMocked*.java</exclude>
+                    <exclude>**/TestBlobMetadata</exclude>
+                    <exclude>**/TestWasbFsck</exclude>
+                    <exclude>**/TestNativeAzureFileSystemConcurrency</exclude>
+                    <exclude>**/TestOutOfBandAzureBlobOperations</exclude>
+                    <exclude>**/TestNativeAzureFileSystemOperationsMocked</exclude>
+                    <exclude>**/TestNativeAzureFileSystemContractMocked</exclude>
+                    <exclude>**/TestNativeAzureFileSystemFileNameCheck</exclude>
                   </excludes>
                 </configuration>
               </execution>

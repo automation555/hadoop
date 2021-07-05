@@ -179,6 +179,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_STRE
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION_DEFAULT;
+<<<<<<< HEAD
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_GC_TIME_MONITOR_SLEEP_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_GC_TIME_MONITOR_SLEEP_INTERVAL_MS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_GC_TIME_MONITOR_OBSERVATION_WINDOW_MS;
@@ -187,6 +188,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_GC_TIME_MONITOR_
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_GC_TIME_MONITOR_ENABLE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_REPLICATOR_CLASSNAME_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_PLACEMENT_EC_CLASSNAME_KEY;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.ToolRunner.confirmPrompt;
@@ -325,10 +328,14 @@ public class NameNode extends ReconfigurableBase implements
           DFS_STORAGE_POLICY_SATISFIER_MODE_KEY,
           DFS_NAMENODE_REPLICATION_MAX_STREAMS_KEY,
           DFS_NAMENODE_REPLICATION_STREAMS_HARD_LIMIT_KEY,
+<<<<<<< HEAD
           DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION,
           DFS_BLOCK_REPLICATOR_CLASSNAME_KEY,
           DFS_BLOCK_PLACEMENT_EC_CLASSNAME_KEY,
           DFS_IMAGE_PARALLEL_LOAD_KEY));
+=======
+          DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private static final String USAGE = "Usage: hdfs namenode ["
       + StartupOption.BACKUP.getName() + "] | \n\t["
@@ -1870,6 +1877,7 @@ public class NameNode extends ReconfigurableBase implements
           "Cannot transition from '" + OBSERVER_STATE + "' to '" +
               ACTIVE_STATE + "'");
     }
+<<<<<<< HEAD
     if (notBecomeActiveInSafemode && isInSafeMode()) {
       throw new ServiceFailedException(getRole() + " still not leave safemode");
     }
@@ -1879,15 +1887,29 @@ public class NameNode extends ReconfigurableBase implements
   synchronized void transitionToStandby() throws IOException {
     String operationName = "transitionToStandby";
     namesystem.checkSuperuserPrivilege(operationName);
+=======
+    state.setState(haContext, ACTIVE_STATE);
+  }
+
+  synchronized void transitionToStandby()
+      throws ServiceFailedException, AccessControlException {
+    namesystem.checkSuperuserPrivilege();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (!haEnabled) {
       throw new ServiceFailedException("HA for namenode is not enabled");
     }
     state.setState(haContext, STANDBY_STATE);
   }
 
+<<<<<<< HEAD
   synchronized void transitionToObserver() throws IOException {
     String operationName = "transitionToObserver";
     namesystem.checkSuperuserPrivilege(operationName);
+=======
+  synchronized void transitionToObserver()
+      throws ServiceFailedException, AccessControlException {
+    namesystem.checkSuperuserPrivilege();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (!haEnabled) {
       throw new ServiceFailedException("HA for namenode is not enabled");
     }
@@ -2191,12 +2213,15 @@ public class NameNode extends ReconfigurableBase implements
         || property.equals(
             DFS_NAMENODE_REPLICATION_WORK_MULTIPLIER_PER_ITERATION)) {
       return reconfReplicationParameters(newVal, property);
+<<<<<<< HEAD
     } else if (property.equals(DFS_BLOCK_REPLICATOR_CLASSNAME_KEY) || property
         .equals(DFS_BLOCK_PLACEMENT_EC_CLASSNAME_KEY)) {
       reconfBlockPlacementPolicy();
       return newVal;
     } else if (property.equals(DFS_IMAGE_PARALLEL_LOAD_KEY)) {
       return reconfigureParallelLoad(newVal);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } else {
       throw new ReconfigurationException(property, newVal, getConf().get(
           property));
@@ -2241,11 +2266,14 @@ public class NameNode extends ReconfigurableBase implements
     }
   }
 
+<<<<<<< HEAD
   private void reconfBlockPlacementPolicy() {
     getNamesystem().getBlockManager()
         .refreshBlockPlacementPolicy(getNewConf());
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private int adjustNewVal(int defaultVal, String newVal) {
     if (newVal == null) {
       return defaultVal;

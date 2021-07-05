@@ -2723,7 +2723,11 @@ public class TestRMRestart extends ParameterizedSchedulerTestBase {
     nm1.registerNode();
 
     // create an app and finish the app.
+<<<<<<< HEAD
     RMApp app0 = MockRMAppSubmitter.submitWithMemory(200, rm1);
+=======
+    RMApp app0 = rm1.submitApp(200);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     MockAM am0 = launchAndFailAM(app0, rm1, nm1);
     MockAM am1 = launchAndFailAM(app0, rm1, nm1);

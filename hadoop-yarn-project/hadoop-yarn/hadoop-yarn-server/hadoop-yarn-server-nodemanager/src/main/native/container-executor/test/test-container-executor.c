@@ -1050,10 +1050,18 @@ void test_launch_container(const char* app, int https) {
            "container directory %s\n", container_dir);
     exit(1);
   }
+<<<<<<< HEAD
   char touchfile[100000];
   sprintf(touchfile, "%s/foobar", container_dir);
   if (access(touchfile, R_OK) != 0) {
     printf("FAIL: failed to create touch file %s\n", touchfile);
+=======
+
+  char buffer[100000];
+  sprintf(buffer, "%s/foobar", container_dir);
+  if (access(buffer, R_OK) != 0) {
+    printf("FAIL: failed to create touch file %s\n", buffer);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     exit(1);
   }
   free(container_dir);

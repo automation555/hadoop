@@ -75,10 +75,13 @@ public class TestSSLFactory {
       + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
       + "SSL_RSA_WITH_RC4_128_MD5,"
       + "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA";
+<<<<<<< HEAD
   private static final Configuration FAKE_SSL_CONFIG =
       KeyStoreTestUtil.createClientSSLConfig("clientKeyStoreLocation",
           "keystorePassword", "keyPassword",
           "trustStoreLocation", "trustStorePassword");
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   @BeforeClass
   public static void setUp() throws Exception {

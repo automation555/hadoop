@@ -163,7 +163,11 @@ public class TestNMProxy extends BaseContainerManagerTest {
         IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY, 100);
     // connect to some dummy address so that it can trigger
     // connection failure and RPC level retires.
+<<<<<<< HEAD
     newConf.set(YarnConfiguration.NM_ADDRESS, "127.0.0.1:1");
+=======
+    newConf.set(YarnConfiguration.NM_ADDRESS, "0.0.0.0:1234");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ContainerManagementProtocol proxy = getNMProxy(newConf);
     LambdaTestUtils.intercept(SocketException.class,
         () -> proxy.startContainers(allRequests));

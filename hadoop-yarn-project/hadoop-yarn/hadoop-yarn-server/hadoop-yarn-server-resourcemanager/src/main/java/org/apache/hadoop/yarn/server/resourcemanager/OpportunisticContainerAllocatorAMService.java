@@ -174,7 +174,11 @@ public class OpportunisticContainerAllocatorAMService
 
       if (!appAttempt.getApplicationAttemptId().equals(appAttemptId)){
         LOG.error("Calling allocate on previous or removed or non "
+<<<<<<< HEAD
             + "existent application attempt {}", appAttemptId);
+=======
+            + "existent application attempt " + appAttemptId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         return;
       }
 
@@ -368,6 +372,7 @@ public class OpportunisticContainerAllocatorAMService
             new RMContainerEvent(container.getId(),
                 RMContainerEventType.ACQUIRED));
       }
+<<<<<<< HEAD
     }
   }
 
@@ -375,6 +380,8 @@ public class OpportunisticContainerAllocatorAMService
   protected void serviceStop() throws Exception {
     if (nodeMonitor != null) {
       nodeMonitor.stop();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     super.serviceStop();
   }

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+<<<<<<< HEAD
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
+=======
+import java.util.stream.Collectors;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
@@ -151,6 +158,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
             return;
           }
           if (event != null) {
+<<<<<<< HEAD
             if (eventTypeMetricsMap.
                 get(event.getType().getDeclaringClass()) != null) {
               long startTime = clock.getTime();
@@ -161,6 +169,9 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
             } else {
               dispatch(event);
             }
+=======
+            dispatch(event);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
             if (printTrigger) {
               //Log the latest dispatch event type
               // may cause the too many events queued
@@ -185,6 +196,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
                     YARN_DISPATCHER_PRINT_EVENTS_INFO_THRESHOLD,
             YarnConfiguration.
                     DEFAULT_YARN_DISPATCHER_PRINT_EVENTS_INFO_THRESHOLD);
+<<<<<<< HEAD
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("PrintEventDetailsThread #%d")
@@ -194,6 +206,8 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
     printEventDetailsExecutor = new ThreadPoolExecutor(
         1, 5, 10, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(), threadFactory);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override
@@ -303,6 +317,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   }
 
   class GenericEventHandler implements EventHandler<Event> {
+<<<<<<< HEAD
     private void printEventQueueDetails() {
       Iterator<Event> iterator = eventQueue.iterator();
       Map<Enum, Long> counterMap = new HashMap<>();
@@ -313,6 +328,13 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
         }
         counterMap.put(eventType, counterMap.get(eventType) + 1);
       }
+=======
+    private void printEventQueueDetails(BlockingQueue<Event> queue) {
+      Map<Enum, Long> counterMap = eventQueue.stream().
+              collect(Collectors.
+                      groupingBy(e -> e.getType(), Collectors.counting())
+              );
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       for (Map.Entry<Enum, Long> entry : counterMap.entrySet()) {
         long num = entry.getValue();
         LOG.info("Event type: " + entry.getKey()
@@ -335,7 +357,11 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
       if (qSize != 0 && qSize % detailsInterval == 0
               && lastEventDetailsQueueSizeLogged != qSize) {
         lastEventDetailsQueueSizeLogged = qSize;
+<<<<<<< HEAD
         printEventDetailsExecutor.submit(this::printEventQueueDetails);
+=======
+        printEventQueueDetails(eventQueue);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         printTrigger = true;
       }
       int remCapacity = eventQueue.remainingCapacity();

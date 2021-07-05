@@ -475,7 +475,11 @@ namespace ContainerExecutor {
       }
       ret = set_runtime(&cmd_cfg, &container_cfg, &buff);
       char *actual = flatten(&buff);
+<<<<<<< HEAD
       ASSERT_EQ(0, ret) << "error message: " << get_error_message(ret) << " for input " << itr->first;
+=======
+      ASSERT_EQ(0, ret) << "error message: " << get_docker_error_message(ret) << " for input " << itr->first;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       ASSERT_STREQ(itr->second.c_str(), actual);
       reset_args(&buff);
       free(actual);
@@ -600,7 +604,11 @@ namespace ContainerExecutor {
       }
       ret = add_ports_mapping_to_command(&cmd_cfg, &buff);
       char *actual = flatten(&buff);
+<<<<<<< HEAD
       ASSERT_EQ(0, ret) << "error message: " << get_error_message(ret) << " for input " << itr->first;
+=======
+      ASSERT_EQ(0, ret) << "error message: " << get_docker_error_message(ret) << " for input " << itr->first;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       ASSERT_STREQ(itr->second.c_str(), actual);
       reset_args(&buff);
       free(actual);
@@ -1462,7 +1470,11 @@ namespace ContainerExecutor {
         "[docker-command-execution]\n"
             "  docker-command=run\n  name=container_e1_12312_11111_02_000001\n  image=hadoop/docker-image\n  user=root\n  hostname=host-id\n"
             "  mounts=/var/log:/var/log:ro,/var/lib:/lib:ro,/usr/bin/cut:/usr/bin/cut:ro,/tmp:/tmp:rw\n"
+<<<<<<< HEAD
             "  network=bridge\n  devices=/dev/test:/dev/test\n  privileged=true\n  use-entry-point=true\n"
+=======
+            "  network=bridge\n  devices=/dev/test:/dev/test\n  privileged=true\n"
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
             "  cap-add=CHOWN,SETUID\n  cgroup-parent=ctr-cgroup\n  detach=true\n  rm=true\n"
             "  launch-command=bash,test_script.sh,arg1,arg2",
         "run --name=container_e1_12312_11111_02_000001 -d --rm -v /var/log:/var/log:ro -v /var/lib:/lib:ro"
@@ -1474,7 +1486,11 @@ namespace ContainerExecutor {
         "[docker-command-execution]\n"
             "  docker-command=run\n  name=container_e1_12312_11111_02_000001\n  image=hadoop/docker-image\n  user=root\n  hostname=host-id\n"
             "  mounts=/var/log:/var/log:ro,/var/lib:/lib:ro,/usr/bin/cut:/usr/bin/cut:ro,/tmp:/tmp:rw\n"
+<<<<<<< HEAD
             "  network=bridge\n  devices=/dev/test:/dev/test\n  privileged=true\n  use-entry-point=true\n"
+=======
+            "  network=bridge\n  devices=/dev/test:/dev/test\n  privileged=true\n"
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
             "  cap-add=CHOWN,SETUID\n  cgroup-parent=ctr-cgroup\n  detach=true\n  rm=true\n  group-add=1000,1001\n"
             "  launch-command=bash,test_script.sh,arg1,arg2",
         "run --name=container_e1_12312_11111_02_000001 -d --rm -v /var/log:/var/log:ro -v /var/lib:/lib:ro"

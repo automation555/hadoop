@@ -37,7 +37,10 @@ import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+<<<<<<< HEAD
 import java.util.EnumSet;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import java.util.function.Supplier;
 import org.apache.commons.text.TextStringBuilder;
@@ -1043,8 +1046,11 @@ public class TestDecommission extends AdminStatesBaseTest {
   @Test(timeout=120000)
   public void testAllocAndIBRWhileDecommission() throws IOException {
     LOG.info("Starting test testAllocAndIBRWhileDecommission");
+<<<<<<< HEAD
     getConf().setLong(DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_KEY,
         DFSConfigKeys.DFS_BLOCKREPORT_INTERVAL_MSEC_DEFAULT);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     startCluster(1, 6);
     getCluster().waitActive();
     FSNamesystem ns = getCluster().getNamesystem(0);

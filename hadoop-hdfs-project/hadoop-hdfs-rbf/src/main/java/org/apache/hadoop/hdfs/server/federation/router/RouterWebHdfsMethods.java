@@ -213,10 +213,14 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
       final CreateFlagParam createFlagParam,
       final NoRedirectParam noredirectParam,
       final StoragePolicyParam policyName,
+<<<<<<< HEAD
       final ECPolicyParam ecpolicy,
       final NameSpaceQuotaParam namespaceQuota,
       final StorageSpaceQuotaParam storagespaceQuota,
       final StorageTypeParam storageType
+=======
+      final ECPolicyParam ecpolicy
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   ) throws IOException, URISyntaxException {
 
     switch(op.getValue()) {
@@ -259,7 +263,10 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
     case SETSTORAGEPOLICY:
     case ENABLEECPOLICY:
     case DISABLEECPOLICY:
+<<<<<<< HEAD
     case SATISFYSTORAGEPOLICY:
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     {
       // Whitelist operations that can handled by NamenodeWebHdfsMethods
       return super.put(ugi, delegation, username, doAsUser, fullpath, op,
@@ -268,7 +275,11 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
           accessTime, renameOptions, createParent, delegationTokenArgument,
           aclPermission, xattrName, xattrValue, xattrSetFlag, snapshotName,
           oldSnapshotName, exclDatanodes, createFlagParam, noredirectParam,
+<<<<<<< HEAD
           policyName, ecpolicy, namespaceQuota, storagespaceQuota, storageType);
+=======
+          policyName, ecpolicy);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     default:
       throw new UnsupportedOperationException(op + " is not supported");
@@ -394,6 +405,107 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
   }
 
   /**
+<<<<<<< HEAD
+=======
+   * Get the redirect URI from the Namenode responsible for a path.
+   * @param router Router to check.
+   * @param path Path to get location for.
+   * @return URI returned by the Namenode.
+   * @throws IOException If it cannot get the redirect URI.
+   */
+  private URI redirectURI(final Router router, final String path)
+      throws IOException {
+    // Forward the request to the proper Namenode
+    final HttpURLConnection conn = forwardRequest(router, path);
+    try {
+      conn.setInstanceFollowRedirects(false);
+      conn.setDoOutput(true);
+      conn.connect();
+
+      // Read the reply from the Namenode
+      int responseCode = conn.getResponseCode();
+      if (responseCode != HttpServletResponse.SC_TEMPORARY_REDIRECT) {
+        LOG.info("We expected a redirection from the Namenode, not {}",
+            responseCode);
+        return null;
+      }
+
+      // Extract the redirect location and return it
+      String redirectLocation = conn.getHeaderField("Location");
+      try {
+        // We modify the namenode location and the path
+        redirectLocation = redirectLocation
+            .replaceAll("(?<=[?&;])namenoderpcaddress=.*?(?=[&;])",
+                "namenoderpcaddress=" + router.getRouterId())
+            .replaceAll("(?<=[/])webhdfs/v1/.*?(?=[?])",
+                "webhdfs/v1" + path);
+        return new URI(redirectLocation);
+      } catch (URISyntaxException e) {
+        LOG.error("Cannot parse redirect location {}", redirectLocation);
+      }
+    } finally {
+      if (conn != null) {
+        conn.disconnect();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Forwards a request to a subcluster.
+   * @param router Router to check.
+   * @param path Path in HDFS.
+   * @return Reply from the subcluster.
+   * @throws IOException
+   */
+  private HttpURLConnection forwardRequest(
+      final Router router, final String path) throws IOException {
+    final Configuration conf =
+        (Configuration)getContext().getAttribute(JspHelper.CURRENT_CONF);
+    URLConnectionFactory connectionFactory =
+        URLConnectionFactory.newDefaultURLConnectionFactory(conf);
+
+    // Find the namespace responsible for a path
+    final RouterRpcServer rpcServer = getRPCServer(router);
+    RemoteLocation createLoc = rpcServer.getCreateLocation(path);
+    String nsId = createLoc.getNameserviceId();
+    String dest = createLoc.getDest();
+    ActiveNamenodeResolver nnResolver = router.getNamenodeResolver();
+    List<? extends FederationNamenodeContext> namenodes =
+        nnResolver.getNamenodesForNameserviceId(nsId);
+
+    // Go over the namenodes responsible for that namespace
+    for (FederationNamenodeContext namenode : namenodes) {
+      try {
+        // Generate the request for the namenode
+        String nnWebAddress = namenode.getWebAddress();
+        String[] nnWebAddressSplit = nnWebAddress.split(":");
+        String host = nnWebAddressSplit[0];
+        int port = Integer.parseInt(nnWebAddressSplit[1]);
+
+        // Avoid double-encoding here
+        query = URLDecoder.decode(query, "UTF-8");
+        URI uri = new URI(getScheme(), null, host, port,
+            reqPath + dest, query, null);
+        URL url = uri.toURL();
+
+        // Send a request to the proper Namenode
+        final HttpURLConnection conn =
+            (HttpURLConnection)connectionFactory.openConnection(url);
+        conn.setRequestMethod(method);
+
+        connectionFactory.destroy();
+        return conn;
+      } catch (Exception e) {
+        LOG.error("Cannot redirect request to {}", namenode, e);
+      }
+    }
+    connectionFactory.destroy();
+    return null;
+  }
+
+  /**
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Get a URI to redirect an operation to.
    * @param router Router to check.
    * @param ugi User group information.

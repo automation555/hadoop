@@ -139,7 +139,10 @@ public final class DistCpConstants {
   public static final String CONF_LABEL_BLOCKS_PER_CHUNK =
       "distcp.blocks.per.chunk";
 
+<<<<<<< HEAD
   public static final String CONF_LABEL_USE_ITERATOR = "distcp.use.iterator";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Constants for DistCp return code to shell / consumer of ToolRunner's run
    */

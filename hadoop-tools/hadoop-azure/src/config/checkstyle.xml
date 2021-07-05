@@ -66,8 +66,11 @@
         <property name="max" value="160" />
     </module>
 
+<<<<<<< HEAD
     <module name="TreeWalker">
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         <!-- Checks for Javadoc comments.                     -->
         <!-- See http://checkstyle.sf.net/config_javadoc.html -->
 

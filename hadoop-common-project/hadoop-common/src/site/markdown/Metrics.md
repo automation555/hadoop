@@ -123,6 +123,7 @@ FairCallQueue metrics will only exist if FairCallQueue is enabled. Each metric e
 | `FairCallQueueSize_p`*Priority* | Current number of calls in priority queue |
 | `FairCallQueueOverflowedCalls_p`*Priority* | Total number of overflowed calls in priority queue |
 
+<<<<<<< HEAD
 DecayRpcSchedulerDetailed
 -------------------------
 
@@ -134,6 +135,8 @@ to FairCallQueue metrics. For each level of priority, rpcqueue and rpcprocessing
 |  `DecayRPCSchedulerPriority.`*Priority*`.RpcQueueTime` | RpcQueueTime metrics for each priority |
 |  `DecayRPCSchedulerPriority.`*Priority*`.RpcProcessingTime` | RpcProcessingTime metrics for each priority |
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 rpcdetailed context
 ===================
 

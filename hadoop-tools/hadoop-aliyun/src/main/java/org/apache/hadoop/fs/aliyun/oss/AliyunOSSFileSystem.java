@@ -272,6 +272,7 @@ public class AliyunOSSFileSystem extends FileSystem {
     }
     if (meta == null) {
       ObjectListing listing = store.listObjects(key, 1, null, false);
+<<<<<<< HEAD
       do {
         if (CollectionUtils.isNotEmpty(listing.getObjectSummaries()) ||
             CollectionUtils.isNotEmpty(listing.getCommonPrefixes())) {
@@ -284,6 +285,14 @@ public class AliyunOSSFileSystem extends FileSystem {
               path + ": No such file or directory!");
         }
       } while (true);
+=======
+      if (CollectionUtils.isNotEmpty(listing.getObjectSummaries()) ||
+          CollectionUtils.isNotEmpty(listing.getCommonPrefixes())) {
+        return new OSSFileStatus(0, true, 1, 0, 0, qualifiedPath, username);
+      } else {
+        throw new FileNotFoundException(path + ": No such file or directory!");
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } else if (objectRepresentsDirectory(key, meta.getContentLength())) {
       return new OSSFileStatus(0, true, 1, 0, meta.getLastModified().getTime(),
           qualifiedPath, username);

@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+<<<<<<< HEAD
 import java.util.function.Supplier;
+=======
+import com.google.common.base.Supplier;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;

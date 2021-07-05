@@ -2632,9 +2632,16 @@ public class TestNodeLabelContainerAllocation {
     assertEquals(0 * GB, leafQueueB.getMetrics().getAvailableMB());
     assertEquals(0 * GB, leafQueueB.getMetrics().getAllocatedMB());
 
+<<<<<<< HEAD
     CSQueue rootQueue = cs.getRootQueue();
     assertEquals(0 * GB, rootQueue.getMetrics().getAvailableMB()
         + rootQueue.getMetrics().getAllocatedMB());
+=======
+    // The total memory tracked by QueueMetrics is 0GB for the default partition
+    CSQueue rootQueue = cs.getRootQueue();
+    assertEquals(0*GB, rootQueue.getMetrics().getAvailableMB() +
+        rootQueue.getMetrics().getAllocatedMB());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // Kill all apps in queue a
     cs.killAllAppsInQueue("a");
@@ -2785,6 +2792,7 @@ public class TestNodeLabelContainerAllocation {
     Assert.assertEquals(1 * GB, reportNm2.getUsedResource().getMemorySize());
     Assert.assertEquals(9 * GB,
         reportNm2.getAvailableResource().getMemorySize());
+<<<<<<< HEAD
     assertEquals(7 * GB, partXMetrics.getAvailableMB(), delta);
     assertEquals(9 * GB, partDefaultMetrics.getAvailableMB(), delta);
     assertEquals(1.5 * GB, queueAPartDefaultMetrics.getAvailableMB(), delta);
@@ -2803,6 +2811,13 @@ public class TestNodeLabelContainerAllocation {
     assertEquals(0 * GB, queueBPartDefaultMetrics.getPendingMB(), delta);
     assertEquals(0 * GB, queueBPartXMetrics.getPendingMB(), delta);
     assertEquals(1.5 * GB, leafQueue.getMetrics().getAvailableMB(), delta);
+=======
+
+    LeafQueue leafQueue = (LeafQueue) cs.getQueue("a");
+    // 3GB is used from label x quota. 1.5 GB is remaining from default label.
+    // 2GB is remaining from label x.
+    assertEquals(15 * GB / 10, leafQueue.getMetrics().getAvailableMB());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertEquals(1 * GB, leafQueue.getMetrics().getAllocatedMB());
     assertEquals(3 * GB, partXMetrics.getAllocatedMB(), delta);
     assertEquals(1 * GB, partDefaultMetrics.getAllocatedMB(), delta);
@@ -2841,6 +2856,7 @@ public class TestNodeLabelContainerAllocation {
 
     // The total memory tracked by QueueMetrics is 10GB
     // for the default partition
+<<<<<<< HEAD
     assertEquals(10*GB, rootQueue.getMetrics().getAvailableMB() +
         rootQueue.getMetrics().getAllocatedMB());
 
@@ -2935,6 +2951,12 @@ public class TestNodeLabelContainerAllocation {
     assertEquals(3 * GB, queueAUserMetrics.getAvailableMB(), delta);
     assertEquals(3 * GB, partDefaultQueueAUserMetrics.getAvailableMB(), delta);
     assertEquals(5 * GB, partXQueueAUserMetrics.getAvailableMB(), delta);
+=======
+    CSQueue rootQueue = cs.getRootQueue();
+    assertEquals(10*GB, rootQueue.getMetrics().getAvailableMB() +
+        rootQueue.getMetrics().getAllocatedMB());
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     rm1.close();
   }
 
@@ -2985,6 +3007,7 @@ public class TestNodeLabelContainerAllocation {
     assertEquals(0 * GB, leafQueueA.getMetrics().getAllocatedMB());
 
     // app1 -> a
+<<<<<<< HEAD
     RMApp app1 = MockRMAppSubmitter.submit(rm1,
         MockRMAppSubmissionData.Builder.createWithMemory(1 * GB, rm1)
             .withAppName("app")
@@ -2993,6 +3016,9 @@ public class TestNodeLabelContainerAllocation {
             .withQueue("a")
             .withAmLabel("x")
             .build());
+=======
+    RMApp app1 = rm1.submitApp(1 * GB, "app", "user", null, "a", "x");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
 
     // app1 asks for 5 partition=x containers
@@ -3025,6 +3051,7 @@ public class TestNodeLabelContainerAllocation {
     assertEquals(0 * GB, leafQueueA.getMetrics().getAllocatedMB());
 
     // app2 -> a
+<<<<<<< HEAD
     RMApp app2 = MockRMAppSubmitter.submit(rm1,
         MockRMAppSubmissionData.Builder.createWithMemory(1 * GB, rm1)
             .withAppName("app")
@@ -3033,6 +3060,9 @@ public class TestNodeLabelContainerAllocation {
             .withQueue("a")
             .withAmLabel("")
             .build());
+=======
+    RMApp app2 = rm1.submitApp(1 * GB, "app", "user", null, "a", "");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     MockAM am2 = MockRM.launchAndRegisterAM(app2, rm1, nm2);
 
     // app2 asks for 5 partition= containers
@@ -3065,8 +3095,13 @@ public class TestNodeLabelContainerAllocation {
     // The total memory tracked by QueueMetrics is 12GB
     // for the default partition
     CSQueue rootQueue = cs.getRootQueue();
+<<<<<<< HEAD
     assertEquals(12 * GB, rootQueue.getMetrics().getAvailableMB()
         + rootQueue.getMetrics().getAllocatedMB());
+=======
+    assertEquals(12*GB, rootQueue.getMetrics().getAvailableMB() +
+        rootQueue.getMetrics().getAllocatedMB());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // Kill all apps in queue a
     cs.killAllAppsInQueue("a");
@@ -3075,6 +3110,7 @@ public class TestNodeLabelContainerAllocation {
 
     assertEquals(0 * GB, leafQueueA.getMetrics().getUsedAMResourceMB());
     assertEquals(0, leafQueueA.getMetrics().getUsedAMResourceVCores());
+<<<<<<< HEAD
     rm1.close();
   }
 
@@ -3276,6 +3312,8 @@ public class TestNodeLabelContainerAllocation {
     rm1.waitForAppRemovedFromScheduler(app1.getApplicationId());
     assertEquals(0 * GB, leafQueueA.getMetrics().getUsedAMResourceMB());
     assertEquals(0, leafQueueA.getMetrics().getUsedAMResourceVCores());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     rm1.close();
   }
 

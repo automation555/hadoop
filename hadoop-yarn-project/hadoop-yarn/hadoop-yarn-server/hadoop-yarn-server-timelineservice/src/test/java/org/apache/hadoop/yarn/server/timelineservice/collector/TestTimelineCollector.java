@@ -34,8 +34,14 @@ import org.apache.hadoop.yarn.server.timelineservice.collector.TimelineCollector
 import org.apache.hadoop.yarn.server.timelineservice.storage.TimelineWriter;
 import org.junit.Test;
 
+<<<<<<< HEAD
 import org.mockito.internal.stubbing.answers.AnswersWithDelay;
 import org.mockito.internal.stubbing.answers.Returns;
+=======
+import com.google.common.collect.Sets;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -194,8 +200,21 @@ public class TestTimelineCollector {
   public void testAsyncEntityDiscard() throws Exception {
     TimelineWriter writer = mock(TimelineWriter.class);
 
+<<<<<<< HEAD
     when(writer.write(any(), any(), any())).thenAnswer(
         new AnswersWithDelay(500, new Returns(new TimelineWriteResponse())));
+=======
+    when(writer.write(any(), any(), any()))
+        .thenAnswer(new Answer<TimelineWriteResponse>() {
+          @Override
+          public TimelineWriteResponse answer(InvocationOnMock invocation)
+              throws InterruptedException {
+            Thread.sleep(500);
+            return new TimelineWriteResponse();
+          }
+        });
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     TimelineCollector collector = new TimelineCollectorForTest(writer);
     Configuration config = new Configuration();
     config

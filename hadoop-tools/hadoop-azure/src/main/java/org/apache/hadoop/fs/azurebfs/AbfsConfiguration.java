@@ -283,6 +283,7 @@ public class AbfsConfiguration{
       DefaultValue = DEFAULT_USE_UPN)
   private boolean useUpn;
 
+<<<<<<< HEAD
   @BooleanConfigurationValidatorAnnotation(ConfigurationKey =
       FS_AZURE_ENABLE_CHECK_ACCESS, DefaultValue = DEFAULT_ENABLE_CHECK_ACCESS)
   private boolean isCheckAccessEnabled;
@@ -299,6 +300,9 @@ public class AbfsConfiguration{
   @BooleanConfigurationValidatorAnnotation(ConfigurationKey =
       FS_AZURE_ENABLE_ABFS_LIST_ITERATOR, DefaultValue = DEFAULT_ENABLE_ABFS_LIST_ITERATOR)
   private boolean enableAbfsListIterator;
+=======
+  private Map<String, String> storageAccountKeys;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public AbfsConfiguration(final Configuration rawConfig, String accountName)
       throws IllegalAccessException, InvalidConfigurationValueException, IOException {
@@ -764,6 +768,7 @@ public class AbfsConfiguration{
     return this.useUpn;
   }
 
+<<<<<<< HEAD
   /**
    * Whether {@code AbfsClient} should track and send latency info back to storage servers.
    *
@@ -773,6 +778,8 @@ public class AbfsConfiguration{
     return this.trackLatency;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public AccessTokenProvider getTokenProvider() throws TokenAccessProviderException {
     AuthType authType = getEnum(FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME, AuthType.SharedKey);
     if (authType == AuthType.OAuth) {

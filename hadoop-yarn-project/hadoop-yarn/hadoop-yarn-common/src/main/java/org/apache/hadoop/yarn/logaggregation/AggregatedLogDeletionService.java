@@ -44,6 +44,12 @@ import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+<<<<<<< HEAD
+=======
+import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileController;
+import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileControllerFactory;
+import org.apache.hadoop.yarn.util.ConverterUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
@@ -69,12 +75,19 @@ public class AggregatedLogDeletionService extends AbstractService {
     public LogDeletionTask(Configuration conf, long retentionSecs, ApplicationClientProtocol rmClient) {
       this.conf = conf;
       this.retentionMillis = retentionSecs * 1000;
+<<<<<<< HEAD
       this.suffix = LogAggregationUtils.getBucketSuffix();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       LogAggregationFileControllerFactory factory =
           new LogAggregationFileControllerFactory(conf);
       LogAggregationFileController fileController =
           factory.getFileControllerForWrite();
       this.remoteRootLogDir = fileController.getRemoteRootLogDir();
+<<<<<<< HEAD
+=======
+      this.suffix = fileController.getRemoteRootLogDirSuffix();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       this.rmClient = rmClient;
     }
     

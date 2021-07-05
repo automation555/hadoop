@@ -504,10 +504,15 @@ public class NodeManager extends CompositeService
       super.serviceStop();
       DefaultMetricsSystem.shutdown();
 
+<<<<<<< HEAD
       if (null != context) {
         context.getContainerExecutor().stop();
 
         // Cleanup ResourcePluginManager
+=======
+      // Cleanup ResourcePluginManager
+      if (null != context) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         ResourcePluginManager rpm = context.getResourcePluginManager();
         if (rpm != null) {
           rpm.cleanup();

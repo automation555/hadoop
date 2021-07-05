@@ -61,19 +61,32 @@ public class TestAggregatedLogDeletionService {
     long toKeepTime = now - (1500*1000);
     String root = "mockfs://foo/";
     String remoteRootLogDir = root+"tmp/logs";
+<<<<<<< HEAD
     String suffix = "logs";
     String newSuffix = LogAggregationUtils.getBucketSuffix() + suffix;
+=======
+    String configuredSuffix = "logs";
+    String actualSuffix = "logs-tfile";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Configuration conf = new Configuration();
     conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
     conf.set(YarnConfiguration.LOG_AGGREGATION_ENABLED, "true");
     conf.set(YarnConfiguration.LOG_AGGREGATION_RETAIN_SECONDS, "1800");
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR, remoteRootLogDir);
+<<<<<<< HEAD
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, suffix);
     conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
     conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
          LogAggregationTFileController.class.getName());
 
 
+=======
+    conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, configuredSuffix);
+    conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
+    conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
+        LogAggregationTFileController.class.getName());
+    
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Path rootPath = new Path(root);
     FileSystem rootFs = rootPath.getFileSystem(conf);
     FileSystem mockFs = ((FilterFileSystem)rootFs).getRawFileSystem();
@@ -87,6 +100,7 @@ public class TestAggregatedLogDeletionService {
         new FileStatus[]{userDirStatus});
 
     ApplicationId appId1 =
+<<<<<<< HEAD
         ApplicationId.newInstance(now, 1);
     Path suffixDir = new Path(userDir, newSuffix);
     FileStatus suffixDirStatus = new FileStatus(0, true,
@@ -99,6 +113,12 @@ public class TestAggregatedLogDeletionService {
         remoteRootLogPath, appId1, "me", suffix);
     FileStatus app1DirStatus = new FileStatus(0, true, 0, 0,
         toDeleteTime, app1Dir);
+=======
+        ApplicationId.newInstance(System.currentTimeMillis(), 1);
+    Path userLogDir = new Path(userDir, actualSuffix);
+    Path app1Dir = new Path(userLogDir, appId1.toString());
+    FileStatus app1DirStatus = new FileStatus(0, true, 0, 0, toDeleteTime, app1Dir);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     
     ApplicationId appId2 =
         ApplicationId.newInstance(now, 2);
@@ -207,8 +227,13 @@ public class TestAggregatedLogDeletionService {
     long before50Secs = now - (50 * 1000);
     String root = "mockfs://foo/";
     String remoteRootLogDir = root + "tmp/logs";
+<<<<<<< HEAD
     String suffix = "logs";
     String newSuffix = LogAggregationUtils.getBucketSuffix() + suffix;
+=======
+    String configuredSuffix = "logs";
+    String actualSuffix = "logs-tfile";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Configuration conf = new Configuration();
     conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
     conf.set(YarnConfiguration.LOG_AGGREGATION_ENABLED, "true");
@@ -216,11 +241,18 @@ public class TestAggregatedLogDeletionService {
     conf.set(YarnConfiguration.LOG_AGGREGATION_RETAIN_CHECK_INTERVAL_SECONDS,
         "1");
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR, remoteRootLogDir);
+<<<<<<< HEAD
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, suffix);
     conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
     conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
          LogAggregationTFileController.class.getName());
 
+=======
+    conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, configuredSuffix);
+    conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
+    conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
+        LogAggregationTFileController.class.getName());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     Path rootPath = new Path(root);
     FileSystem rootFs = rootPath.getFileSystem(conf);
@@ -235,9 +267,13 @@ public class TestAggregatedLogDeletionService {
     when(mockFs.listStatus(remoteRootLogPath)).thenReturn(
         new FileStatus[] { userDirStatus });
 
+<<<<<<< HEAD
     Path suffixDir = new Path(userDir, newSuffix);
     FileStatus suffixStatus = new FileStatus(0, true, 0, 0, before50Secs,
         suffixDir);
+=======
+    Path userLogDir = new Path(userDir, actualSuffix);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     ApplicationId appId1 =
         ApplicationId.newInstance(System.currentTimeMillis(), 1);
@@ -336,19 +372,31 @@ public class TestAggregatedLogDeletionService {
 
     String root = "mockfs://foo/";
     String remoteRootLogDir = root+"tmp/logs";
+<<<<<<< HEAD
     String suffix = "logs";
     String newSuffix = LogAggregationUtils.getBucketSuffix() + suffix;
+=======
+    String configuredSuffix = "logs";
+    String actualSuffix = "logs-tfile";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Configuration conf = new Configuration();
     conf.setClass("fs.mockfs.impl", MockFileSystem.class, FileSystem.class);
     conf.set(YarnConfiguration.LOG_AGGREGATION_ENABLED, "true");
     conf.set(YarnConfiguration.LOG_AGGREGATION_RETAIN_SECONDS, "864000");
     conf.set(YarnConfiguration.LOG_AGGREGATION_RETAIN_CHECK_INTERVAL_SECONDS, "1");
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR, remoteRootLogDir);
+<<<<<<< HEAD
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, suffix);
     conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
     conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
          LogAggregationTFileController.class.getName());
 
+=======
+    conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, configuredSuffix);
+    conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
+    conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
+        LogAggregationTFileController.class.getName());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // prevent us from picking up the same mockfs instance from another test
     FileSystem.closeAll();
@@ -366,6 +414,7 @@ public class TestAggregatedLogDeletionService {
 
     ApplicationId appId1 =
         ApplicationId.newInstance(System.currentTimeMillis(), 1);
+<<<<<<< HEAD
     Path suffixDir = new Path(userDir, newSuffix);
     FileStatus suffixDirStatus = new FileStatus(0, true, 0, 0, now,
         suffixDir);
@@ -376,6 +425,10 @@ public class TestAggregatedLogDeletionService {
     FileStatus bucketDirStatus = new FileStatus(0, true, 0,
         0, now, bucketDir);
 
+=======
+    Path userLogDir = new Path(userDir, actualSuffix);
+    Path app1Dir = new Path(userLogDir, appId1.toString());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     FileStatus app1DirStatus = new FileStatus(0, true, 0, 0, now, app1Dir);
 
     when(mockFs.listStatus(userDir)).thenReturn(
@@ -440,8 +493,13 @@ public class TestAggregatedLogDeletionService {
 
     String root = "mockfs://foo/";
     String remoteRootLogDir = root+"tmp/logs";
+<<<<<<< HEAD
     String suffix = "logs";
     String newSuffix = LogAggregationUtils.getBucketSuffix() + suffix;
+=======
+    String configuredSuffix = "logs";
+    String actualSuffix = "logs-tfile";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Configuration conf = new Configuration();
     conf.setClass("fs.mockfs.impl", MockFileSystem.class,
         FileSystem.class);
@@ -450,10 +508,17 @@ public class TestAggregatedLogDeletionService {
     conf.set(YarnConfiguration.LOG_AGGREGATION_RETAIN_CHECK_INTERVAL_SECONDS,
         "1");
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR, remoteRootLogDir);
+<<<<<<< HEAD
     conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, suffix);
     conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
     conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
          LogAggregationTFileController.class.getName());
+=======
+    conf.set(YarnConfiguration.NM_REMOTE_APP_LOG_DIR_SUFFIX, configuredSuffix);
+    conf.set(YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS, "TFile");
+    conf.set(String.format(LOG_AGGREGATION_FILE_CONTROLLER_FMT, "TFile"),
+        LogAggregationTFileController.class.getName());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // prevent us from picking up the same mockfs instance from another test
     FileSystem.closeAll();
@@ -477,6 +542,10 @@ public class TestAggregatedLogDeletionService {
     when(mockFs.listStatus(suffixDir)).thenReturn(
         new FileStatus[]{bucketDirStatus});
 
+<<<<<<< HEAD
+=======
+    Path userLogDir = new Path(userDir, actualSuffix);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ApplicationId appId1 =
         ApplicationId.newInstance(System.currentTimeMillis(), 1);
     Path app1Dir = new Path(bucketDir, appId1.toString());

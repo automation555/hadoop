@@ -51,9 +51,12 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotException;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.ipc.RemoteException;
@@ -743,8 +746,11 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
     fs.close();
     assertEquals(hdfsContentSummary.getDirectoryCount(),
         httpContentSummary.getDirectoryCount());
+<<<<<<< HEAD
     assertEquals(hdfsContentSummary.getErasureCodingPolicy(),
         httpContentSummary.getErasureCodingPolicy());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertEquals(hdfsContentSummary.getFileCount(),
         httpContentSummary.getFileCount());
     assertEquals(hdfsContentSummary.getLength(),
@@ -1193,9 +1199,13 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
     LIST_STATUS_BATCH, GETTRASHROOT, STORAGEPOLICY, ERASURE_CODING,
     CREATE_SNAPSHOT, RENAME_SNAPSHOT, DELETE_SNAPSHOT,
     ALLOW_SNAPSHOT, DISALLOW_SNAPSHOT, DISALLOW_SNAPSHOT_EXCEPTION,
+<<<<<<< HEAD
     FILE_STATUS_ATTR, GET_SNAPSHOT_DIFF, GET_SNAPSHOTTABLE_DIRECTORY_LIST,
     GET_SNAPSHOT_LIST, GET_SERVERDEFAULTS, CHECKACCESS, SETECPOLICY,
     SATISFYSTORAGEPOLICY
+=======
+    FILE_STATUS_ATTR, GET_SNAPSHOT_DIFF, GET_SNAPSHOTTABLE_DIRECTORY_LIST
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   private void operation(Operation op) throws Exception {
@@ -1317,6 +1327,7 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
     case GET_SNAPSHOTTABLE_DIRECTORY_LIST:
       testGetSnapshottableDirListing();
       break;
+<<<<<<< HEAD
     case GET_SNAPSHOT_LIST:
       testGetSnapshotListing();
       break;
@@ -1332,6 +1343,8 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
     case SATISFYSTORAGEPOLICY:
       testStoragePolicySatisfier();
       break;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
   }
@@ -1698,6 +1711,7 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
         JsonUtil.toJsonString(dfssds));
   }
 
+<<<<<<< HEAD
   private void testGetSnapshotListing() throws Exception {
     if (!this.isLocalFS()) {
       // Create a directory with snapshot allowed
@@ -1742,6 +1756,8 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
   }
 
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private void testGetSnapshottableDirListing() throws Exception {
     if (!this.isLocalFS()) {
       FileSystem fs = this.getHttpFSFileSystem();
@@ -1768,6 +1784,7 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
       verifyGetSnapshottableDirListing(fs, dfs);
     }
   }
+<<<<<<< HEAD
 
   private void testFileAclsCustomizedUserAndGroupNames() throws Exception {
     if (isLocalFS()) {
@@ -1949,3 +1966,6 @@ public abstract class BaseTestHttpFSWith extends HFSTestCase {
     }
   }
 }
+=======
+}
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776

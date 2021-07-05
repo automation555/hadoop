@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.ipc;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+=======
+import com.google.protobuf.ServiceException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -98,8 +102,13 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+<<<<<<< HEAD
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+=======
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -1097,9 +1106,13 @@ public class TestRPC extends TestRpcBase {
 
       proxy.lockAndSleep(null, newSleepRequest(5));
       rpcMetrics = getMetrics(server.getRpcMetrics().name());
+<<<<<<< HEAD
       assertGauge("RpcLockWaitTimeAvgTime",
           (double)(RpcMetrics.TIMEUNIT.convert(10L, TimeUnit.SECONDS)),
           rpcMetrics);
+=======
+      assertGauge("RpcLockWaitTimeAvgTime", 10000.0, rpcMetrics);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } finally {
       if (proxy2 != null) {
         RPC.stopProxy(proxy2);
@@ -1294,6 +1307,7 @@ public class TestRPC extends TestRpcBase {
     }
   }
 
+<<<<<<< HEAD
   @Test (timeout=30000)
   public void testProtocolUserPriority() throws Exception {
     final String ns = CommonConfigurationKeys.IPC_NAMESPACE + ".0";
@@ -1331,6 +1345,8 @@ public class TestRPC extends TestRpcBase {
     };
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private Server setupDecayRpcSchedulerandTestServer(String ns)
       throws Exception {
     final int queueSizePerHandler = 3;

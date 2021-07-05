@@ -17,6 +17,20 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+<<<<<<< HEAD
+=======
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Random;
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -608,6 +622,7 @@ public class TestFSImageWithSnapshot {
     final String b =
         fsn.getFSDirectory().getINode("/").dumpTreeRecursively().toString();
     output.println(b);
+<<<<<<< HEAD
 
     final String s = NamespacePrintVisitor.print2Sting(fsn);
     Assert.assertEquals(b, s);
@@ -831,4 +846,8 @@ public class TestFSImageWithSnapshot {
     hdfs = cluster.getFileSystem();
   }
 
+=======
+    return b;
+  }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

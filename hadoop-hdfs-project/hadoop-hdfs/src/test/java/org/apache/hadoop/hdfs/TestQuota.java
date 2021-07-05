@@ -1566,6 +1566,7 @@ public class TestQuota {
   }
 
   @Test
+<<<<<<< HEAD
   public void testClrQuotaOnRoot() throws Exception {
     long orignalQuota = dfs.getQuotaUsage(new Path("/")).getQuota();
     DFSAdmin admin = new DFSAdmin(conf);
@@ -1579,6 +1580,8 @@ public class TestQuota {
   }
 
   @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testRename() throws Exception {
     int fileLen = 1024;
     short replication = 3;

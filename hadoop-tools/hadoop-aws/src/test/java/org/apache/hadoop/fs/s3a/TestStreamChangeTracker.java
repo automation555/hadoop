@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a;
 
+<<<<<<< HEAD
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.SdkBaseException;
 import com.amazonaws.services.s3.Headers;
@@ -26,15 +27,29 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.transfer.model.CopyResult;
+=======
+import java.util.concurrent.atomic.AtomicLong;
+
+import com.amazonaws.services.s3.Headers;
+import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.S3Object;
+import org.apache.hadoop.fs.PathIOException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+<<<<<<< HEAD
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.s3a.impl.ChangeDetectionPolicy;
 import org.apache.hadoop.fs.s3a.impl.ChangeTracker;
 import org.apache.hadoop.fs.s3a.statistics.impl.CountingChangeTracker;
+=======
+import org.apache.hadoop.fs.s3a.impl.ChangeDetectionPolicy;
+import org.apache.hadoop.fs.s3a.impl.ChangeTracker;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.test.HadoopTestBase;
 
 import static org.apache.hadoop.fs.s3a.impl.ChangeDetectionPolicy.CHANGE_DETECTED;
@@ -54,12 +69,17 @@ public class TestStreamChangeTracker extends HadoopTestBase {
 
   public static final String OBJECT = "object";
 
+<<<<<<< HEAD
   public static final String DEST_OBJECT = "new_object";
 
   public static final String URI = "s3a://" + BUCKET + "/" + OBJECT;
 
   public static final Path PATH = new Path(URI);
 
+=======
+  public static final String URI = "s3a://" + BUCKET + "/" + OBJECT;
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test
   public void testVersionCheckingHandlingNoVersions() throws Throwable {
     LOG.info("If an endpoint doesn't return versions, that's OK");
@@ -169,6 +189,7 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         CHANGE_DETECTED);
   }
 
+<<<<<<< HEAD
   @Test
   public void testVersionCheckingUpfrontETag() throws Throwable {
     ChangeTracker tracker = newTracker(
@@ -259,18 +280,23 @@ public class TestStreamChangeTracker extends HadoopTestBase {
     tracker.processException(new SdkBaseException("foo"), "copy");
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   protected void assertConstraintApplied(final ChangeTracker tracker,
       final GetObjectRequest request) {
     assertTrue("Tracker should have applied contraints " + tracker,
         tracker.maybeApplyConstraint(request));
   }
 
+<<<<<<< HEAD
   protected void assertConstraintApplied(final ChangeTracker tracker,
       final CopyObjectRequest request) throws PathIOException {
     assertTrue("Tracker should have applied contraints " + tracker,
         tracker.maybeApplyConstraint(request));
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   protected RemoteFileChangedException expectChangeException(
       final ChangeTracker tracker,
       final S3Object response,
@@ -279,6 +305,7 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         RemoteFileChangedException.class);
   }
 
+<<<<<<< HEAD
   protected RemoteFileChangedException expectChangeException(
       final ChangeTracker tracker,
       final SdkBaseException exception,
@@ -288,6 +315,8 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         RemoteFileChangedException.class);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   protected PathIOException expectNoVersionAttributeException(
       final ChangeTracker tracker,
       final S3Object response,
@@ -296,6 +325,7 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         NoVersionAttributeException.class);
   }
 
+<<<<<<< HEAD
   protected PathIOException expectNoVersionAttributeException(
       final ChangeTracker tracker,
       final CopyResult response,
@@ -304,6 +334,8 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         NoVersionAttributeException.class);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   protected <T extends Exception> T expectException(
       final ChangeTracker tracker,
       final S3Object response,
@@ -318,6 +350,7 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         });
   }
 
+<<<<<<< HEAD
   protected <T extends Exception> T expectException(
       final ChangeTracker tracker,
       final CopyResult response,
@@ -347,6 +380,8 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         });
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   protected void assertRevisionId(final ChangeTracker tracker,
       final String revId) {
     assertEquals("Wrong revision ID in " + tracker,
@@ -358,7 +393,11 @@ public class TestStreamChangeTracker extends HadoopTestBase {
       final ChangeTracker tracker,
       final int expectedCount) {
     assertEquals("counter in tracker " + tracker,
+<<<<<<< HEAD
         expectedCount, tracker.getVersionMismatches());
+=======
+        expectedCount, tracker.getVersionMismatches().get());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -368,6 +407,7 @@ public class TestStreamChangeTracker extends HadoopTestBase {
    */
   protected ChangeTracker newTracker(final ChangeDetectionPolicy.Mode mode,
       final ChangeDetectionPolicy.Source source, boolean requireVersion) {
+<<<<<<< HEAD
     return newTracker(mode, source, requireVersion,
         objectAttributes(null, null));
   }
@@ -380,17 +420,25 @@ public class TestStreamChangeTracker extends HadoopTestBase {
   protected ChangeTracker newTracker(final ChangeDetectionPolicy.Mode mode,
       final ChangeDetectionPolicy.Source source, boolean requireVersion,
       S3ObjectAttributes objectAttributes) {
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ChangeDetectionPolicy policy = createPolicy(
         mode,
         source,
         requireVersion);
     ChangeTracker tracker = new ChangeTracker(URI, policy,
+<<<<<<< HEAD
         new CountingChangeTracker(), objectAttributes);
     if (objectAttributes.getVersionId() == null
         && objectAttributes.getETag() == null) {
       assertFalse("Tracker should not have applied constraints " + tracker,
           tracker.maybeApplyConstraint(newGetObjectRequest()));
     }
+=======
+        new AtomicLong(0));
+    assertFalse("Tracker should not have applied constraints " + tracker,
+        tracker.maybeApplyConstraint(newGetObjectRequest()));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return tracker;
   }
 
@@ -398,6 +446,7 @@ public class TestStreamChangeTracker extends HadoopTestBase {
     return new GetObjectRequest(BUCKET, OBJECT);
   }
 
+<<<<<<< HEAD
   private CopyObjectRequest newCopyObjectRequest() {
     return new CopyObjectRequest(BUCKET, OBJECT, BUCKET, DEST_OBJECT);
   }
@@ -413,6 +462,8 @@ public class TestStreamChangeTracker extends HadoopTestBase {
     return copyResult;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private S3Object newResponse(String etag, String versionId) {
     ObjectMetadata md = new ObjectMetadata();
     if (etag != null) {
@@ -432,6 +483,7 @@ public class TestStreamChangeTracker extends HadoopTestBase {
     response.setKey(OBJECT);
     return response;
   }
+<<<<<<< HEAD
 
   private S3ObjectAttributes objectAttributes(
       String etag, String versionId) {
@@ -444,4 +496,6 @@ public class TestStreamChangeTracker extends HadoopTestBase {
         versionId,
         0);
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

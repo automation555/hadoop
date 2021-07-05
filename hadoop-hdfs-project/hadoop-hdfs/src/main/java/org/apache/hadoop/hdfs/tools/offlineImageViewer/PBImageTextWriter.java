@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.tools.offlineImageViewer;
 
+<<<<<<< HEAD
 import java.io.BufferedInputStream;
 import java.io.Closeable;
 import java.io.File;
@@ -38,6 +39,11 @@ import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
+=======
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.XAttr;

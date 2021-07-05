@@ -493,6 +493,7 @@ export default Ember.Component.extend({
         var containerLogUrl = row.get('appAttemptContainerLogsURL');
         if (containerLogUrl) {
           return `<a href="${containerLogUrl}">Link</a>`;
+<<<<<<< HEAD
         } else {
           return 'N/A';
         }
@@ -505,6 +506,8 @@ export default Ember.Component.extend({
         var ports = row.get('exposedPorts');
         if (ports) {
           return ports;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         } else {
           return 'N/A';
         }

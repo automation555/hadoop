@@ -1439,6 +1439,7 @@ public class TestMRJobs {
     sleepJob.setConf(conf);
 
     Job job1 = sleepJob.createJob(1, 1, 1, 1, 1, 1);
+<<<<<<< HEAD
     assertThat(job1.getJobName())
         .withFailMessage("Wrong default name of sleep job.")
         .isEqualTo(SleepJob.SLEEP_JOB_NAME);
@@ -1448,5 +1449,14 @@ public class TestMRJobs {
     assertThat(job2.getJobName())
         .withFailMessage("Wrong name of sleep job.")
         .isEqualTo(expectedJob2Name);
+=======
+    Assert.assertEquals("Wrong default name of sleep job.",
+        job1.getJobName(), SleepJob.SLEEP_JOB_NAME);
+
+    String expectedJob2Name = SleepJob.SLEEP_JOB_NAME + " - test";
+    Job job2 = sleepJob.createJob(1, 1, 1, 1, 1, 1, "test");
+    Assert.assertEquals("Wrong name of sleep job.",
+        job2.getJobName(), expectedJob2Name);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

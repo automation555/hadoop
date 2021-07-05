@@ -1353,6 +1353,7 @@ public class TestContainerAllocation {
     // submit an app beyond queue max leads to failure.
     boolean submitFailed = false;
     MockNM nm1 = rm1.registerNode("h1:1234", 2 * GB, 1);
+<<<<<<< HEAD
     MockRMAppSubmissionData data =
         MockRMAppSubmissionData.Builder.createWithMemory(1 * GB, rm1)
             .withAppName("app")
@@ -1362,6 +1363,9 @@ public class TestContainerAllocation {
             .withUnmanagedAM(false)
             .build();
     RMApp app1 = MockRMAppSubmitter.submit(rm1, data);
+=======
+    RMApp app1 = rm1.submitApp(1 * GB, "app", "user", null, "a");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
     try {
       am1.allocate("*", 5 * GB, 1, null);

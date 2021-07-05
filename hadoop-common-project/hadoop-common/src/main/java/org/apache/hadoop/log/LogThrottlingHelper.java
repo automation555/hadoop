@@ -293,7 +293,11 @@ public class LogThrottlingHelper {
    * suppressed in the provided log action. If no statements were suppressed,
    * this returns an empty string. The message has the format (without quotes):
    *
+<<<<<<< HEAD
    * <p>' (suppressed logging <i>{suppression_count}</i> times)'</p>
+=======
+   * <p/>' (suppressed logging <i>{suppression_count}</i> times)'
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    *
    * @param action The log action to produce a message about.
    * @return A message about suppression within this action.

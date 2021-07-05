@@ -59,7 +59,10 @@ import org.junit.runners.Parameterized.Parameters;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+<<<<<<< HEAD
 import java.util.Collections;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -110,6 +113,7 @@ public class TestSchedulingRequestContainerAllocation {
     mgr.init(conf);
   }
 
+<<<<<<< HEAD
   private RMApp submitApp(MockRM rm, int memory, Set<String> appTags)
       throws Exception {
     Resource resource = Resource.newInstance(memory, 0);
@@ -126,6 +130,8 @@ public class TestSchedulingRequestContainerAllocation {
     return MockRMAppSubmitter.submit(rm, data);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test(timeout = 30000L)
   public void testIntraAppAntiAffinity() throws Exception {
     Configuration csConf = TestUtils.getConfigurationWithMultipleQueues(conf);
@@ -357,8 +363,13 @@ public class TestSchedulingRequestContainerAllocation {
     Assert.assertEquals(1, getContainerNodesNum(allocated1));
     allocated.addAll(allocated1);
     Assert.assertEquals(4, getContainerNodesNum(allocated));
+<<<<<<< HEAD
 
 
+=======
+
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     CapacityScheduler cs = (CapacityScheduler) rm1.getResourceScheduler();
     FiCaSchedulerApp schedulerApp2 = cs.getApplicationAttempt(
         am2.getApplicationAttemptId());
@@ -520,6 +531,7 @@ public class TestSchedulingRequestContainerAllocation {
 
     allocated = waitForAllocation(2, 3000, am1, nms);
     Assert.assertEquals(2, allocated.size());
+<<<<<<< HEAD
 
     rm1.close();
   }
@@ -555,6 +567,8 @@ public class TestSchedulingRequestContainerAllocation {
         .build();
     RMApp app1 = MockRMAppSubmitter.submit(rm1, submissionData);
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nms[0]);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // Constraint with Invalid Allocation Tag Namespace
     PlacementConstraint constraint = targetNotIn("node",

@@ -41,8 +41,11 @@ public class DFSOpsCountStatistics extends StorageStatistics {
 
   /** This is for counting distributed file system operations. */
   public enum OpType {
+<<<<<<< HEAD
     ADD_CACHE_DIRECTIVE("op_add_cache_directive"),
     ADD_CACHE_POOL("op_add_cache_pool"),
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ADD_EC_POLICY("op_add_ec_policy"),
     ALLOW_SNAPSHOT("op_allow_snapshot"),
     APPEND(CommonStatisticNames.OP_APPEND),
@@ -64,7 +67,10 @@ public class DFSOpsCountStatistics extends StorageStatistics {
     GET_EC_CODECS("op_get_ec_codecs"),
     GET_EC_POLICY("op_get_ec_policy"),
     GET_EC_POLICIES("op_get_ec_policies"),
+<<<<<<< HEAD
     GET_ENCRYPTION_ZONE("op_get_encryption_zone"),
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     GET_FILE_BLOCK_LOCATIONS("op_get_file_block_locations"),
     GET_FILE_CHECKSUM(CommonStatisticNames.OP_GET_FILE_CHECKSUM),
     GET_FILE_LINK_STATUS("op_get_file_link_status"),

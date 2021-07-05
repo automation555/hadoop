@@ -17,13 +17,17 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
+<<<<<<< HEAD
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+<<<<<<< HEAD
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Collections;
@@ -43,15 +47,34 @@ import org.apache.hadoop.ha.HAServiceStatus;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+=======
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.qjournal.MiniQJMHACluster;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
+<<<<<<< HEAD
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.RpcScheduler;
 import org.apache.hadoop.ipc.Schedulable;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+=======
+import org.apache.hadoop.ipc.RpcScheduler;
+import org.apache.hadoop.ipc.Schedulable;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.After;
@@ -80,7 +103,10 @@ public class TestConsistentReadsObserver {
   @BeforeClass
   public static void startUpCluster() throws Exception {
     conf = new Configuration();
+<<<<<<< HEAD
     conf.setBoolean(DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY, true);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // disable fast tailing here because this test's assertions are based on the
     // timing of explicitly called rollEditLogAndTail. Although this means this
     // test takes some time to run
@@ -116,8 +142,12 @@ public class TestConsistentReadsObserver {
     final int observerIdx = 2;
     NameNode nn = dfsCluster.getNameNode(observerIdx);
     int port = nn.getNameNodeAddress().getPort();
+<<<<<<< HEAD
     Configuration originalConf = dfsCluster.getConfiguration(observerIdx);
     Configuration configuration = new Configuration(originalConf);
+=======
+    Configuration configuration = dfsCluster.getConfiguration(observerIdx);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     String prefix = CommonConfigurationKeys.IPC_NAMESPACE + "." + port + ".";
     configuration.set(prefix + CommonConfigurationKeys.IPC_SCHEDULER_IMPL_KEY,
         TestRpcScheduler.class.getName());
@@ -134,8 +164,11 @@ public class TestConsistentReadsObserver {
     // be triggered and client should retry active NN.
     dfs.getFileStatus(testPath);
     assertSentTo(0);
+<<<<<<< HEAD
     // reset the original call queue
     NameNodeAdapter.getRpcServer(nn).refreshCallQueue(originalConf);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Test
@@ -205,7 +238,11 @@ public class TestConsistentReadsObserver {
         // Therefore, the subsequent getFileStatus call should succeed.
         if (!autoMsync) {
           // If not testing auto-msync, perform an explicit one here
+<<<<<<< HEAD
           dfs2.msync();
+=======
+          dfs2.getClient().msync();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         } else if (autoMsyncPeriodMs > 0) {
           Thread.sleep(autoMsyncPeriodMs);
         }
@@ -361,6 +398,7 @@ public class TestConsistentReadsObserver {
     reader.interrupt();
   }
 
+<<<<<<< HEAD
   @Test
   public void testRequestFromNonObserverProxyProvider() throws Exception {
     // Create another HDFS client using ConfiguredFailoverProvider
@@ -473,6 +511,8 @@ public class TestConsistentReadsObserver {
     assertEquals(rpcQueueTimeNumOps, rpcProcessingTimeNumOps);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private void assertSentTo(int nnIdx) throws IOException {
     assertTrue("Request was not sent to the expected namenode " + nnIdx,
         HATestUtil.isSentToAnyOfNameNodes(dfs, dfsCluster, nnIdx));

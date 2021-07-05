@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
@@ -953,6 +954,7 @@ public class QueueMetrics implements MetricsSource {
     }
   }
 
+<<<<<<< HEAD
   public void updatePreemptedForCustomResources(Resource res) {
     if (queueMetricsForCustomResources != null) {
       queueMetricsForCustomResources.increaseAggregatedPreempted(res);
@@ -978,6 +980,8 @@ public class QueueMetrics implements MetricsSource {
     }
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void reserveResource(String partition, String user, Resource res) {
     if (partition == null || partition.equals(RMNodeLabelsManager.NO_LABEL)) {
       internalReserveResources(partition, user, res);
@@ -1277,6 +1281,7 @@ public class QueueMetrics implements MetricsSource {
     return aggregateContainersPreempted.value();
   }
 
+<<<<<<< HEAD
   /**
    * Fills in Resource values from available metrics values of custom resources
    * to @code{targetResource}, only if the corresponding
@@ -1329,3 +1334,15 @@ public class QueueMetrics implements MetricsSource {
     return parentQueue;
   }
 }
+=======
+  @VisibleForTesting
+  public long getAggregateMemoryMBPreempted() {
+    return aggregateMemoryMBPreempted.value();
+  }
+
+  @VisibleForTesting
+  public long getAggregateVcoresPreempted() {
+    return aggregateVcoresPreempted.value();
+  }
+}
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776

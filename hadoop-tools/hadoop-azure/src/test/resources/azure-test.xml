@@ -30,6 +30,7 @@
 
   <property>
     <name>fs.azure.test.namespace.enabled</name>
+<<<<<<< HEAD
     <value>true</value>
   </property>
 
@@ -43,6 +44,11 @@
     <value>true</value>
   </property>
 
+=======
+    <value>false</value>
+  </property>
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <!--====================  ABFS CONFIGURATION ====================-->
   <!-- SEE relevant section in "site/markdown/testing_azure.md"-->
 

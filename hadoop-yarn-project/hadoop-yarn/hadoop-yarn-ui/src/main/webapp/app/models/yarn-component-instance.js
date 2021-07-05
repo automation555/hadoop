@@ -50,6 +50,7 @@ export default DS.Model.extend({
     return 'N/A';
   }),
 
+<<<<<<< HEAD
   termLink: Ember.computed('node', 'containerId', function() {
     var protocol = window.location.protocol;
     var node = this.get('node');
@@ -60,6 +61,8 @@ export default DS.Model.extend({
     return url;
   }),
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   containerLogURL: Ember.computed('containerId', function() {
     const containerId = this.get('containerId');
     const attemptId = Converter.containerIdToAttemptId(containerId);

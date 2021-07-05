@@ -1110,11 +1110,14 @@ public class INodeFile extends INodeWithAdditionalFields
       out.print(snapshotFeature);
     }
     out.println();
+<<<<<<< HEAD
   }
 
   @Override
   public void accept(NamespaceVisitor visitor, int snapshot) {
     visitor.visitFile(this, snapshot);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

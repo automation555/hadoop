@@ -20,12 +20,18 @@ package org.apache.hadoop.fs.s3a.impl;
 
 import java.util.Locale;
 
+<<<<<<< HEAD
 import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.transfer.model.CopyResult;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
+import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,9 +39,13 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.s3a.S3ObjectAttributes;
 import org.apache.hadoop.fs.s3a.RemoteFileChangedException;
 import org.apache.hadoop.fs.store.LogExactlyOnce;
+=======
+import org.apache.hadoop.fs.s3a.RemoteFileChangedException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import static org.apache.hadoop.fs.s3a.Constants.*;
 
@@ -52,7 +62,11 @@ public abstract class ChangeDetectionPolicy {
       LoggerFactory.getLogger(ChangeDetectionPolicy.class);
 
   @VisibleForTesting
+<<<<<<< HEAD
   public static final String CHANGE_DETECTED = "change detected on client";
+=======
+  public static final String CHANGE_DETECTED = "change detected";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private final Mode mode;
   private final boolean requireVersion;
@@ -192,6 +206,7 @@ public abstract class ChangeDetectionPolicy {
   }
 
   /**
+<<<<<<< HEAD
    * String value for logging.
    * @return source and mode.
    */
@@ -201,6 +216,8 @@ public abstract class ChangeDetectionPolicy {
   }
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Pulls the attribute this policy uses to detect change out of the S3 object
    * metadata.  The policy generically refers to this attribute as
    * {@code revisionId}.
@@ -215,6 +232,7 @@ public abstract class ChangeDetectionPolicy {
       String uri);
 
   /**
+<<<<<<< HEAD
    * Like {{@link #getRevisionId(ObjectMetadata, String)}}, but retrieves the
    * revision identifier from {@link S3ObjectAttributes}.
    *
@@ -237,6 +255,8 @@ public abstract class ChangeDetectionPolicy {
   public abstract String getRevisionId(CopyResult copyResult);
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Applies the given {@link #getRevisionId(ObjectMetadata, String) revisionId}
    * as a server-side qualification on the {@code GetObjectRequest}.
    *
@@ -247,6 +267,7 @@ public abstract class ChangeDetectionPolicy {
       String revisionId);
 
   /**
+<<<<<<< HEAD
    * Applies the given {@link #getRevisionId(ObjectMetadata, String) revisionId}
    * as a server-side qualification on the {@code CopyObjectRequest}.
    *
@@ -267,6 +288,8 @@ public abstract class ChangeDetectionPolicy {
       String revisionId);
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Takes appropriate action based on {@link #getMode() mode} when a change has
    * been detected.
    *
@@ -290,7 +313,10 @@ public abstract class ChangeDetectionPolicy {
       long position,
       String operation,
       long timesAlreadyDetected) {
+<<<<<<< HEAD
     String positionText = position >= 0 ? (" at " + position) : "";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     switch (mode) {
     case None:
       // something changed; we don't care.
@@ -299,9 +325,14 @@ public abstract class ChangeDetectionPolicy {
       if (timesAlreadyDetected == 0) {
         // only warn on the first detection to avoid a noisy log
         LOG.warn(
+<<<<<<< HEAD
             String.format(
                 "%s change detected on %s %s%s. Expected %s got %s",
                 getSource(), operation, uri, positionText, revisionId,
+=======
+            String.format("%s change detected on %s %s at %d. Expected %s got %s",
+                getSource(), operation, uri, position, revisionId,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                 newRevisionId));
         return new ImmutablePair<>(true, null);
       }
@@ -309,16 +340,26 @@ public abstract class ChangeDetectionPolicy {
     case Client:
     case Server:
     default:
+<<<<<<< HEAD
       // mode == Client or Server; will trigger on version failures
       // of getObjectMetadata even on server.
+=======
+      // mode == Client (or Server, but really won't be called for Server)
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return new ImmutablePair<>(true,
           new RemoteFileChangedException(uri,
               operation,
               String.format("%s "
                       + CHANGE_DETECTED
+<<<<<<< HEAD
                       + " during %s%s."
                     + " Expected %s got %s",
               getSource(), operation, positionText, revisionId, newRevisionId)));
+=======
+                      + " while reading at position %s."
+                    + " Expected %s got %s",
+              getSource(), position, revisionId, newRevisionId)));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 
@@ -337,6 +378,7 @@ public abstract class ChangeDetectionPolicy {
     }
 
     @Override
+<<<<<<< HEAD
     public String getRevisionId(S3ObjectAttributes s3Attributes) {
       return s3Attributes.getETag();
     }
@@ -372,6 +414,12 @@ public abstract class ChangeDetectionPolicy {
     public void applyRevisionConstraint(GetObjectMetadataRequest request,
         String revisionId) {
       LOG.debug("Unable to restrict HEAD request to etag; will check later");
+=======
+    public void applyRevisionConstraint(GetObjectRequest request,
+        String revisionId) {
+      LOG.debug("Restricting request to etag {}", revisionId);
+      request.withMatchingETagConstraint(revisionId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     @Override
@@ -414,6 +462,7 @@ public abstract class ChangeDetectionPolicy {
     }
 
     @Override
+<<<<<<< HEAD
     public String getRevisionId(S3ObjectAttributes s3Attributes) {
       return s3Attributes.getVersionId();
     }
@@ -454,6 +503,12 @@ public abstract class ChangeDetectionPolicy {
       } else {
         LOG.debug("No version ID to use as a constraint");
       }
+=======
+    public void applyRevisionConstraint(GetObjectRequest request,
+        String revisionId) {
+      LOG.debug("Restricting request to version {}", revisionId);
+      request.withVersionId(revisionId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     @Override
@@ -488,6 +543,7 @@ public abstract class ChangeDetectionPolicy {
     }
 
     @Override
+<<<<<<< HEAD
     public String getRevisionId(final S3ObjectAttributes s3ObjectAttributes) {
       return null;
     }
@@ -498,12 +554,15 @@ public abstract class ChangeDetectionPolicy {
     }
 
     @Override
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     public void applyRevisionConstraint(final GetObjectRequest request,
         final String revisionId) {
 
     }
 
     @Override
+<<<<<<< HEAD
     public void applyRevisionConstraint(CopyObjectRequest request,
         String revisionId) {
 
@@ -516,6 +575,8 @@ public abstract class ChangeDetectionPolicy {
     }
 
     @Override
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     public String toString() {
       return "NoChangeDetection";
     }

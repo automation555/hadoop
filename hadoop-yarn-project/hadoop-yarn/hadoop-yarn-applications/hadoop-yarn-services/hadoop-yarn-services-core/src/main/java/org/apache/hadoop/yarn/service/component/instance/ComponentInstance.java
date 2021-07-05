@@ -201,9 +201,12 @@ public class ComponentInstance implements EventHandler<ComponentInstanceEvent>,
         ComponentInstanceEvent event) {
       // Query container status for ip and host
       compInstance.initializeStatusRetriever(event, 0);
+<<<<<<< HEAD
       compInstance.initializeLocalizationStatusRetriever(
           event.getContainerId());
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       long containerStartTime = System.currentTimeMillis();
       try {
         ContainerTokenIdentifier containerTokenIdentifier = BuilderUtils
@@ -289,7 +292,10 @@ public class ComponentInstance implements EventHandler<ComponentInstanceEvent>,
       } else {
         instance.initializeStatusRetriever(event, 0);
       }
+<<<<<<< HEAD
       instance.initializeLocalizationStatusRetriever(event.getContainerId());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       Component.UpgradeStatus status = instance.getState().equals(UPGRADING) ?
           instance.component.getUpgradeStatus() :
@@ -664,16 +670,25 @@ public class ComponentInstance implements EventHandler<ComponentInstanceEvent>,
 
   private void reInitHelper(Component.UpgradeStatus upgradeStatus) {
     cancelContainerStatusRetriever();
+<<<<<<< HEAD
     cancelLclRetriever();
     setContainerStatus(container.getId(), null);
     scheduler.executorService.submit(() -> cleanupRegistry(container.getId()));
     Future<ProviderService.ResolvedLaunchParams> launchParamsFuture =
         scheduler.getContainerLaunchService()
+=======
+    setContainerStatus(container.getId(), null);
+    scheduler.executorService.submit(() -> cleanupRegistry(container.getId()));
+    scheduler.getContainerLaunchService()
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         .reInitCompInstance(scheduler.getApp(), this,
             this.container, this.component.createLaunchContext(
                 upgradeStatus.getTargetSpec(),
                 upgradeStatus.getTargetVersion()));
+<<<<<<< HEAD
     updateResolvedLaunchParams(launchParamsFuture);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   private void initializeStatusRetriever(ComponentInstanceEvent event,
@@ -834,8 +849,13 @@ public class ComponentInstance implements EventHandler<ComponentInstanceEvent>,
   }
 
   public ContainerStatus getContainerStatus() {
+<<<<<<< HEAD
     readLock.lock();
     try {
+=======
+    try {
+      readLock.lock();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return status;
     } finally {
       readLock.unlock();
@@ -844,8 +864,13 @@ public class ComponentInstance implements EventHandler<ComponentInstanceEvent>,
 
   private void setContainerStatus(ContainerId containerId,
       ContainerStatus latestStatus) {
+<<<<<<< HEAD
     writeLock.lock();
     try {
+=======
+    try {
+      writeLock.lock();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       this.status = latestStatus;
       org.apache.hadoop.yarn.service.api.records.Container containerRec =
           getCompSpec().getContainer(containerId.toString());
@@ -875,6 +900,7 @@ public class ComponentInstance implements EventHandler<ComponentInstanceEvent>,
         doRegistryUpdate = false;
       }
     }
+<<<<<<< HEAD
     ObjectMapper mapper = new ObjectMapper();
     try {
       Map<String, List<Map<String, String>>> ports = null;
@@ -884,6 +910,8 @@ public class ComponentInstance implements EventHandler<ComponentInstanceEvent>,
     } catch (IOException e) {
       LOG.warn("Unable to process container ports mapping: {}", e);
     }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     setContainerStatus(status.getContainerId(), status);
     if (containerRec != null && timelineServiceEnabled && doRegistryUpdate) {
       serviceTimelinePublisher.componentInstanceIPHostUpdated(containerRec);

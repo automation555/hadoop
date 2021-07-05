@@ -1178,6 +1178,7 @@ public class TestRMNodeTransitions {
     Assert.assertEquals(1, rmNode.getContainersToBeRemovedFromNM().size());
 
   }
+<<<<<<< HEAD
 
   private void calcIntervalTest(RMNodeImpl rmNode, ResourceUtilization nodeUtil,
       long hbDefault, long hbMin, long hbMax, float speedup, float slowdown,
@@ -1286,4 +1287,6 @@ public class TestRMNodeTransitions {
     calcIntervalTest(rmNode, nodeUtil, hbDefault, hbMin, hbMax,
         speedup, slowdown, vcoreUnit * 1.0F, hbDefault); // 100%
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

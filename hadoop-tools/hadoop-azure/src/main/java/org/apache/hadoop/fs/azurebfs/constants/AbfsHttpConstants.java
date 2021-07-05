@@ -37,6 +37,7 @@ public final class AbfsHttpConstants {
   public static final String SET_PROPERTIES_ACTION = "setProperties";
   public static final String SET_ACCESS_CONTROL = "setAccessControl";
   public static final String GET_ACCESS_CONTROL = "getAccessControl";
+<<<<<<< HEAD
   public static final String CHECK_ACCESS = "checkAccess";
   public static final String GET_STATUS = "getStatus";
   public static final String ACQUIRE_LEASE_ACTION = "acquire";
@@ -46,6 +47,10 @@ public final class AbfsHttpConstants {
   public static final String DEFAULT_LEASE_BREAK_PERIOD = "0";
   public static final String DEFAULT_TIMEOUT = "90";
   public static final String APPEND_BLOB_TYPE = "appendblob";
+=======
+  public static final String GET_STATUS = "getStatus";
+  public static final String DEFAULT_TIMEOUT = "90";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public static final String TOKEN_VERSION = "2";
 
   public static final String JAVA_VENDOR = "java.vendor";
@@ -54,7 +59,10 @@ public final class AbfsHttpConstants {
   public static final String OS_VERSION = "os.version";
   public static final String OS_ARCH = "os.arch";
 
+<<<<<<< HEAD
   public static final String APN_VERSION = "APN/1.0";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public static final String CLIENT_VERSION = "Azure Blob FS/" + VersionInfo.getVersion();
 
   // Abfs Http Verb

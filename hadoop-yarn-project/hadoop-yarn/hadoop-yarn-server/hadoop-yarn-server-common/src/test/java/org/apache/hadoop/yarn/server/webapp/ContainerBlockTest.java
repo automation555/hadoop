@@ -16,7 +16,13 @@
 
 package org.apache.hadoop.yarn.server.webapp;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+=======
+import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.LocalConfigurationProvider;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.api.ApplicationBaseProtocol;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -27,17 +33,31 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceInformation;
+<<<<<<< HEAD
 import org.apache.hadoop.yarn.resourcetypes.ResourceTypesTestHelper;
 import org.apache.hadoop.yarn.server.webapp.dao.ContainerInfo;
 import org.apache.hadoop.yarn.util.resource.CustomResourceTypesConfigurationProvider;
+=======
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.resourcetypes.ResourceTypesTestHelper;
+import org.apache.hadoop.yarn.server.webapp.dao.ContainerInfo;
+import org.apache.hadoop.yarn.util.resource.ResourceUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.webapp.View;
 import org.junit.Assert;
 import org.junit.Test;
 
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+=======
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB;
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES;
@@ -47,30 +67,81 @@ import static org.mockito.Mockito.mock;
  * Tests for ContainerBlock.
  */
 public class ContainerBlockTest {
+<<<<<<< HEAD
+=======
+  private static class CustomResourceTypesConfigurationProvider
+      extends LocalConfigurationProvider {
+
+    private static String resourceName;
+
+    @Override
+    public InputStream getConfigurationInputStream(Configuration bootstrapConf,
+        String name) throws YarnException, IOException {
+      if (YarnConfiguration.RESOURCE_TYPES_CONFIGURATION_FILE.equals(name)) {
+        return new ByteArrayInputStream(
+            ("<configuration>\n" +
+            " <property>\n" +
+            "   <name>yarn.resource-types</name>\n" +
+            "   <value>" + resourceName + "</value>\n" +
+            " </property>\n" +
+            " <property>\n" +
+            "   <name>yarn.resource-types.a-custom-resource.units</name>\n" +
+            "   <value>G</value>\n" +
+            " </property>\n" +
+            "</configuration>\n").getBytes());
+      } else {
+        return super.getConfigurationInputStream(bootstrapConf, name);
+      }
+    }
+
+    public static String getResourceName() {
+      return resourceName;
+    }
+  }
+
+  private void initResourceTypes(String resourceName) {
+    CustomResourceTypesConfigurationProvider.resourceName = resourceName;
+
+    Configuration configuration = new Configuration();
+    configuration.set(YarnConfiguration.RM_CONFIGURATION_PROVIDER_CLASS,
+        CustomResourceTypesConfigurationProvider.class.getName());
+    ResourceUtils.resetResourceTypes(configuration);
+  }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private ContainerReport createContainerReport() {
     ApplicationId applicationId = ApplicationId.newInstance(1234, 5);
     ApplicationAttemptId attemptId = ApplicationAttemptId.newInstance(
         applicationId, 1);
     ContainerId containerId = ContainerId.newContainerId(attemptId, 1);
+<<<<<<< HEAD
     Map<String, List<Map<String, String>>> ports = new HashMap<>();
     List<Map<String, String>> list = new ArrayList<>();
     Map<String, String> map = new HashMap<>();
     map.put("abc", "123");
     list.add(map);
     ports.put("192.168.0.1", list);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ContainerReport container = ContainerReport.newInstance(containerId, null,
         NodeId.newInstance("host", 1234), Priority.UNDEFINED, 1234, 5678,
         "diagnosticInfo", "logURL", 0, ContainerState.COMPLETE,
         "http://" + NodeId.newInstance("host", 2345).toString());
+<<<<<<< HEAD
     container.setExposedPorts(ports);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     return container;
   }
   @Test
   public void testRenderResourcesString() {
+<<<<<<< HEAD
     CustomResourceTypesConfigurationProvider.
         initResourceTypes(ResourceInformation.GPU_URI);
+=======
+    initResourceTypes(ResourceInformation.GPU_URI);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     Resource resource = ResourceTypesTestHelper.newResource(
         DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,

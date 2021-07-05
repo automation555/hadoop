@@ -1490,6 +1490,7 @@ public class RMAppImpl implements RMApp, Recoverable {
 
     @Override
     public void transition(RMAppImpl app, RMAppEvent event) {
+<<<<<<< HEAD
       completeAndCleanupApp(app);
       handleAppFinished(app);
       app.clearUnusedFields();
@@ -1498,6 +1499,10 @@ public class RMAppImpl implements RMApp, Recoverable {
 
     private void completeAndCleanupApp(RMAppImpl app) {
       //cleanup app in RM Nodes
+=======
+      app.logAggregation
+        .recordLogAggregationStartTime(app.systemClock.getTime());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       for (NodeId nodeId : app.getRanNodes()) {
         app.handler.handle(
                 new RMNodeCleanAppEvent(nodeId, app.applicationId));
@@ -1769,6 +1774,19 @@ public class RMAppImpl implements RMApp, Recoverable {
     logAggregation.aggregateLogReport(nodeId, report, this);
   }
 
+<<<<<<< HEAD
+=======
+  @Override
+  public boolean isLogAggregationFinished() {
+    return logAggregation.isFinished();
+  }
+
+  @Override
+  public boolean isLogAggregationEnabled() {
+    return logAggregation.isEnabled();
+  }
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public String getLogAggregationFailureMessagesForNM(NodeId nodeId) {
     return logAggregation.getLogAggregationFailureMessagesForNM(nodeId);
   }

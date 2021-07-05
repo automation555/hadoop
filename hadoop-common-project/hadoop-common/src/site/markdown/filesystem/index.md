@@ -40,4 +40,7 @@ HDFS as these are commonly expected by Hadoop client applications.
 2. [Testing with the Filesystem specification](testing.html)
 2. [Extending the specification and its tests](extending.html)
 1. [Uploading a file using Multiple Parts](multipartuploader.html)
+<<<<<<< HEAD
 1. [IOStatistics](iostatistics.html)
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776

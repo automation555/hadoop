@@ -81,6 +81,7 @@ public class MockAMLauncher extends ApplicationMasterLauncher
   @Override
   @SuppressWarnings("unchecked")
   public void handle(AMLauncherEvent event) {
+<<<<<<< HEAD
     ApplicationId appId =
         event.getAppAttempt().getAppAttemptId().getApplicationId();
     // find AMSimulator
@@ -108,6 +109,36 @@ public class MockAMLauncher extends ApplicationMasterLauncher
         return;
       } catch (Exception e) {
         throw new YarnRuntimeException(e);
+=======
+    if (AMLauncherEventType.LAUNCH == event.getType()) {
+      ApplicationId appId =
+          event.getAppAttempt().getAppAttemptId().getApplicationId();
+
+      // find AMSimulator
+      AMSimulator ams = appIdAMSim.get(appId);
+      if (ams != null) {
+        try {
+          Container amContainer = event.getAppAttempt().getMasterContainer();
+
+          setupAMRMToken(event.getAppAttempt());
+
+          // Notify RMAppAttempt to change state
+          super.context.getDispatcher().getEventHandler().handle(
+              new RMAppAttemptEvent(event.getAppAttempt().getAppAttemptId(),
+                  RMAppAttemptEventType.LAUNCHED));
+
+          ams.notifyAMContainerLaunched(
+              event.getAppAttempt().getMasterContainer());
+          LOG.info("Notify AM launcher launched:" + amContainer.getId());
+
+          se.getNmMap().get(amContainer.getNodeId())
+              .addNewContainer(amContainer, 100000000L);
+
+          return;
+        } catch (Exception e) {
+          throw new YarnRuntimeException(e);
+        }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     case CLEANUP:
       se.getNmMap().get(amContainer.getNodeId())

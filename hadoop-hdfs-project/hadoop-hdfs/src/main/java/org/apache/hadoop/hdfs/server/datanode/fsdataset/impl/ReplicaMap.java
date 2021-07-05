@@ -146,7 +146,11 @@ class ReplicaMap {
       if (oldReplicaInfo != null) {
         return oldReplicaInfo;
       } else {
+<<<<<<< HEAD
         m.put(replicaInfo);
+=======
+        set.addOrReplace(replicaInfo);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
       return replicaInfo;
     }

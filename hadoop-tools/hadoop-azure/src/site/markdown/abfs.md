@@ -46,6 +46,7 @@ propagate to jobs running in-cluster.
 * Can be used as a replacement for HDFS on Hadoop clusters deployed in Azure infrastructure.
 
 For details on ABFS, consult the following documents:
+<<<<<<< HEAD
 
 * [A closer look at Azure Data Lake Storage Gen2](https://azure.microsoft.com/en-gb/blog/a-closer-look-at-azure-data-lake-storage-gen2/);
 MSDN Article from June 28, 2018.
@@ -57,6 +58,19 @@ MSDN Article from June 28, 2018.
 
 The Azure Storage data model presents 3 core concepts:
 
+=======
+
+* [A closer look at Azure Data Lake Storage Gen2](https://azure.microsoft.com/en-gb/blog/a-closer-look-at-azure-data-lake-storage-gen2/);
+MSDN Article from June 28, 2018.
+* [Storage Tiers](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-storage-tiers)
+
+## Getting started
+
+### Concepts
+
+The Azure Storage data model presents 3 core concepts:
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 * **Storage Account**: All access is done through a storage account.
 * **Container**: A container is a grouping of multiple blobs.  A storage account
   may have multiple containers.  In Hadoop, an entire file system hierarchy is
@@ -175,6 +189,7 @@ Australia Central 2  -35.3075    149.1244     australiacentral2
 
 Once a location has been chosen, create the account
 ```bash
+<<<<<<< HEAD
 
 az storage account create --verbose \
     --name abfswales1 \
@@ -279,6 +294,111 @@ $ hadoop fs -D fs.azure.createRemoteFileSystemDuringInitialization=true \
 This is useful for creating accounts on the command line, especially before
 the `az storage` command supports hierarchical namespaces completely.
 
+=======
+
+az storage account create --verbose \
+    --name abfswales1 \
+    --resource-group devteam2 \
+    --kind StorageV2 \
+    --hierarchical-namespace true \
+    --location ukwest \
+    --sku Standard_LRS \
+    --https-only true \
+    --encryption-services blob \
+    --access-tier Hot \
+    --tags owner=engineering \
+    --assign-identity \
+    --output jsonc
+```
+
+The output of the command is a JSON file, whose `primaryEndpoints` command
+includes the name of the store endpoint:
+```json
+{
+  "primaryEndpoints": {
+    "blob": "https://abfswales1.blob.core.windows.net/",
+    "dfs": "https://abfswales1.dfs.core.windows.net/",
+    "file": "https://abfswales1.file.core.windows.net/",
+    "queue": "https://abfswales1.queue.core.windows.net/",
+    "table": "https://abfswales1.table.core.windows.net/",
+    "web": "https://abfswales1.z35.web.core.windows.net/"
+  }
+}
+```
+
+The `abfswales1.dfs.core.windows.net` account is the name by which the
+storage account will be referred to.
+
+Now ask for the connection string to the store, which contains the account key
+```bash
+az storage account  show-connection-string --name abfswales1
+{
+  "connectionString": "DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=abfswales1;AccountKey=ZGlkIHlvdSByZWFsbHkgdGhpbmsgSSB3YXMgZ29pbmcgdG8gcHV0IGEga2V5IGluIGhlcmU/IA=="
+}
+```
+
+You then need to add the access key to your `core-site.xml`, JCEKs file or
+use your cluster management tool to set it the option `fs.azure.account.key.STORAGE-ACCOUNT`
+to this value.
+```XML
+<property>
+  <name>fs.azure.account.key.abfswales1.dfs.core.windows.net</name>
+  <value>ZGlkIHlvdSByZWFsbHkgdGhpbmsgSSB3YXMgZ29pbmcgdG8gcHV0IGEga2V5IGluIGhlcmU/IA==</value>
+</property>
+```
+
+#### Creation through the Azure Portal
+
+Creation through the portal is covered in [Quickstart: Create an Azure Data Lake Storage Gen2 storage account](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-quickstart-create-account)
+
+Key Steps
+
+1. Create a new Storage Account in a location which suits you.
+1. "Basics" Tab: select "StorageV2".
+1. "Advanced" Tab: enable "Hierarchical Namespace".
+
+You have now created your storage account. Next, get the key for authentication
+for using the default "Shared Key" authentication.
+
+1. Go to the Azure Portal.
+1. Select "Storage Accounts"
+1. Select the newly created storage account.
+1. In the list of settings, locate "Access Keys" and select that.
+1. Copy one of the access keys to the clipboard, add to the XML option,
+set in cluster management tools, Hadoop JCEKS file or KMS store.
+
+### <a name="new_container"></a> Creating a new container
+
+An Azure storage account can have multiple containers, each with the container
+name as the userinfo field of the URI used to reference it.
+
+For example, the container "container1" in the storage account just created
+will have the URL `abfs://container1@abfswales1.dfs.core.windows.net/`
+
+
+You can create a new container through the ABFS connector, by setting the option
+ `fs.azure.createRemoteFileSystemDuringInitialization` to `true`.
+
+If the container does not exist, an attempt to list it with `hadoop fs -ls`
+will fail
+
+```
+$ hadoop fs -ls abfs://container1@abfswales1.dfs.core.windows.net/
+
+ls: `abfs://container1@abfswales1.dfs.core.windows.net/': No such file or directory
+```
+
+Enable remote FS creation and the second attempt succeeds, creating the container as it does so:
+
+```
+$ hadoop fs -D fs.azure.createRemoteFileSystemDuringInitialization=true \
+ -ls abfs://container1@abfswales1.dfs.core.windows.net/
+```
+
+This is useful for creating accounts on the command line, especially before
+the `az storage` command supports hierarchical namespaces completely.
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 ### Listing and examining containers of a Storage Account.
 
@@ -314,6 +434,7 @@ driven by them.
 1. Using OAuth 2.0 tokens of one form or another.
 1. Deployed in-Azure with the Azure VMs providing OAuth 2.0 tokens to the application,
  "Managed Instance".
+<<<<<<< HEAD
 1. Using Shared Access Signature (SAS) tokens provided by a custom implementation of the SASTokenProvider interface.
 
 What can be changed is what secrets/credentials are used to authenticate the caller.
@@ -325,11 +446,19 @@ and SAS. For the various OAuth options use the config `fs.azure.account
 ClientCredsTokenProvider, UserPasswordTokenProvider, MsiTokenProvider and
 RefreshTokenBasedTokenProvider. An IllegalArgumentException is thrown if
 the specified provider type is not one of the supported.
+=======
+
+What can be changed is what secrets/credentials are used to authenticate the caller.
+
+The authentication mechanism is set in `fs.azure.account.auth.type` (or the account specific variant),
+and, for the various OAuth options `fs.azure.account.oauth.provider.type`
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 All secrets can be stored in JCEKS files. These are encrypted and password
 protected —use them or a compatible Hadoop Key Management Store wherever
 possible
 
+<<<<<<< HEAD
 ### <a name="aad-token-fetch-retry-logic"></a> AAD Token fetch retries
 
 The exponential retry policy used for the AAD token fetch retries can be tuned
@@ -346,6 +475,8 @@ seconds.
 retries. Multiples of this timespan are used for subsequent retry attempts
  . The default value is 2.
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 ### <a name="shared-key-auth"></a> Default: Shared Key
 
 This is the simplest authentication mechanism of account + password.
@@ -372,6 +503,7 @@ the password, "key", retrieved from the XML/JCECKs configuration files.
 *Note*: The source of the account key can be changed through a custom key provider;
 one exists to execute a shell script to retrieve it.
 
+<<<<<<< HEAD
 A custom key provider class can be provided with the config
 `fs.azure.account.keyprovider`. If a key provider class is specified the same
 will be used to get account key. Otherwise the Simple key provider will be used
@@ -381,6 +513,8 @@ To retrieve using shell script, specify the path to the script for the config
 `fs.azure.shellkeyprovider.script`. ShellDecryptionKeyProvider class use the
 script specified to retrieve the key.
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 ### <a name="oauth-client-credentials"></a> OAuth 2.0 Client Credentials
 
 OAuth 2.0 credentials of (client id, client secret, endpoint) are provided in the configuration/JCEKS file.
@@ -497,6 +631,7 @@ With an existing Oauth 2.0 token, make a request of the Active Directory endpoin
   </description>
 </property>
 <property>
+<<<<<<< HEAD
   <name>fs.azure.account.oauth2.refresh.endpoint</name>
   <value></value>
   <description>
@@ -504,6 +639,8 @@ With an existing Oauth 2.0 token, make a request of the Active Directory endpoin
   </description>
 </property>
 <property>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <name>fs.azure.account.oauth2.client.id</name>
   <value></value>
   <description>
@@ -545,6 +682,7 @@ The Azure Portal/CLI is used to create the service identity.
   </description>
 </property>
 <property>
+<<<<<<< HEAD
   <name>fs.azure.account.oauth2.msi.endpoint</name>
   <value></value>
   <description>
@@ -552,6 +690,8 @@ The Azure Portal/CLI is used to create the service identity.
   </description>
 </property>
 <property>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <name>fs.azure.account.oauth2.client.id</name>
   <value></value>
   <description>
@@ -585,6 +725,7 @@ token when its `getAccessToken()` method is invoked.
 The declared class must implement `org.apache.hadoop.fs.azurebfs.extensions.CustomTokenProviderAdaptee`
 and optionally `org.apache.hadoop.fs.azurebfs.extensions.BoundDTExtension`.
 
+<<<<<<< HEAD
 The declared class also holds responsibility to implement retry logic while fetching access tokens.
 
 ### <a name="delegationtokensupportconfigoptions"></a> Delegation Token Provider
@@ -625,6 +766,8 @@ tokens by implementing the SASTokenProvider interface.
 
 The declared class must implement `org.apache.hadoop.fs.azurebfs.extensions.SASTokenProvider`.
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 ## <a name="technical"></a> Technical notes
 
 ### <a name="proxy"></a> Proxy setup
@@ -712,7 +855,11 @@ points for third-parties to integrate their authentication and authorization
 services into the ABFS client.
 
 * `CustomDelegationTokenManager` : adds ability to issue Hadoop Delegation Tokens.
+<<<<<<< HEAD
 * `SASTokenProvider`: allows for custom provision of Azure Storage Shared Access Signature (SAS) tokens.
+=======
+* `AbfsAuthorizer` permits client-side authorization of file operations.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 * `CustomTokenProviderAdaptee`: allows for custom provision of
 Azure OAuth tokens.
 * `KeyProvider`.
@@ -729,6 +876,7 @@ Consult the javadocs for `org.apache.hadoop.fs.azurebfs.constants.ConfigurationK
 `org.apache.hadoop.fs.azurebfs.AbfsConfiguration` for the full list
 of configuration options and their default values.
 
+<<<<<<< HEAD
 ### <a name="clientcorrelationoptions"></a> Client Correlation Options
 
 #### <a name="clientcorrelationid"></a> 1. Client CorrelationId Option
@@ -970,6 +1118,8 @@ logged with the last callee)
 Note that these performance numbers are also sent back to the ADLS Gen 2 API endpoints
 in the `x-ms-abfs-client-latency` HTTP headers in subsequent requests. Azure uses these
 settings to track their end-to-end latency.
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 ## <a name="troubleshooting"></a> Troubleshooting
 
@@ -1117,6 +1267,7 @@ signon page for humans, even though it is a machine calling.
 1. The URL is wrong —it is pointing at a web page unrelated to OAuth2.0
 1. There's a proxy server in the way trying to return helpful instructions.
 
+<<<<<<< HEAD
 ### `java.io.IOException: The ownership on the staging directory /tmp/hadoop-yarn/staging/user1/.staging is not as expected. It is owned by <principal_id>. The directory must be owned by the submitter user1 or user1`
 
 When using [Azure Managed Identities](https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview), the files/directories in ADLS Gen2 by default will be owned by the service principal object id i.e. principal ID & submitting jobs as the local OS user 'user1' results in the above exception.
@@ -1148,6 +1299,8 @@ The fix is to mimic the ownership to the local OS user, by adding the below prop
 
 Once the above properties are configured, `hdfs dfs -ls abfs://container1@abfswales1.dfs.core.windows.net/` shows the ADLS Gen2 files/directories are now owned by 'user1'.
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 ## <a name="testing"></a> Testing ABFS
 
 See the relevant section in [Testing Azure](testing_azure.html).

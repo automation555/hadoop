@@ -184,7 +184,23 @@ static int is_valid_ports_mapping(const char *ports_mapping) {
   const char *regex_str = "^:[0-9]+|^[0-9]+:[0-9]+|^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.)"
                           "{3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):[0-9]+:[0-9]+$";
   // execute_regex_match return 0 is matched success
+<<<<<<< HEAD
   return execute_regex_match(regex_str, ports_mapping) == 0;
+=======
+  return execute_regex_match(regex_str, volume_name) == 0;
+}
+
+static int is_valid_ports_mapping(const char *ports_mapping) {
+  const char *regex_str = "^:[0-9]+|^[0-9]+:[0-9]+|^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.)"
+                          "{3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):[0-9]+:[0-9]+$";
+  // execute_regex_match return 0 is matched success
+  return execute_regex_match(regex_str, ports_mapping) == 0;
+}
+
+static int is_volume_name_matched_by_regex(const char* requested, const char* pattern) {
+  // execute_regex_match return 0 is matched success
+  return is_volume_name(requested) && (execute_regex_match(pattern + sizeof("regex:"), requested) == 0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }
 
 static int add_param_to_command_if_allowed(const struct configuration *command_config,
@@ -307,6 +323,67 @@ static int validate_container_name(const char *container_name) {
   return INVALID_DOCKER_CONTAINER_NAME;
 }
 
+<<<<<<< HEAD
+=======
+const char *get_docker_error_message(const int error_code) {
+
+  switch (error_code) {
+    case INVALID_COMMAND_FILE:
+      return "Invalid command file passed";
+    case INCORRECT_COMMAND:
+      return "Incorrect command";
+    case BUFFER_TOO_SMALL:
+      return "Command buffer too small";
+    case INVALID_DOCKER_CONTAINER_NAME:
+      return "Invalid docker container name";
+    case INVALID_DOCKER_IMAGE_NAME:
+      return "Invalid docker image name";
+    case INVALID_DOCKER_USER_NAME:
+      return "Invalid docker user name";
+    case INVALID_DOCKER_INSPECT_FORMAT:
+      return "Invalid docker inspect format";
+    case UNKNOWN_DOCKER_COMMAND:
+      return "Unknown docker command";
+    case INVALID_DOCKER_NETWORK:
+      return "Invalid docker network";
+    case INVALID_DOCKER_PORTS_MAPPING:
+      return "Invalid docker ports mapping";
+    case INVALID_DOCKER_CAPABILITY:
+      return "Invalid docker capability";
+    case PRIVILEGED_CONTAINERS_DISABLED:
+      return "Privileged containers are disabled";
+    case INVALID_DOCKER_MOUNT:
+      return "Invalid docker mount";
+    case INVALID_DOCKER_RO_MOUNT:
+      return "Invalid docker read-only mount";
+    case INVALID_DOCKER_RW_MOUNT:
+      return "Invalid docker read-write mount";
+    case MOUNT_ACCESS_ERROR:
+      return "Mount access error";
+    case INVALID_DOCKER_DEVICE:
+      return "Invalid docker device";
+    case INVALID_DOCKER_VOLUME_DRIVER:
+      return "Invalid docker volume-driver";
+    case INVALID_DOCKER_VOLUME_NAME:
+      return "Invalid docker volume name";
+    case INVALID_DOCKER_VOLUME_COMMAND:
+      return "Invalid docker volume command";
+    case PID_HOST_DISABLED:
+      return "Host pid namespace is disabled";
+    case INVALID_PID_NAMESPACE:
+      return "Invalid pid namespace";
+    case INVALID_DOCKER_IMAGE_TRUST:
+      return "Docker image is not trusted";
+    case INVALID_DOCKER_TMPFS_MOUNT:
+      return "Invalid docker tmpfs mount";
+    case INVALID_DOCKER_RUNTIME:
+      return "Invalid docker runtime";
+    default:
+      return "Unknown error";
+  }
+}
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 int get_max_retries(const struct configuration *conf) {
   int retries = 10;
   char *max_retries = get_configuration_value(DOCKER_INSPECT_MAX_RETRIES_KEY,
@@ -915,6 +992,7 @@ static int set_runtime(const struct configuration *command_config,
   return ret;
 }
 
+<<<<<<< HEAD
 int is_service_mode_enabled(const struct configuration *command_config,
                             const struct configuration *executor_cfg, args *args) {
     int ret = 0;
@@ -931,6 +1009,8 @@ int is_service_mode_enabled(const struct configuration *command_config,
     return ret;
 }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 static int add_ports_mapping_to_command(const struct configuration *command_config, args *args) {
   int i = 0, ret = 0;
   char *network_type = (char*) malloc(128);
@@ -1683,6 +1763,14 @@ int get_docker_run_command(const char *command_file, const struct configuration 
   }
 
   ret = set_runtime(&command_config, conf, args);
+<<<<<<< HEAD
+=======
+  if (ret != 0) {
+    goto free_and_exit;
+  }
+
+  ret = set_hostname(&command_config, args);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   if (ret != 0) {
     goto free_and_exit;
   }

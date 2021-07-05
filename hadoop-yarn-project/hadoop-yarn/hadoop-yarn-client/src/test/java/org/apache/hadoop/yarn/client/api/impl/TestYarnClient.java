@@ -574,9 +574,15 @@ public class TestYarnClient extends ParameterizedSchedulerTestBase {
     List<ContainerReport> reports = client.getContainers(appAttemptId);
     Assert.assertNotNull(reports);
     Assert.assertTrue(reports.size() == 2);
+<<<<<<< HEAD
     assertThat(reports.get(0).getContainerId()).isEqualTo(
         (ContainerId.newContainerId(appAttemptId, 1)));
     assertThat(reports.get(1).getContainerId()).isEqualTo(
+=======
+    Assert.assertEquals(reports.get(0).getContainerId(),
+        (ContainerId.newContainerId(appAttemptId, 1)));
+    Assert.assertEquals(reports.get(1).getContainerId(),
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         (ContainerId.newContainerId(appAttemptId, 2)));
 
     //Only 2 running containers from RM are present when AHS throws exception

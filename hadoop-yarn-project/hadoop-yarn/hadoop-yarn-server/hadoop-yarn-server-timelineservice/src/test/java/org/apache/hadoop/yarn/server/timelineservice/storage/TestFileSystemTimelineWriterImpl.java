@@ -146,6 +146,7 @@ public class TestFileSystemTimelineWriterImpl {
     }
   }
 
+<<<<<<< HEAD
   @Test
   public void testWriteMultipleEntities() throws Exception {
     String id = "appId";
@@ -265,6 +266,8 @@ public class TestFileSystemTimelineWriterImpl {
     }
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private List<String> readFromFile(FileSystem fs, Path path)
           throws IOException {
     BufferedReader br = new BufferedReader(

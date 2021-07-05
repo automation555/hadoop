@@ -160,7 +160,10 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   private NMNodeAttributesHandler nodeAttributesHandler;
   private NodeLabelsProvider nodeLabelsProvider;
   private NodeAttributesProvider nodeAttributesProvider;
+<<<<<<< HEAD
   private long tokenSequenceNo;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private boolean timelineServiceV2Enabled;
 
   public NodeStatusUpdaterImpl(Context context, Dispatcher dispatcher,
@@ -256,7 +259,10 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
           YarnConfiguration.DEFAULT_LOG_AGGREGATION_ENABLED);
     this.timelineServiceV2Enabled = YarnConfiguration.
         timelineServiceV2Enabled(conf);
+<<<<<<< HEAD
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override
@@ -396,7 +402,11 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       RegisterNodeManagerRequest request =
           RegisterNodeManagerRequest.newInstance(nodeId, httpPort, totalResource,
               nodeManagerVersionId, containerReports, getRunningApplications(),
+<<<<<<< HEAD
               nodeLabels, physicalResource, nodeAttributes, nodeStatus);
+=======
+              nodeLabels, physicalResource, nodeAttributes);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       if (containerReports != null && !containerReports.isEmpty()) {
         LOG.info("Registering with RM using containers :" + containerReports);
@@ -1131,8 +1141,15 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         NodeHeartbeatResponse response) {
       if (isValueSented()) {
         if (response.getAreNodeAttributesAcceptedByRM()) {
+<<<<<<< HEAD
           LOG.debug("Node attributes {{}} were Accepted by RM ",
               getPreviousValue());
+=======
+          if(LOG.isDebugEnabled()){
+            LOG.debug("Node attributes {" + getPreviousValue()
+                + "} were Accepted by RM ");
+          }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         } else {
           // case where updated node attributes from NodeAttributesProvider
           // is sent to RM and RM rejected the attributes
@@ -1282,8 +1299,16 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
         NodeHeartbeatResponse response) {
       if (isValueSented()) {
         if (response.getAreNodeLabelsAcceptedByRM()) {
+<<<<<<< HEAD
           LOG.debug("Node Labels {{}} were Accepted by RM",
               StringUtils.join(",", getPreviousValue()));
+=======
+          if(LOG.isDebugEnabled()){
+            LOG.debug(
+                "Node Labels {" + StringUtils.join(",", getPreviousValue())
+                    + "} were Accepted by RM ");
+          }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         } else {
           // case where updated labels from NodeLabelsProvider is sent to RM and
           // RM rejected the labels

@@ -35,9 +35,65 @@ ENV DEBCONF_TERSE true
 ######
 # Platform package dependency resolver
 ######
+<<<<<<< HEAD
 COPY pkg-resolver pkg-resolver
 RUN chmod a+x pkg-resolver/*.sh pkg-resolver/*.py \
     && chmod a+r pkg-resolver/*.json
+=======
+# hadolint ignore=DL3008
+RUN apt-get -q update \
+    && apt-get -q install -y --no-install-recommends \
+        apt-utils \
+        build-essential \
+        bzip2 \
+        clang \
+        curl \
+        doxygen \
+        fuse \
+        g++ \
+        gcc \
+        git \
+        gnupg-agent \
+        libbz2-dev \
+        libcurl4-openssl-dev \
+        libfuse-dev \
+        libprotobuf-dev \
+        libprotoc-dev \
+        libsasl2-dev \
+        libsnappy-dev \
+        libssl-dev \
+        libtool \
+        libzstd1-dev \
+        locales \
+        make \
+        pinentry-curses \
+        pkg-config \
+        python \
+        python2.7 \
+        python-pip \
+        python-pkg-resources \
+        python-setuptools \
+        python-wheel \
+        rsync \
+        software-properties-common \
+        snappy \
+        sudo \
+        valgrind \
+        zlib1g-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+
+#######
+# OpenJDK 8
+#######
+# hadolint ignore=DL3008
+RUN apt-get -q update \
+    && apt-get -q install -y --no-install-recommends openjdk-8-jdk libbcprov-java \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 ######
 # Install packages from apt

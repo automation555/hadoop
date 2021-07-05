@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.impl.ChangeDetectionPolicy;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.s3a.statistics.S3AStatisticsContext;
 import org.apache.hadoop.fs.store.audit.AuditSpan;
 
@@ -30,6 +31,14 @@ import javax.annotation.Nullable;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkNotNull;
+=======
+
+import javax.annotation.Nullable;
+
+import com.google.common.base.Preconditions;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * Read-specific operation context struct.
@@ -56,14 +65,18 @@ public class S3AReadOpContext extends S3AOpContext {
    */
   private final long readahead;
 
+<<<<<<< HEAD
   private final AuditSpan auditSpan;
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Instantiate.
    * @param path path of read
    * @param isS3GuardEnabled true iff S3Guard is enabled.
    * @param invoker invoker for normal retries.
    * @param s3guardInvoker S3Guard-specific retry invoker.
+<<<<<<< HEAD
    * @param stats Fileystem statistics (may be null)
    * @param instrumentation statistics context
    * @param dstFileStatus target file status
@@ -71,11 +84,20 @@ public class S3AReadOpContext extends S3AOpContext {
    * @param changeDetectionPolicy change detection policy.
    * @param readahead readahead for GET operations/skip, etc.
    * @param auditSpan active audit
+=======
+   * @param stats statistics (may be null)
+   * @param instrumentation FS instrumentation
+   * @param dstFileStatus target file status
+   * @param inputPolicy the input policy
+   * @param readahead readahead for GET operations/skip, etc.
+   * @param changeDetectionPolicy change detection policy.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    */
   public S3AReadOpContext(
       final Path path,
       boolean isS3GuardEnabled,
       Invoker invoker,
+<<<<<<< HEAD
       @Nullable Invoker s3guardInvoker,
       @Nullable FileSystem.Statistics stats,
       S3AStatisticsContext instrumentation,
@@ -89,6 +111,18 @@ public class S3AReadOpContext extends S3AOpContext {
         dstFileStatus);
     this.path = checkNotNull(path);
     this.auditSpan = auditSpan;
+=======
+      Invoker s3guardInvoker,
+      @Nullable FileSystem.Statistics stats,
+      S3AInstrumentation instrumentation,
+      FileStatus dstFileStatus,
+      S3AInputPolicy inputPolicy,
+      ChangeDetectionPolicy changeDetectionPolicy,
+      final long readahead) {
+    super(isS3GuardEnabled, invoker, s3guardInvoker, stats, instrumentation,
+        dstFileStatus);
+    this.path = checkNotNull(path);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Preconditions.checkArgument(readahead >= 0,
         "invalid readahead %d", readahead);
     this.inputPolicy = checkNotNull(inputPolicy);
@@ -139,6 +173,7 @@ public class S3AReadOpContext extends S3AOpContext {
     return readahead;
   }
 
+<<<<<<< HEAD
   /**
    * Get the audit which was active when the file was opened.
    * @return active span
@@ -147,6 +182,8 @@ public class S3AReadOpContext extends S3AOpContext {
     return auditSpan;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(

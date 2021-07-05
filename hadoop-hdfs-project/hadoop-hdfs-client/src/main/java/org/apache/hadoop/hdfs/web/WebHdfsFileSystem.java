@@ -76,9 +76,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.GlobalStorageStatistics.StorageStatisticsProvider;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.MultipartUploaderBuilder;
 import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.fs.PathCapabilities;
+=======
+import org.apache.hadoop.fs.QuotaUsage;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.impl.FileSystemMultipartUploaderBuilder;
@@ -155,7 +159,10 @@ public class WebHdfsFileSystem extends FileSystem
       + "/v" + VERSION;
   public static final String EZ_HEADER = "X-Hadoop-Accept-EZ";
   public static final String FEFINFO_HEADER = "X-Hadoop-feInfo";
+<<<<<<< HEAD
   public static final String DFS_HTTP_POLICY_KEY = "dfs.http.policy";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   /**
    * Default connection factory may be overridden in tests to use smaller
@@ -185,7 +192,10 @@ public class WebHdfsFileSystem extends FileSystem
 
   private DFSOpsCountStatistics storageStatistics;
   private KeyProvider testProvider;
+<<<<<<< HEAD
   private boolean isTLSKrb;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   /**
    * Return the protocol scheme for the FileSystem.
@@ -1354,6 +1364,48 @@ public class WebHdfsFileSystem extends FileSystem
     new FsPathRunner(op, p).run();
   }
 
+  public void enableECPolicy(String policyName) throws IOException {
+    statistics.incrementWriteOps(1);
+    storageStatistics.incrementOpCounter(OpType.ENABLE_EC_POLICY);
+    final HttpOpParam.Op op = PutOpParam.Op.ENABLEECPOLICY;
+    new FsPathRunner(op, null, new ECPolicyParam(policyName)).run();
+  }
+
+  public void disableECPolicy(String policyName) throws IOException {
+    statistics.incrementWriteOps(1);
+    storageStatistics.incrementOpCounter(OpType.DISABLE_EC_POLICY);
+    final HttpOpParam.Op op = PutOpParam.Op.DISABLEECPOLICY;
+    new FsPathRunner(op, null, new ECPolicyParam(policyName)).run();
+  }
+
+  public void setErasureCodingPolicy(Path p, String policyName)
+      throws IOException {
+    statistics.incrementWriteOps(1);
+    storageStatistics.incrementOpCounter(OpType.SET_EC_POLICY);
+    final HttpOpParam.Op op = PutOpParam.Op.SETECPOLICY;
+    new FsPathRunner(op, p, new ECPolicyParam(policyName)).run();
+  }
+
+  public void unsetErasureCodingPolicy(Path p) throws IOException {
+    statistics.incrementWriteOps(1);
+    storageStatistics.incrementOpCounter(OpType.UNSET_EC_POLICY);
+    final HttpOpParam.Op op = PostOpParam.Op.UNSETECPOLICY;
+    new FsPathRunner(op, p).run();
+  }
+
+  public ErasureCodingPolicy getErasureCodingPolicy(Path p)
+      throws IOException {
+    statistics.incrementReadOps(1);
+    storageStatistics.incrementOpCounter(OpType.GET_EC_POLICY);
+    final HttpOpParam.Op op =GetOpParam.Op.GETECPOLICY;
+    return new FsPathResponseRunner<ErasureCodingPolicy>(op, p) {
+      @Override
+      ErasureCodingPolicy decodeResponse(Map<?, ?> json) throws IOException {
+        return JsonUtilClient.toECPolicy((Map<?, ?>) json);
+      }
+    }.run();
+  }
+
   @Override
   public void satisfyStoragePolicy(final Path p) throws IOException {
     statistics.incrementWriteOps(1);
@@ -1929,6 +1981,7 @@ public class WebHdfsFileSystem extends FileSystem
   }
 
   @Override
+<<<<<<< HEAD
   public void setQuota(Path p, final long namespaceQuota,
       final long storagespaceQuota) throws IOException {
     // sanity check
@@ -1971,6 +2024,8 @@ public class WebHdfsFileSystem extends FileSystem
   }
 
   @Override
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public MD5MD5CRC32FileChecksum getFileChecksum(final Path p
   ) throws IOException {
     statistics.incrementReadOps(1);
@@ -2137,6 +2192,7 @@ public class WebHdfsFileSystem extends FileSystem
     testProvider = kp;
   }
 
+<<<<<<< HEAD
   /**
    * HDFS client capabilities.
    * Uses {@link DfsPathCapabilities} to keep in sync with HDFS.
@@ -2161,6 +2217,8 @@ public class WebHdfsFileSystem extends FileSystem
     return new FileSystemMultipartUploaderBuilder(this, basePath);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * This class is used for opening, reading, and seeking files while using the
    * WebHdfsFileSystem. This class will invoke the retry policy when performing

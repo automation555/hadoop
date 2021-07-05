@@ -42,14 +42,22 @@ public class TestLogWebService {
 
   private HttpServletRequest request;
   private LogWebServiceTest logWebService;
+<<<<<<< HEAD
+=======
+  private static TimelineEntity entity;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private ApplicationId appId;
   private ContainerId cId;
   private String user = "user1";
   private Map<String, TimelineEntity> entities;
   private String nodeHttpAddress = "localhost:0";
 
+<<<<<<< HEAD
   @Before
   public void setup() throws Exception {
+=======
+  @Before public void setup() throws Exception {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     appId = ApplicationId.fromString("application_1518143905142_509690");
     cId =
         ContainerId.fromString("container_e138_1518143905142_509690_01_000001");
@@ -62,26 +70,43 @@ public class TestLogWebService {
 
   }
 
+<<<<<<< HEAD
   @Test
   public void testGetApp() {
     BasicAppInfo app =
+=======
+  @Test public void testGetApp() {
+
+    LogWebService.AppInfo app =
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         logWebService.getApp(request, appId.toString(), null);
     Assert.assertEquals("RUNNING", app.getAppState().toString());
     Assert.assertEquals(user, app.getUser());
   }
 
+<<<<<<< HEAD
   @Test
   public void testGetContainer() {
     String address = logWebService
         .getNodeHttpAddress(request, appId.toString(), null, cId.toString(),
             null);
     Assert.assertEquals(this.nodeHttpAddress, address);
+=======
+  @Test public void testGetContainer() {
+    LogWebService.ContainerInfo container = logWebService
+        .getContainer(request, appId.toString(), cId.toString(), null);
+    Assert.assertEquals(nodeHttpAddress, container.getNodeHttpAddress());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   class LogWebServiceTest extends LogWebService {
 
+<<<<<<< HEAD
     @Override
     protected TimelineEntity getEntity(String path,
+=======
+    @Override protected TimelineEntity getEntity(String path,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         MultivaluedMap<String, String> params) throws IOException {
       if (path.endsWith(cId.toString())) {
         return entities.get(cId.toString());

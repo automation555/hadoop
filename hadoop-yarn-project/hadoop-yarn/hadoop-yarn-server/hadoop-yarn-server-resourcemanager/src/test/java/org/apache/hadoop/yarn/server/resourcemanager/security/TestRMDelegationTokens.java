@@ -26,7 +26,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+<<<<<<< HEAD
 import java.util.function.Supplier;
+=======
+import com.google.common.base.Supplier;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -112,8 +116,23 @@ public class TestRMDelegationTokens {
 
     RMDelegationTokenSecretManager dtSecretManager =
         rm1.getRMContext().getRMDelegationTokenSecretManager();
+<<<<<<< HEAD
 
     assertMasterKeysAreSaved(rmDTMasterKeyState, dtSecretManager);
+=======
+    // assert all master keys are saved
+    dtSecretManager.getAllMasterKeys().forEach(managerKey -> {
+      int keyId = managerKey.getKeyId();
+      boolean found = false;
+      for (DelegationKey stateKey: rmDTMasterKeyState) {
+        if (stateKey.getKeyId() == keyId) {
+          found = true;
+          break;
+        }
+      }
+      Assert.assertTrue("Master key not found: " + keyId, found);
+    });
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // request to generate a RMDelegationToken
     GetDelegationTokenRequest request = mock(GetDelegationTokenRequest.class);

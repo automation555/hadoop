@@ -213,6 +213,7 @@ public final class ErasureCodingPolicyManager {
         .toArray(new ErasureCodingPolicyInfo[0]);
   }
 
+<<<<<<< HEAD
   public ErasureCodingPolicy[] getCopyOfEnabledPolicies() {
     ErasureCodingPolicy[] copy;
     synchronized (this) {
@@ -221,6 +222,8 @@ public final class ErasureCodingPolicyManager {
     return copy;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Get a {@link ErasureCodingPolicy} by policy ID, including system policy
    * and user defined policy.
@@ -343,7 +346,10 @@ public final class ErasureCodingPolicyManager {
         policiesByName.values().toArray(new ErasureCodingPolicyInfo[0]);
     allPersistedPolicies.put(policy.getId(),
         new ErasureCodingPolicyInfo(policy));
+<<<<<<< HEAD
     LOG.info("Added erasure coding policy " + policy);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return policy;
   }
 
@@ -415,7 +421,11 @@ public final class ErasureCodingPolicyManager {
       enabledPolicies =
           enabledPoliciesByName.values().toArray(new ErasureCodingPolicy[0]);
       info.setState(ErasureCodingPolicyState.DISABLED);
+<<<<<<< HEAD
       LOG.info("Disabled the erasure coding policy " + name);
+=======
+      LOG.info("Disable the erasure coding policy " + name);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       allPersistedPolicies.put(info.getPolicy().getId(),
           createPolicyInfo(info.getPolicy(),
               ErasureCodingPolicyState.DISABLED));
@@ -449,7 +459,11 @@ public final class ErasureCodingPolicyManager {
         enabledPoliciesByName.values().toArray(new ErasureCodingPolicy[0]);
     allPersistedPolicies.put(ecPolicy.getId(),
         createPolicyInfo(info.getPolicy(), ErasureCodingPolicyState.ENABLED));
+<<<<<<< HEAD
     LOG.info("Enabled the erasure coding policy " + name);
+=======
+    LOG.info("Enable the erasure coding policy " + name);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return true;
   }
 

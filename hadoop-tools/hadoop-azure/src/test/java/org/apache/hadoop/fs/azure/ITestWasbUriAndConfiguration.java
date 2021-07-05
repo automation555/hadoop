@@ -19,7 +19,10 @@
 package org.apache.hadoop.fs.azure;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
+<<<<<<< HEAD
 import static org.apache.hadoop.fs.azure.NativeAzureFileSystem.RETURN_URI_AS_CANONICAL_SERVICE_NAME_PROPERTY_NAME;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeNotNull;

@@ -109,11 +109,19 @@ public class StripedBlockUtil {
     @Override
     public String toString() {
       final StringBuilder sb = new StringBuilder();
+<<<<<<< HEAD
       sb.append("bytesRead=").append(bytesRead)
           .append(',')
           .append("isShortCircuit=").append(isShortCircuit)
           .append(',')
           .append("networkDistance=").append(networkDistance);
+=======
+      sb.append("bytesRead=").append(bytesRead);
+      sb.append(',');
+      sb.append("isShortCircuit=").append(isShortCircuit);
+      sb.append(',');
+      sb.append("networkDistance=").append(networkDistance);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return sb.toString();
     }
   }

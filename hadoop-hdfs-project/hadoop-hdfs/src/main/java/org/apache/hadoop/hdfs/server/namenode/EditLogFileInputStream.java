@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.protobuf.ByteString;
+=======
+import com.google.protobuf.ByteString;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;

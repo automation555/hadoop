@@ -1120,6 +1120,7 @@ public class TestCapacitySchedulerAsyncScheduling {
     SchedulerNode sn2 = cs.getSchedulerNode(nm2.getNodeId());
 
     // launch app1-am on nm1
+<<<<<<< HEAD
     MockRMAppSubmissionData data =
         MockRMAppSubmissionData.Builder.createWithMemory(1 * GB, rm)
         .withAppName("app1")
@@ -1134,6 +1135,10 @@ public class TestCapacitySchedulerAsyncScheduling {
         .withKeepContainers(true)
         .build();
     RMApp app1 = MockRMAppSubmitter.submit(rm, data);
+=======
+    RMApp app1 = rm.submitApp(1 * GB, "app1", "user", null, false, "default",
+        YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS, null, null, true, true);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm, nm1);
 
     // app2 asks 1 * 1G container

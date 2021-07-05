@@ -42,8 +42,11 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileg
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourceHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourceHandlerChain;
+<<<<<<< HEAD
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.deviceframework.*;
 import org.apache.hadoop.yarn.server.nodemanager.health.NodeHealthCheckerService;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.TestResourceUtils;
@@ -61,10 +64,11 @@ import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.spy;
+
+import java.io.IOException;
 
 public class TestResourcePluginManager extends NodeManagerTestBase {
   private NodeManager nm;
@@ -223,6 +227,10 @@ public class TestResourcePluginManager extends NodeManagerTestBase {
         rpm.getNameToPlugins().get("resource1")
             .getNodeResourceHandlerInstance();
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     verify(nodeResourceUpdaterPlugin)
         .updateConfiguredResource(any(Resource.class));
   }
@@ -231,7 +239,12 @@ public class TestResourcePluginManager extends NodeManagerTestBase {
    * Make sure ResourcePluginManager is used to initialize ResourceHandlerChain.
    */
   @Test(timeout = 30000)
+<<<<<<< HEAD
   public void testLinuxContainerExecutorWithResourcePluginsEnabled() {
+=======
+  public void testLinuxContainerExecutorWithResourcePluginsEnabled()
+      throws IOException {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final ResourcePluginManager rpm = stubResourcePluginmanager();
     final LinuxContainerExecutor lce = new MyLCE();
 

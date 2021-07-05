@@ -44,8 +44,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+<<<<<<< HEAD
 import java.util.Set;
 import java.util.TreeSet;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -1181,6 +1184,7 @@ public class TestBPOfferService {
       bpos.stop();
     }
   }
+<<<<<<< HEAD
 
   @Test(timeout = 15000)
   public void testCommandProcessingThread() throws Exception {
@@ -1231,4 +1235,6 @@ public class TestBPOfferService {
       }
     }
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

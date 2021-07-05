@@ -476,6 +476,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         LOG.error(errorMsg);
         throw new IOException(errorMsg);
       }
+<<<<<<< HEAD
       // Check if there is same storage type on the mount.
       // Only useful when same disk tiering is turned on.
       FsVolumeImpl volumeImpl = (FsVolumeImpl) ref.getVolume();
@@ -491,6 +492,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         LOG.error(errorMsg);
         throw new IOException(errorMsg);
       }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       volumeMap.mergeAll(replicaMap);
       storageMap.put(sd.getStorageUuid(),
           new DatanodeStorage(sd.getStorageUuid(),
@@ -851,7 +854,11 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       long seekOffset) throws IOException {
 
     ReplicaInfo info;
+<<<<<<< HEAD
     try (AutoCloseableLock lock = datasetReadLock.acquire()) {
+=======
+    try (AutoCloseableLock lock = datasetLock.acquire()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       info = volumeMap.get(b.getBlockPoolId(), b.getLocalBlock());
     }
 
@@ -860,7 +867,13 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       datanode.getMetrics().incrRamDiskBlocksReadHits();
     }
 
+<<<<<<< HEAD
     if (info == null) {
+=======
+    if (info != null) {
+      return info.getDataInputStream(seekOffset);
+    } else {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw new IOException("No data exists for block " + b);
     }
     return getBlockInputStreamWithCheckingPmemCache(info, b, seekOffset);
@@ -3083,7 +3096,11 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
       throws IOException {
     LOG.info("Adding block pool " + bpid);
     AddBlockPoolException volumeExceptions = new AddBlockPoolException();
+<<<<<<< HEAD
     try (AutoCloseableLock lock = datasetWriteLock.acquire()) {
+=======
+    try (AutoCloseableLock lock = datasetLock.acquire()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       try {
         volumes.addBlockPool(bpid, conf);
       } catch (AddBlockPoolException e) {
@@ -3099,6 +3116,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
     if (volumeExceptions.hasExceptions()) {
       throw volumeExceptions;
     }
+<<<<<<< HEAD
     // For test use only.
     if (!blockPoolId.isEmpty()) {
       bpid = blockPoolId;
@@ -3109,6 +3127,8 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   @VisibleForTesting
   public static void setBlockPoolId(String bpid) {
     blockPoolId = bpid;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override

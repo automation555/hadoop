@@ -14,6 +14,7 @@
 
 
 <!--  ============================================================= -->
+<<<<<<< HEAD
 <!--  INTERFACE: MultipartUploader -->
 <!--  ============================================================= -->
 
@@ -22,6 +23,16 @@
 <!-- MACRO{toc|fromDepth=1|toDepth=2} -->
 
 The `MultipartUploader` can upload a file
+=======
+<!--  CLASS: MultipartUploader -->
+<!--  ============================================================= -->
+
+# class `org.apache.hadoop.fs.MultipartUploader`
+
+<!-- MACRO{toc|fromDepth=1|toDepth=2} -->
+
+The abstract `MultipartUploader` class is the original class to upload a file
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 using multiple parts to Hadoop-supported filesystems. The benefits of a
 multipart upload is that the file can be uploaded from multiple clients or
 processes in parallel and the results will not be visible to other clients until
@@ -30,12 +41,22 @@ the `complete` function is called.
 When implemented by an object store, uploaded data may incur storage charges,
 even before it is visible in the filesystems. Users of this API must be diligent
 and always perform best-effort attempts to complete or abort the upload.
+<<<<<<< HEAD
 The `abortUploadsUnderPath(path)` operation can help here.
 
 ## Invariants
 
 All the requirements of a valid `MultipartUploader` are considered implicit
 econditions and postconditions:
+=======
+
+## Invariants
+
+All the requirements of a valid MultipartUploader are considered implicit
+econditions and postconditions:
+all operations on a valid MultipartUploader MUST result in a new
+MultipartUploader that is also valid.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 The operations of a single multipart upload may take place across different
 instance of a multipart uploader, across different processes and hosts.
@@ -44,6 +65,7 @@ It is therefore a requirement that:
 1. All state needed to upload a part, complete an upload or abort an upload
 must be contained within or retrievable from an upload handle.
 
+<<<<<<< HEAD
 1. That handle MUST be serializable; it MUST be deserializable to different
 processes executing the exact same version of Hadoop.
 
@@ -60,12 +82,22 @@ until the upload may complete.
 1. It is not an error if a single multipart uploader instance initiates
 or completes multiple uploads files to the same destination sequentially,
 irrespective of whether or not the store supports concurrent uploads.
+=======
+1. If an upload handle is marshalled to another process, then, if the
+receiving process has the correct permissions, it may participate in the
+upload, by uploading one or more parts, by completing an upload, and/or by
+aborting the upload.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 ## Concurrency
 
 Multiple processes may upload parts of a multipart upload simultaneously.
 
+<<<<<<< HEAD
 If a call is made to `startUpload(path)` to a destination where an active
+=======
+If a call is made to `initialize(path)` to a destination where an active
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 upload is in progress, implementations MUST perform one of the two operations.
 
 * Reject the call as a duplicate.
@@ -81,6 +113,7 @@ the in-progress upload, if it has not completed, must not be included in
 the final file, in whole or in part. Implementations SHOULD raise an error
 in the `putPart()` operation.
 
+<<<<<<< HEAD
 # Serialization Compatibility
 
 Users MUST NOT expect that serialized PathHandle versions are compatible across
@@ -92,6 +125,11 @@ That is: all clients MUST use the exact same version of Hadoop.
 ## Model
 
 A FileSystem/FileContext which supports Multipart Uploads extends the existing model
+=======
+## Model
+
+A File System which supports Multipart Uploads extends the existing model
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 `(Directories, Files, Symlinks)` to one of `(Directories, Files, Symlinks, Uploads)`
 `Uploads` of type `Map[UploadHandle -> Map[PartHandle -> UploadPart]`.
 
@@ -131,6 +169,7 @@ However, if Part Handles are rapidly recycled, there is a risk that the nominall
 idempotent operation `abort(FS, uploadHandle)` could unintentionally cancel a
 successor operation which used the same Upload Handle.
 
+<<<<<<< HEAD
 ## Asynchronous API
 
 All operations return `CompletableFuture<>` types which must be
@@ -165,6 +204,13 @@ objects, update statistics, etc.
 ### `CompletableFuture<UploadHandle> startUpload(Path)`
 
 Starts a Multipart Upload, ultimately returning an `UploadHandle` for use in
+=======
+## State Changing Operations
+
+### `UploadHandle initialize(Path path)`
+
+Initialized a Multipart Upload, returning an upload handle for use in
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 subsequent operations.
 
 #### Preconditions
@@ -176,6 +222,7 @@ if exists(FS, path) and not isFile(FS, path) raise PathIsDirectoryException, IOE
 ```
 
 If a filesystem does not support concurrent uploads to a destination,
+<<<<<<< HEAD
 then the following precondition is added:
 
 ```python
@@ -185,6 +232,19 @@ if path in values(FS.Uploads) raise PathExistsException, IOException
 #### Postconditions
 
 Once the initialization operation completes, the filesystem state is updated with a new
+=======
+then the following precondition is added
+
+```python
+if path in values(FS.Uploads) raise PathExistsException, IOException
+
+```
+
+
+#### Postconditions
+
+The outcome of this operation is that the filesystem state is updated with a new
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 active upload, with a new handle, this handle being returned to the caller.
 
 ```python
@@ -193,10 +253,16 @@ FS' = FS where FS'.Uploads(handle') == {}
 result = handle'
 ```
 
+<<<<<<< HEAD
 ### `CompletableFuture<PartHandle> putPart(UploadHandle uploadHandle, int partNumber, Path filePath, InputStream inputStream, long lengthInBytes)`
 
 Upload a part for the specific multipart upload, eventually being returned an opaque part handle
 represting this part of the specified upload.
+=======
+### `PartHandle putPart(Path path, InputStream inputStream, int partNumber, UploadHandle uploadHandle, long lengthInBytes)`
+
+Upload a part for the multipart upload.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 #### Preconditions
 
@@ -217,12 +283,19 @@ FS' = FS where FS'.uploads(uploadHandle).parts(partHandle') == data'
 result = partHandle'
 ```
 
+<<<<<<< HEAD
 The data is stored in the filesystem, pending completion. It MUST NOT be visible at the destination path.
 It MAY be visible in a temporary path somewhere in the file system;
 This is implementation-specific and MUST NOT be relied upon.
 
 
 ### ` CompletableFuture<PathHandle> complete(UploadHandle uploadId, Path filePath, Map<Integer, PartHandle> handles)`
+=======
+The data is stored in the filesystem, pending completion.
+
+
+### `PathHandle complete(Path path, Map<Integer, PartHandle> parts, UploadHandle multipartUploadId)`
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 Complete the multipart upload.
 
@@ -237,6 +310,7 @@ uploadHandle in keys(FS.Uploads) else raise FileNotFoundException
 FS.Uploads(uploadHandle).path == path
 if exists(FS, path) and not isFile(FS, path) raise PathIsDirectoryException, IOException
 parts.size() > 0
+<<<<<<< HEAD
 forall k in keys(parts): k > 0
 forall k in keys(parts):
   not exists(k2 in keys(parts)) where (parts[k] == parts[k2])
@@ -254,6 +328,13 @@ if `putPart()` operations For this `uploadHandle` were performed But whose
 parts SHALL NOT be a part of the resulting file.
 
 The MultipartUploader MUST clean up any such outstanding entries.
+=======
+```
+
+If there are handles in the MPU which aren't included in the map, then the omitted
+parts will not be a part of the resulting file. It is up to the implementation
+of the MultipartUploader to make sure the leftover parts are cleaned up.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 In the case of backing stores that support directories (local filesystem, HDFS,
 etc), if, at the point of completion, there is now a directory at the
@@ -267,6 +348,7 @@ exists(FS', path') and result = PathHandle(path')
 FS' = FS where FS.Files(path) == UploadData' and not uploadHandle in keys(FS'.uploads)
 ```
 
+<<<<<<< HEAD
 The `PathHandle` is returned by the complete operation so subsequent operations
 will be able to identify that the data has not changed in the meantime.
 
@@ -275,6 +357,16 @@ parts in the map: part 1 is ahead of part 2, etc.
 
 
 ### `CompletableFuture<Void> abort(UploadHandle uploadId, Path filePath)`
+=======
+The PathHandle is returned by the complete operation so subsequent operations
+will be able to identify that the data has not changed in the meantime.
+
+The order of parts in the uploaded by file is that of the natural order of
+parts: part 1 is ahead of part 2, etc.
+
+
+### `void abort(Path path, UploadHandle multipartUploadId)`
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 Abort a multipart upload. The handle becomes invalid and not subject to reuse.
 
@@ -294,6 +386,7 @@ FS' = FS where not uploadHandle in keys(FS'.uploads)
 ```
 A subsequent call to `abort()` with the same handle will fail, unless
 the handle has been recycled.
+<<<<<<< HEAD
 
 ### `CompletableFuture<Integer> abortUploadsUnderPath(Path path)`
 
@@ -314,3 +407,5 @@ FS'.uploads forall upload in FS.uploads:
 return len(forall upload in FS.uploads:
                isDescendant(FS, path, upload.path))
 ```
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776

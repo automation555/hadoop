@@ -33,7 +33,10 @@ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.ResourceInformation;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.util.Times;
+<<<<<<< HEAD
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.util.StringHelper;
 
 @Public
@@ -131,9 +134,16 @@ public class AppInfo {
         }
       }
       aggregateResourceAllocation = StringHelper.getResourceSecondsString(
+<<<<<<< HEAD
           usageReport.getResourceSecondsMap());
       aggregatePreemptedResourceAllocation = StringHelper
         .getResourceSecondsString(usageReport.getPreemptedResourceSecondsMap());
+=======
+        app.getApplicationResourceUsageReport().getResourceSecondsMap());
+      aggregatePreemptedResourceAllocation = StringHelper
+        .getResourceSecondsString(app.getApplicationResourceUsageReport()
+          .getPreemptedResourceSecondsMap());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     progress = app.getProgress() * 100; // in percent
     if (app.getApplicationTags() != null && !app.getApplicationTags().isEmpty()) {

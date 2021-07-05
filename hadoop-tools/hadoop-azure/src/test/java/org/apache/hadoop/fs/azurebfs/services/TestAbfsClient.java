@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AzureBlobFileSystemExc
 import org.apache.hadoop.fs.azurebfs.oauth2.AccessTokenProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys;
+<<<<<<< HEAD
 import org.apache.hadoop.security.ssl.DelegatingSSLSocketFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +55,9 @@ import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_CLUSTER_TYPE;
 import static org.apache.hadoop.fs.azurebfs.constants.FileSystemConfigurations.DEFAULT_VALUE_UNKNOWN;
 import static org.apache.hadoop.fs.azurebfs.constants.TestConfigurationKeys.TEST_CONFIGURATION_FILE_NAME;
+=======
+import org.apache.hadoop.util.VersionInfo;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * Test useragent of abfs client.
@@ -111,11 +115,25 @@ public final class TestAbfsClient {
       sslProviderName = DelegatingSSLSocketFactory.getDefaultFactory()
           .getProviderName();
     }
+<<<<<<< HEAD
     return client.initializeUserAgent(config, sslProviderName);
   }
 
   @Test
   public void verifybBasicInfo() throws Exception {
+=======
+    String userAgent = client.initializeUserAgent(config, sslProviderName);
+    Pattern pattern = Pattern.compile(expectedPattern);
+    Assert.assertTrue("Incorrect User Agent String",
+        pattern.matcher(userAgent).matches());
+  }
+
+  @Test
+  public void verifyUnknownUserAgent() throws Exception {
+    String clientVersion = "Azure Blob FS/" + VersionInfo.getVersion();
+    String expectedUserAgentPattern = String.format(clientVersion
+        + " %s", "\\(JavaJRE ([^\\)]+)\\)");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Configuration configuration = new Configuration();
     configuration.addResource(TEST_CONFIGURATION_FILE_NAME);
     AbfsConfiguration abfsConfiguration = new AbfsConfiguration(configuration,
@@ -143,8 +161,15 @@ public final class TestAbfsClient {
   }
 
   @Test
+<<<<<<< HEAD
   public void verifyUserAgentPrefix()
       throws IOException, IllegalAccessException {
+=======
+  public void verifyUserAgent() throws Exception {
+    String clientVersion = "Azure Blob FS/" + VersionInfo.getVersion();
+    String expectedUserAgentPattern = String.format(clientVersion
+        + " %s", "\\(JavaJRE ([^\\)]+)\\) Partner Service");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Configuration configuration = new Configuration();
     configuration.addResource(TEST_CONFIGURATION_FILE_NAME);
     configuration.set(ConfigurationKeys.FS_AZURE_USER_AGENT_PREFIX_KEY, FS_AZURE_USER_AGENT_PREFIX);
@@ -169,7 +194,14 @@ public final class TestAbfsClient {
   }
 
   @Test
+<<<<<<< HEAD
   public void verifyUserAgentWithoutSSLProvider() throws Exception {
+=======
+  public void verifyUserAgentWithSSLProvider() throws Exception {
+    String clientVersion = "Azure Blob FS/" + VersionInfo.getVersion();
+    String expectedUserAgentPattern = String.format(clientVersion
+        + " %s", "\\(JavaJRE ([^\\)]+)\\) Partner Service");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Configuration configuration = new Configuration();
     configuration.addResource(TEST_CONFIGURATION_FILE_NAME);
     configuration.set(ConfigurationKeys.FS_AZURE_SSL_CHANNEL_MODE_KEY,

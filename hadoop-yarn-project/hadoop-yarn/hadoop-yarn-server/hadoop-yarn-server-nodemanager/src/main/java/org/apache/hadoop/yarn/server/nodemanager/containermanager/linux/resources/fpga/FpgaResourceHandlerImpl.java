@@ -59,12 +59,19 @@ public class FpgaResourceHandlerImpl implements ResourceHandler {
   private final String REQUEST_FPGA_IP_ID_KEY = "REQUESTED_FPGA_IP_ID";
 
   private final AbstractFpgaVendorPlugin vendorPlugin;
+<<<<<<< HEAD
 
   private final FpgaResourceAllocator allocator;
 
   private final CGroupsHandler cGroupsHandler;
 
   private final FpgaDiscoverer fpgaDiscoverer;
+=======
+
+  private final FpgaResourceAllocator allocator;
+
+  private final CGroupsHandler cGroupsHandler;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public static final String EXCLUDED_FPGAS_CLI_OPTION = "--excluded_fpgas";
   public static final String CONTAINER_ID_CLI_OPTION = "--container_id";

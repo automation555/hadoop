@@ -121,6 +121,7 @@
   </property>
 
   <property>
+<<<<<<< HEAD
     <description>
       Resource manager dispatcher thread cpu monitor sampling rate.
       Units are samples per minute.  This controls how often to sample
@@ -134,6 +135,8 @@
   </property>
 
   <property>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <description>The expiry interval for application master reporting.</description>
     <name>yarn.am.liveness-monitor.expiry-interval-ms</name>
     <value>600000</value>
@@ -4457,6 +4460,7 @@
     </description>
     <name>yarn.nodemanager.resource-plugins.fpga.allowed-fpga-devices</name>
     <value>auto</value>
+<<<<<<< HEAD
   </property>
 
   <property>
@@ -4484,6 +4488,8 @@
     </description>
     <name>yarn.nodemanager.resource-plugins.fpga.available-devices</name>
     <value></value>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   </property>
 
   <property>
@@ -4631,6 +4637,7 @@
     <value>org.apache.hadoop.yarn.server.resourcemanager.nodelabels.FileSystemNodeAttributeStore</value>
   </property>
 
+<<<<<<< HEAD
   <!-- CSI configuration -->
   <property>
     <description>
@@ -4691,6 +4698,8 @@
     <value>100</value>
   </property>
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <property>
     <description>
       Containers launcher implementation for determining how containers
@@ -4720,6 +4729,7 @@
     <value>60000</value>
   </property>
 
+<<<<<<< HEAD
   <property>
     <description>
       Comma-separated list of partitions. If a label P is in this list,
@@ -4779,4 +4789,6 @@
     <name>yarn.resourcemanager.application-tag-based-placement.force-lowercase</name>
     <value>true</value>
   </property>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 </configuration>

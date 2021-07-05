@@ -133,9 +133,18 @@ public class TestZKConfigurationStore extends
     assertNull(confStore.retrieve());
   }
 
+<<<<<<< HEAD
   @Test(expected = IllegalStateException.class)
   public void testGetConfigurationVersionOnSerializedNullData()
       throws Exception {
+=======
+    assertNull(confStore.retrieve().get(YarnConfiguration.RM_HOSTNAME));
+
+    // Create a new configuration store, and check for old configuration
+    confStore = createConfStore();
+    schedConf.set("key", "badVal");
+    // Should ignore passed-in scheduler configuration.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     confStore.initialize(conf, schedConf, rmContext);
     String confVersionPath = getZkPath("CONF_VERSION");
     ((ZKConfigurationStore) confStore).setZkData(confVersionPath, null);

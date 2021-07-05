@@ -97,6 +97,7 @@ public class KerberosAuthenticationHandler implements AuthenticationHandler {
    */
   public static final String RULE_MECHANISM = TYPE + ".name.rules.mechanism";
 
+<<<<<<< HEAD
   /**
    * Constant for the list of endpoints that skips Kerberos authentication.
    */
@@ -104,6 +105,8 @@ public class KerberosAuthenticationHandler implements AuthenticationHandler {
   static final String ENDPOINT_WHITELIST = TYPE + ".endpoint.whitelist";
   private static final Pattern ENDPOINT_PATTERN = Pattern.compile("^/[\\w]+");
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private String type;
   private String keytab;
   private GSSManager gssManager;
@@ -184,6 +187,7 @@ public class KerberosAuthenticationHandler implements AuthenticationHandler {
       if (ruleMechanism != null) {
         KerberosName.setRuleMechanism(ruleMechanism);
       }
+<<<<<<< HEAD
 
       final String whitelistStr = config.getProperty(ENDPOINT_WHITELIST, null);
       if (whitelistStr != null) {
@@ -200,6 +204,8 @@ public class KerberosAuthenticationHandler implements AuthenticationHandler {
         }
       }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       try {
         gssManager = Subject.doAs(serverSubject,
             new PrivilegedExceptionAction<GSSManager>() {

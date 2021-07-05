@@ -1493,6 +1493,7 @@ public class ServiceClient extends AppAdminClient implements SliderExitCodes,
     if ("file".equals(keytabURI.getScheme())) {
       LOG.info("Using a keytab from localhost: " + keytabURI);
     } else {
+<<<<<<< HEAD
       Path keytabPath = new Path(keytabURI);
       if (!fileSystem.getFileSystem().exists(keytabPath)) {
         LOG.warn(service.getName() + "'s keytab (principalName = "
@@ -1505,6 +1506,20 @@ public class ServiceClient extends AppAdminClient implements SliderExitCodes,
           service.getName()), keytabRes);
       LOG.info("Adding " + service.getName() + "'s keytab for "
           + "localization, uri = " + keytabPath);
+=======
+      Path keytabOnhdfs = new Path(keytabURI);
+      if (!fileSystem.getFileSystem().exists(keytabOnhdfs)) {
+        LOG.warn(service.getName() + "'s keytab (principalName = "
+            + principalName + ") doesn't exist at: " + keytabOnhdfs);
+        return;
+      }
+      LocalResource keytabRes = fileSystem.createAmResource(keytabOnhdfs,
+          LocalResourceType.FILE);
+      localResource.put(String.format(YarnServiceConstants.KEYTAB_LOCATION,
+          service.getName()), keytabRes);
+      LOG.info("Adding " + service.getName() + "'s keytab for "
+          + "localization, uri = " + keytabOnhdfs);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 
@@ -1597,6 +1612,7 @@ public class ServiceClient extends AppAdminClient implements SliderExitCodes,
       return appSpec;
     }
     appSpec.setId(currentAppId.toString());
+<<<<<<< HEAD
     ApplicationReport appReport = null;
     try {
       appReport = yarnClient.getApplicationReport(currentAppId);
@@ -1608,6 +1624,9 @@ public class ServiceClient extends AppAdminClient implements SliderExitCodes,
       LOG.warn("application ID {} is reported as null", currentAppId);
       return appSpec;
     }
+=======
+    ApplicationReport appReport = yarnClient.getApplicationReport(currentAppId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     appSpec.setState(convertState(appReport.getYarnApplicationState()));
     ApplicationTimeout lifetime =
         appReport.getApplicationTimeouts().get(ApplicationTimeoutType.LIFETIME);

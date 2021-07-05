@@ -20,6 +20,8 @@ package org.apache.hadoop.ipc;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+import java.io.IOException;
+
 /**
  * Thrown by a remote ObserverNode indicating the operation has failed and the
  * client should retry active namenode directly (instead of retry other
@@ -27,7 +29,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class ObserverRetryOnActiveException extends StandbyException {
+public class ObserverRetryOnActiveException extends IOException {
   static final long serialVersionUID = 1L;
   public ObserverRetryOnActiveException(String msg) {
     super(msg);

@@ -171,6 +171,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
     if (this.usage != null) {
       reserved = new ReservedSpaceCalculator.Builder(conf)
           .setUsage(this.usage).setStorageType(storageType).build();
+<<<<<<< HEAD
       boolean fixedSizeVolume = conf.getBoolean(
           DFSConfigKeys.DFS_DATANODE_FIXED_VOLUME_SIZE_KEY,
           DFSConfigKeys.DFS_DATANODE_FIXED_VOLUME_SIZE_DEFAULT);
@@ -181,6 +182,11 @@ public class FsVolumeImpl implements FsVolumeSpi {
       reserved = null;
       LOG.warn("Setting reserved to null as usage is null");
       cachedCapacity = -1;
+=======
+    } else {
+      reserved = null;
+      LOG.warn("Setting reserved to null as usage is null");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     if (currentDir != null) {
       File parent = currentDir.getParentFile();
@@ -193,6 +199,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
     }
     this.conf = conf;
     this.fileIoProvider = fileIoProvider;
+<<<<<<< HEAD
     this.enableSameDiskTiering =
         conf.getBoolean(DFSConfigKeys.DFS_DATANODE_ALLOW_SAME_DISK_TIERING,
             DFSConfigKeys.DFS_DATANODE_ALLOW_SAME_DISK_TIERING_DEFAULT);
@@ -205,6 +212,8 @@ public class FsVolumeImpl implements FsVolumeSpi {
 
   String getMount() {
     return mount;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   protected ThreadPoolExecutor initializeCacheExecutor(File parent) {

@@ -22,6 +22,10 @@ import static org.apache.hadoop.security.LdapGroupsMapping.LDAP_CTX_FACTORY_CLAS
 import static org.apache.hadoop.security.LdapGroupsMapping.LDAP_CTX_FACTORY_CLASS_KEY;
 import static org.apache.hadoop.security.LdapGroupsMapping.LDAP_URL_KEY;
 import static org.junit.Assert.assertEquals;
+<<<<<<< HEAD
+=======
+import static org.junit.Assert.fail;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,7 +39,10 @@ import javax.naming.directory.BasicAttributes;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
+<<<<<<< HEAD
 import javax.naming.ldap.InitialLdapContext;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import javax.naming.spi.InitialContextFactory;
 
 import org.apache.hadoop.conf.Configuration;
@@ -190,8 +197,11 @@ public class TestLdapGroupsMappingBase {
 
     private static DirContext contextToReturn;
     private static String expectedLdapUrl;
+<<<<<<< HEAD
     private static String expectedBindUser;
     private static String expectedBindPassword;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     public DummyLdapCtxFactory() {
     }
@@ -204,6 +214,7 @@ public class TestLdapGroupsMappingBase {
       expectedLdapUrl = url;
     }
 
+<<<<<<< HEAD
     public static void setExpectedBindUser(String bindUser) {
       expectedBindUser = bindUser;
     }
@@ -218,6 +229,8 @@ public class TestLdapGroupsMappingBase {
       expectedBindPassword = null;
     }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     @Override
     public Context getInitialContext(Hashtable<?, ?> env)
         throws NamingException {
@@ -225,6 +238,7 @@ public class TestLdapGroupsMappingBase {
         String actualLdapUrl = (String) env.get(Context.PROVIDER_URL);
         assertEquals(expectedLdapUrl, actualLdapUrl);
       }
+<<<<<<< HEAD
       if (expectedBindUser != null) {
         String actualBindUser = (String) env.get(Context.SECURITY_PRINCIPAL);
         assertEquals(expectedBindUser, actualBindUser);
@@ -239,6 +253,16 @@ public class TestLdapGroupsMappingBase {
         newEnv.put(Context.INITIAL_CONTEXT_FACTORY,
             LDAP_CTX_FACTORY_CLASS_DEFAULT);
         contextToReturn = new InitialLdapContext(newEnv, null);
+=======
+      if (contextToReturn == null) {
+        InitialContextFactory defaultFactory = null;
+        try {
+          defaultFactory = LDAP_CTX_FACTORY_CLASS_DEFAULT.newInstance();
+        } catch (ReflectiveOperationException e) {
+          fail("Could not initialize the default factory");
+        }
+        return defaultFactory.getInitialContext(env);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
       return contextToReturn;
     }

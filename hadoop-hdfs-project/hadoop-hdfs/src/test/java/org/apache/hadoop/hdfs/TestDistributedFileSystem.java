@@ -44,7 +44,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+<<<<<<< HEAD
 import java.util.Collection;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -816,6 +819,7 @@ public class TestDistributedFileSystem {
   }
 
   @Test
+<<<<<<< HEAD
   public void testStatistics2() throws IOException, NoSuchAlgorithmException {
     HdfsConfiguration conf = getTestConfiguration();
     conf.set(DFSConfigKeys.DFS_STORAGE_POLICY_SATISFIER_MODE_KEY,
@@ -944,6 +948,8 @@ public class TestDistributedFileSystem {
   }
 
   @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testECStatistics() throws IOException {
     try (MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(getTestConfiguration()).build()) {
@@ -2059,7 +2065,11 @@ public class TestDistributedFileSystem {
   @Test
   public void testStorageFavouredNodes()
       throws IOException, InterruptedException, TimeoutException {
+<<<<<<< HEAD
     Configuration conf = getTestConfiguration();
+=======
+    Configuration conf = new HdfsConfiguration();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     try (MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
         .storageTypes(new StorageType[] {StorageType.SSD, StorageType.DISK})
         .numDataNodes(3).storagesPerDatanode(2).build()) {
@@ -2081,6 +2091,7 @@ public class TestDistributedFileSystem {
       assertEquals("Number of SSD should be 1 but was : " + numSSD, 1, numSSD);
     }
   }
+<<<<<<< HEAD
 
   @Test
   public void testGetECTopologyResultForPolicies() throws Exception {
@@ -2568,4 +2579,6 @@ public class TestDistributedFileSystem {
   }
 
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

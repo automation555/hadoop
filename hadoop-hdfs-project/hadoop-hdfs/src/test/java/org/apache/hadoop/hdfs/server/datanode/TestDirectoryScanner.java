@@ -75,6 +75,10 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.AutoCloseableLock;
 import org.apache.hadoop.util.Time;
+<<<<<<< HEAD
+=======
+import org.apache.log4j.Level;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.log4j.SimpleLayout;
 import org.apache.log4j.WriterAppender;
 import org.junit.Before;
@@ -410,12 +414,71 @@ public class TestDirectoryScanner {
     ByteArrayOutputStream loggerStream = new ByteArrayOutputStream();
     org.apache.log4j.Logger rootLogger =
         org.apache.log4j.Logger.getRootLogger();
+<<<<<<< HEAD
     GenericTestUtils.setRootLogLevel(Level.INFO);
+=======
+    rootLogger.setLevel(Level.INFO);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     WriterAppender writerAppender =
         new WriterAppender(new SimpleLayout(), loggerStream);
     rootLogger.addAppender(writerAppender);
 
+<<<<<<< HEAD
     Configuration conf = getConfiguration();
+=======
+    cluster = new MiniDFSCluster
+        .Builder(CONF)
+        .storageTypes(new StorageType[] {
+            StorageType.RAM_DISK, StorageType.DEFAULT })
+        .numDataNodes(1)
+        .build();
+    try {
+      cluster.waitActive();
+      bpid = cluster.getNamesystem().getBlockPoolId();
+      DataNode dataNode = cluster.getDataNodes().get(0);
+      fds = DataNodeTestUtils.getFSDataset(cluster.getDataNodes().get(0));
+      client = cluster.getFileSystem().getClient();
+      scanner = new DirectoryScanner(dataNode, fds, CONF);
+      scanner.setRetainDiffs(true);
+      FsDatasetTestUtil.stopLazyWriter(cluster.getDataNodes().get(0));
+
+      // Create a file file on RAM_DISK
+      createFile(GenericTestUtils.getMethodName(), BLOCK_LENGTH, true);
+
+      // Ensure no difference between volumeMap and disk.
+      scan(1, 0, 0, 0, 0, 0);
+
+      //delete thre block file , left the meta file alone
+      deleteBlockFile();
+
+      //scan to ensure log warn not printed
+      scan(1, 1, 0, 1, 0, 0, 0);
+
+      //ensure the warn log not appear and missing block log do appear
+      String logContent = new String(loggerStream.toByteArray());
+      String missingBlockWarn = "Deleted a metadata file" +
+          " for the deleted block";
+      String dirStructureWarnLog = " found in invalid directory." +
+          "  Expected directory: ";
+      assertFalse("directory check print meaningless warning message",
+          logContent.contains(dirStructureWarnLog));
+      assertTrue("missing block warn log not appear",
+          logContent.contains(missingBlockWarn));
+      LOG.info("check pass");
+
+    } finally {
+      if (scanner != null) {
+        scanner.shutdown();
+        scanner = null;
+      }
+      cluster.shutdown();
+      cluster = null;
+    }
+  }
+
+  @Test (timeout=300000)
+  public void testDeleteBlockOnTransientStorage() throws Exception {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     cluster = new MiniDFSCluster
         .Builder(conf)
         .storageTypes(new StorageType[] {

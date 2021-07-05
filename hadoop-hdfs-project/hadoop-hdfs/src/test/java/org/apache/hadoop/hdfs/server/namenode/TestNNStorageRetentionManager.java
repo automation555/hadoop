@@ -26,7 +26,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Comparator;
+<<<<<<< HEAD
 import java.util.LinkedHashSet;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -305,7 +308,11 @@ public class TestNNStorageRetentionManager {
     Mockito.verify(mockPurger, Mockito.atLeast(0))
       .markStale(staleLogsCaptor.capture());
 
+<<<<<<< HEAD
     Set<String> capturedPaths = new LinkedHashSet<>();
+=======
+    Set<String> capturedPaths = Sets.newLinkedHashSet();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // Check images
     for (FSImageFile captured : imagesPurgedCaptor.getAllValues()) {
       capturedPaths.add(fileToPath(captured.getFile()));
@@ -335,9 +342,15 @@ public class TestNNStorageRetentionManager {
 
   private class TestCaseDescription {
     private final Map<File, FakeRoot> dirRoots = Maps.newLinkedHashMap();
+<<<<<<< HEAD
     private final Set<File> expectedPurgedLogs = new LinkedHashSet<>();
     private final Set<File> expectedPurgedImages = new LinkedHashSet<>();
     private final Set<File> expectedStaleLogs = new LinkedHashSet<>();
+=======
+    private final Set<File> expectedPurgedLogs = Sets.newLinkedHashSet();
+    private final Set<File> expectedPurgedImages = Sets.newLinkedHashSet();
+    private final Set<File> expectedStaleLogs = Sets.newLinkedHashSet();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     private class FakeRoot {
       final NameNodeDirType type;
@@ -485,7 +498,12 @@ public class TestNNStorageRetentionManager {
         inspector.inspectDirectory(sd);
       }
       return null;
+<<<<<<< HEAD
     }).when(mockStorage).inspectStorageDirs(any());
+=======
+    }).when(mockStorage).inspectStorageDirs(
+        Mockito.<FSImageStorageInspector>anyObject());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return mockStorage;
   }
 }

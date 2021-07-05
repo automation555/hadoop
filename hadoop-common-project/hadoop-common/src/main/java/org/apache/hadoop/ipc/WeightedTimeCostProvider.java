@@ -29,8 +29,13 @@ import static org.apache.hadoop.ipc.ProcessingDetails.Timing;
  * {@link ProcessingDetails}). This can be used by specifying the
  * {@link org.apache.hadoop.fs.CommonConfigurationKeys#IPC_COST_PROVIDER_KEY}
  * configuration key.
+<<<<<<< HEAD
  * <p>
  * This allows for configuration of how heavily each of the operations
+=======
+ *
+ * <p/>This allows for configuration of how heavily each of the operations
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
  * within {@link ProcessingDetails} is weighted. By default,
  * {@link ProcessingDetails.Timing#LOCKFREE},
  * {@link ProcessingDetails.Timing#RESPONSE}, and

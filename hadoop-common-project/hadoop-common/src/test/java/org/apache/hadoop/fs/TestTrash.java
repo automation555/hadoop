@@ -38,10 +38,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+<<<<<<< HEAD
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+=======
+import static org.junit.Assert.*;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.TrashPolicyDefault.Emptier;
@@ -447,8 +451,17 @@ public class TestTrash {
 
       // Clear out trash
       int rc = -1;
+<<<<<<< HEAD
       rc = shell.run(new String[] {"-expunge", "-immediate"});
 
+=======
+      try {
+        rc = shell.run(new String[] {"-expunge", "-immediate"});
+      } catch (Exception e) {
+        fail("Unexpected exception running the trash shell: " +
+            e.getLocalizedMessage());
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       assertEquals("Expunge immediate should return zero", 0, rc);
       assertFalse("Old checkpoint should be removed",
           trashRootFs.exists(oldCheckpoint));
@@ -456,6 +469,7 @@ public class TestTrash {
           trashRootFs.exists(recentCheckpoint));
       assertFalse("Current folder should be removed",
           trashRootFs.exists(currentFolder));
+<<<<<<< HEAD
       assertEquals("Ensure trash folder is empty", 0,
           trashRootFs.listStatus(trashRoot.getParent()).length);
     }
@@ -537,6 +551,10 @@ public class TestTrash {
       assertNotEquals("Expunge immediate should fail when filesystem is NULL",
           0, val);
       FileSystem.removeFileSystemForTesting(testlfsURI, config, testlfs);
+=======
+      assertEquals("Ensure trash folder is empty",
+          trashRootFs.listStatus(trashRoot.getParent()).length, 0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 

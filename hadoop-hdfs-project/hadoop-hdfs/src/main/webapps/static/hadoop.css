@@ -262,7 +262,11 @@ header.bs-docs-nav, header.bs-docs-nav .navbar-brand {
 
 .dfshealth-node-down-decommissioned:before {
     color: #c7254e;
+<<<<<<< HEAD
     content: "\e090";
+=======
+    content: "\e017";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }
 
 .dfshealth-node-down-maintenance:before {

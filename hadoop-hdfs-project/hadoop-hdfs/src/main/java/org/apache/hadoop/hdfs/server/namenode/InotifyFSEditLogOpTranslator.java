@@ -23,7 +23,10 @@ import org.apache.hadoop.hdfs.inotify.Event;
 import org.apache.hadoop.hdfs.inotify.EventBatch;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.io.erasurecode.ErasureCodeConstants;
+<<<<<<< HEAD
 import org.apache.hadoop.util.Lists;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import java.util.List;
 

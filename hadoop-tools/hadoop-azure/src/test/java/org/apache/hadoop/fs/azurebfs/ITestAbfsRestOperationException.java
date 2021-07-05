@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.azurebfs;
 
 import java.io.IOException;
 
+<<<<<<< HEAD
 import org.assertj.core.api.Assertions;
 import org.junit.Assert;
 import org.junit.Test;
@@ -38,13 +39,23 @@ import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_TOKEN_PROVIDER_TYPE_PROPERTY_NAME;
 import static org.apache.hadoop.fs.azurebfs.constants.TestConfigurationKeys.FS_AZURE_ABFS_ACCOUNT_NAME;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+=======
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
+
+import org.junit.Assert;
+import org.junit.Test;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * Verify the AbfsRestOperationException error message format.
  * */
 public class ITestAbfsRestOperationException extends AbstractAbfsIntegrationTest{
+<<<<<<< HEAD
   private static final String RETRY_TEST_TOKEN_PROVIDER = "org.apache.hadoop.fs.azurebfs.oauth2.RetryTestTokenProvider";
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public ITestAbfsRestOperationException() throws Exception {
     super();
   }
@@ -87,6 +98,7 @@ public class ITestAbfsRestOperationException extends AbstractAbfsIntegrationTest
               && errorFields[5].contains("Time"));
     }
   }
+<<<<<<< HEAD
 
   @Test
   public void testCustomTokenFetchRetryCount() throws Exception {
@@ -155,4 +167,6 @@ public class ITestAbfsRestOperationException extends AbstractAbfsIntegrationTest
           .contains("Auth failure: ");
     }
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

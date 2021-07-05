@@ -199,7 +199,11 @@ public class DiskBalancerCLI extends Configured implements Tool {
           "Invalid or extra Arguments: " + Arrays
               .toString(Arrays.copyOfRange(cmdArgs, 2, cmdArgs.length)));
     }
+<<<<<<< HEAD
     return dispatch(cmd);
+=======
+    return dispatch(cmd, opts);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**

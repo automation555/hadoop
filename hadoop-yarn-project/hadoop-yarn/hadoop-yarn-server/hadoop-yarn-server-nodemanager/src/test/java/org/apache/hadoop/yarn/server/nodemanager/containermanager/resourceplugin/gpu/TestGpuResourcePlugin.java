@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu;
 
 import static org.mockito.Mockito.mock;
+<<<<<<< HEAD
 import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.conf.Configuration;
@@ -53,6 +54,17 @@ public class TestGpuResourcePlugin {
   @Test(expected = YarnException.class)
   public void testResourceHandlerNotInitialized() throws YarnException {
     GpuDiscoverer gpuDiscoverer = createMockDiscoverer();
+=======
+
+import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.junit.Test;
+
+public class TestGpuResourcePlugin {
+
+  @Test(expected = YarnException.class)
+  public void testResourceHandlerNotInitialized() throws YarnException {
+    GpuDiscoverer gpuDiscoverer = mock(GpuDiscoverer.class);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     GpuNodeResourceUpdateHandler gpuNodeResourceUpdateHandler =
         mock(GpuNodeResourceUpdateHandler.class);
 
@@ -64,7 +76,11 @@ public class TestGpuResourcePlugin {
 
   @Test
   public void testResourceHandlerIsInitialized() throws YarnException {
+<<<<<<< HEAD
     GpuDiscoverer gpuDiscoverer = createMockDiscoverer();
+=======
+    GpuDiscoverer gpuDiscoverer = mock(GpuDiscoverer.class);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     GpuNodeResourceUpdateHandler gpuNodeResourceUpdateHandler =
         mock(GpuNodeResourceUpdateHandler.class);
 
@@ -76,6 +92,7 @@ public class TestGpuResourcePlugin {
     //Not throwing any exception
     target.getNMResourceInfo();
   }
+<<<<<<< HEAD
 
   @Test
   public void testGetNMResourceInfoAutoDiscoveryEnabled()
@@ -165,4 +182,6 @@ public class TestGpuResourcePlugin {
     when(gpuDiscoverer.getGpuDeviceInformation()).thenReturn(gpuDeviceInfo);
     return gpuDiscoverer;
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

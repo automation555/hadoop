@@ -96,7 +96,11 @@ public class ApiServiceClient extends AppAdminClient {
   /**
    * Calculate Resource Manager address base on working REST API.
    */
+<<<<<<< HEAD
   String getRMWebAddress() throws IOException {
+=======
+  String getRMWebAddress() {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Configuration conf = getConfig();
     String scheme = "http://";
     String path = "/app/v1/services/version";
@@ -107,6 +111,7 @@ public class ApiServiceClient extends AppAdminClient {
       rmAddress = conf
           .get("yarn.resourcemanager.webapp.https.address");
     }
+<<<<<<< HEAD
 
     if (HAUtil.isHAEnabled(conf)) {
       boolean useKerberos = UserGroupInformation.isSecurityEnabled();
@@ -129,6 +134,25 @@ public class ApiServiceClient extends AppAdminClient {
             } catch (IOException e) {
               LOG.debug("Fail to resolve username: {}", e);
             }
+=======
+    boolean useKerberos = UserGroupInformation.isSecurityEnabled();
+    List<String> rmServers = getRMHAWebAddresses(conf);
+    for (String host : rmServers) {
+      try {
+        Client client = Client.create();
+        client.setFollowRedirects(false);
+        StringBuilder sb = new StringBuilder();
+        sb.append(scheme);
+        sb.append(host);
+        sb.append(path);
+        if (!useKerberos) {
+          try {
+            String username = UserGroupInformation.getCurrentUser().getShortUserName();
+            sb.append("?user.name=");
+            sb.append(username);
+          } catch (IOException e) {
+            LOG.debug("Fail to resolve username: {}", e);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
           }
           Builder builder = client
               .resource(sb.toString()).type(MediaType.APPLICATION_JSON);
@@ -149,6 +173,26 @@ public class ApiServiceClient extends AppAdminClient {
           diagnosticsMsg.append("Error connecting to " + host
               + " due to " + e.getMessage() + "\n");
         }
+<<<<<<< HEAD
+=======
+        Builder builder = client
+            .resource(sb.toString()).type(MediaType.APPLICATION_JSON);
+        if (useKerberos) {
+          String[] server = host.split(":");
+          String challenge = generateToken(server[0]);
+          builder.header(HttpHeaders.AUTHORIZATION, "Negotiate " +
+              challenge);
+          LOG.debug("Authorization: Negotiate {}", challenge);
+        }
+        ClientResponse test = builder.get(ClientResponse.class);
+        if (test.getStatus() == 200) {
+          rmAddress = host;
+          break;
+        }
+      } catch (Exception e) {
+        LOG.info("Fail to connect to: "+host);
+        LOG.debug("Root cause: {}", e);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
       throw new IOException(diagnosticsMsg.toString());
     }

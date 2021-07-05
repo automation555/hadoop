@@ -1809,6 +1809,13 @@ public class RouterClientProtocol implements ClientProtocol {
     return HAServiceProtocol.HAServiceState.ACTIVE;
   }
 
+  @Override
+  public HAServiceProtocol.HAServiceState getHAServiceState()
+      throws IOException {
+    rpcServer.checkOperation(NameNode.OperationCategory.READ, false);
+    return null;
+  }
+
   /**
    * Determines combinations of eligible src/dst locations for a rename. A
    * rename cannot change the namespace. Renames are only allowed if there is an

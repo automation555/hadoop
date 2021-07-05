@@ -205,7 +205,24 @@ public class DockerLinuxContainerRuntime extends OCIContainerRuntime {
       "^(([a-zA-Z0-9.-]+)(:\\d+)?/)?([a-z0-9_./-]+)(:[\\w.-]+)?$";
   private static final Pattern dockerImagePattern =
       Pattern.compile(DOCKER_IMAGE_PATTERN);
+<<<<<<< HEAD
 
+=======
+  public static final String HOSTNAME_PATTERN =
+      "^[a-zA-Z0-9][a-zA-Z0-9_.-]+$";
+  private static final Pattern hostnamePattern = Pattern.compile(
+      HOSTNAME_PATTERN);
+  private static final Pattern USER_MOUNT_PATTERN = Pattern.compile(
+      "(?<=^|,)([^:\\x00]+):([^:\\x00]+)" +
+          "(:(r[ow]|(r[ow][+])?(r?shared|r?slave|r?private)))?(?:,|$)");
+  private static final Pattern TMPFS_MOUNT_PATTERN = Pattern.compile(
+      "^/[^:\\x00]+$");
+  public static final String PORTS_MAPPING_PATTERN =
+      "^:[0-9]+|^[0-9]+:[0-9]+|^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]" +
+          "|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])" +
+          ":[0-9]+:[0-9]+$";
+  private static final int HOST_NAME_LENGTH = 64;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private static final String DEFAULT_PROCFS = "/proc";
 
   @InterfaceAudience.Private
@@ -231,6 +248,7 @@ public class DockerLinuxContainerRuntime extends OCIContainerRuntime {
       "YARN_CONTAINER_RUNTIME_DOCKER_DELAYED_REMOVAL";
   @InterfaceAudience.Private
   public static final String ENV_DOCKER_CONTAINER_PORTS_MAPPING =
+<<<<<<< HEAD
       "YARN_CONTAINER_RUNTIME_DOCKER_PORTS_MAPPING";
   @InterfaceAudience.Private
   public static final String ENV_DOCKER_CONTAINER_YARN_SYSFS =
@@ -249,6 +267,9 @@ public class DockerLinuxContainerRuntime extends OCIContainerRuntime {
   public final static String ENV_OCI_CONTAINER_RUN_PRIVILEGED_CONTAINER =
       formatOciEnvKey(RUNTIME_TYPE, RUN_PRIVILEGED_CONTAINER_SUFFIX);
 
+=======
+          "YARN_CONTAINER_RUNTIME_DOCKER_PORTS_MAPPING";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private Configuration conf;
   private Context nmContext;
   private DockerClient dockerClient;

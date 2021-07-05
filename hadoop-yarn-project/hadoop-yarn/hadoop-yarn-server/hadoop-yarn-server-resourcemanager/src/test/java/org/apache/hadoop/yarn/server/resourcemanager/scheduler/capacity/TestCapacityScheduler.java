@@ -55,11 +55,17 @@ import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
+<<<<<<< HEAD
 import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+=======
+import com.google.common.collect.Sets;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -5767,6 +5773,7 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
 
   @Test
   public void testCSQueueMetrics() throws Exception {
+<<<<<<< HEAD
 
     // Initialize resource map
     Map<String, ResourceInformation> riMap = new HashMap<>();
@@ -5842,10 +5849,26 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
     assertEquals(3000, maxCapA11
         .get(TestQueueMetricsForCustomResources.CUSTOM_RES_1).longValue());
 
+=======
+    CapacityScheduler cs = new CapacityScheduler();
+    cs.setConf(new YarnConfiguration());
+    cs.setRMContext(resourceManager.getRMContext());
+    CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
+    setupQueueConfiguration(conf);
+    cs.init(conf);
+    cs.start();
+
+    RMNode n1 = MockNodes.newNodeInfo(0, MockNodes.newResource(50 * GB), 1, "n1");
+    RMNode n2 = MockNodes.newNodeInfo(0, MockNodes.newResource(50 * GB), 2, "n2");
+    cs.handle(new NodeAddedSchedulerEvent(n1));
+    cs.handle(new NodeAddedSchedulerEvent(n2));
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertEquals(10240, ((CSQueueMetrics)cs.getQueue("a").getMetrics()).getGuaranteedMB());
     assertEquals(71680, ((CSQueueMetrics)cs.getQueue("b1").getMetrics()).getGuaranteedMB());
     assertEquals(102400, ((CSQueueMetrics)cs.getQueue("a").getMetrics()).getMaxCapacityMB());
     assertEquals(102400, ((CSQueueMetrics)cs.getQueue("b1").getMetrics()).getMaxCapacityMB());
+<<<<<<< HEAD
     Map<String, Long> guaranteedCapA =
         ((CSQueueMetricsForCustomResources) ((CSQueueMetrics) cs.getQueue("a")
             .getMetrics()).getQueueMetricsForCustomResources())
@@ -5870,6 +5893,8 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
                 .getMaxCapacity();
     assertEquals(3000, maxCapB1
         .get(TestQueueMetricsForCustomResources.CUSTOM_RES_1).longValue());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // Remove a node, metrics should be updated
     cs.handle(new NodeRemovedSchedulerEvent(n2));
@@ -5877,6 +5902,7 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
     assertEquals(35840, ((CSQueueMetrics)cs.getQueue("b1").getMetrics()).getGuaranteedMB());
     assertEquals(51200, ((CSQueueMetrics)cs.getQueue("a").getMetrics()).getMaxCapacityMB());
     assertEquals(51200, ((CSQueueMetrics)cs.getQueue("b1").getMetrics()).getMaxCapacityMB());
+<<<<<<< HEAD
     Map<String, Long> guaranteedCapA1 =
         ((CSQueueMetricsForCustomResources) ((CSQueueMetrics) cs.getQueue("a")
             .getMetrics()).getQueueMetricsForCustomResources())
@@ -5902,6 +5928,8 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
                 .getMaxCapacity();
     assertEquals(1000, maxCapB11
         .get(TestQueueMetricsForCustomResources.CUSTOM_RES_1).longValue());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertEquals(A_CAPACITY / 100, ((CSQueueMetrics)cs.getQueue("a")
         .getMetrics()).getGuaranteedCapacity(), DELTA);
     assertEquals(A_CAPACITY / 100, ((CSQueueMetrics)cs.getQueue("a")
@@ -5920,6 +5948,7 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
         .getMaxAbsoluteCapacity(), DELTA);
 
     // Add child queue to a, and reinitialize. Metrics should be updated
+<<<<<<< HEAD
     csConf.setQueues(CapacitySchedulerConfiguration.ROOT + ".a",
         new String[] {"a1", "a2", "a3"});
     csConf.setCapacity(CapacitySchedulerConfiguration.ROOT + ".a.a2", 29.5f);
@@ -5930,12 +5959,23 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
     cs.reinitialize(csConf, new RMContextImpl(null, null, null, null, null,
         null, new RMContainerTokenSecretManager(csConf),
         new NMTokenSecretManagerInRM(csConf),
+=======
+    conf.setQueues(CapacitySchedulerConfiguration.ROOT + ".a", new String[] {"a1", "a2", "a3"} );
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT + ".a.a2", 30.0f);
+    conf.setCapacity(CapacitySchedulerConfiguration.ROOT + ".a.a3", 40.0f);
+    conf.setMaximumCapacity(CapacitySchedulerConfiguration.ROOT + ".a.a3", 50.0f);
+
+    cs.reinitialize(conf, new RMContextImpl(null, null, null, null, null,
+        null, new RMContainerTokenSecretManager(conf),
+        new NMTokenSecretManagerInRM(conf),
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         new ClientToAMTokenSecretManagerInRM(), null));
 
     assertEquals(1024, ((CSQueueMetrics)cs.getQueue("a2").getMetrics()).getGuaranteedMB());
     assertEquals(2048, ((CSQueueMetrics)cs.getQueue("a3").getMetrics()).getGuaranteedMB());
     assertEquals(51200, ((CSQueueMetrics)cs.getQueue("a2").getMetrics()).getMaxCapacityMB());
     assertEquals(25600, ((CSQueueMetrics)cs.getQueue("a3").getMetrics()).getMaxCapacityMB());
+<<<<<<< HEAD
 
     Map<String, Long> guaranteedCapA2 =
         ((CSQueueMetricsForCustomResources) ((CSQueueMetrics) cs.getQueue("a2")
@@ -6067,5 +6107,7 @@ public class TestCapacityScheduler extends CapacitySchedulerTestBase {
     Assert.assertEquals(0, srcQueue.getUsedResources().getMemorySize());
     Assert.assertEquals(0, desQueue.getUsedResources().getMemorySize());
     rm1.close();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

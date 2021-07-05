@@ -143,6 +143,7 @@ public final class HdfsKMSUtil {
           URI.create(DFSUtilClient.bytes2String(keyProviderUriBytes));
     }
     if (keyProviderUri == null) {
+<<<<<<< HEAD
       // Check if NN provided uri is not null and ignore property is false.
       if (keyProviderUriStr != null && !conf.getBoolean(
           DFS_CLIENT_IGNORE_NAMENODE_DEFAULT_KMS_URI,
@@ -161,6 +162,18 @@ public final class HdfsKMSUtil {
         credentials.addSecretKey(
             credsKey, DFSUtilClient.string2Bytes(keyProviderUri.toString()));
       }
+=======
+      // NN is old and doesn't report provider, so use conf.
+      if (keyProviderUriStr == null) {
+        keyProviderUri = KMSUtil.getKeyProviderUri(conf, keyProviderUriKeyName);
+      } else if (!keyProviderUriStr.isEmpty()) {
+        keyProviderUri = URI.create(keyProviderUriStr);
+      }
+      if (keyProviderUri != null) {
+        credentials.addSecretKey(
+            credsKey, DFSUtilClient.string2Bytes(keyProviderUri.toString()));
+      }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     return keyProviderUri;
   }

@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+<<<<<<< HEAD
 import java.io.IOException;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
@@ -27,11 +30,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+<<<<<<< HEAD
 import org.apache.hadoop.hdfs.server.namenode.ha.ObserverReadProxyProvider;
 import org.apache.hadoop.hdfs.server.namenode.ha.ReadOnly;
 import org.apache.hadoop.ipc.AlignmentContext;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.ipc.StandbyException;
+=======
+import org.apache.hadoop.hdfs.server.namenode.ha.ReadOnly;
+import org.apache.hadoop.ipc.AlignmentContext;
+import org.apache.hadoop.ipc.RetriableException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcRequestHeaderProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto;
 
@@ -126,6 +135,7 @@ class GlobalStateIdContext implements AlignmentContext {
    */
   @Override
   public long receiveRequestState(RpcRequestHeaderProto header,
+<<<<<<< HEAD
       long clientWaitTime) throws IOException {
     if (!header.hasStateId() &&
         HAServiceState.OBSERVER.equals(namesystem.getState())) {
@@ -149,6 +159,16 @@ class GlobalStateIdContext implements AlignmentContext {
           + "the server stateId: {} This is unexpected. "
           + "Resetting client stateId to server stateId",
           clientStateId, serverStateId);
+=======
+      long clientWaitTime) throws RetriableException {
+    long serverStateId =
+        namesystem.getFSImage().getCorrectLastAppliedOrWrittenTxId();
+    long clientStateId = header.getStateId();
+    if (clientStateId > serverStateId &&
+        HAServiceState.ACTIVE.equals(namesystem.getState())) {
+      FSNamesystem.LOG.warn("A client sent stateId: " + clientStateId +
+          ", but server state is: " + serverStateId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return serverStateId;
     }
     if (HAServiceState.OBSERVER.equals(namesystem.getState()) &&
@@ -165,9 +185,13 @@ class GlobalStateIdContext implements AlignmentContext {
 
   @Override
   public long getLastSeenStateId() {
+<<<<<<< HEAD
     // Should not need to call getCorrectLastAppliedOrWrittenTxId()
     // see HDFS-14822.
     return namesystem.getFSImage().getLastAppliedOrWrittenTxId();
+=======
+    return namesystem.getFSImage().getCorrectLastAppliedOrWrittenTxId();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override

@@ -150,7 +150,11 @@ public class LogCLIHelpers implements Configurable {
    */
   public static String getOwnerForAppIdOrNull(
       ApplicationId appId, String bestGuess,
+<<<<<<< HEAD
       Configuration conf) {
+=======
+      Configuration conf) throws IOException {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     LogAggregationFileControllerFactory factory =
         new LogAggregationFileControllerFactory(conf);
     List<LogAggregationFileController> fileControllers = factory
@@ -164,6 +168,7 @@ public class LogCLIHelpers implements Configurable {
           if (owner != null) {
             return owner;
           }
+<<<<<<< HEAD
         } catch (IOException e) {
           return null;
         }
@@ -172,6 +177,52 @@ public class LogCLIHelpers implements Configurable {
       System.err.println("Can not find any valid fileControllers. " +
           " The configurated fileControllers: " +
           YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS);
+=======
+        } catch (AccessControlException | AccessDeniedException ex) {
+          return null;
+        } catch (IOException io) {
+          // Ignore IOException thrown from wrong file format
+        }
+      }
+    } else {
+      System.err.println("Can not find any valid fileControllers. " +
+          " The configurated fileControllers: " +
+          YarnConfiguration.LOG_AGGREGATION_FILE_FORMATS);
+    }
+    return null;
+  }
+
+  public static String guessOwnerWithFileFormat(
+      LogAggregationFileController fileFormat, ApplicationId appId,
+      String bestGuess, Configuration conf) throws IOException {
+    Path remoteRootLogDir = fileFormat.getRemoteRootLogDir();
+    String suffix = fileFormat.getRemoteRootLogDirSuffix();
+    Path fullPath = fileFormat.getRemoteAppLogDir(appId, bestGuess);
+    FileContext fc =
+        FileContext.getFileContext(remoteRootLogDir.toUri(), conf);
+    String pathAccess = fullPath.toString();
+    try {
+      if (fc.util().exists(fullPath)) {
+        return bestGuess;
+      }
+      Path toMatch = LogAggregationUtils.
+          getRemoteAppLogDir(remoteRootLogDir, appId, "*", suffix);
+      pathAccess = toMatch.toString();
+      FileStatus[] matching  = fc.util().globStatus(toMatch);
+      if (matching == null || matching.length != 1) {
+        return null;
+      }
+      //fetch the user from the full path /app-logs/user[/suffix]/app_id
+      Path parent = matching[0].getPath().getParent();
+      //skip the suffix too
+      if (suffix != null && !StringUtils.isEmpty(suffix)) {
+        parent = parent.getParent();
+      }
+      return parent.getName();
+    } catch (AccessControlException | AccessDeniedException ex) {
+      logDirNoAccessPermission(pathAccess, bestGuess, ex.getMessage());
+      throw ex;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     return null;
@@ -320,8 +371,14 @@ public class LogCLIHelpers implements Configurable {
       logDirNotExist(fileFormat.getRemoteAppLogDir(appId,
           appOwner).toString());
     } catch (AccessControlException | AccessDeniedException ace) {
+<<<<<<< HEAD
       logDirNoAccessPermission(fileFormat.getRemoteAppLogDir(appId,
           appOwner).toString(), appOwner, ace.getMessage());
+=======
+      logDirNoAccessPermission(fileFormat.getRemoteAppLogDir(
+          appId, appOwner).toString(), appOwner,
+          ace.getMessage());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     if (nodeFiles == null) {
       return;

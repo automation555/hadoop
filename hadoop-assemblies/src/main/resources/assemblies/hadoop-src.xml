@@ -56,7 +56,10 @@
         <exclude>**/build/**</exclude>
         <exclude>**/file:/**</exclude>
         <exclude>**/SecurityAuth.audit*</exclude>
+<<<<<<< HEAD
         <exclude>patchprocess/**</exclude>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       </excludes>
     </fileSet>
   </fileSets>

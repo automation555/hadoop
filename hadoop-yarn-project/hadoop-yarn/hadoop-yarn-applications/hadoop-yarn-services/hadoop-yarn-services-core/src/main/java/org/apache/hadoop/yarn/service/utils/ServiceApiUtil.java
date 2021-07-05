@@ -250,7 +250,11 @@ public class ServiceApiUtil {
 
   public static void validateJvmOpts(String jvmOpts)
       throws IllegalArgumentException {
+<<<<<<< HEAD
     Pattern pattern = Pattern.compile("[!~#?@*&%${}()<>\\[\\]|\",`;]");
+=======
+    Pattern pattern = Pattern.compile("[!~#?@*&%${}()<>\\[\\]|\"\\/,`;]");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Matcher matcher = pattern.matcher(jvmOpts);
     if (matcher.find()) {
       throw new IllegalArgumentException(

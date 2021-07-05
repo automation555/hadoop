@@ -951,6 +951,12 @@ public class ContainerImpl implements Container {
     this.workDir = workDir;
   }
 
+  private void clearIpAndHost() {
+    LOG.info("{} clearing ip and host", containerId);
+    this.ips = null;
+    this.host = null;
+  }
+
   @Override
   public String getCsiVolumesRootDir() {
     return csiVolumesRootDir;
@@ -969,8 +975,13 @@ public class ContainerImpl implements Container {
 
   @Override
   public void setIpAndHost(String[] ipAndHost) {
+<<<<<<< HEAD
     this.writeLock.lock();
     try {
+=======
+    try {
+      this.writeLock.lock();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       this.ips = ipAndHost[0];
       this.host = ipAndHost[1];
     } finally {

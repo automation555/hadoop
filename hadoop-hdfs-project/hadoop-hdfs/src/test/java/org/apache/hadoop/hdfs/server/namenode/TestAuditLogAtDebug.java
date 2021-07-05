@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+=======
+import com.google.common.base.Joiner;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -35,6 +39,10 @@ import java.net.Inet4Address;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 
 import static org.mockito.ArgumentMatchers.anyString;

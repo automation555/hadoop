@@ -3367,6 +3367,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       throws IOException {
     return namenode.getHAServiceState();
   }
+<<<<<<< HEAD
 
   /**
    * If deadNodeDetectionEnabled is true, return the dead nodes that detected by
@@ -3468,4 +3469,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   public DeadNodeDetector getDeadNodeDetector() {
     return clientContext.getDeadNodeDetector();
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

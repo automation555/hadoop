@@ -355,6 +355,7 @@ public class JsonUtil {
     m.put("length", contentsummary.getLength());
     m.put("fileCount", contentsummary.getFileCount());
     m.put("directoryCount", contentsummary.getDirectoryCount());
+<<<<<<< HEAD
     m.put("ecPolicy", contentsummary.getErasureCodingPolicy());
     // For ContentSummary we don't need this since we already have
     // separate count for file and directory.
@@ -364,6 +365,11 @@ public class JsonUtil {
     m.put("snapshotDirectoryCount",
         contentsummary.getSnapshotDirectoryCount());
     m.put("snapshotSpaceConsumed", contentsummary.getSnapshotSpaceConsumed());
+=======
+    // For ContentSummary we don't need this since we already have
+    // separate count for file and directory.
+    m.putAll(toJsonMap(contentsummary, false));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return toJsonString(ContentSummary.class, m);
   }
 
@@ -611,6 +617,7 @@ public class JsonUtil {
     return m;
   }
 
+<<<<<<< HEAD
   private static Object toJsonMap(
       SnapshotStatus snapshotStatus) {
     final Map<String, Object> m = new TreeMap<String, Object>();
@@ -624,6 +631,8 @@ public class JsonUtil {
     return m;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private static Map<String, Object> toJsonMap(
       final BlockLocation blockLocation) throws IOException {
     if (blockLocation == null) {

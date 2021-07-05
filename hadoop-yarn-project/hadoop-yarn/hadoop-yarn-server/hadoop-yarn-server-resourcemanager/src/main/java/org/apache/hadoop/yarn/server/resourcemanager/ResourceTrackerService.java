@@ -134,7 +134,10 @@ public class ResourceTrackerService extends AbstractService implements
   private DynamicResourceConfiguration drConf;
 
   private final AtomicLong timelineCollectorVersion = new AtomicLong(0);
+<<<<<<< HEAD
   private boolean checkIpHostnameInRegistration;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private boolean timelineServiceV2Enabled;
 
   public ResourceTrackerService(RMContext rmContext,
@@ -836,9 +839,15 @@ public class ResourceTrackerService extends AbstractService implements
       this.rmContext.getNodeAttributesManager()
           .replaceNodeAttributes(NodeAttribute.PREFIX_DISTRIBUTED,
               ImmutableMap.of(nodeId.getHost(), nodeAttributes));
+<<<<<<< HEAD
     } else {
       LOG.debug("Skip updating node attributes since there is no change"
           +" for {} : {}", nodeId, nodeAttributes);
+=======
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug("Skip updating node attributes since there is no change for "
+          + nodeId + " : " + nodeAttributes);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 

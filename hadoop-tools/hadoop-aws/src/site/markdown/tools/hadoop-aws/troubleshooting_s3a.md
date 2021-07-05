@@ -1475,7 +1475,278 @@ problems.
 
 Something has been trying to write data to "/".
 
+<<<<<<< HEAD
 ## <a name="best"></a> Best Practises
+=======
+## File System Semantics
+
+These are the issues where S3 does not appear to behave the way a filesystem
+"should".
+
+### Visible S3 Inconsistency
+
+Amazon S3 is *an eventually consistent object store*. That is: not a filesystem.
+
+To reduce visible inconsistencies, use the [S3Guard](./s3guard.html) consistency
+cache.
+
+
+By default, Amazon S3 offers read-after-create consistency: a newly created file
+is immediately visible.
+There is a small quirk: a negative GET may be cached, such
+that even if an object is immediately created, the fact that there "wasn't"
+an object is still remembered.
+
+That means the following sequence on its own will be consistent
+```
+touch(path) -> getFileStatus(path)
+```
+
+But this sequence *may* be inconsistent.
+
+```
+getFileStatus(path) -> touch(path) -> getFileStatus(path)
+```
+
+A common source of visible inconsistencies is that the S3 metadata
+database —the part of S3 which serves list requests— is updated asynchronously.
+Newly added or deleted files may not be visible in the index, even though direct
+operations on the object (`HEAD` and `GET`) succeed.
+
+That means the `getFileStatus()` and `open()` operations are more likely
+to be consistent with the state of the object store, but without S3Guard enabled,
+directory list operations such as `listStatus()`, `listFiles()`, `listLocatedStatus()`,
+and `listStatusIterator()` may not see newly created files, and still list
+old files.
+
+### `FileNotFoundException` even though the file was just written.
+
+This can be a sign of consistency problems. It may also surface if there is some
+asynchronous file write operation still in progress in the client: the operation
+has returned, but the write has not yet completed. While the S3A client code
+does block during the `close()` operation, we suspect that asynchronous writes
+may be taking place somewhere in the stack —this could explain why parallel tests
+fail more often than serialized tests.
+
+### File not found in a directory listing, even though `getFileStatus()` finds it
+
+(Similarly: deleted file found in listing, though `getFileStatus()` reports
+that it is not there)
+
+This is a visible sign of updates to the metadata server lagging
+behind the state of the underlying filesystem.
+
+Fix: Use [S3Guard](s3guard.html).
+
+
+### File not visible/saved
+
+The files in an object store are not visible until the write has been completed.
+In-progress writes are simply saved to a local file/cached in RAM and only uploaded.
+at the end of a write operation. If a process terminated unexpectedly, or failed
+to call the `close()` method on an output stream, the pending data will have
+been lost.
+
+### File `flush()`, `hsync` and `hflush()` calls do not save data to S3
+
+Again, this is due to the fact that the data is cached locally until the
+`close()` operation. The S3A filesystem cannot be used as a store of data
+if it is required that the data is persisted durably after every
+`Syncable.hflush()` or `Syncable.hsync()` call.
+This includes resilient logging, HBase-style journaling
+and the like. The standard strategy here is to save to HDFS and then copy to S3.
+
+### `RemoteFileChangedException` and read-during-overwrite
+
+```
+org.apache.hadoop.fs.s3a.RemoteFileChangedException: re-open `s3a://my-bucket/test/file.txt':
+  ETag change reported by S3 while reading at position 1949.
+  Version f9c186d787d4de9657e99f280ba26555 was unavailable
+  at org.apache.hadoop.fs.s3a.impl.ChangeTracker.processResponse(ChangeTracker.java:137)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.reopen(S3AInputStream.java:200)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.lambda$lazySeek$1(S3AInputStream.java:346)
+  at org.apache.hadoop.fs.s3a.Invoker.lambda$retry$2(Invoker.java:195)
+  at org.apache.hadoop.fs.s3a.Invoker.once(Invoker.java:109)
+  at org.apache.hadoop.fs.s3a.Invoker.lambda$retry$3(Invoker.java:265)
+  at org.apache.hadoop.fs.s3a.Invoker.retryUntranslated(Invoker.java:322)
+  at org.apache.hadoop.fs.s3a.Invoker.retry(Invoker.java:261)
+  at org.apache.hadoop.fs.s3a.Invoker.retry(Invoker.java:193)
+  at org.apache.hadoop.fs.s3a.Invoker.retry(Invoker.java:215)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.lazySeek(S3AInputStream.java:339)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.read(S3AInputStream.java:372)
+```
+
+If an S3 object is updated while an S3A filesystem reader has an open
+`InputStream` on it, the reader may encounter `RemoteFileChangedException`.  This
+occurs if the S3A `InputStream` needs to re-open the object (e.g. during a seek())
+and detects the change.
+
+If the change detection mode is configured to 'warn', a warning like the
+following will be seen instead of `RemoteFileChangedException`:
+
+```
+WARN  - ETag change detected on re-open s3a://my-bucket/test/readFileToChange.txt at 1949.
+ Expected f9c186d787d4de9657e99f280ba26555 got 043abff21b7bd068d2d2f27ccca70309
+```
+
+Using a third-party S3 implementation that doesn't support eTags might result in
+the following error.
+
+```
+org.apache.hadoop.fs.s3a.NoVersionAttributeException: `s3a://my-bucket/test/file.txt':
+ Change detection policy requires ETag
+  at org.apache.hadoop.fs.s3a.impl.ChangeTracker.processResponse(ChangeTracker.java:153)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.reopen(S3AInputStream.java:200)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.lambda$lazySeek$1(S3AInputStream.java:346)
+  at org.apache.hadoop.fs.s3a.Invoker.lambda$retry$2(Invoker.java:195)
+  at org.apache.hadoop.fs.s3a.Invoker.once(Invoker.java:109)
+  at org.apache.hadoop.fs.s3a.Invoker.lambda$retry$3(Invoker.java:265)
+  at org.apache.hadoop.fs.s3a.Invoker.retryUntranslated(Invoker.java:322)
+  at org.apache.hadoop.fs.s3a.Invoker.retry(Invoker.java:261)
+  at org.apache.hadoop.fs.s3a.Invoker.retry(Invoker.java:193)
+  at org.apache.hadoop.fs.s3a.Invoker.retry(Invoker.java:215)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.lazySeek(S3AInputStream.java:339)
+  at org.apache.hadoop.fs.s3a.S3AInputStream.read(S3AInputStream.java:372)
+```
+
+If the change policy is `versionid` there are a number of possible causes
+
+* The bucket does not have object versioning enabled.
+* The bucket does have versioning enabled, but the object being read was created
+before versioning was enabled.
+* The bucket is on a third-party store which does not support object versioning.
+
+See [Handling Read-During-Overwrite](./index.html#handling_read-during-overwrite)
+for more information.
+
+## <a name="encryption"></a> S3 Server Side Encryption
+
+### `AWSS3IOException` `KMS.NotFoundException` "Invalid arn" when using SSE-KMS
+
+When performing file operations, the user may run into an issue where the KMS
+key arn is invalid.
+
+```
+org.apache.hadoop.fs.s3a.AWSS3IOException: innerMkdirs on /test:
+ com.amazonaws.services.s3.model.AmazonS3Exception:
+  Invalid arn (Service: Amazon S3; Status Code: 400; Error Code: KMS.NotFoundException;
+   Request ID: CA89F276B3394565),
+   S3 Extended Request ID: ncz0LWn8zor1cUO2fQ7gc5eyqOk3YfyQLDn2OQNoe5Zj/GqDLggUYz9QY7JhdZHdBaDTh+TL5ZQ=:
+   Invalid arn (Service: Amazon S3; Status Code: 400; Error Code: KMS.NotFoundException; Request ID: CA89F276B3394565)
+  at org.apache.hadoop.fs.s3a.S3AUtils.translateException(S3AUtils.java:194)
+  at org.apache.hadoop.fs.s3a.S3AUtils.translateException(S3AUtils.java:117)
+  at org.apache.hadoop.fs.s3a.S3AFileSystem.mkdirs(S3AFileSystem.java:1541)
+  at org.apache.hadoop.fs.FileSystem.mkdirs(FileSystem.java:2230)
+  at org.apache.hadoop.fs.contract.AbstractFSContractTestBase.mkdirs(AbstractFSContractTestBase.java:338)
+  at org.apache.hadoop.fs.contract.AbstractFSContractTestBase.setup(AbstractFSContractTestBase.java:193)
+  at org.apache.hadoop.fs.s3a.scale.S3AScaleTestBase.setup(S3AScaleTestBase.java:90)
+  at org.apache.hadoop.fs.s3a.scale.AbstractSTestS3AHugeFiles.setup(AbstractSTestS3AHugeFiles.java:77)
+  at sun.reflect.GeneratedMethodAccessor12.invoke(Unknown Source)
+  at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+  at java.lang.reflect.Method.invoke(Method.java:498)
+  at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:47)
+  at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+  at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:44)
+  at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:24)
+  at org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)
+  at org.junit.rules.TestWatcher$1.evaluate(TestWatcher.java:55)
+  at org.junit.internal.runners.statements.FailOnTimeout$StatementThread.run(FailOnTimeout.java:74)
+Caused by: com.amazonaws.services.s3.model.AmazonS3Exception:
+ Invalid arn (Service: Amazon S3; Status Code: 400; Error Code: KMS.NotFoundException; Request ID: CA89F276B3394565)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutor.handleErrorResponse(AmazonHttpClient.java:1588)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutor.executeOneRequest(AmazonHttpClient.java:1258)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutor.executeHelper(AmazonHttpClient.java:1030)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutor.doExecute(AmazonHttpClient.java:742)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutor.executeWithTimer(AmazonHttpClient.java:716)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutor.execute(AmazonHttpClient.java:699)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutor.access$500(AmazonHttpClient.java:667)
+  at com.amazonaws.http.AmazonHttpClient$RequestExecutionBuilderImpl.execute(AmazonHttpClient.java:649)
+  at com.amazonaws.http.AmazonHttpClient.execute(AmazonHttpClient.java:513)
+  at com.amazonaws.services.s3.AmazonS3Client.invoke(AmazonS3Client.java:4221)
+  at com.amazonaws.services.s3.AmazonS3Client.invoke(AmazonS3Client.java:4168)
+  at com.amazonaws.services.s3.AmazonS3Client.putObject(AmazonS3Client.java:1718)
+  at com.amazonaws.services.s3.transfer.internal.UploadCallable.uploadInOneChunk(UploadCallable.java:133)
+  at com.amazonaws.services.s3.transfer.internal.UploadCallable.call(UploadCallable.java:125)
+  at com.amazonaws.services.s3.transfer.internal.UploadMonitor.call(UploadMonitor.java:143)
+  at com.amazonaws.services.s3.transfer.internal.UploadMonitor.call(UploadMonitor.java:48)
+  at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+  at java.lang.Thread.run(Thread.java:745)
+```
+
+Possible causes:
+
+* the KMS key ARN is entered incorrectly, or
+* the KMS key referenced by the ARN is in a different region than the S3 bucket
+being used.
+
+
+### Using SSE-C "Bad Request"
+
+When performing file operations the user may run into an unexpected 400/403
+error such as
+```
+org.apache.hadoop.fs.s3a.AWSS3IOException: getFileStatus on fork-4/:
+ com.amazonaws.services.s3.model.AmazonS3Exception:
+Bad Request (Service: Amazon S3; Status Code: 400;
+Error Code: 400 Bad Request; Request ID: 42F9A1987CB49A99),
+S3 Extended Request ID: jU2kcwaXnWj5APB14Cgb1IKkc449gu2+dhIsW/+7x9J4D+VUkKvu78mBo03oh9jnOT2eoTLdECU=:
+Bad Request (Service: Amazon S3; Status Code: 400; Error Code: 400 Bad Request; Request ID: 42F9A1987CB49A99)
+```
+
+This can happen in the cases of not specifying the correct SSE-C encryption key.
+Such cases can be as follows:
+1. An object is encrypted using SSE-C on S3 and either the wrong encryption type
+is used, no encryption is specified, or the SSE-C specified is incorrect.
+2. A directory is encrypted with a SSE-C keyA and the user is trying to move a
+file using configured SSE-C keyB into that structure.
+
+## <a name="not_all_bytes_were_read"></a> Message appears in logs "Not all bytes were read from the S3ObjectInputStream"
+
+
+This is a message which can be generated by the Amazon SDK when the client application
+calls `abort()` on the HTTP input stream, rather than reading to the end of
+the file/stream and causing `close()`. The S3A client does call `abort()` when
+seeking round large files, [so leading to the message](https://github.com/aws/aws-sdk-java/issues/1211).
+
+No ASF Hadoop releases have shipped with an SDK which prints this message
+when used by the S3A client. However third party and private builds of Hadoop
+may cause the message to be logged.
+
+Ignore it. The S3A client does call `abort()`, but that's because our benchmarking
+shows that it is generally more efficient to abort the TCP connection and initiate
+a new one than read to the end of a large file.
+
+Note: the threshold when data is read rather than the stream aborted can be tuned
+by `fs.s3a.readahead.range`; seek policy in `fs.s3a.experimental.fadvise`.
+
+### <a name="no_such_bucket"></a> `FileNotFoundException` Bucket does not exist.
+
+The bucket does not exist.
+
+```
+java.io.FileNotFoundException: Bucket stevel45r56666 does not exist
+  at org.apache.hadoop.fs.s3a.S3AFileSystem.verifyBucketExists(S3AFileSystem.java:361)
+  at org.apache.hadoop.fs.s3a.S3AFileSystem.initialize(S3AFileSystem.java:293)
+  at org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3288)
+  at org.apache.hadoop.fs.FileSystem.access$200(FileSystem.java:123)
+  at org.apache.hadoop.fs.FileSystem$Cache.getInternal(FileSystem.java:3337)
+  at org.apache.hadoop.fs.FileSystem$Cache.getUnique(FileSystem.java:3311)
+  at org.apache.hadoop.fs.FileSystem.newInstance(FileSystem.java:529)
+  at org.apache.hadoop.fs.s3a.s3guard.S3GuardTool$BucketInfo.run(S3GuardTool.java:997)
+  at org.apache.hadoop.fs.s3a.s3guard.S3GuardTool.run(S3GuardTool.java:309)
+  at org.apache.hadoop.util.ToolRunner.run(ToolRunner.java:76)
+  at org.apache.hadoop.fs.s3a.s3guard.S3GuardTool.run(S3GuardTool.java:1218)
+  at org.apache.hadoop.fs.s3a.s3guard.S3GuardTool.main(S3GuardTool.java:1227)
+```
+
+
+Check the URI. If using a third-party store, verify that you've configured
+the client to talk to the specific server in `fs.s3a.endpoint`.
+
+## Other Issues
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 ### <a name="logging"></a> Enabling low-level logging
 

@@ -31,6 +31,7 @@
           {{/if}}
           {{#if (eq model.queues.firstObject.type "capacity")}}
               <div class="top-1">
+<<<<<<< HEAD
                   {{#if model.selectedQueue.isWeightMode}}
   <span class="yarn-label secondary">
     <span class="label-key">weight</span>
@@ -59,6 +60,16 @@
     <span class="label-key">flexible dynamic queue</span>
   </span>
                   {{/if}}
+=======
+                <span class="yarn-label secondary">
+                  <span class="label-key">configured capacity</span>
+                  <span class="label-value">{{model.selectedQueue.capacity}}%</span>
+                </span>
+                <span class="yarn-label secondary">
+                  <span class="label-key">configured max capacity</span>
+                  <span class="label-value">{{model.selectedQueue.maxCapacity}}%</span>
+                </span>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                 {{#if model.selectedQueue.isLeafQueue}}
                 <span class="yarn-label secondary">
                   <span class="label-key">user limit</span>

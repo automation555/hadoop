@@ -98,7 +98,11 @@ import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
+import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1110,6 +1114,15 @@ public class Client {
     }
   }
 
+  @VisibleForTesting
+  void specifyLogAggregationContext(ApplicationSubmissionContext appContext) {
+    if (!rollingFilesPattern.isEmpty()) {
+      LogAggregationContext logAggregationContext = LogAggregationContext
+          .newInstance(null, null, rollingFilesPattern, "");
+      appContext.setLogAggregationContext(logAggregationContext);
+    }
+  }
+
   /**
    * Monitor the submitted application for completion. 
    * Kill application if time expires. 
@@ -1169,6 +1182,7 @@ public class Client {
                   + "YarnState={}, DSFinalStatus={}. Breaking monitoring loop",
               state, dsStatus);
         }
+<<<<<<< HEAD
         break;
       } else if (YarnApplicationState.KILLED == state
           || YarnApplicationState.FAILED == state) {
@@ -1176,6 +1190,32 @@ public class Client {
                 + "Breaking monitoring loop", state, dsStatus);
         break;
       }
+=======
+        else {
+          LOG.info("Application did finished unsuccessfully."
+              + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString()
+              + ". Breaking monitoring loop");
+          return false;
+        }
+      }
+      else if (YarnApplicationState.KILLED == state
+          || YarnApplicationState.FAILED == state) {
+        LOG.info("Application did not finish."
+            + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString()
+            + ". Breaking monitoring loop");
+        return false;
+      }
+
+      // The value equal or less than 0 means no timeout
+      if (clientTimeout > 0
+          && System.currentTimeMillis() > (clientStartTime + clientTimeout)) {
+        LOG.info("Reached client specified timeout for application. " +
+            "Killing application");
+        forceKillApplication(appId);
+        return false;
+      }
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
       // The value equal or less than 0 means no timeout
       if (clientTimeout > 0

@@ -1774,6 +1774,7 @@ public class YarnConfiguration extends Configuration {
   @Private
   public static final boolean DEFAULT_NM_RESOURCE_PLUGINS_FAIL_FAST = true;
 
+<<<<<<< HEAD
   /**
    * This setting controls if pluggable device plugin framework is enabled.
    * */
@@ -1796,6 +1797,8 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_PLUGGABLE_DEVICE_FRAMEWORK_DEVICE_CLASSES =
       NM_PREFIX + "pluggable-device-framework.device-classes";
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Prefix for gpu configurations. Work in progress: This configuration
    * parameter may be changed/removed in the future.
@@ -2930,6 +2933,7 @@ public class YarnConfiguration extends Configuration {
   public static final int
           DEFAULT_YARN_DISPATCHER_PRINT_EVENTS_INFO_THRESHOLD = 5000;
 
+<<<<<<< HEAD
   /** Resource manager dispatcher thread monitor sampling rate.
    * Units are samples per minute.  This controls how often to sample
    * the cpu utilization of the resource manager dispatcher thread.
@@ -2942,6 +2946,8 @@ public class YarnConfiguration extends Configuration {
   public static final int
       DEFAULT_YARN_DISPATCHER_CPU_MONITOR_SAMPLES_PER_MIN = 60;
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * CLASSPATH for YARN applications. A comma-separated list of CLASSPATH
    * entries
@@ -4549,6 +4555,7 @@ public class YarnConfiguration extends Configuration {
       "/usr/bin/numactl";
 
   /**
+<<<<<<< HEAD
    * Settings for activities manager.
    */
   public static final String RM_ACTIVITIES_MANAGER_PREFIX =
@@ -4584,11 +4591,14 @@ public class YarnConfiguration extends Configuration {
       DEFAULT_RM_ACTIVITIES_MANAGER_APP_ACTIVITIES_MAX_QUEUE_LENGTH = 100;
 
   /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Containers launcher implementation to use.
    */
   public static final String NM_CONTAINERS_LAUNCHER_CLASS =
       NM_PREFIX + "containers-launcher.class";
 
+<<<<<<< HEAD
   // Configuration for the prefix of the tag which contains workflow ID,
   // followed by the prefix.
   public static final String YARN_WORKFLOW_ID_TAG_PREFIX =
@@ -4596,6 +4606,8 @@ public class YarnConfiguration extends Configuration {
   public static final String DEFAULT_YARN_WORKFLOW_ID_TAG_PREFIX =
       "workflowid:";
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public YarnConfiguration() {
     super();
   }

@@ -465,6 +465,12 @@ public class BlockPlacementPolicyDefault extends BlockPlacementPolicy {
             unavailableStorages, newBlock);
     if (storageTypes == null) {
       storageTypes = getRequiredStorageTypes(requiredStorageTypes);
+<<<<<<< HEAD
+=======
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("storageTypes=" + storageTypes);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     LOG.trace("storageTypes={}", storageTypes);
 

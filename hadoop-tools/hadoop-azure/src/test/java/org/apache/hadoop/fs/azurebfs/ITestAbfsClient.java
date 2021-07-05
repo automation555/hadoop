@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.azurebfs;
 
+<<<<<<< HEAD
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,13 +29,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.assertj.core.api.Assertions;
+=======
+import java.util.UUID;
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import org.apache.hadoop.fs.FileSystem;
+<<<<<<< HEAD
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.azurebfs.contracts.services.ListResultEntrySchema;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.azurebfs.contracts.exceptions.AbfsRestOperationException;
 import org.apache.hadoop.fs.azurebfs.services.AbfsClient;
 import org.apache.hadoop.fs.azurebfs.services.AbfsRestOperation;
@@ -48,7 +56,10 @@ import static org.apache.hadoop.test.LambdaTestUtils.intercept;
  */
 public final class ITestAbfsClient extends AbstractAbfsIntegrationTest {
   private static final int LIST_MAX_RESULTS = 500;
+<<<<<<< HEAD
   private static final int LIST_MAX_RESULTS_SERVER = 5000;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public ITestAbfsClient() throws Exception {
     super();
@@ -88,6 +99,7 @@ public final class ITestAbfsClient extends AbstractAbfsIntegrationTest {
             "UnknownHostException: " + fakeAccountName,
             () -> FileSystem.get(conf.getRawConfiguration()));
   }
+<<<<<<< HEAD
 
   @Test
   public void testListPathWithValidListMaxResultsValues()
@@ -168,4 +180,6 @@ public final class ITestAbfsClient extends AbstractAbfsIntegrationTest {
     }
     es.shutdownNow();
   }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

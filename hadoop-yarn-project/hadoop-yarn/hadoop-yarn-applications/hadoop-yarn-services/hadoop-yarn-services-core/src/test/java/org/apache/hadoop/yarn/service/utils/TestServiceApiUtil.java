@@ -51,7 +51,10 @@ import static org.apache.hadoop.yarn.service.conf.RestApiConstants.DEFAULT_UNLIM
 import static org.apache.hadoop.yarn.service.exceptions.RestApiErrorMessages.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+<<<<<<< HEAD
 import static org.junit.Assert.fail;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * Test for ServiceApiUtil helper methods.
@@ -746,6 +749,7 @@ public class TestServiceApiUtil extends ServiceTestUtils {
     Assert.assertTrue(thread.isAlive());
   }
 
+<<<<<<< HEAD
   @Test
   public void testJvmOpts() throws Exception {
     String invalidJvmOpts = "`ping -c 3 example.com`";
@@ -759,6 +763,12 @@ public class TestServiceApiUtil extends ServiceTestUtils {
     } catch (Exception ex) {
       fail("Invalid character in yarn.service.am.java.opts.");
     }
+=======
+  @Test(expected = IllegalArgumentException.class)
+  public void testJvmOpts() {
+    String jvmOpts = "`ping -c 3 example.com`";
+    ServiceApiUtil.validateJvmOpts(jvmOpts);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public static Service createExampleApplication() {

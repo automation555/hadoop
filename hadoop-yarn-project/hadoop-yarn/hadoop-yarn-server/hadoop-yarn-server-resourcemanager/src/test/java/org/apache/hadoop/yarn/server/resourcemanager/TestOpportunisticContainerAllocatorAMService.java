@@ -89,6 +89,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.TestUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
+<<<<<<< HEAD
+=======
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
@@ -101,12 +105,17 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.base.Supplier;
+
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Test cases for {@link OpportunisticContainerAllocatorAMService}.
@@ -723,6 +732,7 @@ public class TestOpportunisticContainerAllocatorAMService {
   }
 
   @Test(timeout = 60000)
+<<<<<<< HEAD
   public void testOpportunisticSchedulerMetrics() throws Exception {
     HashMap<NodeId, MockNM> nodes = new HashMap<>();
     MockNM nm1 = new MockNM("h1:1234", 4096, rm.getResourceTrackerService());
@@ -818,10 +828,13 @@ public class TestOpportunisticContainerAllocatorAMService {
   }
 
   @Test(timeout = 60000)
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testAMCrashDuringAllocate() throws Exception {
     MockNM nm = new MockNM("h:1234", 4096, rm.getResourceTrackerService());
     nm.registerNode();
 
+<<<<<<< HEAD
     RMApp app = MockRMAppSubmitter.submit(rm,
         MockRMAppSubmissionData.Builder.createWithMemory(1 * GB, rm)
             .withAppName("app")
@@ -829,6 +842,9 @@ public class TestOpportunisticContainerAllocatorAMService {
             .withAcls(null)
             .withQueue("default")
             .build());
+=======
+    RMApp app = rm.submitApp(1 * GB, "app", "user", null, "default");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ApplicationAttemptId attemptId0 =
         app.getCurrentAppAttempt().getAppAttemptId();
     MockAM am = MockRM.launchAndRegisterAM(app, rm, nm);
@@ -922,6 +938,7 @@ public class TestOpportunisticContainerAllocatorAMService {
   @Test(timeout = 60000)
   public void testAppAttemptRemovalAfterNodeRemoval() throws Exception {
     MockNM nm = new MockNM("h:1234", 4096, rm.getResourceTrackerService());
+<<<<<<< HEAD
 
     nm.registerNode();
     nm.nodeHeartbeat(oppContainersStatus, true);
@@ -933,6 +950,13 @@ public class TestOpportunisticContainerAllocatorAMService {
             .withAcls(null)
             .withQueue("default")
             .build());
+=======
+    nm.registerNode();
+    OpportunisticContainerAllocatorAMService amservice =
+        (OpportunisticContainerAllocatorAMService) rm
+            .getApplicationMasterService();
+    RMApp app = rm.submitApp(1 * GB, "app", "user", null, "default");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     ApplicationAttemptId attemptId =
         app.getCurrentAppAttempt().getAppAttemptId();
     MockAM am = MockRM.launchAndRegisterAM(app, rm, nm);
@@ -940,12 +964,30 @@ public class TestOpportunisticContainerAllocatorAMService {
     SchedulerApplicationAttempt schedulerAttempt =
         ((CapacityScheduler)scheduler).getApplicationAttempt(attemptId);
     RMNode rmNode1 = rm.getRMContext().getRMNodes().get(nm.getNodeId());
+<<<<<<< HEAD
 
     nm.nodeHeartbeat(oppContainersStatus, true);
 
     GenericTestUtils.waitFor(() ->
         scheduler.getNumClusterNodes() == 1, 10, 200 * 100);
 
+=======
+    nm.nodeHeartbeat(true);
+    ((RMNodeImpl) rmNode1)
+        .setOpportunisticContainersStatus(getOppurtunisticStatus(-1, 100));
+    // Send add and update node events to AM Service.
+    amservice.handle(new NodeAddedSchedulerEvent(rmNode1));
+    amservice.handle(new NodeUpdateSchedulerEvent(rmNode1));
+    try {
+      GenericTestUtils.waitFor(new Supplier<Boolean>() {
+        @Override public Boolean get() {
+          return scheduler.getNumClusterNodes() == 1;
+        }
+      }, 10, 200 * 100);
+    }catch (TimeoutException e) {
+      fail("timed out while waiting for NM to add.");
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     AllocateResponse allocateResponse = am.allocate(
             Arrays.asList(ResourceRequest.newInstance(Priority.newInstance(1),
                 "*", Resources.createResource(1 * GB), 2, true, null,
@@ -956,10 +998,22 @@ public class TestOpportunisticContainerAllocatorAMService {
         .getAllocatedContainers();
     Container container = allocatedContainers.get(0);
     scheduler.handle(new NodeRemovedSchedulerEvent(rmNode1));
+<<<<<<< HEAD
 
     GenericTestUtils.waitFor(() ->
         scheduler.getNumClusterNodes() == 0, 10, 200 * 100);
 
+=======
+    try {
+      GenericTestUtils.waitFor(new Supplier<Boolean>() {
+        @Override public Boolean get() {
+          return scheduler.getNumClusterNodes() == 0;
+        }
+      }, 10, 200 * 100);
+    }catch (TimeoutException e) {
+      fail("timed out while waiting for NM to remove.");
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     //test YARN-9165
     RMContainer rmContainer = null;
     rmContainer = SchedulerUtils.createOpportunisticRmContainer(
@@ -970,16 +1024,23 @@ public class TestOpportunisticContainerAllocatorAMService {
         schedulerAttempt.getApplicationAttemptId(), container.getNodeId(),
         schedulerAttempt.getUser(), rm.getRMContext(), true);
     }
+<<<<<<< HEAD
+=======
+    assert(rmContainer!=null);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     //test YARN-9164
     schedulerAttempt.addRMContainer(container.getId(), rmContainer);
     scheduler.handle(new AppAttemptRemovedSchedulerEvent(attemptId,
         RMAppAttemptState.FAILED, false));
   }
 
+<<<<<<< HEAD
   private OpportunisticContainersStatus getOpportunisticStatus() {
     return getOppurtunisticStatus(-1, 100, 1000);
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private OpportunisticContainersStatus getOppurtunisticStatus(int waitTime,
       int queueLength, int queueCapacity) {
     OpportunisticContainersStatus status =

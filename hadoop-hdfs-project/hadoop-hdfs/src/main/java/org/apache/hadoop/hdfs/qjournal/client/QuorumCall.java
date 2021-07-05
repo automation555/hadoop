@@ -24,7 +24,11 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
+<<<<<<< HEAD
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.MoreExecutors;
+=======
+import com.google.common.util.concurrent.MoreExecutors;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.util.StopWatch;
 import org.apache.hadoop.util.Timer;

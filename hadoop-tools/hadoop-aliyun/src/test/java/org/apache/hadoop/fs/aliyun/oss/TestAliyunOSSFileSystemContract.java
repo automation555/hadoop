@@ -98,6 +98,7 @@ public class TestAliyunOSSFileSystemContract
   }
 
   @Test
+<<<<<<< HEAD
   public void testGetFileStatusInVersioningBucket() throws Exception {
     Path file = this.path("/test/hadoop/file");
     for (int i = 1; i <= 30; ++i) {
@@ -120,6 +121,8 @@ public class TestAliyunOSSFileSystemContract
   }
 
   @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testDeleteSubdir() throws IOException {
     Path parentDir = this.path("/test/hadoop");
     Path file = this.path("/test/hadoop/file");

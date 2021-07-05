@@ -413,7 +413,11 @@
     <Bug pattern="NP_NULL_PARAM_DEREF"/>
   </Match>
 
+<<<<<<< HEAD
   <!-- Parameter is checked with Strings.isNullOrEmpty before accessing -->
+=======
+  <!-- propertyName is checked with isNullOrEmpty (fix after guava 27) -->
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <Match>
     <Class name="org.apache.hadoop.conf.Configuration"/>
     <Method name="asXmlDocument"/>

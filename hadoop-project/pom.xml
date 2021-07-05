@@ -20,10 +20,17 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-main</artifactId>
+<<<<<<< HEAD
     <version>3.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-project</artifactId>
   <version>3.4.0-SNAPSHOT</version>
+=======
+    <version>3.2.1</version>
+  </parent>
+  <artifactId>hadoop-project</artifactId>
+  <version>3.2.1</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <description>Apache Hadoop Project POM</description>
   <name>Apache Hadoop Project POM</name>
   <packaging>pom</packaging>
@@ -31,13 +38,21 @@
 
   <properties>
     <!-- Set the Release year during release -->
+<<<<<<< HEAD
     <release-year>2020</release-year>
+=======
+    <release-year>2019</release-year>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     <failIfNoTests>false</failIfNoTests>
     <!--Whether to proceed to next module if any test failures exist-->
     <ignoreTestFailure>true</ignoreTestFailure>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
+<<<<<<< HEAD
     <jetty.version>9.4.20.v20190813</jetty.version>
+=======
+    <jetty.version>9.3.24.v20180605</jetty.version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <test.exclude>_</test.exclude>
     <test.exclude.pattern>_</test.exclude.pattern>
 
@@ -52,7 +67,11 @@
 
     <kafka.version>2.4.0</kafka.version>
 
+<<<<<<< HEAD
     <hadoop.assemblies.version>3.4.0-SNAPSHOT</hadoop.assemblies.version>
+=======
+    <hadoop.assemblies.version>3.2.1</hadoop.assemblies.version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <commons-daemon.version>1.0.13</commons-daemon.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
@@ -71,12 +90,20 @@
 
     <!-- jackson versions -->
     <jackson.version>1.9.13</jackson.version>
+<<<<<<< HEAD
     <jackson2.version>2.10.3</jackson2.version>
     <jackson2.databind.version>2.10.3</jackson2.databind.version>
 
     <!-- httpcomponents versions -->
     <httpclient.version>4.5.13</httpclient.version>
     <httpcore.version>4.4.13</httpcore.version>
+=======
+    <jackson2.version>2.9.8</jackson2.version>
+
+    <!-- httpcomponents versions -->
+    <httpclient.version>4.5.6</httpclient.version>
+    <httpcore.version>4.4.10</httpcore.version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>1.7.30</slf4j.version>
@@ -91,6 +118,7 @@
     <hadoop.protobuf.version>3.7.1</hadoop.protobuf.version>
     <protoc.path>${env.HADOOP_PROTOC_PATH}</protoc.path>
 
+<<<<<<< HEAD
     <hadoop-thirdparty.version>1.1.0-SNAPSHOT</hadoop-thirdparty.version>
     <hadoop-thirdparty-protobuf.version>${hadoop-thirdparty.version}</hadoop-thirdparty-protobuf.version>
     <hadoop-thirdparty-guava.version>${hadoop-thirdparty.version}</hadoop-thirdparty-guava.version>
@@ -102,10 +130,18 @@
     <curator.version>4.2.0</curator.version>
     <findbugs.version>3.0.5</findbugs.version>
     <spotbugs.version>4.0.6</spotbugs.version>
+=======
+    <zookeeper.version>3.4.13</zookeeper.version>
+    <curator.version>2.13.0</curator.version>
+    <findbugs.version>3.0.0</findbugs.version>
+    <spotbugs.version>3.1.0-RC1</spotbugs.version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <dnsjava.version>2.1.7</dnsjava.version>
 
     <guava.version>27.0-jre</guava.version>
     <guice.version>4.0</guice.version>
+
+    <bouncycastle.version>1.60</bouncycastle.version>
 
     <bouncycastle.version>1.60</bouncycastle.version>
 
@@ -175,7 +211,11 @@
     <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
     <maven-install-plugin.version>2.5.1</maven-install-plugin.version>
     <maven-resources-plugin.version>2.6</maven-resources-plugin.version>
+<<<<<<< HEAD
     <maven-shade-plugin.version>3.2.1</maven-shade-plugin.version>
+=======
+    <maven-shade-plugin.version>3.2.0</maven-shade-plugin.version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
     <maven-war-plugin.version>3.1.0</maven-war-plugin.version>
     <maven-source-plugin.version>2.3</maven-source-plugin.version>
@@ -670,9 +710,20 @@
       </dependency>
 
       <dependency>
+<<<<<<< HEAD
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-cos</artifactId>
         <version>${hadoop.version}</version>
+=======
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-core</artifactId>
+        <version>1.19</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-generator-annprocess</artifactId>
+        <version>1.19</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       </dependency>
 
       <dependency>
@@ -716,7 +767,11 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-compress</artifactId>
+<<<<<<< HEAD
         <version>${commons-compress.version}</version>
+=======
+        <version>1.18</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -1449,12 +1504,16 @@
       <dependency>
         <groupId>org.wildfly.openssl</groupId>
         <artifactId>wildfly-openssl</artifactId>
+<<<<<<< HEAD
         <version>${openssl-wildfly.version}</version>
       </dependency>
       <dependency>
         <groupId>org.wildfly.openssl</groupId>
         <artifactId>wildfly-openssl-java</artifactId>
         <version>${openssl-wildfly.version}</version>
+=======
+        <version>1.0.7.Final</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       </dependency>
 
       <dependency>
@@ -1561,6 +1620,20 @@
        <groupId>org.bouncycastle</groupId>
        <artifactId>bcprov-jdk15on</artifactId>
        <version>${bouncycastle.version}</version>
+<<<<<<< HEAD
+=======
+     </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcpkix-jdk15on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+
+     <dependency>
+        <groupId>joda-time</groupId>
+        <artifactId>joda-time</artifactId>
+        <version>${joda-time.version}</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
      </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
@@ -1881,7 +1954,10 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
+<<<<<<< HEAD
             <doclint>all</doclint>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
             <additionalOptions>
                 <additionalOption>-Xmaxwarns 10000</additionalOption>
             </additionalOptions>
@@ -2142,6 +2218,38 @@
         <artifactId>findbugs-maven-plugin</artifactId>
       </plugin>
       <plugin>
+<<<<<<< HEAD
+=======
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>animal-sniffer-maven-plugin</artifactId>
+        <version>1.16</version>
+        <executions>
+          <execution>
+            <id>signature-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <signature>
+            <groupId>org.codehaus.mojo.signature</groupId>
+            <artifactId>java18</artifactId>
+            <version>1.0</version>
+          </signature>
+          <ignores>
+            <ignore>sun.misc.*</ignore>
+            <ignore>sun.net.*</ignore>
+            <ignore>sun.nio.ch.*</ignore>
+            <ignore>com.sun.javadoc.*</ignore>
+            <ignore>com.sun.tools.*</ignore>
+            <ignore>java.lang.invoke.*</ignore>
+          </ignores>
+        </configuration>
+      </plugin>
+      <plugin>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>

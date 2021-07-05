@@ -233,7 +233,11 @@ public class ProtobufRpcEngine implements RpcEngine {
       final RpcWritable.Buffer val;
       try {
         val = (RpcWritable.Buffer) client.call(RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+<<<<<<< HEAD
             constructRpcRequest(method, theRequest), remoteId,
+=======
+            new RpcProtobufRequest(rpcRequestHeader, theRequest), remoteId,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
             fallbackToSimpleAuth, alignmentContext);
 
       } catch (Throwable e) {
@@ -421,7 +425,10 @@ public class ProtobufRpcEngine implements RpcEngine {
      * @param numHandlers the number of method handler threads to run
      * @param verbose whether each call should be logged
      * @param portRangeConfig A config parameter that can be used to restrict
+<<<<<<< HEAD
      * the range of ports used when port is 0 (an ephemeral port)
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
      * @param alignmentContext provides server state info on client responses
      */
     public Server(Class<?> protocolClass, Object protocolImpl,
@@ -430,9 +437,20 @@ public class ProtobufRpcEngine implements RpcEngine {
         SecretManager<? extends TokenIdentifier> secretManager, 
         String portRangeConfig, AlignmentContext alignmentContext)
         throws IOException {
+<<<<<<< HEAD
       super(protocolClass, protocolImpl, conf, bindAddress, port, numHandlers,
           numReaders, queueSizePerHandler, verbose, secretManager,
           portRangeConfig, alignmentContext);
+=======
+      super(bindAddress, port, null, numHandlers,
+          numReaders, queueSizePerHandler, conf,
+          serverNameFromClass(protocolImpl.getClass()), secretManager,
+          portRangeConfig);
+      setAlignmentContext(alignmentContext);
+      this.verbose = verbose;  
+      registerProtocolAndImpl(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocolClass,
+          protocolImpl);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     /**
@@ -456,6 +474,7 @@ public class ProtobufRpcEngine implements RpcEngine {
       Message prototype = service.getRequestPrototype(methodDescriptor);
       Message param = request.getValue(prototype);
 
+<<<<<<< HEAD
       Message result;
       Call currentCall = Server.getCurCall().get();
       try {
@@ -469,6 +488,94 @@ public class ProtobufRpcEngine implements RpcEngine {
           currentCall.deferResponse();
           currentCallback.set(null);
           return null;
+=======
+      @Override 
+      /**
+       * This is a server side method, which is invoked over RPC. On success
+       * the return response has protobuf response payload. On failure, the
+       * exception name and the stack trace are returned in the response.
+       * See {@link HadoopRpcResponseProto}
+       * 
+       * In this method there three types of exceptions possible and they are
+       * returned in response as follows.
+       * <ol>
+       * <li> Exceptions encountered in this method that are returned 
+       * as {@link RpcServerException} </li>
+       * <li> Exceptions thrown by the service is wrapped in ServiceException. 
+       * In that this method returns in response the exception thrown by the 
+       * service.</li>
+       * <li> Other exceptions thrown by the service. They are returned as
+       * it is.</li>
+       * </ol>
+       */
+      public Writable call(RPC.Server server, String connectionProtocolName,
+          Writable writableRequest, long receiveTime) throws Exception {
+        RpcProtobufRequest request = (RpcProtobufRequest) writableRequest;
+        RequestHeaderProto rpcRequest = request.getRequestHeader();
+        String methodName = rpcRequest.getMethodName();
+
+        /** 
+         * RPCs for a particular interface (ie protocol) are done using a
+         * IPC connection that is setup using rpcProxy.
+         * The rpcProxy's has a declared protocol name that is 
+         * sent form client to server at connection time. 
+         * 
+         * Each Rpc call also sends a protocol name 
+         * (called declaringClassprotocolName). This name is usually the same
+         * as the connection protocol name except in some cases. 
+         * For example metaProtocols such ProtocolInfoProto which get info
+         * about the protocol reuse the connection but need to indicate that
+         * the actual protocol is different (i.e. the protocol is
+         * ProtocolInfoProto) since they reuse the connection; in this case
+         * the declaringClassProtocolName field is set to the ProtocolInfoProto.
+         */
+
+        String declaringClassProtoName = 
+            rpcRequest.getDeclaringClassProtocolName();
+        long clientVersion = rpcRequest.getClientProtocolVersion();
+        if (server.verbose)
+          LOG.info("Call: connectionProtocolName=" + connectionProtocolName + 
+              ", method=" + methodName);
+        
+        ProtoClassProtoImpl protocolImpl = getProtocolImpl(server, 
+                              declaringClassProtoName, clientVersion);
+        BlockingService service = (BlockingService) protocolImpl.protocolImpl;
+        MethodDescriptor methodDescriptor = service.getDescriptorForType()
+            .findMethodByName(methodName);
+        if (methodDescriptor == null) {
+          String msg = "Unknown method " + methodName + " called on " 
+                                + connectionProtocolName + " protocol.";
+          LOG.warn(msg);
+          throw new RpcNoSuchMethodException(msg);
+        }
+        Message prototype = service.getRequestPrototype(methodDescriptor);
+        Message param = request.getValue(prototype);
+
+        Message result;
+        Call currentCall = Server.getCurCall().get();
+        try {
+          server.rpcDetailedMetrics.init(protocolImpl.protocolClass);
+          currentCallInfo.set(new CallInfo(server, methodName));
+          currentCall.setDetailedMetricsName(methodName);
+          result = service.callBlockingMethod(methodDescriptor, null, param);
+          // Check if this needs to be a deferred response,
+          // by checking the ThreadLocal callback being set
+          if (currentCallback.get() != null) {
+            currentCall.deferResponse();
+            currentCallback.set(null);
+            return null;
+          }
+        } catch (ServiceException e) {
+          Exception exception = (Exception) e.getCause();
+          currentCall.setDetailedMetricsName(
+              exception.getClass().getSimpleName());
+          throw (Exception) e.getCause();
+        } catch (Exception e) {
+          currentCall.setDetailedMetricsName(e.getClass().getSimpleName());
+          throw e;
+        } finally {
+          currentCallInfo.set(null);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         }
       } catch (ServiceException e) {
         Exception exception = (Exception) e.getCause();

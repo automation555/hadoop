@@ -34,8 +34,13 @@ import static org.apache.hadoop.security.LdapGroupsMapping.LDAP_NUM_ATTEMPTS_BEF
 import static org.apache.hadoop.security.LdapGroupsMapping.LDAP_NUM_ATTEMPTS_KEY;
 import static org.apache.hadoop.security.LdapGroupsMapping.LDAP_URL_KEY;
 import static org.junit.Assert.assertTrue;
+<<<<<<< HEAD
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+=======
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;

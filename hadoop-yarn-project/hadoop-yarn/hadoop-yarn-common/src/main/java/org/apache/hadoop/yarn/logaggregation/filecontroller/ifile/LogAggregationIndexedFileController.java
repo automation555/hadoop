@@ -142,6 +142,19 @@ public class LogAggregationIndexedFileController
 
   @Override
   public void initInternal(Configuration conf) {
+<<<<<<< HEAD
+=======
+    // Currently, we need the underlying File System to support append
+    // operation. Will remove this check after we finish
+    // LogAggregationIndexedFileController for non-append mode.
+    boolean append = conf.getBoolean(LOG_AGGREGATION_FS_SUPPORT_APPEND, true);
+    if (!append) {
+      throw new YarnRuntimeException("The configuration:"
+          + LOG_AGGREGATION_FS_SUPPORT_APPEND + " is set as False. We can only"
+          + " use LogAggregationIndexedFileController when the FileSystem "
+          + "support append operations.");
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     String compressName = conf.get(
         YarnConfiguration.NM_LOG_AGG_COMPRESSION_TYPE,
         YarnConfiguration.DEFAULT_NM_LOG_AGG_COMPRESSION_TYPE);

@@ -115,9 +115,13 @@ public class OptionsParser {
         .withVerboseLog(
             command.hasOption(DistCpOptionSwitch.VERBOSE_LOG.getSwitch()))
         .withDirectWrite(
+<<<<<<< HEAD
             command.hasOption(DistCpOptionSwitch.DIRECT_WRITE.getSwitch()))
         .withUseIterator(
             command.hasOption(DistCpOptionSwitch.USE_ITERATOR.getSwitch()));
+=======
+            command.hasOption(DistCpOptionSwitch.DIRECT_WRITE.getSwitch()));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     if (command.hasOption(DistCpOptionSwitch.DIFF.getSwitch())) {
       String[] snapshots = getVals(command,

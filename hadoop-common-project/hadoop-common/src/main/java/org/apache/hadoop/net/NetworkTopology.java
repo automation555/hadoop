@@ -562,7 +562,10 @@ public class NetworkTopology {
           totalInScopeNodes, availableNodes);
       return null;
     }
+<<<<<<< HEAD
     Random r = getRandom();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (excludedNodes == null || excludedNodes.isEmpty()) {
       // if there are no excludedNodes, randomly choose a node
       final int index = r.nextInt(totalInScopeNodes);

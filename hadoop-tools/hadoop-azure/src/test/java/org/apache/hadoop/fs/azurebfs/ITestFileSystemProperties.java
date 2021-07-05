@@ -79,10 +79,16 @@ public class ITestFileSystemProperties extends AbstractAbfsIntegrationTest {
     final Hashtable<String, String> properties = new Hashtable<>();
     properties.put("key", "{ value: valueTest }");
     touch(TEST_PATH);
+<<<<<<< HEAD
     TracingContext tracingContext = getTestTracingContext(fs, true);
     fs.getAbfsStore().setPathProperties(TEST_PATH, properties, tracingContext);
     Hashtable<String, String> fetchedProperties = fs.getAbfsStore()
         .getPathStatus(TEST_PATH, tracingContext);
+=======
+    fs.getAbfsStore().setPathProperties(TEST_PATH, properties);
+    Hashtable<String, String> fetchedProperties =
+            fs.getAbfsStore().getPathStatus(TEST_PATH);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     assertEquals(properties, fetchedProperties);
   }
@@ -106,10 +112,15 @@ public class ITestFileSystemProperties extends AbstractAbfsIntegrationTest {
     final Hashtable<String, String> properties = new Hashtable<>();
     properties.put("key", "{ value: valueTest兩 }");
     touch(TEST_PATH);
+<<<<<<< HEAD
     TracingContext tracingContext = getTestTracingContext(fs, true);
     fs.getAbfsStore().setPathProperties(TEST_PATH, properties, tracingContext);
     Hashtable<String, String> fetchedProperties = fs.getAbfsStore()
         .getPathStatus(TEST_PATH, tracingContext);
+=======
+    fs.getAbfsStore().setPathProperties(TEST_PATH, properties);
+    Hashtable<String, String> fetchedProperties = fs.getAbfsStore().getPathStatus(TEST_PATH);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     assertEquals(properties, fetchedProperties);
   }

@@ -20,7 +20,10 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugi
 
 import java.util.List;
 
+<<<<<<< HEAD
 import org.apache.hadoop.conf.Configuration;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
@@ -62,7 +65,10 @@ public class GpuResourcePlugin implements ResourcePlugin {
 
   @Override
   public void initialize(Context context) throws YarnException {
+<<<<<<< HEAD
     validateExecutorConfig(context.getConf());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.gpuDiscoverer.initialize(context.getConf(),
         new NvidiaBinaryHelper());
     this.dockerCommandPlugin =
@@ -109,6 +115,7 @@ public class GpuResourcePlugin implements ResourcePlugin {
 
   @Override
   public synchronized NMResourceInfo getNMResourceInfo() throws YarnException {
+<<<<<<< HEAD
     final GpuDeviceInformation gpuDeviceInformation;
 
     if (gpuDiscoverer.isAutoDiscoveryEnabled()) {
@@ -127,11 +134,32 @@ public class GpuResourcePlugin implements ResourcePlugin {
     } else {
       gpuDeviceInformation = null;
     }
+=======
+    GpuDeviceInformation gpuDeviceInformation;
+
+    //At this point the gpu plugin is already enabled
+    checkGpuResourceHandler();
+
+    checkErrorCount();
+    try{
+      gpuDeviceInformation = gpuDiscoverer.getGpuDeviceInformation();
+      numOfErrorExecutionSinceLastSucceed = 0;
+    } catch (YarnException e) {
+      LOG.error(e.getMessage(), e);
+      numOfErrorExecutionSinceLastSucceed++;
+      throw e;
+    }
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     GpuResourceAllocator gpuResourceAllocator =
         gpuResourceHandler.getGpuAllocator();
     List<GpuDevice> totalGpus = gpuResourceAllocator.getAllowedGpus();
     List<AssignedGpuDevice> assignedGpuDevices =
         gpuResourceAllocator.getAssignedGpus();
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return new NMGpuResourceInfo(gpuDeviceInformation, totalGpus,
         assignedGpuDevices);
   }

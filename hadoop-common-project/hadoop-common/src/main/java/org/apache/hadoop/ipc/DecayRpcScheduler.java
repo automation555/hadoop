@@ -154,6 +154,7 @@ public class DecayRpcScheduler implements RpcScheduler,
   private final ConcurrentHashMap<Object, List<AtomicLong>> callCosts =
       new ConcurrentHashMap<Object, List<AtomicLong>>();
 
+<<<<<<< HEAD
   // Should be the sum of all AtomicLongs in decayed callCosts except
   // service-user.
   private final AtomicLong totalDecayedCallCost = new AtomicLong();
@@ -163,6 +164,12 @@ public class DecayRpcScheduler implements RpcScheduler,
   private final AtomicLong totalServiceUserDecayedCallCost = new AtomicLong();
   // The sum of all AtomicLongs in raw callCosts of service-user.
   private final AtomicLong totalServiceUserRawCallCost = new AtomicLong();
+=======
+  // Should be the sum of all AtomicLongs in decayed callCosts
+  private final AtomicLong totalDecayedCallCost = new AtomicLong();
+  // The sum of all AtomicLongs in raw callCosts
+  private final AtomicLong totalRawCallCost = new AtomicLong();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 
   // Track total call count and response time in current decay window
@@ -195,8 +202,11 @@ public class DecayRpcScheduler implements RpcScheduler,
   private static final double PRECISION = 0.0001;
   private MetricsProxy metricsProxy;
   private final CostProvider costProvider;
+<<<<<<< HEAD
   private final Map<String, Integer> staticPriorities = new HashMap<>();
   private Set<String> serviceUserNames;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   /**
    * This TimerTask will call decayCurrentCosts until
@@ -454,8 +464,11 @@ public class DecayRpcScheduler implements RpcScheduler,
     try {
       long totalDecayedCost = 0;
       long totalRawCost = 0;
+<<<<<<< HEAD
       long totalServiceUserDecayedCost = 0;
       long totalServiceUserRawCost = 0;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       Iterator<Map.Entry<Object, List<AtomicLong>>> it =
           callCosts.entrySet().iterator();
 
@@ -466,6 +479,7 @@ public class DecayRpcScheduler implements RpcScheduler,
 
 
         // Compute the next value by reducing it by the decayFactor
+<<<<<<< HEAD
         long currentValue = decayedCost.get();
         long nextValue = (long) (currentValue * decayFactor);
         if (isServiceUser((String) entry.getKey())) {
@@ -475,6 +489,12 @@ public class DecayRpcScheduler implements RpcScheduler,
           totalRawCost += rawCost.get();
           totalDecayedCost += nextValue;
         }
+=======
+        totalRawCost += rawCost.get();
+        long currentValue = decayedCost.get();
+        long nextValue = (long) (currentValue * decayFactor);
+        totalDecayedCost += nextValue;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         decayedCost.set(nextValue);
 
         LOG.debug(
@@ -493,6 +513,7 @@ public class DecayRpcScheduler implements RpcScheduler,
       // Update the total so that we remain in sync
       totalDecayedCallCost.set(totalDecayedCost);
       totalRawCallCost.set(totalRawCost);
+<<<<<<< HEAD
       totalServiceUserDecayedCallCost.set(totalServiceUserDecayedCost);
       totalServiceUserRawCallCost.set(totalServiceUserRawCost);
 
@@ -500,6 +521,11 @@ public class DecayRpcScheduler implements RpcScheduler,
               + "totalRawCallCost: {}, totalServiceUserDecayedCost: {},"
               + " totalServiceUserRawCost: {}.", totalDecayedCost, totalRawCost,
           totalServiceUserDecayedCost, totalServiceUserRawCost);
+=======
+
+      LOG.debug("After decaying the stored costs, totalDecayedCost: {}, " +
+          "totalRawCallCost: {}.", totalDecayedCost, totalRawCost);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       // Now refresh the cache of scheduling decisions
       recomputeScheduleCache();
 
@@ -557,6 +583,7 @@ public class DecayRpcScheduler implements RpcScheduler,
     }
 
     // Update the total
+<<<<<<< HEAD
     if (!isServiceUser((String) identity)) {
       totalDecayedCallCost.getAndAdd(costDelta);
       totalRawCallCost.getAndAdd(costDelta);
@@ -564,6 +591,10 @@ public class DecayRpcScheduler implements RpcScheduler,
       totalServiceUserDecayedCallCost.getAndAdd(costDelta);
       totalServiceUserRawCallCost.getAndAdd(costDelta);
     }
+=======
+    totalDecayedCallCost.getAndAdd(costDelta);
+    totalRawCallCost.getAndAdd(costDelta);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     // At this point value is guaranteed to be not null. It may however have
     // been clobbered from callCosts. Nonetheless, we return what
@@ -576,6 +607,7 @@ public class DecayRpcScheduler implements RpcScheduler,
    * Given the cost for an identity, compute a scheduling decision.
    *
    * @param cost the cost for an identity
+<<<<<<< HEAD
    * @param identity the identity of the user
    * @return scheduling decision from 0 to numLevels - 1
    */
@@ -588,6 +620,11 @@ public class DecayRpcScheduler implements RpcScheduler,
     if (staticPriority != null) {
       return staticPriority.intValue();
     }
+=======
+   * @return scheduling decision from 0 to numLevels - 1
+   */
+  private int computePriorityLevel(long cost) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     long totalCallSnapshot = totalDecayedCallCost.get();
 
     double proportion = 0;
@@ -622,6 +659,7 @@ public class DecayRpcScheduler implements RpcScheduler,
             priority);
         return priority;
       }
+<<<<<<< HEAD
     }
 
     // Cache was no good, compute it
@@ -640,6 +678,16 @@ public class DecayRpcScheduler implements RpcScheduler,
       identity = DECAYSCHEDULER_UNKNOWN_IDENTITY;
     }
     return identity;
+=======
+    }
+
+    // Cache was no good, compute it
+    List<AtomicLong> costList = callCosts.get(identity);
+    long currentCost = costList == null ? 0 : costList.get(0).get();
+    int priority = computePriorityLevel(currentCost);
+    LOG.debug("compute priority for {} priority {}", identity, priority);
+    return priority;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -725,6 +773,7 @@ public class DecayRpcScheduler implements RpcScheduler,
     addCost(user, processingCost);
 
     int priorityLevel = schedulable.getPriorityLevel();
+<<<<<<< HEAD
     long queueTime = details.get(Timing.QUEUE, RpcMetrics.TIMEUNIT);
     long processingTime = details.get(Timing.PROCESSING, RpcMetrics.TIMEUNIT);
 
@@ -732,13 +781,25 @@ public class DecayRpcScheduler implements RpcScheduler,
         priorityLevel, queueTime);
     this.decayRpcSchedulerDetailedMetrics.addProcessingTime(
         priorityLevel, processingTime);
+=======
+    long queueTime = details.get(Timing.QUEUE, TimeUnit.MILLISECONDS);
+    long processingTime = details.get(Timing.PROCESSING, TimeUnit.MILLISECONDS);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     responseTimeCountInCurrWindow.getAndIncrement(priorityLevel);
     responseTimeTotalInCurrWindow.getAndAdd(priorityLevel,
         queueTime+processingTime);
+<<<<<<< HEAD
     LOG.debug("addResponseTime for call: {}  priority: {} queueTime: {} " +
         "processingTime: {} ", callName, priorityLevel, queueTime,
         processingTime);
+=======
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("addResponseTime for call: {}  priority: {} queueTime: {} " +
+          "processingTime: {} ", callName, priorityLevel, queueTime,
+          processingTime);
+    }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   // Update the cached average response time at the end of the decay window
@@ -787,6 +848,7 @@ public class DecayRpcScheduler implements RpcScheduler,
   }
 
   @VisibleForTesting
+<<<<<<< HEAD
   Set<String> getServiceUserNames() {
     return serviceUserNames;
   }
@@ -797,6 +859,13 @@ public class DecayRpcScheduler implements RpcScheduler,
   }
 
   @VisibleForTesting
+=======
+  void forceDecay() {
+    decayCurrentCosts();
+  }
+
+  @VisibleForTesting
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   Map<Object, Long> getCallCostSnapshot() {
     HashMap<Object, Long> snapshot = new HashMap<Object, Long>();
 
@@ -951,6 +1020,7 @@ public class DecayRpcScheduler implements RpcScheduler,
 
   public long getTotalRawCallVolume() {
     return totalRawCallCost.get();
+<<<<<<< HEAD
   }
 
   public long getTotalServiceUserCallVolume() {
@@ -959,6 +1029,8 @@ public class DecayRpcScheduler implements RpcScheduler,
 
   public long getTotalServiceUserRawCallVolume() {
     return totalServiceUserRawCallCost.get();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public long[] getResponseTimeCountInLastWindow() {
@@ -1117,12 +1189,15 @@ public class DecayRpcScheduler implements RpcScheduler,
       }
     }
     return decayedCallCosts;
+<<<<<<< HEAD
   }
 
   @VisibleForTesting
   public DecayRpcSchedulerDetailedMetrics
       getDecayRpcSchedulerDetailedMetrics() {
     return decayRpcSchedulerDetailedMetrics;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override

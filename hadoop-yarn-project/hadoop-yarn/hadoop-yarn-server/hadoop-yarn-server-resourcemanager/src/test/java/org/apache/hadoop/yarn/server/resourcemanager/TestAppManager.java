@@ -994,6 +994,7 @@ public class TestAppManager extends AppManagerTestBase{
     when(app.getSubmitTime()).thenReturn(1000L);
     when(app.getLaunchTime()).thenReturn(2000L);
     when(app.getApplicationTags()).thenReturn(Sets.newHashSet("tag2", "tag1"));
+<<<<<<< HEAD
 
     RMAppAttempt mockRMAppAttempt = mock(RMAppAttempt.class);
     Container mockContainer = mock(Container.class);
@@ -1005,6 +1006,8 @@ public class TestAppManager extends AppManagerTestBase{
     when(mockRMAppAttempt.getMasterContainer()).thenReturn(mockContainer);
     when(app.getCurrentAppAttempt()).thenReturn(mockRMAppAttempt);
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Map<String, Long> resourceSecondsMap = new HashMap<>();
     resourceSecondsMap.put(ResourceInformation.MEMORY_MB.getName(), 16384L);
     resourceSecondsMap.put(ResourceInformation.VCORES.getName(), 64L);
@@ -1036,10 +1039,13 @@ public class TestAppManager extends AppManagerTestBase{
     assertTrue(msg.contains("preemptedResources=<memory:1234\\, vCores:56>"));
     assertTrue(msg.contains("applicationType=MAPREDUCE"));
     assertTrue(msg.contains("applicationTags=tag1\\,tag2"));
+<<<<<<< HEAD
     assertTrue(msg.contains("applicationNodeLabel=test"));
     assertTrue(msg.contains("diagnostics=Multiline" + escaped
         + "Diagnostics\\=Diagn\\,ostic"));
     assertTrue(msg.contains("totalAllocatedContainers=1234"));
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Test

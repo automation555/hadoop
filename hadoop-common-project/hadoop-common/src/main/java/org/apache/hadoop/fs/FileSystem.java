@@ -170,7 +170,11 @@ import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapa
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public abstract class FileSystem extends Configured
+<<<<<<< HEAD
     implements Closeable, DelegationTokenIssuer, PathCapabilities {
+=======
+    implements Closeable, DelegationTokenIssuer {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public static final String FS_DEFAULT_NAME_KEY =
                    CommonConfigurationKeys.FS_DEFAULT_NAME_KEY;
   public static final String DEFAULT_FS =

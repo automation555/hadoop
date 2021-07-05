@@ -73,9 +73,15 @@ public class QuorumJournalManager implements JournalManager {
   static final Logger LOG = LoggerFactory.getLogger(QuorumJournalManager.class);
 
   // This config is not publicly exposed
+<<<<<<< HEAD
   public static final String QJM_RPC_MAX_TXNS_KEY =
       "dfs.ha.tail-edits.qjm.rpc.max-txns";
   public static final int QJM_RPC_MAX_TXNS_DEFAULT = 5000;
+=======
+  static final String QJM_RPC_MAX_TXNS_KEY =
+      "dfs.ha.tail-edits.qjm.rpc.max-txns";
+  static final int QJM_RPC_MAX_TXNS_DEFAULT = 5000;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   // Maximum number of transactions to fetch at a time when using the
   // RPC edit fetch mechanism
@@ -535,6 +541,7 @@ public class QuorumJournalManager implements JournalManager {
     selectStreamingInputStreams(streams, fromTxnId, inProgressOk,
         onlyDurableTxns);
   }
+<<<<<<< HEAD
 
   /**
    * Select input streams from the journals, specifically using the RPC
@@ -556,6 +563,29 @@ public class QuorumJournalManager implements JournalManager {
     assert responseMap.size() >= loggers.getMajoritySize() :
         "Quorum call returned without a majority";
 
+=======
+
+  /**
+   * Select input streams from the journals, specifically using the RPC
+   * mechanism optimized for low latency.
+   *
+   * @param streams The collection to store the return streams into.
+   * @param fromTxnId Select edits starting from this transaction ID
+   * @param onlyDurableTxns Iff true, only include transactions which have been
+   *                        committed to a quorum of the journals.
+   * @throws IOException Upon issues, including cache misses on the journals.
+   */
+  private void selectRpcInputStreams(Collection<EditLogInputStream> streams,
+      long fromTxnId, boolean onlyDurableTxns) throws IOException {
+    QuorumCall<AsyncLogger, GetJournaledEditsResponseProto> q =
+        loggers.getJournaledEdits(fromTxnId, maxTxnsPerRpc);
+    Map<AsyncLogger, GetJournaledEditsResponseProto> responseMap =
+        loggers.waitForWriteQuorum(q, selectInputStreamsTimeoutMs,
+            "selectRpcInputStreams");
+    assert responseMap.size() >= loggers.getMajoritySize() :
+        "Quorum call returned without a majority";
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     List<Integer> responseCounts = new ArrayList<>();
     for (GetJournaledEditsResponseProto resp : responseMap.values()) {
       responseCounts.add(resp.getTxnCount());
@@ -579,8 +609,11 @@ public class QuorumJournalManager implements JournalManager {
         LOG.debug(msg.toString());
       }
     }
+<<<<<<< HEAD
     // Cancel any outstanding calls to JN's.
     q.cancelCalls();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     int maxAllowedTxns = !onlyDurableTxns ? highestTxnCount :
         responseCounts.get(responseCounts.size() - loggers.getMajoritySize());

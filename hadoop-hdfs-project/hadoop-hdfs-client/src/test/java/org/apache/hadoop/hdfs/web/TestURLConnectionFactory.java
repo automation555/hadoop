@@ -27,7 +27,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.security.authentication.client.ConnectionConfigurator;
+<<<<<<< HEAD
 import static org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory.SSL_MONITORING_THREAD_NAME;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -100,7 +103,11 @@ public final class TestURLConnectionFactory {
     Thread reloaderThread = null;
     for (Thread thread : threads) {
       if ((thread.getName() != null)
+<<<<<<< HEAD
           && (thread.getName().contains(SSL_MONITORING_THREAD_NAME))) {
+=======
+          && (thread.getName().contains("Truststore reloader thread"))) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         reloaderThread = thread;
       }
     }

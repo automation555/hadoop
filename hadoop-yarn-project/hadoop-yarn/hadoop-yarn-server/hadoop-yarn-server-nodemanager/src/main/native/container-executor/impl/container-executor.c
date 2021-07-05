@@ -829,12 +829,15 @@ static int create_container_directories(const char* user, const char *app_id,
       if (container_log_dir == NULL) {
         free(combined_name);
         return OUT_OF_MEMORY;
+<<<<<<< HEAD
       }
       if (strstr(container_log_dir, "..") != 0) {
         fprintf(LOGFILE, "Unsupported container log directory path detected.\n");
         free(container_log_dir);
         free(combined_name);
         return COULD_NOT_CREATE_APP_LOG_DIRECTORIES;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       } else if (mkdirs(container_log_dir, logdir_perms) != 0) {
         free(container_log_dir);
       } else {
@@ -1381,9 +1384,12 @@ static char *create_app_dirs(const char *user,
     char *app_dir = get_app_directory(*nm_root, user, app_id);
     if (app_dir == NULL) {
       // try the next one
+<<<<<<< HEAD
     } else if (strstr(app_dir, "..") != 0) {
       fprintf(LOGFILE, "Unsupported app directory path detected.\n");
       free(app_dir);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } else if (mkdirs(app_dir, permissions) != 0) {
       free(app_dir);
     } else if (primary_app_dir == NULL) {
@@ -2291,6 +2297,10 @@ int launch_docker_container_as_user(const char * user, const char *app_id,
     res = fscanf (inspect_exitcode_docker, "%d", &exit_code);
     if (pclose (inspect_exitcode_docker) != 0 || res <= 0) {
       fprintf (ERRORFILE, "Could not inspect docker to get Exit code %s.\n", docker_inspect_exitcode_command);
+<<<<<<< HEAD
+=======
+      fflush(ERRORFILE);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       exit_code = -1;
     } else {
       if (exit_code != 0) {

@@ -40,8 +40,11 @@ import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.net.JarURLConnection;
+<<<<<<< HEAD
 import java.net.URI;
 import java.net.URISyntaxException;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -1911,6 +1914,11 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     vStr = StringUtils.toLowerCase(vStr);
     ParsedTimeDuration vUnit = ParsedTimeDuration.unitFor(vStr);
     if (null == vUnit) {
+<<<<<<< HEAD
+=======
+      logDeprecation("No unit for " + name + "(" + vStr + ") assuming " +
+          defaultUnit);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       vUnit = ParsedTimeDuration.unitFor(defaultUnit);
     } else {
       vStr = vStr.substring(0, vStr.lastIndexOf(vUnit.suffix()));
@@ -3115,7 +3123,11 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
           LOG.debug("parsing File " + file);
         }
         reader = (XMLStreamReader2)parse(new BufferedInputStream(
+<<<<<<< HEAD
             Files.newInputStream(file.toPath())), ((Path) resource).toString(),
+=======
+            new FileInputStream(file)), ((Path)resource).toString(),
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
             isRestricted);
       }
     } else if (resource instanceof InputStream) {
@@ -3538,7 +3550,7 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     writeXml(new OutputStreamWriter(out, "UTF-8"));
   }
 
-  public void writeXml(Writer out) throws IOException {
+  public void writeXml(@Nullable Writer out) throws IOException {
     writeXml(null, out);
   }
 

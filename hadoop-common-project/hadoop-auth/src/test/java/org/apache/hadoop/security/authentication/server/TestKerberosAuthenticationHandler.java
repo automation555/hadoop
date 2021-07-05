@@ -100,7 +100,11 @@ public class TestKerberosAuthenticationHandler
     }
   }
 
+<<<<<<< HEAD
   @Test
+=======
+  @Test(timeout=60000)
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testNameRulesHadoop() throws Exception {
     KerberosName kn = new KerberosName(KerberosTestUtils.getServerPrincipal());
     Assert.assertEquals(KerberosTestUtils.getRealm(), kn.getRealm());
@@ -123,7 +127,12 @@ public class TestKerberosAuthenticationHandler
     try {
       kn.getShortName();
       Assert.fail();
+<<<<<<< HEAD
     } catch (Exception ex) {
+=======
+    }
+    catch (Exception ex) {      
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 

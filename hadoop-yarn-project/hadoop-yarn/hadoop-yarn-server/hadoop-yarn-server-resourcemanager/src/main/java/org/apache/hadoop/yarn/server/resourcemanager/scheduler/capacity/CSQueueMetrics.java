@@ -67,6 +67,7 @@ public class CSQueueMetrics extends QueueMetrics {
   private MutableGaugeFloat maxCapacity;
   @Metric("Maximum capacity in percentage relative to total partition")
   private MutableGaugeFloat maxAbsoluteCapacity;
+<<<<<<< HEAD
 
   private static final String GUARANTEED_CAPACITY_METRIC_PREFIX =
       "GuaranteedCapacity.";
@@ -79,6 +80,8 @@ public class CSQueueMetrics extends QueueMetrics {
       "MaxCapacity of NAME";
 
   private CSQueueMetricsForCustomResources csQueueMetricsForCustomResources;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   CSQueueMetrics(MetricsSystem ms, String queueName, Queue parent,
       boolean enableUserMetrics, Configuration conf) {
@@ -189,12 +192,15 @@ public class CSQueueMetrics extends QueueMetrics {
     if (partition == null || partition.equals(RMNodeLabelsManager.NO_LABEL)) {
       guaranteedMB.set(res.getMemorySize());
       guaranteedVCores.set(res.getVirtualCores());
+<<<<<<< HEAD
       if (csQueueMetricsForCustomResources != null) {
         csQueueMetricsForCustomResources.setGuaranteedCapacity(res);
         csQueueMetricsForCustomResources.registerCustomResources(
             csQueueMetricsForCustomResources.getGuaranteedCapacity(), registry,
             GUARANTEED_CAPACITY_METRIC_PREFIX, GUARANTEED_CAPACITY_METRIC_DESC);
       }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 
@@ -210,6 +216,7 @@ public class CSQueueMetrics extends QueueMetrics {
     if (partition == null || partition.equals(RMNodeLabelsManager.NO_LABEL)) {
       maxCapacityMB.set(res.getMemorySize());
       maxCapacityVCores.set(res.getVirtualCores());
+<<<<<<< HEAD
       if (csQueueMetricsForCustomResources != null) {
         csQueueMetricsForCustomResources.setMaxCapacity(res);
         csQueueMetricsForCustomResources.registerCustomResources(
@@ -226,6 +233,8 @@ public class CSQueueMetrics extends QueueMetrics {
           new CSQueueMetricsForCustomResources();
       setQueueMetricsForCustomResources(csQueueMetricsForCustomResources);
       registerCustomResources();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 

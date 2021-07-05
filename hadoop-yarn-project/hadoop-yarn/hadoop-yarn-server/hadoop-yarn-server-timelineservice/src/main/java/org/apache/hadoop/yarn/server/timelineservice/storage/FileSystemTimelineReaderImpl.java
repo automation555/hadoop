@@ -432,10 +432,13 @@ public class FileSystemTimelineReaderImpl extends AbstractService
     String flowRunPathStr = getFlowRunPath(context.getUserId(),
         context.getClusterId(), context.getFlowName(), context.getFlowRunId(),
         context.getAppId());
+<<<<<<< HEAD
     if (context.getUserId() == null) {
       context.setUserId(new Path(flowRunPathStr).getParent().getParent().
           getName());
     }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Path clusterIdPath = new Path(entitiesPath, context.getClusterId());
     Path flowRunPath = new Path(clusterIdPath, flowRunPathStr);
     Path appIdPath = new Path(flowRunPath, context.getAppId());
@@ -448,17 +451,27 @@ public class FileSystemTimelineReaderImpl extends AbstractService
     return result;
   }
 
+<<<<<<< HEAD
   @Override
   public TimelineHealth getHealthStatus() {
+=======
+  @Override public TimelineHealth getHealthStatus() {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     try {
       fs.exists(rootPath);
     } catch (IOException e) {
       return new TimelineHealth(
           TimelineHealth.TimelineHealthStatus.READER_CONNECTION_FAILURE,
+<<<<<<< HEAD
           e.getMessage()
           );
     }
     return new TimelineHealth(TimelineHealth.TimelineHealthStatus.RUNNING,
         "");
+=======
+          e.getMessage());
+    }
+    return new TimelineHealth(TimelineHealth.TimelineHealthStatus.RUNNING, "");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

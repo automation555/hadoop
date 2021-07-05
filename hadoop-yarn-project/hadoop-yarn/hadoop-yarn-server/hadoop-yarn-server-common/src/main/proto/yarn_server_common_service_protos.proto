@@ -74,7 +74,10 @@ message RegisterNodeManagerRequestProto {
   optional ResourceProto physicalResource = 9;
   repeated LogAggregationReportProto log_aggregation_reports_for_apps = 10;
   optional NodeAttributesProto nodeAttributes = 11;
+<<<<<<< HEAD
   optional NodeStatusProto nodeStatus = 12;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }
 
 message RegisterNodeManagerResponseProto {
@@ -134,7 +137,10 @@ message NodeHeartbeatResponseProto {
   // to be used in place of containers_to_decrease
   repeated ContainerProto containers_to_update = 17;
   optional bool areNodeAttributesAcceptedByRM = 18 [default = false];
+<<<<<<< HEAD
   optional int64 tokenSequenceNo = 19;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }
 
 message ContainerQueuingLimitProto {

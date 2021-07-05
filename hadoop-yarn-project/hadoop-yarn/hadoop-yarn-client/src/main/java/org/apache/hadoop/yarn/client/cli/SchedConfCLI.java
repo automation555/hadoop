@@ -21,10 +21,14 @@ package org.apache.hadoop.yarn.client.cli;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
+<<<<<<< HEAD
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.WebResource.Builder;
 import com.sun.jersey.client.urlconnection.HttpURLConnectionFactory;
 import com.sun.jersey.client.urlconnection.URLConnectionClientHandler;
+=======
+import com.sun.jersey.api.client.WebResource.Builder;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.MissingArgumentException;
@@ -175,6 +179,7 @@ public class SchedConfCLI extends Configured implements Tool {
     }
 
     Configuration conf = getConf();
+<<<<<<< HEAD
     if (format) {
       return WebAppUtils.execOnActiveRM(conf, this::formatSchedulerConf, null);
     } else if (getConf) {
@@ -321,6 +326,20 @@ public class SchedConfCLI extends Configured implements Tool {
             .path("scheduler-conf").accept(MediaType.APPLICATION_JSON);
       }
 
+=======
+    return WebAppUtils.execOnActiveRM(conf,
+        this::updateSchedulerConfOnRMNode, updateInfo);
+  }
+
+  private int updateSchedulerConfOnRMNode(String webAppAddress,
+      SchedConfUpdateInfo updateInfo) throws Exception {
+    Client webServiceClient = Client.create();
+    ClientResponse response = null;
+    try {
+      Builder builder = webServiceClient.resource(webAppAddress)
+          .path("ws").path("v1").path("cluster")
+          .path("scheduler-conf").accept(MediaType.APPLICATION_JSON);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       builder.entity(YarnWebServiceUtils.toJson(updateInfo,
           SchedConfUpdateInfo.class), MediaType.APPLICATION_JSON);
       response = builder.put(ClientResponse.class);
@@ -344,6 +363,7 @@ public class SchedConfCLI extends Configured implements Tool {
     }
   }
 
+<<<<<<< HEAD
   private Client createWebServiceClient(SSLFactory clientSslFactory) {
     Client webServiceClient = new Client(new URLConnectionClientHandler(
         new HttpURLConnectionFactory() {
@@ -371,6 +391,8 @@ public class SchedConfCLI extends Configured implements Tool {
     return webServiceClient;
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   @VisibleForTesting
   void addQueues(String args, SchedConfUpdateInfo updateInfo) {

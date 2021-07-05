@@ -256,10 +256,16 @@ public class TestFSNamesystem {
     fsn = new FSNamesystem(conf, fsImage);
     auditLoggers = fsn.getAuditLoggers();
     assertTrue(auditLoggers.size() == 1);
+<<<<<<< HEAD
     assertTrue(
         auditLoggers.get(0) instanceof FSNamesystem.FSNamesystemAuditLogger);
     FSNamesystem.FSNamesystemAuditLogger defaultAuditLogger =
         (FSNamesystem.FSNamesystemAuditLogger) auditLoggers.get(0);
+=======
+    assertTrue(auditLoggers.get(0) instanceof FSNamesystem.DefaultAuditLogger);
+    FSNamesystem.DefaultAuditLogger defaultAuditLogger =
+        (FSNamesystem.DefaultAuditLogger) auditLoggers.get(0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertTrue(defaultAuditLogger.getCallerContextEnabled());
 
     // Not to specify any audit loggers in config

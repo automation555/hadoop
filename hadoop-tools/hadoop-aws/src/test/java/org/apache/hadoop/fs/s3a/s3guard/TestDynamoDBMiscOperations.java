@@ -20,12 +20,16 @@ package org.apache.hadoop.fs.s3a.s3guard;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+<<<<<<< HEAD
 import java.util.List;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.waiters.WaiterTimedOutException;
 import org.junit.Test;
 
+<<<<<<< HEAD
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.s3a.AWSClientIOException;
 import org.apache.hadoop.fs.s3a.S3AFileStatus;
@@ -36,6 +40,12 @@ import static org.apache.hadoop.fs.s3a.s3guard.DynamoDBMetadataStoreTableManager
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+=======
+import org.apache.hadoop.fs.s3a.AWSClientIOException;
+import org.apache.hadoop.test.HadoopTestBase;
+
+import static org.apache.hadoop.fs.s3a.s3guard.DynamoDBMetadataStore.translateTableWaitFailure;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
@@ -98,6 +108,7 @@ public class TestDynamoDBMiscOperations extends HadoopTestBase {
     assertEquals(e, ex.getCause());
   }
 
+<<<<<<< HEAD
   @Test
   public void testInnerListChildrenDirectoryNpe() throws Exception {
     DynamoDBMetadataStore ddbms = new DynamoDBMetadataStore();
@@ -178,4 +189,6 @@ public class TestDynamoDBMiscOperations extends HadoopTestBase {
             BulkOperationState.OperationType.Put, null));
   }
 
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }
