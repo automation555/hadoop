@@ -45,7 +45,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriBuilderException;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -64,14 +63,15 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.client.params.ClientPNames;
+import org.apache.http.client.params.CookiePolicy;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,9 +122,6 @@ public class WebAppProxyServlet extends HttpServlet {
     }
   }
 
-  protected void setConf(YarnConfiguration conf){
-    this.conf = conf;
-  }
   /**
    * Default constructor
    */
@@ -180,39 +177,6 @@ public class WebAppProxyServlet extends HttpServlet {
         __().
         __();
   }
-
-  /**
-   * Show the user a page that says that HTTPS must be used but was not.
-   * @param resp the http response
-   * @param link the link to point to
-   * @return true if HTTPS must be used but was not, false otherwise
-   * @throws IOException on any error.
-   */
-  @VisibleForTesting
-  static boolean checkHttpsStrictAndNotProvided(
-      HttpServletResponse resp, URI link, YarnConfiguration conf)
-      throws IOException {
-    String httpsPolicy = conf.get(
-        YarnConfiguration.RM_APPLICATION_HTTPS_POLICY,
-        YarnConfiguration.DEFAULT_RM_APPLICATION_HTTPS_POLICY);
-    boolean required = httpsPolicy.equals("STRICT");
-    boolean provided = link.getScheme().equals("https");
-    if (required && !provided) {
-      resp.setContentType(MimeType.HTML);
-      Page p = new Page(resp.getWriter());
-      p.html().
-          h1("HTTPS must be used").
-          h3().
-          __(YarnConfiguration.RM_APPLICATION_HTTPS_POLICY,
-              "is set to STRICT, which means that the tracking URL ",
-              "must be an HTTPS URL, but it is not.").
-          __("The tracking URL is: ", link).
-          __().
-          __();
-      return true;
-    }
-    return false;
-  }
   
   /**
    * Download link and have it be the response.
@@ -222,57 +186,26 @@ public class WebAppProxyServlet extends HttpServlet {
    * @param c the cookie to set if any
    * @param proxyHost the proxy host
    * @param method the http method
-   * @param appId the ApplicationID
    * @throws IOException on any error.
    */
-  private void proxyLink(final HttpServletRequest req,
+  private static void proxyLink(final HttpServletRequest req,
       final HttpServletResponse resp, final URI link, final Cookie c,
-      final String proxyHost, final HTTP method, final ApplicationId appId)
-      throws IOException {
-    HttpClientBuilder httpClientBuilder = HttpClientBuilder.create();
-
-    String httpsPolicy = conf.get(YarnConfiguration.RM_APPLICATION_HTTPS_POLICY,
-        YarnConfiguration.DEFAULT_RM_APPLICATION_HTTPS_POLICY);
-
-    boolean connectionTimeoutEnabled =
-        conf.getBoolean(YarnConfiguration.RM_PROXY_TIMEOUT_ENABLED,
-        YarnConfiguration.DEFALUT_RM_PROXY_TIMEOUT_ENABLED);
-    int connectionTimeout =
-        conf.getInt(YarnConfiguration.RM_PROXY_CONNECTION_TIMEOUT,
-            YarnConfiguration.DEFAULT_RM_PROXY_CONNECTION_TIMEOUT);
-
-    if (httpsPolicy.equals("LENIENT") || httpsPolicy.equals("STRICT")) {
-      ProxyCA proxyCA = getProxyCA();
-      // ProxyCA could be null when the Proxy is run outside the RM
-      if (proxyCA != null) {
-        try {
-          httpClientBuilder.setSSLContext(proxyCA.createSSLContext(appId));
-          httpClientBuilder.setSSLHostnameVerifier(
-              proxyCA.getHostnameVerifier());
-        } catch (Exception e) {
-          throw new IOException(e);
-        }
-      }
-    }
-
+      final String proxyHost, final HTTP method) throws IOException {
+    DefaultHttpClient client = new DefaultHttpClient();
+    client
+        .getParams()
+        .setParameter(ClientPNames.COOKIE_POLICY,
+            CookiePolicy.BROWSER_COMPATIBILITY)
+        .setBooleanParameter(ClientPNames.ALLOW_CIRCULAR_REDIRECTS, true);
     // Make sure we send the request from the proxy address in the config
     // since that is what the AM filter checks against. IP aliasing or
     // similar could cause issues otherwise.
     InetAddress localAddress = InetAddress.getByName(proxyHost);
-    LOG.debug("local InetAddress for proxy host: {}", localAddress);
-    httpClientBuilder.setDefaultRequestConfig(
-        connectionTimeoutEnabled ?
-            RequestConfig.custom()
-                .setCircularRedirectsAllowed(true)
-                .setLocalAddress(localAddress)
-                .setConnectionRequestTimeout(connectionTimeout)
-                .setSocketTimeout(connectionTimeout)
-                .setConnectTimeout(connectionTimeout)
-                .build() :
-            RequestConfig.custom()
-                .setCircularRedirectsAllowed(true)
-                .setLocalAddress(localAddress)
-                .build());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("local InetAddress for proxy host: {}", localAddress);
+    }
+    client.getParams()
+        .setParameter(ConnRoutePNames.LOCAL_ADDRESS, localAddress);
 
     HttpRequestBase base = null;
     if (method.equals(HTTP.GET)) {
@@ -301,7 +234,9 @@ public class WebAppProxyServlet extends HttpServlet {
       String name = names.nextElement();
       if (PASS_THROUGH_HEADERS.contains(name)) {
         String value = req.getHeader(name);
-        LOG.debug("REQ HEADER: {} : {}", name, value);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("REQ HEADER: {} : {}", name, value);
+        }
         base.setHeader(name, value);
       }
     }
@@ -312,8 +247,11 @@ public class WebAppProxyServlet extends HttpServlet {
           PROXY_USER_COOKIE_NAME + "=" + URLEncoder.encode(user, "ASCII"));
     }
     OutputStream out = resp.getOutputStream();
-    HttpClient client = httpClientBuilder.build();
     try {
+      //wait too long . then have too many request will throw IOException 
+      client.setConnectionTimeout(100);
+      client.setTimeout(100);
+
       HttpResponse httpResp = client.execute(base);
       resp.setStatus(httpResp.getStatusLine().getStatusCode());
       for (Header header : httpResp.getAllHeaders()) {
@@ -337,7 +275,6 @@ public class WebAppProxyServlet extends HttpServlet {
   
   private static Cookie makeCheckCookie(ApplicationId id, boolean isSet) {
     Cookie c = new Cookie(getCheckCookieName(id),String.valueOf(isSet));
-    c.setHttpOnly(true);
     c.setPath(ProxyUriUtils.getPath(id));
     c.setMaxAge(60 * 60 * 2); //2 hours in seconds
     return c;
@@ -353,10 +290,6 @@ public class WebAppProxyServlet extends HttpServlet {
       throws IOException, YarnException {
     return ((AppReportFetcher) getServletContext()
         .getAttribute(WebAppProxy.FETCHER_ATTRIBUTE)).getApplicationReport(id);
-  }
-
-  private ProxyCA getProxyCA() {
-    return ((ProxyCA) getServletContext().getAttribute(WebAppProxy.PROXY_CA));
   }
   
   private String getProxyHost() throws IOException {
@@ -491,10 +424,6 @@ public class WebAppProxyServlet extends HttpServlet {
         return;
       }
 
-      if (checkHttpsStrictAndNotProvided(resp, trackingUri, conf)) {
-        return;
-      }
-
       String runningUser = applicationReport.getUser();
 
       if (checkUser && !runningUser.equals(remoteUser)) {
@@ -528,7 +457,7 @@ public class WebAppProxyServlet extends HttpServlet {
       if (userWasWarned && userApproved) {
         c = makeCheckCookie(id, true);
       }
-      proxyLink(req, resp, toFetch, c, getProxyHost(), method, id);
+      proxyLink(req, resp, toFetch, c, getProxyHost(), method);
 
     } catch(URISyntaxException | YarnException e) {
       throw new IOException(e); 
@@ -640,6 +569,7 @@ public class WebAppProxyServlet extends HttpServlet {
    * again... If this method returns true, there was a redirect, and
    * it was handled by redirecting the current request to an error page.
    *
+   * @param path the part of the request path after the app id
    * @param id the app id
    * @param req the request object
    * @param resp the response object
