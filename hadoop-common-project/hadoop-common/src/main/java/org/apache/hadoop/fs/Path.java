@@ -24,11 +24,10 @@ import java.io.ObjectInputValidation;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.apache.avro.reflect.Stringable;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -41,8 +40,7 @@ import org.apache.hadoop.conf.Configuration;
 @Stringable
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public class Path
-    implements Comparable<Path>, Serializable, ObjectInputValidation {
+public class Path implements Comparable, Serializable, ObjectInputValidation {
 
   /**
    * The directory separator, a slash.
@@ -70,9 +68,6 @@ public class Path
    */
   private static final Pattern HAS_DRIVE_LETTER_SPECIFIER =
       Pattern.compile("^/?[a-zA-Z]:");
-
-  /** Pre-compiled regular expressions to detect duplicated slashes. */
-  private static final Pattern SLASHES = Pattern.compile("/+");
 
   private static final long serialVersionUID = 0xad00f;
 
@@ -201,8 +196,7 @@ public class Path
     // parse uri scheme, if any
     int colon = pathString.indexOf(':');
     int slash = pathString.indexOf('/');
-    if ((colon != -1) &&
-        ((slash == -1) || (colon < slash))) {     // has a scheme
+    if ((colon > 0) && (colon == (slash-1))) {     // has a scheme
       scheme = pathString.substring(0, colon);
       start = colon+1;
     }
@@ -218,6 +212,12 @@ public class Path
 
     // uri path is the rest of the string -- query & fragment not supported
     String path = pathString.substring(start, pathString.length());
+
+    // add "./" in front of Linux relative paths so that a path containing
+    // a colon e.q. "a:b" will not be interpreted as scheme "a".
+    if (!WINDOWS && !path.isEmpty() && path.charAt(0) != '/') {
+      path = "./" + path;
+    }
 
     initialize(scheme, authority, path, null);
   }
@@ -295,8 +295,8 @@ public class Path
    * @return the normalized path string
    */
   private static String normalizePath(String scheme, String path) {
-    // Remove duplicated slashes.
-    path = SLASHES.matcher(path).replaceAll("/");
+    // Remove double forward slashes.
+    path = StringUtils.replace(path, "//", "/");
 
     // Remove backslashes if this looks like a Windows path. Avoid
     // the substitution if it looks like a non-local URI.
@@ -421,39 +421,22 @@ public class Path
   }
 
   /**
-   * Returns the parent of a path or null if at root. Better alternative is
-   * {@link #getOptionalParentPath()} to handle nullable value for root path.
-   *
+   * Returns the parent of a path or null if at root.
    * @return the parent of a path or null if at root
    */
   public Path getParent() {
-    return getParentUtil();
-  }
-
-  /**
-   * Returns the parent of a path as {@link Optional} or
-   * {@link Optional#empty()} i.e an empty Optional if at root.
-   *
-   * @return Parent of path wrappen in {@link Optional}.
-   * {@link Optional#empty()} i.e an empty Optional if at root.
-   */
-  public Optional<Path> getOptionalParentPath() {
-    return Optional.ofNullable(getParentUtil());
-  }
-
-  private Path getParentUtil() {
     String path = uri.getPath();
     int lastSlash = path.lastIndexOf('/');
     int start = startPositionWithoutWindowsDrive(path);
     if ((path.length() == start) ||               // empty path
-        (lastSlash == start && path.length() == start + 1)) { // at root
+        (lastSlash == start && path.length() == start+1)) { // at root
       return null;
     }
     String parent;
-    if (lastSlash == -1) {
+    if (lastSlash==-1) {
       parent = CUR_DIR;
     } else {
-      parent = path.substring(0, lastSlash == start ? start + 1 : lastSlash);
+      parent = path.substring(0, lastSlash==start?start+1:lastSlash);
     }
     return new Path(uri.getScheme(), uri.getAuthority(), parent);
   }
@@ -474,12 +457,12 @@ public class Path
     // illegal characters unescaped in the string, for glob processing, etc.
     StringBuilder buffer = new StringBuilder();
     if (uri.getScheme() != null) {
-      buffer.append(uri.getScheme())
-          .append(":");
+      buffer.append(uri.getScheme());
+      buffer.append(":");
     }
     if (uri.getAuthority() != null) {
-      buffer.append("//")
-          .append(uri.getAuthority());
+      buffer.append("//");
+      buffer.append(uri.getAuthority());
     }
     if (uri.getPath() != null) {
       String path = uri.getPath();
@@ -491,8 +474,8 @@ public class Path
       buffer.append(path);
     }
     if (uri.getFragment() != null) {
-      buffer.append("#")
-          .append(uri.getFragment());
+      buffer.append("#");
+      buffer.append(uri.getFragment());
     }
     return buffer.toString();
   }
@@ -512,10 +495,11 @@ public class Path
   }
 
   @Override
-  public int compareTo(Path o) {
-    return this.uri.compareTo(o.uri);
+  public int compareTo(Object o) {
+    Path that = (Path)o;
+    return this.uri.compareTo(that.uri);
   }
-
+  
   /**
    * Returns the number of elements in this path.
    * @return the number of elements in this path
