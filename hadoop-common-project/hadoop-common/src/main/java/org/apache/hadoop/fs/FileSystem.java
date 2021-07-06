@@ -21,9 +21,6 @@ import javax.annotation.Nonnull;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.lang.ref.WeakReference;
-import java.lang.ref.ReferenceQueue;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
@@ -44,10 +41,10 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -75,14 +72,13 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 import org.apache.hadoop.util.ClassUtil;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.hadoop.util.DurationInfo;
 import org.apache.hadoop.util.LambdaUtils;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.tracing.Tracer;
-import org.apache.hadoop.tracing.TraceScope;
+import org.apache.htrace.core.Tracer;
+import org.apache.htrace.core.TraceScope;
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
@@ -90,6 +86,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkArgument;
+import static java.util.Collections.newSetFromMap;
+import static java.util.Collections.synchronizedSet;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.*;
 import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapabilityArgs;
 
@@ -181,7 +179,7 @@ public abstract class FileSystem extends Configured
    * so must be considered something to only be changed with care.
    */
   @InterfaceAudience.Private
-  public static final Logger LOG = LoggerFactory.getLogger(FileSystem.class);
+  public static final Log LOG = LogFactory.getLog(FileSystem.class);
 
   /**
    * The SLF4J logger to use in logging within the FileSystem class itself.
@@ -201,7 +199,7 @@ public abstract class FileSystem extends Configured
   public static final String USER_HOME_PREFIX = "/user";
 
   /** FileSystem cache. */
-  static final Cache CACHE = new Cache(new Configuration());
+  static final Cache CACHE = new Cache();
 
   /** The key this instance is stored under in the cache. */
   private Cache.Key key;
@@ -2592,11 +2590,8 @@ public abstract class FileSystem extends Configured
         + "; Object Identity Hash: "
         + Integer.toHexString(System.identityHashCode(this)));
     // delete all files that were marked as delete-on-exit.
-    try {
-      processDeleteOnExit();
-    } finally {
-      CACHE.remove(this.key, this);
-    }
+    processDeleteOnExit();
+    CACHE.remove(this.key, this);
   }
 
   /**
@@ -2681,8 +2676,7 @@ public abstract class FileSystem extends Configured
 
   /**
    * Synchronize client metadata state.
-   * <p>
-   * In some FileSystem implementations such as HDFS metadata
+   * <p/>In some FileSystem implementations such as HDFS metadata
    * synchronization is essential to guarantee consistency of read requests
    * particularly in HA setting.
    * @throws IOException
@@ -3389,7 +3383,15 @@ public abstract class FileSystem extends Configured
               LOGGER.info("Full exception loading: {}", fs, e);
             }
           } catch (ServiceConfigurationError ee) {
-            LOGGER.warn("Cannot load filesystem", ee);
+            LOG.warn("Cannot load filesystem: " + ee);
+            Throwable cause = ee.getCause();
+            // print all the nested exception messages
+            while (cause != null) {
+              LOG.warn(cause.toString());
+              cause = cause.getCause();
+            }
+            // and at debug: the full stack
+            LOG.debug("Stack Trace", ee);
           }
         }
         FILE_SYSTEMS_LOADED = true;
@@ -3449,9 +3451,7 @@ public abstract class FileSystem extends Configured
   private static FileSystem createFileSystem(URI uri, Configuration conf)
       throws IOException {
     Tracer tracer = FsTracer.get(conf);
-    try(TraceScope scope = tracer.newScope("FileSystem#createFileSystem");
-        DurationInfo ignored =
-            new DurationInfo(LOGGER, false, "Creating FS %s", uri)) {
+    try(TraceScope scope = tracer.newScope("FileSystem#createFileSystem")) {
       scope.addKVAnnotation("scheme", uri.getScheme());
       Class<? extends FileSystem> clazz =
           getFileSystemClass(uri.getScheme(), conf);
@@ -3474,38 +3474,14 @@ public abstract class FileSystem extends Configured
   }
 
   /** Caching FileSystem objects. */
-  static final class Cache {
+  static class Cache {
     private final ClientFinalizer clientFinalizer = new ClientFinalizer();
 
     private final Map<Key, FileSystem> map = new HashMap<>();
     private final Set<Key> toAutoClose = new HashSet<>();
 
-    /** Semaphore used to serialize creation of new FS instances. */
-    private final Semaphore creatorPermits;
-
-    /**
-     * Counter of the number of discarded filesystem instances
-     * in this cache. Primarily for testing, but it could possibly
-     * be made visible as some kind of metric.
-     */
-    private final AtomicLong discardedInstances = new AtomicLong(0);
-
     /** A variable that makes all objects in the cache unique. */
     private static AtomicLong unique = new AtomicLong(1);
-
-    /**
-     * Instantiate. The configuration is used to read the
-     * count of permits issued for concurrent creation
-     * of filesystem instances.
-     * @param conf configuration
-     */
-    Cache(final Configuration conf) {
-      int permits = conf.getInt(FS_CREATION_PARALLEL_COUNT,
-          FS_CREATION_PARALLEL_COUNT_DEFAULT);
-      checkArgument(permits > 0, "Invalid value of %s: %s",
-          FS_CREATION_PARALLEL_COUNT, permits);
-      creatorPermits = new Semaphore(permits);
-    }
 
     FileSystem get(URI uri, Configuration conf) throws IOException{
       Key key = new Key(uri, conf);
@@ -3540,86 +3516,33 @@ public abstract class FileSystem extends Configured
       if (fs != null) {
         return fs;
       }
-      // fs not yet created, acquire lock
-      // to construct an instance.
-      try (DurationInfo d = new DurationInfo(LOGGER, false,
-          "Acquiring creator semaphore for %s", uri)) {
-        creatorPermits.acquire();
-      } catch (InterruptedException e) {
-        // acquisition was interrupted; convert to an IOE.
-        throw (IOException)new InterruptedIOException(e.toString())
-            .initCause(e);
-      }
-      FileSystem fsToClose = null;
-      try {
-        // See if FS was instantiated by another thread while waiting
-        // for the permit.
-        synchronized (this) {
-          fs = map.get(key);
-        }
-        if (fs != null) {
-          LOGGER.debug("Filesystem {} created while awaiting semaphore", uri);
-          return fs;
-        }
-        // create the filesystem
-        fs = createFileSystem(uri, conf);
-        final long timeout = conf.getTimeDuration(SERVICE_SHUTDOWN_TIMEOUT,
-            SERVICE_SHUTDOWN_TIMEOUT_DEFAULT,
-            ShutdownHookManager.TIME_UNIT_DEFAULT);
-        // any FS to close outside of the synchronized section
-        synchronized (this) { // lock on the Cache object
 
-          // see if there is now an entry for the FS, which happens
-          // if another thread's creation overlapped with this one.
-          FileSystem oldfs = map.get(key);
-          if (oldfs != null) {
-            // a file system was created in a separate thread.
-            // save the FS reference to close outside all locks,
-            // and switch to returning the oldFS
-            fsToClose = fs;
-            fs = oldfs;
-          } else {
-            // register the clientFinalizer if needed and shutdown isn't
-            // already active
-            if (map.isEmpty()
+      fs = createFileSystem(uri, conf);
+      final long timeout = conf.getTimeDuration(SERVICE_SHUTDOWN_TIMEOUT,
+          SERVICE_SHUTDOWN_TIMEOUT_DEFAULT,
+          ShutdownHookManager.TIME_UNIT_DEFAULT);
+      synchronized (this) { // refetch the lock again
+        FileSystem oldfs = map.get(key);
+        if (oldfs != null) { // a file system is created while lock is releasing
+          fs.close(); // close the new file system
+          return oldfs;  // return the old file system
+        }
+
+        // now insert the new file system into the map
+        if (map.isEmpty()
                 && !ShutdownHookManager.get().isShutdownInProgress()) {
-              ShutdownHookManager.get().addShutdownHook(clientFinalizer,
-                  SHUTDOWN_HOOK_PRIORITY, timeout,
-                  ShutdownHookManager.TIME_UNIT_DEFAULT);
-            }
-            // insert the new file system into the map
-            fs.key = key;
-            map.put(key, fs);
-            if (conf.getBoolean(
-                FS_AUTOMATIC_CLOSE_KEY, FS_AUTOMATIC_CLOSE_DEFAULT)) {
-              toAutoClose.add(key);
-            }
-          }
-        } // end of synchronized block
-      } finally {
-        // release the creator permit.
-        creatorPermits.release();
+          ShutdownHookManager.get().addShutdownHook(clientFinalizer,
+              SHUTDOWN_HOOK_PRIORITY, timeout,
+              ShutdownHookManager.TIME_UNIT_DEFAULT);
+        }
+        fs.key = key;
+        map.put(key, fs);
+        if (conf.getBoolean(
+            FS_AUTOMATIC_CLOSE_KEY, FS_AUTOMATIC_CLOSE_DEFAULT)) {
+          toAutoClose.add(key);
+        }
+        return fs;
       }
-      if (fsToClose != null) {
-        LOGGER.debug("Duplicate FS created for {}; discarding {}",
-            uri, fs);
-        discardedInstances.incrementAndGet();
-        // close the new file system
-        // note this will briefly remove and reinstate "fsToClose" from
-        // the map. It is done in a synchronized block so will not be
-        // visible to others.
-        IOUtils.cleanupWithLogger(LOGGER, fsToClose);
-      }
-      return fs;
-    }
-
-    /**
-     * Get the count of discarded instances.
-     * @return the new instance.
-     */
-    @VisibleForTesting
-    long getDiscardedInstances() {
-      return discardedInstances.get();
     }
 
     synchronized void remove(Key key, FileSystem fs) {
@@ -3795,104 +3718,73 @@ public abstract class FileSystem extends Configured
      * need.
      */
     public static class StatisticsData {
-      private volatile long bytesRead;
-      private volatile long bytesWritten;
-      private volatile int readOps;
-      private volatile int largeReadOps;
-      private volatile int writeOps;
-      private volatile long bytesReadLocalHost;
-      private volatile long bytesReadDistanceOfOneOrTwo;
-      private volatile long bytesReadDistanceOfThreeOrFour;
-      private volatile long bytesReadDistanceOfFiveOrLarger;
-      private volatile long bytesReadErasureCoded;
+      private final FileSystemStorageStatistics fsStorageStatistics;
+
+      public StatisticsData(String scheme) {
+        this.fsStorageStatistics = new FileSystemStorageStatistics(scheme);
+      }
 
       /**
        * Add another StatisticsData object to this one.
        */
       void add(StatisticsData other) {
-        this.bytesRead += other.bytesRead;
-        this.bytesWritten += other.bytesWritten;
-        this.readOps += other.readOps;
-        this.largeReadOps += other.largeReadOps;
-        this.writeOps += other.writeOps;
-        this.bytesReadLocalHost += other.bytesReadLocalHost;
-        this.bytesReadDistanceOfOneOrTwo += other.bytesReadDistanceOfOneOrTwo;
-        this.bytesReadDistanceOfThreeOrFour +=
-            other.bytesReadDistanceOfThreeOrFour;
-        this.bytesReadDistanceOfFiveOrLarger +=
-            other.bytesReadDistanceOfFiveOrLarger;
-        this.bytesReadErasureCoded += other.bytesReadErasureCoded;
-      }
-
-      /**
-       * Negate the values of all statistics.
-       */
-      void negate() {
-        this.bytesRead = -this.bytesRead;
-        this.bytesWritten = -this.bytesWritten;
-        this.readOps = -this.readOps;
-        this.largeReadOps = -this.largeReadOps;
-        this.writeOps = -this.writeOps;
-        this.bytesReadLocalHost = -this.bytesReadLocalHost;
-        this.bytesReadDistanceOfOneOrTwo = -this.bytesReadDistanceOfOneOrTwo;
-        this.bytesReadDistanceOfThreeOrFour =
-            -this.bytesReadDistanceOfThreeOrFour;
-        this.bytesReadDistanceOfFiveOrLarger =
-            -this.bytesReadDistanceOfFiveOrLarger;
-        this.bytesReadErasureCoded = -this.bytesReadErasureCoded;
+        for (Statistic op : Statistic.VALUES) {
+          this.fsStorageStatistics.incrementCounter(
+              op, other.fsStorageStatistics.getLong(op));
+        }
       }
 
       @Override
       public String toString() {
-        return bytesRead + " bytes read, " + bytesWritten + " bytes written, "
-            + readOps + " read ops, " + largeReadOps + " large read ops, "
-            + writeOps + " write ops";
+        return getBytesRead() + " bytes read, "
+            + getBytesWritten() + " bytes written, "
+            + getReadOps() + " read ops, "
+            + getLargeReadOps() + " large read ops, "
+            + getWriteOps() + " write ops";
       }
 
       public long getBytesRead() {
-        return bytesRead;
+        return fsStorageStatistics.getLong(Statistic.BYTES_READ);
       }
 
       public long getBytesWritten() {
-        return bytesWritten;
+        return fsStorageStatistics.getLong(Statistic.BYTES_WRITTEN);
       }
 
       public int getReadOps() {
-        return readOps;
+        return (int) fsStorageStatistics.getLong(Statistic.READ_OPS);
       }
 
       public int getLargeReadOps() {
-        return largeReadOps;
+        return (int) fsStorageStatistics.getLong(Statistic.LARGE_READ_OPS);
       }
 
       public int getWriteOps() {
-        return writeOps;
+        return (int) fsStorageStatistics.getLong(Statistic.WRITE_OPS);
       }
 
       public long getBytesReadLocalHost() {
-        return bytesReadLocalHost;
+        return fsStorageStatistics.getLong(Statistic.BYTES_READ_LOCAL_HOST);
       }
 
       public long getBytesReadDistanceOfOneOrTwo() {
-        return bytesReadDistanceOfOneOrTwo;
+        return fsStorageStatistics.getLong(
+            Statistic.BYTES_READ_DISTANCE_OF_ONE_OR_TWO);
       }
 
       public long getBytesReadDistanceOfThreeOrFour() {
-        return bytesReadDistanceOfThreeOrFour;
+        return fsStorageStatistics.getLong(
+            Statistic.BYTES_READ_DISTANCE_OF_THREE_OR_FOUR);
       }
 
       public long getBytesReadDistanceOfFiveOrLarger() {
-        return bytesReadDistanceOfFiveOrLarger;
+        return fsStorageStatistics.getLong(
+            Statistic.BYTES_READ_DISTANCE_OF_FIVE_OR_LARGER);
       }
 
       public long getBytesReadErasureCoded() {
-        return bytesReadErasureCoded;
+        return fsStorageStatistics.getLong(Statistic.BYTES_READ_ERASURE_CODED);
       }
-    }
-
-    private interface StatisticsAggregator<T> {
-      void accept(StatisticsData data);
-      T aggregate();
     }
 
     private final String scheme;
@@ -3917,30 +3809,17 @@ public abstract class FileSystem extends Configured
      * to the associated threads. Proper clean-up is performed by the cleaner
      * thread when the threads are garbage collected.
      */
-    private final Set<StatisticsDataReference> allData;
-
-    /**
-     * Global reference queue and a cleaner thread that manage statistics data
-     * references from all filesystem instances.
-     */
-    private static final ReferenceQueue<Thread> STATS_DATA_REF_QUEUE;
-    private static final Thread STATS_DATA_CLEANER;
-
-    static {
-      STATS_DATA_REF_QUEUE = new ReferenceQueue<>();
-      // start a single daemon cleaner thread
-      STATS_DATA_CLEANER = new Thread(new StatisticsDataReferenceCleaner());
-      STATS_DATA_CLEANER.
-          setName(StatisticsDataReferenceCleaner.class.getName());
-      STATS_DATA_CLEANER.setDaemon(true);
-      STATS_DATA_CLEANER.start();
-    }
+    private final Set<StatisticsData> allData =
+        synchronizedSet(newSetFromMap(new WeakHashMap<>()));
 
     public Statistics(String scheme) {
       this.scheme = scheme;
-      this.rootData = new StatisticsData();
-      this.threadData = new ThreadLocal<>();
-      this.allData = new HashSet<>();
+      this.rootData = new StatisticsData(scheme);
+      this.threadData = ThreadLocal.withInitial(() -> {
+        StatisticsData data = new StatisticsData(scheme);
+        allData.add(data);
+        return data;
+      });
     }
 
     /**
@@ -3949,94 +3828,15 @@ public abstract class FileSystem extends Configured
      * @param other    The input Statistics object which is cloned.
      */
     public Statistics(Statistics other) {
-      this.scheme = other.scheme;
-      this.rootData = new StatisticsData();
-      other.visitAll(new StatisticsAggregator<Void>() {
-        @Override
-        public void accept(StatisticsData data) {
-          rootData.add(data);
-        }
-
-        public Void aggregate() {
-          return null;
-        }
-      });
-      this.threadData = new ThreadLocal<>();
-      this.allData = new HashSet<>();
-    }
-
-    /**
-     * A weak reference to a thread that also includes the data associated
-     * with that thread. On the thread being garbage collected, it is enqueued
-     * to the reference queue for clean-up.
-     */
-    private final class StatisticsDataReference extends WeakReference<Thread> {
-      private final StatisticsData data;
-
-      private StatisticsDataReference(StatisticsData data, Thread thread) {
-        super(thread, STATS_DATA_REF_QUEUE);
-        this.data = data;
-      }
-
-      public StatisticsData getData() {
-        return data;
-      }
-
-      /**
-       * Performs clean-up action when the associated thread is garbage
-       * collected.
-       */
-      public void cleanUp() {
-        // use the statistics lock for safety
-        synchronized (Statistics.this) {
-          /*
-           * If the thread that created this thread-local data no longer exists,
-           * remove the StatisticsData from our list and fold the values into
-           * rootData.
-           */
-          rootData.add(data);
-          allData.remove(this);
-        }
-      }
-    }
-
-    /**
-     * Background action to act on references being removed.
-     */
-    private static class StatisticsDataReferenceCleaner implements Runnable {
-      @Override
-      public void run() {
-        while (!Thread.interrupted()) {
-          try {
-            StatisticsDataReference ref =
-                (StatisticsDataReference)STATS_DATA_REF_QUEUE.remove();
-            ref.cleanUp();
-          } catch (InterruptedException ie) {
-            LOGGER.warn("Cleaner thread interrupted, will stop", ie);
-            Thread.currentThread().interrupt();
-          } catch (Throwable th) {
-            LOGGER.warn("Exception in the cleaner thread but it will" +
-                " continue to run", th);
-          }
-        }
-      }
+      this(other.scheme);
+      this.rootData.add(other.rootData);
     }
 
     /**
      * Get or create the thread-local data associated with the current thread.
      */
     public StatisticsData getThreadStatistics() {
-      StatisticsData data = threadData.get();
-      if (data == null) {
-        data = new StatisticsData();
-        threadData.set(data);
-        StatisticsDataReference ref =
-            new StatisticsDataReference(data, Thread.currentThread());
-        synchronized(this) {
-          allData.add(ref);
-        }
-      }
-      return data;
+      return threadData.get();
     }
 
     /**
@@ -4044,7 +3844,7 @@ public abstract class FileSystem extends Configured
      * @param newBytes the additional bytes read
      */
     public void incrementBytesRead(long newBytes) {
-      getThreadStatistics().bytesRead += newBytes;
+      incrementInternal(Statistic.BYTES_READ, newBytes);
     }
 
     /**
@@ -4052,7 +3852,7 @@ public abstract class FileSystem extends Configured
      * @param newBytes the additional bytes written
      */
     public void incrementBytesWritten(long newBytes) {
-      getThreadStatistics().bytesWritten += newBytes;
+      incrementInternal(Statistic.BYTES_WRITTEN, newBytes);
     }
 
     /**
@@ -4060,7 +3860,7 @@ public abstract class FileSystem extends Configured
      * @param count number of read operations
      */
     public void incrementReadOps(int count) {
-      getThreadStatistics().readOps += count;
+      incrementInternal(Statistic.READ_OPS, count);
     }
 
     /**
@@ -4068,7 +3868,7 @@ public abstract class FileSystem extends Configured
      * @param count number of large read operations
      */
     public void incrementLargeReadOps(int count) {
-      getThreadStatistics().largeReadOps += count;
+      incrementInternal(Statistic.LARGE_READ_OPS, count);
     }
 
     /**
@@ -4076,7 +3876,7 @@ public abstract class FileSystem extends Configured
      * @param count number of write operations
      */
     public void incrementWriteOps(int count) {
-      getThreadStatistics().writeOps += count;
+      incrementInternal(Statistic.WRITE_OPS, count);
     }
 
     /**
@@ -4084,7 +3884,7 @@ public abstract class FileSystem extends Configured
      * @param newBytes the additional bytes read
      */
     public void incrementBytesReadErasureCoded(long newBytes) {
-      getThreadStatistics().bytesReadErasureCoded += newBytes;
+      incrementInternal(Statistic.BYTES_READ_ERASURE_CODED, newBytes);
     }
 
     /**
@@ -4098,39 +3898,28 @@ public abstract class FileSystem extends Configured
     public void incrementBytesReadByDistance(int distance, long newBytes) {
       switch (distance) {
       case 0:
-        getThreadStatistics().bytesReadLocalHost += newBytes;
+        incrementInternal(Statistic.BYTES_READ_LOCAL_HOST, newBytes);
         break;
       case 1:
       case 2:
-        getThreadStatistics().bytesReadDistanceOfOneOrTwo += newBytes;
+        incrementInternal(
+            Statistic.BYTES_READ_DISTANCE_OF_ONE_OR_TWO, newBytes);
         break;
       case 3:
       case 4:
-        getThreadStatistics().bytesReadDistanceOfThreeOrFour += newBytes;
+        incrementInternal(
+            Statistic.BYTES_READ_DISTANCE_OF_THREE_OR_FOUR, newBytes);
         break;
       default:
-        getThreadStatistics().bytesReadDistanceOfFiveOrLarger += newBytes;
+        incrementInternal(
+            Statistic.BYTES_READ_DISTANCE_OF_FIVE_OR_LARGER, newBytes);
         break;
       }
     }
 
-    /**
-     * Apply the given aggregator to all StatisticsData objects associated with
-     * this Statistics object.
-     *
-     * For each StatisticsData object, we will call accept on the visitor.
-     * Finally, at the end, we will call aggregate to get the final total.
-     *
-     * @param         visitor to use.
-     * @return        The total.
-     */
-    private synchronized <T> T visitAll(StatisticsAggregator<T> visitor) {
-      visitor.accept(rootData);
-      for (StatisticsDataReference ref: allData) {
-        StatisticsData data = ref.getData();
-        visitor.accept(data);
-      }
-      return visitor.aggregate();
+    private void incrementInternal(Statistic op, long count) {
+      rootData.fsStorageStatistics.incrementCounter(op, count);
+      getThreadStatistics().fsStorageStatistics.incrementCounter(op, count);
     }
 
     /**
@@ -4138,18 +3927,7 @@ public abstract class FileSystem extends Configured
      * @return the number of bytes
      */
     public long getBytesRead() {
-      return visitAll(new StatisticsAggregator<Long>() {
-        private long bytesRead = 0;
-
-        @Override
-        public void accept(StatisticsData data) {
-          bytesRead += data.bytesRead;
-        }
-
-        public Long aggregate() {
-          return bytesRead;
-        }
-      });
+      return rootData.getBytesRead();
     }
 
     /**
@@ -4157,18 +3935,7 @@ public abstract class FileSystem extends Configured
      * @return the number of bytes
      */
     public long getBytesWritten() {
-      return visitAll(new StatisticsAggregator<Long>() {
-        private long bytesWritten = 0;
-
-        @Override
-        public void accept(StatisticsData data) {
-          bytesWritten += data.bytesWritten;
-        }
-
-        public Long aggregate() {
-          return bytesWritten;
-        }
-      });
+      return rootData.getBytesWritten();
     }
 
     /**
@@ -4176,19 +3943,7 @@ public abstract class FileSystem extends Configured
      * @return number of read operations
      */
     public int getReadOps() {
-      return visitAll(new StatisticsAggregator<Integer>() {
-        private int readOps = 0;
-
-        @Override
-        public void accept(StatisticsData data) {
-          readOps += data.readOps;
-          readOps += data.largeReadOps;
-        }
-
-        public Integer aggregate() {
-          return readOps;
-        }
-      });
+      return rootData.getReadOps() + rootData.getLargeReadOps();
     }
 
     /**
@@ -4197,18 +3952,7 @@ public abstract class FileSystem extends Configured
      * @return number of large read operations
      */
     public int getLargeReadOps() {
-      return visitAll(new StatisticsAggregator<Integer>() {
-        private int largeReadOps = 0;
-
-        @Override
-        public void accept(StatisticsData data) {
-          largeReadOps += data.largeReadOps;
-        }
-
-        public Integer aggregate() {
-          return largeReadOps;
-        }
-      });
+      return rootData.getLargeReadOps();
     }
 
     /**
@@ -4217,18 +3961,7 @@ public abstract class FileSystem extends Configured
      * @return number of write operations
      */
     public int getWriteOps() {
-      return visitAll(new StatisticsAggregator<Integer>() {
-        private int writeOps = 0;
-
-        @Override
-        public void accept(StatisticsData data) {
-          writeOps += data.writeOps;
-        }
-
-        public Integer aggregate() {
-          return writeOps;
-        }
-      });
+      return rootData.getWriteOps();
     }
 
     /**
@@ -4241,24 +3974,26 @@ public abstract class FileSystem extends Configured
      * @return the total number of bytes read by the network distance
      */
     public long getBytesReadByDistance(int distance) {
-      long bytesRead;
       switch (distance) {
       case 0:
-        bytesRead = getData().getBytesReadLocalHost();
-        break;
+        return rootData.getBytesReadLocalHost();
       case 1:
       case 2:
-        bytesRead = getData().getBytesReadDistanceOfOneOrTwo();
-        break;
+        return rootData.getBytesReadDistanceOfOneOrTwo();
       case 3:
       case 4:
-        bytesRead = getData().getBytesReadDistanceOfThreeOrFour();
-        break;
+        return rootData.getBytesReadDistanceOfThreeOrFour();
       default:
-        bytesRead = getData().getBytesReadDistanceOfFiveOrLarger();
-        break;
+        return rootData.getBytesReadDistanceOfFiveOrLarger();
       }
-      return bytesRead;
+    }
+
+    /**
+     * Get the total number of bytes read on erasure-coded files.
+     * @return the number of bytes
+     */
+    public long getBytesReadErasureCoded() {
+      return rootData.getBytesReadErasureCoded();
     }
 
     /**
@@ -4267,53 +4002,14 @@ public abstract class FileSystem extends Configured
      * @return the StatisticsData
      */
     public StatisticsData getData() {
-      return visitAll(new StatisticsAggregator<StatisticsData>() {
-        private StatisticsData all = new StatisticsData();
-
-        @Override
-        public void accept(StatisticsData data) {
-          all.add(data);
-        }
-
-        public StatisticsData aggregate() {
-          return all;
-        }
-      });
-    }
-
-    /**
-     * Get the total number of bytes read on erasure-coded files.
-     * @return the number of bytes
-     */
-    public long getBytesReadErasureCoded() {
-      return visitAll(new StatisticsAggregator<Long>() {
-        private long bytesReadErasureCoded = 0;
-
-        @Override
-        public void accept(StatisticsData data) {
-          bytesReadErasureCoded += data.bytesReadErasureCoded;
-        }
-
-        public Long aggregate() {
-          return bytesReadErasureCoded;
-        }
-      });
+      StatisticsData all = new StatisticsData(scheme);
+      all.add(rootData);
+      return all;
     }
 
     @Override
     public String toString() {
-      return visitAll(new StatisticsAggregator<String>() {
-        private StatisticsData total = new StatisticsData();
-
-        @Override
-        public void accept(StatisticsData data) {
-          total.add(data);
-        }
-
-        public String aggregate() {
-          return total.toString();
-        }
-      });
+      return rootData.toString();
     }
 
     /**
@@ -4335,20 +4031,7 @@ public abstract class FileSystem extends Configured
      * that holds the lock.
      */
     public void reset() {
-      visitAll(new StatisticsAggregator<Void>() {
-        private StatisticsData total = new StatisticsData();
-
-        @Override
-        public void accept(StatisticsData data) {
-          total.add(data);
-        }
-
-        public Void aggregate() {
-          total.negate();
-          rootData.add(total);
-          return null;
-        }
-      });
+      rootData.fsStorageStatistics.reset();
     }
 
     /**
@@ -4408,7 +4091,7 @@ public abstract class FileSystem extends Configured
           new StorageStatisticsProvider() {
             @Override
             public StorageStatistics provide() {
-              return new FileSystemStorageStatistics(scheme, newStats);
+              return newStats.rootData.fsStorageStatistics;
             }
           });
     }
