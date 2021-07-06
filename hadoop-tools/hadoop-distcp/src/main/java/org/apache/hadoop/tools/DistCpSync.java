@@ -22,15 +22,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
-import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.tools.CopyListing.InvalidInputException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -41,8 +40,7 @@ import java.util.HashSet;
 /**
  * This class provides the basic functionality to sync two FileSystems based on
  * the snapshot diff report. More specifically, we have the following settings:
- * 1. Both the source and target FileSystem must be DistributedFileSystem or
- * (s)WebHdfsFileSystem
+ * 1. Both the source and target FileSystem must be DistributedFileSystem
  * 2. Two snapshots (e.g., s1 and s2) have been created on the source FS.
  * The diff between these two snapshots will be copied to the target FS.
  * 3. The target has the same snapshot s1. No changes have been made on the
@@ -50,7 +48,7 @@ import java.util.HashSet;
  * source.s1
  */
 class DistCpSync {
-  private DistCpContext context;
+  private DistCpOptions inputOptions;
   private Configuration conf;
   // diffMap maps snapshot diff op type to a list of diff ops.
   // It's initially created based on the snapshot diff. Then the individual
@@ -59,37 +57,34 @@ class DistCpSync {
   //
   private EnumMap<SnapshotDiffReport.DiffType, List<DiffInfo>> diffMap;
   private DiffInfo[] renameDiffs;
-  private CopyFilter copyFilter;
 
-  DistCpSync(DistCpContext context, Configuration conf) {
-    this.context = context;
+  DistCpSync(DistCpOptions options, Configuration conf) {
+    this.inputOptions = options;
     this.conf = conf;
-    this.copyFilter = CopyFilter.getCopyFilter(conf);
-    this.copyFilter.initialize();
   }
 
   private boolean isRdiff() {
-    return context.shouldUseRdiff();
+    return inputOptions.shouldUseRdiff();
   }
 
   /**
    * Check if three conditions are met before sync.
    * 1. Only one source directory.
-   * 2. Both source and target file system are DFS or WebHdfs.
+   * 2. Both source and target file system are DFS.
    * 3. There is no change between from and the current status in target
    *    file system.
    *  Throw exceptions if first two aren't met, and return false to fallback to
    *  default distcp if the third condition isn't met.
    */
   private boolean preSyncCheck() throws IOException {
-    List<Path> sourcePaths = context.getSourcePaths();
+    List<Path> sourcePaths = inputOptions.getSourcePaths();
     if (sourcePaths.size() != 1) {
       // we only support one source dir which must be a snapshottable directory
       throw new IllegalArgumentException(sourcePaths.size()
           + " source paths are provided");
     }
     final Path sourceDir = sourcePaths.get(0);
-    final Path targetDir = context.getTargetPath();
+    final Path targetDir = inputOptions.getTargetPath();
 
     final FileSystem srcFs = sourceDir.getFileSystem(conf);
     final FileSystem tgtFs = targetDir.getFileSystem(conf);
@@ -97,32 +92,25 @@ class DistCpSync {
     final Path snapshotDiffDir = isRdiff() ? targetDir : sourceDir;
 
     // currently we require both the source and the target file system are
-    // DistributedFileSystem or (S)WebHdfsFileSystem.
-    if (!(srcFs instanceof DistributedFileSystem
-            || srcFs instanceof WebHdfsFileSystem)) {
-      throw new IllegalArgumentException("Unsupported source file system: "
-          + srcFs.getScheme() + "://. " +
-          "Supported file systems: hdfs://, webhdfs:// and swebhdfs://.");
-    }
-    if (!(tgtFs instanceof DistributedFileSystem
-        || tgtFs instanceof WebHdfsFileSystem)) {
-      throw new IllegalArgumentException("Unsupported target file system: "
-          + tgtFs.getScheme() + "://. " +
-          "Supported file systems: hdfs://, webhdfs:// and swebhdfs://.");
+    // DistributedFileSystem.
+    if (!(srcFs instanceof DistributedFileSystem) ||
+        !(tgtFs instanceof DistributedFileSystem)) {
+      throw new IllegalArgumentException("The FileSystems needs to" +
+          " be DistributedFileSystem for using snapshot-diff-based distcp");
     }
 
+    final DistributedFileSystem targetFs = (DistributedFileSystem) tgtFs;
+
     // make sure targetFS has no change between from and the current states
-    if (!checkNoChange(tgtFs, targetDir)) {
+    if (!checkNoChange(targetFs, targetDir)) {
       // set the source path using the snapshot path
-      context.setSourcePaths(Arrays.asList(getSnapshotPath(sourceDir,
-          context.getToSnapshot())));
+      inputOptions.setSourcePaths(Arrays.asList(getSnapshotPath(sourceDir,
+          inputOptions.getToSnapshot())));
       return false;
     }
 
-    final String from = getSnapshotName(
-        context.getFromSnapshot());
-    final String to = getSnapshotName(
-        context.getToSnapshot());
+    final String from = getSnapshotName(inputOptions.getFromSnapshot());
+    final String to = getSnapshotName(inputOptions.getToSnapshot());
 
     try {
       final FileStatus fromSnapshotStat =
@@ -164,30 +152,31 @@ class DistCpSync {
       return false;
     }
 
-    List<Path> sourcePaths = context.getSourcePaths();
+    List<Path> sourcePaths = inputOptions.getSourcePaths();
     final Path sourceDir = sourcePaths.get(0);
-    final Path targetDir = context.getTargetPath();
+    final Path targetDir = inputOptions.getTargetPath();
     final FileSystem tfs = targetDir.getFileSystem(conf);
+    final DistributedFileSystem targetFs = (DistributedFileSystem) tfs;
 
     Path tmpDir = null;
     try {
-      tmpDir = createTargetTmpDir(tfs, targetDir);
+      tmpDir = createTargetTmpDir(targetFs, targetDir);
       DiffInfo[] renameAndDeleteDiffs =
           getRenameAndDeleteDiffsForSync(targetDir);
       if (renameAndDeleteDiffs.length > 0) {
         // do the real sync work: deletion and rename
-        syncDiff(renameAndDeleteDiffs, tfs, tmpDir);
+        syncDiff(renameAndDeleteDiffs, targetFs, tmpDir);
       }
       return true;
     } catch (Exception e) {
       DistCp.LOG.warn("Failed to use snapshot diff for distcp", e);
       return false;
     } finally {
-      deleteTargetTmpDir(tfs, tmpDir);
+      deleteTargetTmpDir(targetFs, tmpDir);
       // TODO: since we have tmp directory, we can support "undo" with failures
       // set the source path using the snapshot path
-      context.setSourcePaths(Arrays.asList(getSnapshotPath(sourceDir,
-          context.getToSnapshot())));
+      inputOptions.setSourcePaths(Arrays.asList(getSnapshotPath(sourceDir,
+          inputOptions.getToSnapshot())));
     }
   }
 
@@ -198,25 +187,15 @@ class DistCpSync {
    */
   private boolean getAllDiffs() throws IOException {
     Path ssDir = isRdiff()?
-        context.getTargetPath() : context.getSourcePaths().get(0);
+        inputOptions.getTargetPath() : inputOptions.getSourcePaths().get(0);
 
     try {
-      SnapshotDiffReport report = null;
-      FileSystem fs = ssDir.getFileSystem(conf);
-      final String from = getSnapshotName(context.getFromSnapshot());
-      final String to = getSnapshotName(context.getToSnapshot());
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem)fs;
-        report = dfs.getSnapshotDiffReport(ssDir, from, to);
-      } else if (fs instanceof WebHdfsFileSystem) {
-        WebHdfsFileSystem webHdfs = (WebHdfsFileSystem)fs;
-        report = webHdfs.getSnapshotDiffReport(ssDir, from, to);
-      } else {
-        throw new IllegalArgumentException("Unsupported file system: " +
-            fs.getScheme() + "://. " +
-            "Supported file systems: hdfs://, webhdfs:// and swebhdfs://.");
-      }
-
+      DistributedFileSystem fs =
+          (DistributedFileSystem) ssDir.getFileSystem(conf);
+      final String from = getSnapshotName(inputOptions.getFromSnapshot());
+      final String to = getSnapshotName(inputOptions.getToSnapshot());
+      SnapshotDiffReport report = fs.getSnapshotDiffReport(ssDir,
+          from, to);
       this.diffMap = new EnumMap<>(SnapshotDiffReport.DiffType.class);
       for (SnapshotDiffReport.DiffType type :
           SnapshotDiffReport.DiffType.values()) {
@@ -232,32 +211,18 @@ class DistCpSync {
         }
         SnapshotDiffReport.DiffType dt = entry.getType();
         List<DiffInfo> list = diffMap.get(dt);
-        final Path source =
-                new Path(DFSUtilClient.bytes2String(entry.getSourcePath()));
-        final Path relativeSource = new Path(Path.SEPARATOR + source);
         if (dt == SnapshotDiffReport.DiffType.MODIFY ||
             dt == SnapshotDiffReport.DiffType.CREATE ||
             dt == SnapshotDiffReport.DiffType.DELETE) {
-          if (copyFilter.shouldCopy(relativeSource)) {
-            list.add(new DiffInfo(source, null, dt));
-          }
+          final Path source =
+              new Path(new String(entry.getSourcePath(), UTF_8));
+          list.add(new DiffInfo(source, null, dt));
         } else if (dt == SnapshotDiffReport.DiffType.RENAME) {
+          final Path source =
+              new Path(new String(entry.getSourcePath(), UTF_8));
           final Path target =
-                  new Path(DFSUtilClient.bytes2String(entry.getTargetPath()));
-          final Path relativeTarget = new Path(Path.SEPARATOR + target);
-          if (copyFilter.shouldCopy(relativeSource)) {
-            if (copyFilter.shouldCopy(relativeTarget)) {
-              list.add(new DiffInfo(source, target, dt));
-            } else {
-              list = diffMap.get(SnapshotDiffReport.DiffType.DELETE);
-              list.add(new DiffInfo(source, target,
-                      SnapshotDiffReport.DiffType.DELETE));
-            }
-          } else if (copyFilter.shouldCopy(relativeTarget)) {
-            list = diffMap.get(SnapshotDiffReport.DiffType.CREATE);
-            list.add(new DiffInfo(target, null,
-                    SnapshotDiffReport.DiffType.CREATE));
-          }
+              new Path(new String(entry.getTargetPath(), UTF_8));
+          list.add(new DiffInfo(source, target, dt));
         }
       }
       return true;
@@ -281,7 +246,7 @@ class DistCpSync {
     }
   }
 
-  private Path createTargetTmpDir(FileSystem targetFs,
+  private Path createTargetTmpDir(DistributedFileSystem targetFs,
                                   Path targetDir) throws IOException {
     final Path tmp = new Path(targetDir,
         DistCpConstants.HDFS_DISTCP_DIFF_DIRECTORY_NAME + DistCp.rand.nextInt());
@@ -291,7 +256,7 @@ class DistCpSync {
     return tmp;
   }
 
-  private void deleteTargetTmpDir(FileSystem targetFs,
+  private void deleteTargetTmpDir(DistributedFileSystem targetFs,
                                   Path tmpDir) {
     try {
       if (tmpDir != null) {
@@ -306,33 +271,27 @@ class DistCpSync {
    * Compute the snapshot diff on the given file system. Return true if the diff
    * is empty, i.e., no changes have happened in the FS.
    */
-  private boolean checkNoChange(FileSystem fs, Path path) {
+  private boolean checkNoChange(DistributedFileSystem fs, Path path) {
     try {
-      final String from = getSnapshotName(context.getFromSnapshot());
-      SnapshotDiffReport targetDiff = null;
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem)fs;
-        targetDiff = dfs.getSnapshotDiffReport(path, from, "");
-      } else {
-        WebHdfsFileSystem webHdfs = (WebHdfsFileSystem)fs;
-        targetDiff = webHdfs.getSnapshotDiffReport(path, from, "");
-      }
+      final String from = getSnapshotName(inputOptions.getFromSnapshot());
+      SnapshotDiffReport targetDiff =
+          fs.getSnapshotDiffReport(path, from, "");
       if (!targetDiff.getDiffList().isEmpty()) {
         DistCp.LOG.warn("The target has been modified since snapshot "
-            + context.getFromSnapshot());
+            + inputOptions.getFromSnapshot());
         return false;
       } else {
         return true;
       }
     } catch (IOException e) {
       DistCp.LOG.warn("Failed to compute snapshot diff on " + path
-          + " at snapshot " + context.getFromSnapshot(), e);
+          + " at snapshot " + inputOptions.getFromSnapshot(), e);
     }
     return false;
   }
 
   private void syncDiff(DiffInfo[] diffs,
-      FileSystem targetFs, Path tmpDir) throws IOException {
+      DistributedFileSystem targetFs, Path tmpDir) throws IOException {
     moveToTmpDir(diffs, targetFs, tmpDir);
     moveToTarget(diffs, targetFs);
   }
@@ -342,7 +301,7 @@ class DistCpSync {
    * directory.
    */
   private void moveToTmpDir(DiffInfo[] diffs,
-      FileSystem targetFs, Path tmpDir) throws IOException {
+      DistributedFileSystem targetFs, Path tmpDir) throws IOException {
     // sort the diffs based on their source paths to make sure the files and
     // subdirs are moved before moving their parents/ancestors.
     Arrays.sort(diffs, DiffInfo.sourceComparator);
@@ -363,13 +322,15 @@ class DistCpSync {
    * from the tmp dir to the final targets.
    */
   private void moveToTarget(DiffInfo[] diffs,
-      FileSystem targetFs) throws IOException {
+      DistributedFileSystem targetFs) throws IOException {
     // sort the diffs based on their target paths to make sure the parent
     // directories are created first.
     Arrays.sort(diffs, DiffInfo.targetComparator);
     for (DiffInfo diff : diffs) {
       if (diff.getTarget() != null) {
-        targetFs.mkdirs(diff.getTarget().getParent());
+        if (!targetFs.exists(diff.getTarget().getParent())) {
+          targetFs.mkdirs(diff.getTarget().getParent());
+        }
         targetFs.rename(diff.getTmp(), diff.getTarget());
       }
     }
