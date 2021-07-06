@@ -30,9 +30,12 @@ import org.apache.hadoop.classification.InterfaceStability;
 public interface FsConstants {
   // URI for local filesystem
   public static final URI LOCAL_FS_URI = URI.create("file:///");
-  
+
   // URI scheme for FTP
   public static final String FTP_SCHEME = "ftp";
+
+  // URI scheme for SFTP
+  String SFTP_SCHEME = "sftp";
 
   // Maximum number of symlinks to recursively resolve in a path
   static final int MAX_PATH_LINKS = 32;
@@ -42,7 +45,4 @@ public interface FsConstants {
    */
   public static final URI VIEWFS_URI = URI.create("viewfs:///");
   public static final String VIEWFS_SCHEME = "viewfs";
-  String FS_VIEWFS_OVERLOAD_SCHEME_TARGET_FS_IMPL_PATTERN =
-      "fs.viewfs.overload.scheme.target.%s.impl";
-  String VIEWFS_TYPE = "viewfs";
 }
