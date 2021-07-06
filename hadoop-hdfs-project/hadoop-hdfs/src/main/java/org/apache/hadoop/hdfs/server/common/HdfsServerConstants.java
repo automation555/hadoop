@@ -20,18 +20,18 @@ package org.apache.hadoop.hdfs.server.common;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.server.datanode.DataNodeLayoutVersion;
 import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.MetaRecoveryContext;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeLayoutVersion;
 import org.apache.hadoop.util.StringUtils;
 
@@ -43,6 +43,13 @@ import org.apache.hadoop.util.StringUtils;
 @InterfaceAudience.Private
 public interface HdfsServerConstants {
   int MIN_BLOCKS_FOR_WRITE = 1;
+
+  /**
+   * Please see {@link HdfsConstants#LEASE_SOFTLIMIT_PERIOD} and
+   * {@link HdfsConstants#LEASE_HARDLIMIT_PERIOD} for more information.
+   */
+  long LEASE_SOFTLIMIT_PERIOD = HdfsConstants.LEASE_SOFTLIMIT_PERIOD;
+  long LEASE_HARDLIMIT_PERIOD = HdfsConstants.LEASE_HARDLIMIT_PERIOD;
 
   long LEASE_RECOVER_PERIOD = 10 * 1000; // in ms
   // We need to limit the length and depth of a path in the filesystem.
@@ -62,6 +69,12 @@ public interface HdfsServerConstants {
   int NAMENODE_LAYOUT_VERSION
       = NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION;
   /**
+   * Current layout version for DataNode.
+   * Please see {@link DataNodeLayoutVersion.Feature} on adding new layout version.
+   */
+  int DATANODE_LAYOUT_VERSION
+      = DataNodeLayoutVersion.CURRENT_LAYOUT_VERSION;
+  /**
    * Path components that are reserved in HDFS.
    * <p>
    * .reserved is only reserved under root ("/").
@@ -71,7 +84,7 @@ public interface HdfsServerConstants {
       FSDirectory.DOT_RESERVED_STRING
   };
   byte[] DOT_SNAPSHOT_DIR_BYTES
-              = DFSUtil.string2Bytes(HdfsConstants.DOT_SNAPSHOT_DIR);
+              = HdfsConstants.DOT_SNAPSHOT_DIR.getBytes(UTF_8);
 
   /**
    * Type of the node
@@ -143,7 +156,6 @@ public interface HdfsServerConstants {
     RECOVER  ("-recover"),
     FORCE("-force"),
     NONINTERACTIVE("-nonInteractive"),
-    SKIPSHAREDEDITSCHECK("-skipSharedEditsCheck"),
     RENAMERESERVED("-renameReserved"),
     METADATAVERSION("-metadataVersion"),
     UPGRADEONLY("-upgradeOnly"),
@@ -151,25 +163,23 @@ public interface HdfsServerConstants {
     // only used for StorageDirectory.analyzeStorage() in hot swap drive scenario.
     // TODO refactor StorageDirectory.analyzeStorage() so that we can do away with
     // this in StartupOption.
-    HOTSWAP("-hotswap"),
-    // Startup the namenode in observer mode.
-    OBSERVER("-observer");
+    HOTSWAP("-hotswap");
 
     private static final Pattern ENUM_WITH_ROLLING_UPGRADE_OPTION = Pattern.compile(
         "(\\w+)\\((\\w+)\\)");
 
     private final String name;
-    
+
     // Used only with format and upgrade options
     private String clusterId = null;
-    
+
     // Used only by rolling upgrade
     private RollingUpgradeStartupOption rollingUpgradeStartupOption;
 
     // Used only with format option
     private boolean isForceFormat = false;
     private boolean isInteractiveFormat = true;
-    
+
     // Used only with recovery option
     private int force = 0;
 
@@ -177,15 +187,15 @@ public interface HdfsServerConstants {
     public String getName() {return name;}
     public NamenodeRole toNodeRole() {
       switch(this) {
-      case BACKUP: 
+      case BACKUP:
         return NamenodeRole.BACKUP;
-      case CHECKPOINT: 
+      case CHECKPOINT:
         return NamenodeRole.CHECKPOINT;
       default:
         return NamenodeRole.NAMENODE;
       }
     }
-    
+
     public void setClusterId(String cid) {
       clusterId = cid;
     }
@@ -193,12 +203,12 @@ public interface HdfsServerConstants {
     public String getClusterId() {
       return clusterId;
     }
-    
+
     public void setRollingUpgradeStartupOption(String opt) {
       Preconditions.checkState(this == ROLLINGUPGRADE);
       rollingUpgradeStartupOption = RollingUpgradeStartupOption.fromString(opt);
     }
-    
+
     public RollingUpgradeStartupOption getRollingUpgradeStartupOption() {
       Preconditions.checkState(this == ROLLINGUPGRADE);
       return rollingUpgradeStartupOption;
@@ -213,27 +223,27 @@ public interface HdfsServerConstants {
     public void setForce(int force) {
       this.force = force;
     }
-    
+
     public int getForce() {
       return this.force;
     }
-    
+
     public boolean getForceFormat() {
       return isForceFormat;
     }
-    
+
     public void setForceFormat(boolean force) {
       isForceFormat = force;
     }
-    
+
     public boolean getInteractiveFormat() {
       return isInteractiveFormat;
     }
-    
+
     public void setInteractiveFormat(boolean interactive) {
       isInteractiveFormat = interactive;
     }
-    
+
     @Override
     public String toString() {
       if (this == ROLLINGUPGRADE) {
@@ -266,7 +276,7 @@ public interface HdfsServerConstants {
 
     private String description = null;
     NamenodeRole(String arg) {this.description = arg;}
-  
+
     @Override
     public String toString() {
       return description;
@@ -288,10 +298,6 @@ public interface HdfsServerConstants {
     /** Temporary replica: created for replication and relocation only. */
     TEMPORARY(4);
 
-    // Since ReplicaState (de)serialization depends on ordinal, either adding
-    // new value should be avoided to this enum or newly appended value should
-    // be handled by NameNodeLayoutVersion#Feature.
-
     private static final ReplicaState[] cachedValues = ReplicaState.values();
 
     private final int value;
@@ -304,32 +310,13 @@ public interface HdfsServerConstants {
       return value;
     }
 
-    /**
-     * Retrieve ReplicaState corresponding to given index.
-     *
-     * @param v Index to retrieve {@link ReplicaState}.
-     * @return {@link ReplicaState} object.
-     * @throws IndexOutOfBoundsException if the index is invalid.
-     */
     public static ReplicaState getState(int v) {
-      Validate.validIndex(cachedValues, v, "Index Expected range: [0, "
-          + (cachedValues.length - 1) + "]. Actual value: " + v);
       return cachedValues[v];
     }
 
-    /**
-     * Retrieve ReplicaState corresponding to index provided in binary stream.
-     *
-     * @param in Index value provided as bytes in given binary stream.
-     * @return {@link ReplicaState} object.
-     * @throws IOException if an I/O error occurs while reading bytes.
-     * @throws IndexOutOfBoundsException if the index is invalid.
-     */
+    /** Read from in */
     public static ReplicaState read(DataInput in) throws IOException {
-      byte idx = in.readByte();
-      Validate.validIndex(cachedValues, idx, "Index Expected range: [0, "
-          + (cachedValues.length - 1) + "]. Actual value: " + idx);
-      return cachedValues[idx];
+      return cachedValues[in.readByte()];
     }
 
     /** Write to out */
@@ -359,20 +346,20 @@ public interface HdfsServerConstants {
     /**
      * The block is under recovery.<br>
      * When a file lease expires its last block may not be {@link #COMPLETE}
-     * and needs to go through a recovery procedure, 
+     * and needs to go through a recovery procedure,
      * which synchronizes the existing replicas contents.
      */
     UNDER_RECOVERY,
     /**
      * The block is committed.<br>
      * The client reported that all bytes are written to data-nodes
-     * with the given generation stamp and block length, but no 
-     * {@link ReplicaState#FINALIZED} 
+     * with the given generation stamp and block length, but no
+     * {@link ReplicaState#FINALIZED}
      * replicas has yet been reported by data-nodes themselves.
      */
     COMMITTED
   }
-  
+
   String NAMENODE_LEASE_HOLDER = "HDFS_NameNode";
 
   String CRYPTO_XATTR_ENCRYPTION_ZONE =
@@ -383,14 +370,7 @@ public interface HdfsServerConstants {
       "security.hdfs.unreadable.by.superuser";
   String XATTR_ERASURECODING_POLICY =
       "system.hdfs.erasurecoding.policy";
-  String XATTR_SNAPSHOT_DELETED = "system.hdfs.snapshot.deleted";
-
-  String XATTR_SATISFY_STORAGE_POLICY = "user.hdfs.sps";
-
-  Path MOVER_ID_PATH = new Path("/system/mover.id");
 
   long BLOCK_GROUP_INDEX_MASK = 15;
   byte MAX_BLOCKS_IN_GROUP = 16;
-  // maximum bandwidth per datanode 1TB/sec.
-  long MAX_BANDWIDTH_PER_DATANODE = 1099511627776L;
 }

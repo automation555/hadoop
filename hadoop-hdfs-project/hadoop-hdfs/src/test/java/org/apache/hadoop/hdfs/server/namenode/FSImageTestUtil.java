@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs.server.namenode;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -29,8 +28,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,12 +43,13 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.permission.PermissionStatus;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirType;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
@@ -59,27 +59,24 @@ import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.util.Holder;
 import org.apache.hadoop.hdfs.util.MD5FileUtils;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.util.Lists;
-import org.apache.hadoop.util.Sets;
+import org.mockito.Matchers;
 import org.mockito.Mockito;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
-import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
-import org.apache.hadoop.thirdparty.com.google.common.io.Files;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.io.Files;
 
 /**
  * Utility functions for testing fsimage storage.
  */
 public abstract class FSImageTestUtil {
-  
-  public static final Logger LOG =
-      LoggerFactory.getLogger(FSImageTestUtil.class);
-  
+
+  public static final Log LOG = LogFactory.getLog(FSImageTestUtil.class);
+
   /**
    * The position in the fsimage header where the txid is
    * written.
@@ -88,14 +85,14 @@ public abstract class FSImageTestUtil {
 
   /**
    * This function returns a md5 hash of a file.
-   * 
+   *
    * @param file input file
    * @return The md5 string
    */
   public static String getFileMD5(File file) throws IOException {
     return MD5FileUtils.computeMd5ForFile(file).toString();
   }
-  
+
   /**
    * Calculate the md5sum of an image after zeroing out the transaction ID
    * field in the header. This is useful for tests that want to verify
@@ -111,8 +108,6 @@ public abstract class FSImageTestUtil {
       try {
         raf.seek(IMAGE_TXID_POS);
         raf.writeLong(0);
-        raf.close();
-        raf = null;
       } finally {
         IOUtils.closeStream(raf);
       }
@@ -121,7 +116,7 @@ public abstract class FSImageTestUtil {
       tmpFile.delete();
     }
   }
-  
+
   public static StorageDirectory mockStorageDirectory(
       File currentDir, NameNodeDirType type) {
     // Mock the StorageDirectory interface to just point to this file
@@ -134,7 +129,7 @@ public abstract class FSImageTestUtil {
     Mockito.doReturn(mockFile(false)).when(sd).getPreviousDir();
     return sd;
   }
-  
+
   /**
    * Make a mock storage directory that returns some set of file contents.
    * @param type type of storage dir
@@ -146,37 +141,37 @@ public abstract class FSImageTestUtil {
       boolean previousExists,
       String...  fileNames) {
     StorageDirectory sd = mock(StorageDirectory.class);
-    
+
     doReturn(type).when(sd).getStorageDirType();
-  
+
     // Version file should always exist
     doReturn(mockFile(true)).when(sd).getVersionFile();
     doReturn(mockFile(true)).when(sd).getRoot();
 
     // Previous dir optionally exists
     doReturn(mockFile(previousExists))
-      .when(sd).getPreviousDir();   
-  
+      .when(sd).getPreviousDir();
+
     // Return a mock 'current' directory which has the given paths
     File[] files = new File[fileNames.length];
     for (int i = 0; i < fileNames.length; i++) {
       files[i] = new File(fileNames[i]);
     }
-    
+
     File mockDir = Mockito.spy(new File("/dir/current"));
     doReturn(files).when(mockDir).listFiles();
     doReturn(mockDir).when(sd).getCurrentDir();
-    
+
 
     return sd;
   }
-  
+
   static File mockFile(boolean exists) {
     File mockFile = mock(File.class);
     doReturn(exists).when(mockFile).exists();
     return mockFile;
   }
-  
+
   public static FSImageTransactionalStorageInspector inspectStorageDirectory(
       File dir, NameNodeDirType dirType) throws IOException {
     FSImageTransactionalStorageInspector inspector =
@@ -185,7 +180,7 @@ public abstract class FSImageTestUtil {
     return inspector;
   }
 
-  
+
   /**
    * Return a standalone instance of FSEditLog that will log into the given
    * log directory. The returned instance is not yet opened.
@@ -197,36 +192,20 @@ public abstract class FSImageTestUtil {
       throw new IOException("Unable to delete contents of " + logDir);
     }
     NNStorage storage = Mockito.mock(NNStorage.class);
-    StorageDirectory sd 
+    StorageDirectory sd
       = FSImageTestUtil.mockStorageDirectory(logDir, NameNodeDirType.EDITS);
     List<StorageDirectory> sds = Lists.newArrayList(sd);
     Mockito.doReturn(sds).when(storage).dirIterable(NameNodeDirType.EDITS);
     Mockito.doReturn(sd).when(storage)
-      .getStorageDirectory(any());
+      .getStorageDirectory(Matchers.<URI>anyObject());
 
-    FSEditLog editLog = new FSEditLog(new Configuration(), 
+    FSEditLog editLog = new FSEditLog(new Configuration(),
                          storage,
                          ImmutableList.of(logDir.toURI()));
     editLog.initJournalsForWrite();
     return editLog;
   }
 
-  public static INodeFile createEmptyInodeFile(long id, String name,
-      PermissionStatus permissions, long mtime, long atime, short replication,
-      long preferredBlockSize) {
-    return new INodeFile(id, name.getBytes(StandardCharsets.UTF_8),
-        permissions, mtime, atime, null, replication, preferredBlockSize);
-  }
-
-  public static FSEditLog createEditLogWithJournalManager(Configuration conf,
-      NNStorage storage, URI editsUri, final JournalManager manager) {
-    return new FSEditLog(conf, storage, ImmutableList.of(editsUri)) {
-      @Override
-      protected JournalManager createJournal(URI uri) {
-        return manager;
-      }
-    };
-  }
 
   /**
    * Create an aborted in-progress log in the given directory, containing
@@ -237,13 +216,13 @@ public abstract class FSImageTestUtil {
     FSEditLog editLog = FSImageTestUtil.createStandaloneEditLog(editsLogDir);
     editLog.setNextTxId(firstTxId);
     editLog.openForWrite(NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION);
-    
+
     PermissionStatus perms = PermissionStatus.createImmutable("fakeuser", "fakegroup",
         FsPermission.createImmutable((short)0755));
     for (int i = 1; i <= numDirs; i++) {
       String dirName = "dir" + i;
       INodeDirectory dir = new INodeDirectory(newInodeId + i - 1,
-          DFSUtil.string2Bytes(dirName), perms, 0L);
+          dirName.getBytes(UTF_8), perms, 0L);
       editLog.logMkDir("/" + dirName, dir);
     }
     editLog.logSync();
@@ -272,7 +251,7 @@ public abstract class FSImageTestUtil {
       EditLogInputStream elis) throws IOException {
     EnumMap<FSEditLogOpCodes, Holder<Integer>> opCounts =
         new EnumMap<FSEditLogOpCodes, Holder<Integer>>(FSEditLogOpCodes.class);
-    
+
     FSEditLogOp op;
     while ((op = elis.readOp()) != null) {
       Holder<Integer> i = opCounts.get(op.opCode);
@@ -291,9 +270,9 @@ public abstract class FSImageTestUtil {
    */
   public static void assertSameNewestImage(List<File> dirs) throws Exception {
     if (dirs.size() < 2) return;
-    
+
     long imageTxId = -1;
-    
+
     List<File> imageFiles = new ArrayList<File>();
     for (File dir : dirs) {
       FSImageTransactionalStorageInspector inspector =
@@ -308,16 +287,16 @@ public abstract class FSImageTestUtil {
       imageTxId = thisTxId;
       imageFiles.add(inspector.getLatestImages().get(0).getFile());
     }
-    
+
     assertFileContentsSame(imageFiles.toArray(new File[0]));
   }
-  
+
   /**
    * Given a list of directories, assert that any files that are named
    * the same thing have the same contents. For example, if a file
    * named "fsimage_1" shows up in more than one directory, then it must
    * be the same.
-   * @throws Exception 
+   * @throws Exception
    */
   public static void assertParallelFilesAreIdentical(List<File> dirs,
       Set<String> ignoredFileNames) throws Exception {
@@ -327,7 +306,7 @@ public abstract class FSImageTestUtil {
         if (ignoredFileNames.contains(f.getName())) {
           continue;
         }
-        
+
         List<File> fileList = groupedByName.get(f.getName());
         if (fileList == null) {
           fileList = new ArrayList<File>();
@@ -351,7 +330,7 @@ public abstract class FSImageTestUtil {
           assertFileContentsSame(sameNameList.toArray(new File[0]));
         }
       }
-    }  
+    }
   }
 
   /**
@@ -380,7 +359,7 @@ public abstract class FSImageTestUtil {
   public static void assertPropertiesFilesSame(
       File[] propFiles, Set<String> ignoredProperties) throws IOException {
     Set<Map.Entry<Object, Object>> prevProps = null;
-    
+
     for (File f : propFiles) {
       Properties props;
       FileInputStream is = new FileInputStream(f);
@@ -410,11 +389,11 @@ public abstract class FSImageTestUtil {
 
   /**
    * Assert that all of the given paths have the exact same
-   * contents 
+   * contents
    */
   public static void assertFileContentsSame(File... files) throws Exception {
     if (files.length < 2) return;
-    
+
     Map<File, String> md5s = getFileMD5s(files);
     if (Sets.newHashSet(md5s.values()).size() > 1) {
       fail("File contents differed:\n  " +
@@ -423,7 +402,7 @@ public abstract class FSImageTestUtil {
             .join(md5s));
     }
   }
-  
+
   /**
    * Assert that the given files are not all the same, and in fact that
    * they have <code>expectedUniqueHashes</code> unique contents.
@@ -440,7 +419,7 @@ public abstract class FSImageTestUtil {
             .join(md5s));
     }
   }
-  
+
   public static Map<File, String> getFileMD5s(File... files) throws Exception {
     Map<File, String> ret = Maps.newHashMap();
     for (File f : files) {
@@ -452,7 +431,7 @@ public abstract class FSImageTestUtil {
 
   /**
    * @return a List which contains the "current" dir for each storage
-   * directory of the given type. 
+   * directory of the given type.
    */
   public static List<File> getCurrentDirs(NNStorage storage,
       NameNodeDirType type) {
@@ -472,7 +451,7 @@ public abstract class FSImageTestUtil {
     FSImageTransactionalStorageInspector inspector =
       new FSImageTransactionalStorageInspector();
     inspector.inspectDirectory(sd);
-    
+
     return inspector.getLatestImages().get(0).getFile();
   }
 
@@ -500,7 +479,7 @@ public abstract class FSImageTestUtil {
       List<Integer> txids) {
     assertNNHasCheckpoints(cluster, 0, txids);
   }
-  
+
   public static void assertNNHasCheckpoints(MiniDFSCluster cluster,
       int nnIdx, List<Integer> txids) {
 
@@ -533,7 +512,7 @@ public abstract class FSImageTestUtil {
   public static EditLogFile findLatestEditsLog(StorageDirectory sd)
   throws IOException {
     File currentDir = sd.getCurrentDir();
-    List<EditLogFile> foundEditLogs 
+    List<EditLogFile> foundEditLogs
       = Lists.newArrayList(FileJournalManager.matchEditLogs(currentDir));
     return Collections.max(foundEditLogs, EditLogFile.COMPARE_BY_START_TXID);
   }
@@ -541,7 +520,7 @@ public abstract class FSImageTestUtil {
   /**
    * Corrupt the given VERSION file by replacing a given
    * key with a new value and re-writing the file.
-   * 
+   *
    * @param versionFile the VERSION file to corrupt
    * @param key the key to replace
    * @param value the new value for this key
@@ -554,22 +533,19 @@ public abstract class FSImageTestUtil {
     try {
       props.load(fis);
       IOUtils.closeStream(fis);
-  
+
       if (value == null || value.isEmpty()) {
         props.remove(key);
       } else {
         props.setProperty(key, value);
       }
-      
+
       out = new FileOutputStream(versionFile);
       props.store(out, null);
-      out.close();
-      out = null;
-      
+
     } finally {
-      IOUtils.closeStream(fis);
-      IOUtils.closeStream(out);
-    }    
+      IOUtils.cleanup(null, fis, out);
+    }
   }
 
   public static void assertReasonableNameCurrentDir(File curDir)
@@ -581,19 +557,19 @@ public abstract class FSImageTestUtil {
     assertNotNull(image);
   }
 
-  public static void logStorageContents(Logger log, NNStorage storage) {
-    log.info("current storages and corresponding sizes:");
+  public static void logStorageContents(Log LOG, NNStorage storage) {
+    LOG.info("current storages and corresponding sizes:");
     for (StorageDirectory sd : storage.dirIterable(null)) {
       File curDir = sd.getCurrentDir();
-      log.info("In directory " + curDir);
+      LOG.info("In directory " + curDir);
       File[] files = curDir.listFiles();
       Arrays.sort(files);
       for (File f : files) {
-        log.info("  file " + f.getAbsolutePath() + "; len = " + f.length());
+        LOG.info("  file " + f.getAbsolutePath() + "; len = " + f.length());
       }
     }
   }
-  
+
   /** get the fsImage*/
   public static FSImage getFSImage(NameNode node) {
     return node.getFSImage();
@@ -605,12 +581,12 @@ public abstract class FSImageTestUtil {
   public static long getNSQuota(FSNamesystem ns) {
     return ns.dir.rootDir.getQuotaCounts().getNameSpace();
   }
-  
+
   public static void assertNNFilesMatch(MiniDFSCluster cluster) throws Exception {
     List<File> curDirs = Lists.newArrayList();
     curDirs.addAll(FSImageTestUtil.getNameNodeCurrentDirs(cluster, 0));
     curDirs.addAll(FSImageTestUtil.getNameNodeCurrentDirs(cluster, 1));
-    
+
     // Ignore seen_txid file, since the newly bootstrapped standby
     // will have a higher seen_txid than the one it bootstrapped from.
     Set<String> ignoredFiles = ImmutableSet.of("seen_txid");
@@ -623,28 +599,5 @@ public abstract class FSImageTestUtil {
     StorageDirectory sDir = getFSImage(node).getStorage().
         getStorageDirectory(storageUri);
     return NNStorage.readTransactionIdFile(sDir);
-  }
-
-  /**
-   * Returns the summary section from the latest fsimage stored on the cluster.
-   * This is effectively the image index which contains the offset of each
-   * section and subsection.
-   * @param cluster The cluster to load the image from
-   * @return The FileSummary section of the fsimage
-   * @throws IOException
-   */
-  public static FsImageProto.FileSummary getLatestImageSummary(
-      MiniDFSCluster cluster) throws IOException {
-    RandomAccessFile raFile = null;
-    try {
-      File image = FSImageTestUtil.findLatestImageFile(FSImageTestUtil
-          .getFSImage(cluster.getNameNode()).getStorage().getStorageDir(0));
-      raFile = new RandomAccessFile(image, "r");
-      return FSImageUtil.loadSummary(raFile);
-    } finally {
-      if (raFile != null) {
-        raFile.close();
-      }
-    }
   }
 }

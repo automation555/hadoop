@@ -18,10 +18,10 @@
 package org.apache.hadoop.hdfs.protocol;
 
 import java.io.PrintStream;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.text.SimpleDateFormat;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.EnumSet;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -58,30 +58,13 @@ public class SnapshottableDirectoryStatus {
   private final byte[] parentFullPath;
 
   public SnapshottableDirectoryStatus(long modification_time, long access_time,
-      FsPermission permission, EnumSet<HdfsFileStatus.Flags> flags,
-      String owner, String group, byte[] localName, long inodeId,
-      int childrenNum, int snapshotNumber, int snapshotQuota,
-      byte[] parentFullPath) {
-    this.dirStatus = new HdfsFileStatus.Builder()
-      .isdir(true)
-      .mtime(modification_time)
-      .atime(access_time)
-      .perm(permission)
-      .flags(flags)
-      .owner(owner)
-      .group(group)
-      .path(localName)
-      .fileId(inodeId)
-      .children(childrenNum)
-      .build();
-    this.snapshotNumber = snapshotNumber;
-    this.snapshotQuota = snapshotQuota;
-    this.parentFullPath = parentFullPath;
-  }
-
-  public SnapshottableDirectoryStatus(HdfsFileStatus dirStatus,
+      FsPermission permission, String owner, String group, byte[] localName,
+      long inodeId, int childrenNum,
       int snapshotNumber, int snapshotQuota, byte[] parentFullPath) {
-    this.dirStatus = dirStatus;
+    this.dirStatus = new HdfsFileStatus(0, true, 0, 0, modification_time,
+        access_time, permission, owner, group, null, localName, inodeId,
+        childrenNum, null, HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED,
+        null);
     this.snapshotNumber = snapshotNumber;
     this.snapshotQuota = snapshotQuota;
     this.parentFullPath = parentFullPath;
@@ -121,7 +104,7 @@ public class SnapshottableDirectoryStatus {
   public Path getFullPath() {
     String parentFullPathStr =
         (parentFullPath == null || parentFullPath.length == 0) ?
-            null : DFSUtilClient.bytes2String(parentFullPath);
+            null : new String(parentFullPath, UTF_8);
     if (parentFullPathStr == null
         && dirStatus.getLocalNameInBytes().length == 0) {
       // root

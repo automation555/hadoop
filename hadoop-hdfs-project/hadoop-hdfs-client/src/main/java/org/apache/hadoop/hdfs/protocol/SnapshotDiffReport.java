@@ -17,13 +17,14 @@
  */
 package org.apache.hadoop.hdfs.protocol;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.fs.Path;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Objects;
+import com.google.common.base.Objects;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 
 /**
@@ -68,10 +69,6 @@ public class SnapshotDiffReport {
         return RENAME;
       }
       return null;
-    }
-
-    public static DiffType parseDiffType(String s){
-      return DiffType.valueOf(s.toUpperCase());
     }
   }
 
@@ -125,7 +122,7 @@ public class SnapshotDiffReport {
     }
 
     static String getPathString(byte[] path) {
-      String pathStr = DFSUtilClient.bytes2String(path);
+      String pathStr = new String(path, UTF_8);
       if (pathStr.isEmpty()) {
         return Path.CUR_DIR;
       } else {
@@ -170,75 +167,14 @@ public class SnapshotDiffReport {
   /** end point of the diff */
   private final String toSnapshot;
 
-
   /** list of diff */
   private final List<DiffReportEntry> diffList;
 
-  /**
-   * Records the stats related to Snapshot diff operation.
-   */
-  public static class DiffStats {
-    // Total dirs processed
-    private long totalDirsProcessed;
-
-    // Total dirs compared
-    private long totalDirsCompared;
-
-    // Total files processed
-    private long totalFilesProcessed;
-
-    // Total files compared
-    private long totalFilesCompared;
-
-    // Total children listing time
-    private final long totalChildrenListingTime;
-
-    public DiffStats(long totalDirsProcessed, long totalDirsCompared,
-                      long totalFilesProcessed, long totalFilesCompared,
-                      long totalChildrenListingTime) {
-      this.totalDirsCompared = totalDirsProcessed;
-      this.totalDirsProcessed = totalDirsCompared;
-      this.totalFilesCompared = totalFilesProcessed;
-      this.totalFilesProcessed = totalFilesCompared;
-      this.totalChildrenListingTime = totalChildrenListingTime;
-    }
-
-    public long getTotalDirsProcessed() {
-      return this.totalDirsProcessed;
-    }
-
-    public long getTotalDirsCompared() {
-      return this.totalDirsCompared;
-    }
-
-    public long getTotalFilesProcessed() {
-      return this.totalFilesProcessed;
-    }
-
-    public long getTotalFilesCompared() {
-      return this.totalFilesCompared;
-    }
-
-    public long getTotalChildrenListingTime() {
-      return totalChildrenListingTime;
-    }
-  }
-
-  /* Stats associated with the SnapshotDiff Report. */
-  private final DiffStats diffStats;
-
   public SnapshotDiffReport(String snapshotRoot, String fromSnapshot,
       String toSnapshot, List<DiffReportEntry> entryList) {
-    this(snapshotRoot, fromSnapshot, toSnapshot, new DiffStats(0, 0, 0, 0, 0),
-        entryList);
-  }
-
-  public SnapshotDiffReport(String snapshotRoot, String fromSnapshot,
-      String toSnapshot, DiffStats dStat, List<DiffReportEntry> entryList) {
     this.snapshotRoot = snapshotRoot;
     this.fromSnapshot = fromSnapshot;
     this.toSnapshot = toSnapshot;
-    this.diffStats = dStat;
     this.diffList = entryList != null ? entryList : Collections
         .<DiffReportEntry> emptyList();
   }
@@ -256,10 +192,6 @@ public class SnapshotDiffReport {
   /** @return {@link #toSnapshot} */
   public String getLaterSnapshotName() {
     return toSnapshot;
-  }
-
-  public DiffStats getStats() {
-    return this.diffStats;
   }
 
   /** @return {@link #diffList} */
