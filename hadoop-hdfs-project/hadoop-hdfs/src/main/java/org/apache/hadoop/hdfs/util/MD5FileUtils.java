@@ -19,30 +19,31 @@ package org.apache.hadoop.hdfs.util;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.AltFileInputStream;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.util.StringUtils;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import com.google.common.base.Charsets;
 
 /**
  * Static functions for dealing with files of the same format
  * that the Unix "md5sum" utility writes.
  */
 public abstract class MD5FileUtils {
-  private static final Logger LOG = LoggerFactory.getLogger(
+  private static final Log LOG = LogFactory.getLog(
       MD5FileUtils.class);
 
   public static final String MD5_SUFFIX = ".md5";
@@ -74,8 +75,8 @@ public abstract class MD5FileUtils {
    */
   private static Matcher readStoredMd5(File md5File) throws IOException {
     BufferedReader reader =
-        new BufferedReader(new InputStreamReader(
-            Files.newInputStream(md5File.toPath()), Charsets.UTF_8));
+        new BufferedReader(new InputStreamReader(new FileInputStream(
+            md5File), Charsets.UTF_8));
     String md5Line;
     try {
       md5Line = reader.readLine();
@@ -84,7 +85,7 @@ public abstract class MD5FileUtils {
     } catch (IOException ioe) {
       throw new IOException("Error reading md5 file at " + md5File, ioe);
     } finally {
-      IOUtils.cleanupWithLogger(LOG, reader);
+      IOUtils.cleanup(LOG, reader);
     }
     
     Matcher matcher = LINE_REGEX.matcher(md5Line);
@@ -125,7 +126,7 @@ public abstract class MD5FileUtils {
    * Read dataFile and compute its MD5 checksum.
    */
   public static MD5Hash computeMd5ForFile(File dataFile) throws IOException {
-    InputStream in = Files.newInputStream(dataFile.toPath());
+    InputStream in = new AltFileInputStream(dataFile);
     try {
       MessageDigest digester = MD5Hash.getDigester();
       DigestInputStream dis = new DigestInputStream(in, digester);
