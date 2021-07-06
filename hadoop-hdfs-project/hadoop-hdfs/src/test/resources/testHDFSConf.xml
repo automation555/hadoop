@@ -1060,9 +1060,9 @@
         <comparator>
           <type>RegexpAcrossOutputComparator</type>
           <expected-output>Found 3 items
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file1
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file2
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file3</expected-output>
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file1
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file2
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file3</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1081,9 +1081,9 @@
         <comparator>
           <type>RegexpAcrossOutputComparator</type>
           <expected-output>Found 3 items
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file3
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file2
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file1</expected-output>
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file3
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file2
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/file1</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1105,10 +1105,10 @@
         <comparator>
           <type>RegexpAcrossOutputComparator</type>
           <expected-output>Found 4 items
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*120( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data120bytes
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*60( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data60bytes
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*30( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data30bytes
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*15( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data15bytes</expected-output>
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*120( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data120bytes
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*60( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data60bytes
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*30( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data30bytes
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*15( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data15bytes</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1130,10 +1130,10 @@
         <comparator>
           <type>RegexpAcrossOutputComparator</type>
           <expected-output>Found 4 items
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*15( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data15bytes
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*30( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data30bytes
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*60( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data60bytes
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*120( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data120bytes</expected-output>
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*15( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data15bytes
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*30( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data30bytes
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*60( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data60bytes
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*120( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/data120bytes</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1157,11 +1157,11 @@
         <comparator>
           <type>RegexpAcrossOutputComparator</type>
           <expected-output>Found 5 items
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fifth
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fourth
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/third
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/second
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/first</expected-output>
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fifth
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fourth
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/third
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/second
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/first</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1185,11 +1185,11 @@
         <comparator>
           <type>RegexpAcrossOutputComparator</type>
           <expected-output>Found 5 items
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/first
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/second
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/third
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fourth
--rw-r--r--( )*1( )*USERNAME( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fifth</expected-output>
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/first
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/second
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/third
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fourth
+-rw-r--r--( )*1( )*[a-zA-z0-9]*( )*supergroup( )*0( )*[0-9]{4,}-[0-9]{2,}-[0-9]{2,} [0-9]{2,}:[0-9]{2,}( )*/dir/fifth</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1444,7 +1444,7 @@
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^1\.0 K\s+1\.0 K\s+hdfs:///dir0/data1k</expected-output>
+          <expected-output>^1\.0K\s+1\.0 K\s+hdfs:///dir0/data1k</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -1861,7 +1861,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^mv: `file2': No such file or directory: `NAMENODE/user/USERNAME/file2'</expected-output>
+          <expected-output>^mv: `file2': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -2618,7 +2618,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^cp: `file2': No such file or directory: `NAMENODE/user/USERNAME/file2'</expected-output>
+          <expected-output>^cp: `file2': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -5268,126 +5268,7 @@
     </test>
     
     <!-- Tests for getmerge -->
-    <test> <!-- TESTED -->
-      <description>getmerge: basic</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data30bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -getmerge /user/USERNAME/dir1 CLITEST_DATA/file</command>
-        <command>-cat CLITEST_DATA/file</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user/USERNAME CLITEST_DATA/file</command>
-        <command>rm data</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>ExactComparator</type>
-          <expected-output>12345678901234
-12345678901234
-12345678901234
-</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>getmerge: with file</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -getmerge /user/USERNAME/dir1/data15bytes CLITEST_DATA/file</command>
-        <command>-cat CLITEST_DATA/file</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user/USERNAME CLITEST_DATA/file</command>
-        <command>rm data</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>ExactComparator</type>
-          <expected-output>12345678901234
-</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>getmerge: with multiple files</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data30bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -getmerge /user/USERNAME/dir1/data15bytes /user/USERNAME/dir1/data30bytes CLITEST_DATA/file</command>
-        <command>-cat CLITEST_DATA/file</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user/USERNAME CLITEST_DATA/file</command>
-        <command>rm data</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>ExactComparator</type>
-          <expected-output>12345678901234
-12345678901234
-12345678901234
-</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>getmerge: with newlines</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data30bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -getmerge -nl /user/USERNAME/dir1 CLITEST_DATA/file</command>
-        <command>-cat CLITEST_DATA/file</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user/USERNAME CLITEST_DATA/file</command>
-        <command>rm data</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>ExactComparator</type>
-          <expected-output>12345678901234
-
-12345678901234
-12345678901234
-
-</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>getmerge: with multiple files and newlines</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data30bytes /user/USERNAME/dir1</command>
-        <command>-fs NAMENODE -getmerge -nl /user/USERNAME/dir1/data15bytes /user/USERNAME/dir1/data30bytes CLITEST_DATA/file</command>
-        <command>-cat CLITEST_DATA/file</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user/USERNAME CLITEST_DATA/file</command>
-        <command>rm data</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>ExactComparator</type>
-          <expected-output>12345678901234
-
-12345678901234
-12345678901234
-
-</expected-output>
-        </comparator>
-      </comparators>
-    </test>
+    <!-- Manual Testing -->
 
     <!-- Tests for cat -->
     <test> <!-- TESTED -->
@@ -6183,11 +6064,11 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>.*mkdir:.*dir0': No such file or directory$</expected-output>
+          <expected-output>mkdir: `dir0/dir1': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
-
+    
     <test> <!-- TESTED -->
       <description>mkdir: Test recreate of existing directory fails</description>
       <test-commands>
@@ -6471,61 +6352,7 @@
         </comparator>
       </comparators>
     </test>
-
-    <test> <!-- TESTED -->
-      <description>setrep: invalid replication factor -- too high</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p /dir0</command>
-        <command>-fs NAMENODE -touchz /dir0/file0</command>
-        <command>-fs NAMENODE -setrep 1025 /dir0/file0</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^setrep: Requested replication factor of 1025 exceeds maximum of [0-9]+ for /dir0/file0</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>setrep: invalid replication factor -- 0</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p dir0</command>
-        <command>-fs NAMENODE -touchz dir0/file0</command>
-        <command>-fs NAMENODE -setrep 0 dir0/file0</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^-setrep: replication must be >= 1</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>setrep: invalid replication factor -- NaN</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir -p dir0</command>
-        <command>-fs NAMENODE -touchz dir0/file0</command>
-        <command>-fs NAMENODE -setrep three dir0/file0</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r /user</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^setrep: Illegal replication, a positive integer expected</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
+    
     <!-- Tests for touchz-->
     <test> <!-- TESTED -->
       <description>touchz: touching file (absolute path) </description>
@@ -6555,7 +6382,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>touchz: `file0': No such file or directory: `NAMENODE/user/USERNAME/file0'</expected-output>
+          <expected-output>touchz: `file0': No such file or directory</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -7203,130 +7030,7 @@
         </comparator>
       </comparators>
     </test>
-
-    <test> <!-- TESTED -->
-      <description>stat: Test for hdfs:// path - user/group name for directory</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir hdfs:///dirtest</command>
-        <command>-fs NAMENODE -chown hadoop:hadoopgrp hdfs:///dirtest</command>
-        <command>-fs NAMENODE -stat "%u-%g" hdfs:///dirtest</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r hdfs:///dirtest</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>hadoop-hadoopgrp</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>stat: Test for hdfs:// path - user/group name for file</description>
-      <test-commands>
-        <command>-fs NAMENODE -put CLITEST_DATA/data60bytes hdfs:///data60bytes</command>
-        <command>-fs NAMENODE -chown hadoop:hadoopgrp hdfs:////data60bytes</command>
-        <command>-fs NAMENODE -stat "%u-%g" hdfs:////data60bytes</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r hdfs:///data60bytes</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>hadoop-hadoopgrp</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>stat: Test for hdfs:// path - user/group name for multiple files</description>
-      <test-commands>
-        <command>-fs NAMENODE -put CLITEST_DATA/data60bytes hdfs:///data60bytes</command>
-        <command>-fs NAMENODE -put CLITEST_DATA/data30bytes hdfs:///data30bytes</command>
-        <command>-fs NAMENODE -chown hadoop:hadoopgrp hdfs:///data60bytes</command>
-        <command>-fs NAMENODE -chown hdfs:hdfs hdfs:///data30bytes</command>
-        <command>-fs NAMENODE -stat "%u-%g" hdfs:///data*</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r hdfs:///data60bytes</command>
-        <command>-fs NAMENODE -rm -r hdfs:////data30bytes</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>hadoop-hadoopgrp</expected-output>
-        </comparator>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>hdfs-hdfs</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>stat: Test for Namenode's path - user/group name for directory</description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir /dir0</command>
-        <command>-fs NAMENODE -chown hadoop:hadoopgrp NAMENODE/dir0/</command>
-        <command>-fs NAMENODE -stat "%u-%g" NAMENODE/dir0/</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>hadoop-hadoopgrp</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-    <description>stat: Test for Namenode's path - user/group name for file </description>
-    <test-commands>
-    <command>-fs NAMENODE -mkdir /dir0</command>
-    <command>-fs NAMENODE -put CLITEST_DATA/data15bytes NAMENODE/dir0/data15bytes</command>
-    <command>-fs NAMENODE -chown hadoop:hadoopgrp NAMENODE/dir0/data15bytes</command>
-    <command>-fs NAMENODE -stat "%u-%g" NAMENODE/dir0/data15bytes</command>
-    </test-commands>
-    <cleanup-commands>
-      <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
-    </cleanup-commands>
-    <comparators>
-      <comparator>
-        <type>TokenComparator</type>
-        <expected-output>hadoop-hadoopgrp</expected-output>
-      </comparator>
-    </comparators>
-    </test>
-
-    <test> <!-- TESTED -->
-      <description>stat: Test for Namenode's path - user/group name for multiple files </description>
-      <test-commands>
-        <command>-fs NAMENODE -mkdir /dir0</command>
-        <command>-fs NAMENODE -put CLITEST_DATA/data15bytes NAMENODE/dir0/data15bytes</command>
-        <command>-fs NAMENODE -put CLITEST_DATA/data30bytes NAMENODE/dir0/data30bytes</command>
-        <command>-fs NAMENODE -chown hadoop:hadoopgrp NAMENODE/dir0/data15bytes</command>
-        <command>-fs NAMENODE -chown hdfs:hdfs NAMENODE/dir0/data30bytes</command>
-        <command>-fs NAMENODE -stat "%u-%g" NAMENODE/dir0/data*</command>
-      </test-commands>
-      <cleanup-commands>
-        <command>-fs NAMENODE -rm -r NAMENODE/dir0</command>
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>hadoop-hadoopgrp</expected-output>
-        </comparator>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>hdfs-hdfs</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
+  
     <!-- Tests for tail -->
     <test> <!-- TESTED -->
       <description>tail: contents of file(absolute path)</description>
@@ -9157,7 +8861,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>( |\t)*0( |\t)*1( |\t)*1\.0 K file2</expected-output>
+          <expected-output>( |\t)*0( |\t)*1( |\t)*1\.0K file2</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -9176,7 +8880,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>( |\t)*10( |\t)*9( |\t)*1 M( |\t)*1 M( |\t)*1( |\t)*0( |\t)*0 /dir1</expected-output>
+          <expected-output>( |\t)*10( |\t)*9( |\t)*1M( |\t)*1M( |\t)*1( |\t)*0( |\t)*0 /dir1</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -15788,7 +15492,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^-report \[-live\] \[-dead\] \[-decommissioning\] \[-enteringmaintenance\] \[-inmaintenance\]:(.)*</expected-output>
+          <expected-output>^-report \[-live\] \[-dead\] \[-decommissioning\]:(.)*</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -15807,7 +15511,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^-safemode &lt;enter\|leave\|get\|wait\|forceExit&gt;:( |\t)*Safe mode maintenance command.( )*</expected-output>
+          <expected-output>^-safemode &lt;enter\|leave\|get\|wait&gt;:( |\t)*Safe mode maintenance command.( )*</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -15991,7 +15695,7 @@
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>^( |\t)*1. quota is not a positive integer, or( )*</expected-output>
+          <expected-output>^( |\t)*1. N is not a positive integer, or( )*</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -16101,26 +15805,6 @@
         <comparator>
           <type>RegexpComparator</type>
           <expected-output>^( |\t)*The storage type specific quota is cleared when -storageType option is specified.( )*</expected-output>
-        </comparator>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^( |\t)*Available storageTypes are( )*</expected-output>
-        </comparator>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^( |\t)*- DISK( )*</expected-output>
-        </comparator>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^( |\t)*- SSD( )*</expected-output>
-        </comparator>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^( |\t)*- ARCHIVE( )*</expected-output>
-        </comparator>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>^( |\t)*- PROVIDED( )*</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -16279,7 +15963,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>put: The DiskSpace quota of /dir1 is exceeded: quota = 1024 B = 1 KB but diskspace consumed = [0-9]+ B = [0-9.]+ [KMG]B*</expected-output>
+          <expected-output>put: The DiskSpace quota of /dir1 is exceeded: quota = 1024B = 1KB but diskspace consumed = [0-9]+B = [0-9.]+[KMG]B*</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -16371,24 +16055,6 @@
         </comparator>
       </comparators>
     </test>
-
-    <test> <!-- TESTED -->
-      <description>safemode: Test for foceExit </description>
-      <test-commands>
-        <dfs-admin-command>-fs NAMENODE -safemode enter</dfs-admin-command>
-        <dfs-admin-command>-fs NAMENODE -safemode forceExit</dfs-admin-command>
-      </test-commands>
-      <cleanup-commands>
-        <!-- No cleanup -->
-      </cleanup-commands>
-      <comparators>
-        <comparator>
-          <type>TokenComparator</type>
-          <expected-output>Safe mode is OFF</expected-output>
-        </comparator>
-      </comparators>
-    </test>
-
 
     <test> <!-- TESTED -->
       <description>safemode: Test for leave - Namenode is already in safemode</description>
@@ -16504,19 +16170,19 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Configured Capacity: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>Configured Capacity: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Present Capacity: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>Present Capacity: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>DFS Remaining: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>DFS Remaining: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>DFS Used: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>DFS Used: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -16540,7 +16206,7 @@
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Non DFS Used: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>Non DFS Used: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -16549,10 +16215,6 @@
         <comparator>
           <type>RegexpComparator</type>
           <expected-output>Last contact: [a-zA-Z]+ [a-zA-Z]+ [0-9]+ [0-9:]+ [A-Z\-\+\:0-9]+ [0-9]+</expected-output>
-        </comparator>
-        <comparator>
-          <type>RegexpComparator</type>
-          <expected-output>Num of Blocks: [0-9]+</expected-output>
         </comparator>
         <comparator>
           <type>TokenComparator</type>
@@ -16626,19 +16288,19 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Configured Capacity: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>Configured Capacity: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Present Capacity: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>Present Capacity: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>DFS Remaining: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>DFS Remaining: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>DFS Used: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>DFS Used: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -16658,7 +16320,7 @@
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Non DFS Used: [0-9]+ \([0-9\.]+ [BKMGT]+\)</expected-output>
+          <expected-output>Non DFS Used: [0-9]+ \([0-9\.]+[BKMGT]+\)</expected-output>
         </comparator>
         <comparator>
           <type>RegexpComparator</type>
@@ -16853,6 +16515,27 @@
       </comparators>
     </test>
 
+    <test>
+      <description>getmerge</description>
+      <test-commands>
+        <command>-fs NAMENODE -mkdir -p /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data15bytes /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -copyFromLocal CLITEST_DATA/data30bytes /user/USERNAME/dir1</command>
+        <command>-fs NAMENODE -getmerge /user/USERNAME/dir1 CLITEST_DATA/file</command>
+        <command>-cat CLITEST_DATA/file</command>
+      </test-commands>
+      <cleanup-commands>
+        <command>-fs NAMENODE -rm -r /user/USERNAME</command>
+        <command>rm data</command>
+      </cleanup-commands>
+      <comparators>
+        <comparator>
+          <type>RegexpComparator</type>
+          <expected-output>12345678901234.*</expected-output>
+        </comparator>
+      </comparators>
+    </test>
+
     <!-- Tests for snapshots -->
     <test>
       <description>allowSnapshot</description>
@@ -16867,7 +16550,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Allowing snapshot on /user/USERNAME/dir1 succeeded</expected-output>
+          <expected-output>Allowing snaphot on /user/USERNAME/dir1 succeeded</expected-output>
         </comparator>
       </comparators>
     </test>
@@ -16885,7 +16568,7 @@
       <comparators>
         <comparator>
           <type>RegexpComparator</type>
-          <expected-output>Disallowing snapshot on /user/USERNAME/dir1 succeeded</expected-output>
+          <expected-output>Disallowing snaphot on /user/USERNAME/dir1 succeeded</expected-output>
         </comparator>
       </comparators>
     </test>

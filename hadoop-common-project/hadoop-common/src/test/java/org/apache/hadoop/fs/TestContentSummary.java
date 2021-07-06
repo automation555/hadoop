@@ -232,8 +232,8 @@ public class TestContentSummary {
     ContentSummary contentSummary = new ContentSummary.Builder().length(length).
         fileCount(fileCount).directoryCount(directoryCount).quota(quota).
         spaceConsumed(spaceConsumed).spaceQuota(spaceQuota).build();
-    String expected = "     212.0 M            1023               1 "
-        + "           -1 G       32.6 K      211.9 M              8.0 E ";
+    String expected = "      212.0M            1023               1 "
+        + "            -1G        32.6K       211.9M               8.0E ";
     assertEquals(expected, contentSummary.toString(true, true));
   }
 
@@ -250,43 +250,7 @@ public class TestContentSummary {
     ContentSummary contentSummary = new ContentSummary.Builder().length(length).
         fileCount(fileCount).directoryCount(directoryCount).quota(quota).
         spaceConsumed(spaceConsumed).spaceQuota(spaceQuota).build();
-    String expected = "      32.6 K      211.9 M              8.0 E ";
+    String expected = "       32.6K       211.9M               8.0E ";
     assertEquals(expected, contentSummary.toString(false, true));
-  }
-
-  // check the toSnapshot method with human readable.
-  @Test
-  public void testToSnapshotHumanReadable() {
-    long snapshotLength = Long.MAX_VALUE;
-    long snapshotFileCount = 222222222;
-    long snapshotDirectoryCount = 33333;
-    long snapshotSpaceConsumed = 222256578;
-
-    ContentSummary contentSummary = new ContentSummary.Builder()
-        .snapshotLength(snapshotLength).snapshotFileCount(snapshotFileCount)
-        .snapshotDirectoryCount(snapshotDirectoryCount)
-        .snapshotSpaceConsumed(snapshotSpaceConsumed).build();
-    String expected =
-        "             8.0 E                  211.9 M                   32.6 K "
-            + "                     212.0 M ";
-    assertEquals(expected, contentSummary.toSnapshot(true));
-  }
-
-  // check the toSnapshot method with human readable disabled.
-  @Test
-  public void testToSnapshotNotHumanReadable() {
-    long snapshotLength = 1111;
-    long snapshotFileCount = 2222;
-    long snapshotDirectoryCount = 3333;
-    long snapshotSpaceConsumed = 4444;
-
-    ContentSummary contentSummary = new ContentSummary.Builder()
-        .snapshotLength(snapshotLength).snapshotFileCount(snapshotFileCount)
-        .snapshotDirectoryCount(snapshotDirectoryCount)
-        .snapshotSpaceConsumed(snapshotSpaceConsumed).build();
-    String expected =
-        "              1111                     2222                     3333 "
-            + "                        4444 ";
-    assertEquals(expected, contentSummary.toSnapshot(false));
   }
 }
