@@ -68,7 +68,6 @@ import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileSystem.Statistics.StatisticsData;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.FileChecksum;
@@ -121,7 +120,6 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.apache.hadoop.test.Whitebox;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -676,12 +674,6 @@ public class TestDistributedFileSystem {
   public void testStatistics() throws IOException {
     FileSystem.getStatistics(HdfsConstants.HDFS_URI_SCHEME,
         DistributedFileSystem.class).reset();
-    @SuppressWarnings("unchecked")
-    ThreadLocal<StatisticsData> data = (ThreadLocal<StatisticsData>)
-        Whitebox.getInternalState(
-        FileSystem.getStatistics(HdfsConstants.HDFS_URI_SCHEME,
-        DistributedFileSystem.class), "threadData");
-    data.set(null);
 
     int lsLimit = 2;
     final Configuration conf = getTestConfiguration();
@@ -2524,7 +2516,7 @@ public class TestDistributedFileSystem {
     MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     try {
-      DistributedFileSystem dfs = cluster.getFileSystem();
+      final DistributedFileSystem dfs = cluster.getFileSystem();
       final Path testDir = new Path("/disallowss/test2/");
       final Path file0path = new Path(testDir, "file-0");
       dfs.create(file0path).close();
@@ -2535,20 +2527,7 @@ public class TestDistributedFileSystem {
       // Set dfs.namenode.snapshot.trashroot.enabled=true
       conf.setBoolean("dfs.namenode.snapshot.trashroot.enabled", true);
       cluster.setNameNodeConf(0, conf);
-      cluster.shutdown();
-      conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY, 0);
-      conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_MIN_DATANODES_KEY, 1);
       cluster.restartNameNode(0);
-      dfs = cluster.getFileSystem();
-      assertTrue(cluster.getNameNode().isInSafeMode());
-      // Check .Trash existence, won't be created now
-      assertFalse(dfs.exists(trashRoot));
-      // Start a datanode
-      cluster.startDataNodes(conf, 1, true, null, null);
-      // Wait long enough for safemode check to retire
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException ignored) {}
       // Check .Trash existence, should be created now
       assertTrue(dfs.exists(trashRoot));
       // Check permission
@@ -2566,6 +2545,4 @@ public class TestDistributedFileSystem {
       }
     }
   }
-
-
 }
