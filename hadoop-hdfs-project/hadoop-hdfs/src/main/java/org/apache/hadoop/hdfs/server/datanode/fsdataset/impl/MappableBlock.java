@@ -18,34 +18,168 @@
 
 package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 
+import java.io.IOException;
+import java.io.DataInputStream;
+import java.io.BufferedInputStream;
+import java.io.Closeable;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannel.MapMode;
+
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.hdfs.ExtendedBlockId;
+import org.apache.hadoop.fs.ChecksumException;
+import org.apache.hadoop.hdfs.server.datanode.BlockMetadataHeader;
+import org.apache.hadoop.io.AltFileInputStream;
+import org.apache.hadoop.io.nativeio.NativeIO;
+import org.apache.hadoop.util.DataChecksum;
 
-import java.io.Closeable;
+import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Represents an HDFS block that is mapped by the DataNode.
+ * Represents an HDFS block that is mmapped by the DataNode.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public interface MappableBlock extends Closeable {
+public class MappableBlock implements Closeable {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MappableBlock.class);
+  private MappedByteBuffer mmap;
+  private final long length;
+
+  MappableBlock(MappedByteBuffer mmap, long length) {
+    this.mmap = mmap;
+    this.length = length;
+    assert length > 0;
+  }
+
+  public long getLength() {
+    return length;
+  }
 
   /**
-   * Get the number of bytes that have been cached.
-   * @return the number of bytes that have been cached.
+   * Load the block.
+   *
+   * mmap and mlock the block, and then verify its checksum.
+   *
+   * @param length         The current length of the block.
+   * @param blockIn        The block input stream.  Should be positioned at the
+   *                       start.  The caller must close this.
+   * @param metaIn         The meta file input stream.  Should be positioned at
+   *                       the start.  The caller must close this.
+   * @param blockFileName  The block file name, for logging purposes.
+   *
+   * @return               The Mappable block.
    */
-  long getLength();
+  public static MappableBlock load(long length,
+      AltFileInputStream blockIn, AltFileInputStream metaIn,
+      String blockFileName) throws IOException {
+    MappableBlock mappableBlock = null;
+    MappedByteBuffer mmap = null;
+    FileChannel blockChannel = null;
+    try {
+      blockChannel = blockIn.getChannel();
+      if (blockChannel == null) {
+        throw new IOException("Block InputStream has no FileChannel.");
+      }
+      mmap = blockChannel.map(MapMode.READ_ONLY, 0, length);
+      NativeIO.POSIX.getCacheManipulator().mlock(blockFileName, mmap, length);
+      verifyChecksum(length, metaIn, blockChannel, blockFileName);
+      mappableBlock = new MappableBlock(mmap, length);
+    } finally {
+      IOUtils.closeQuietly(blockChannel);
+      if (mappableBlock == null) {
+        if (mmap != null) {
+          NativeIO.POSIX.munmap(mmap); // unmapping also unlocks
+        }
+      }
+    }
+    return mappableBlock;
+  }
 
   /**
-   * Get cache address if applicable.
-   * Return -1 if not applicable.
+   * Verifies the block's checksum. This is an I/O intensive operation.
    */
-  long getAddress();
+  private static void verifyChecksum(long length,
+      AltFileInputStream metaIn, FileChannel blockChannel, String blockFileName)
+          throws IOException, ChecksumException {
+    // Verify the checksum from the block's meta file
+    // Get the DataChecksum from the meta file header
+    BlockMetadataHeader header =
+        BlockMetadataHeader.readHeader(new DataInputStream(
+            new BufferedInputStream(metaIn, BlockMetadataHeader
+                .getHeaderSize())));
+    FileChannel metaChannel = null;
+    try {
+      metaChannel = metaIn.getChannel();
+      if (metaChannel == null) {
+        throw new IOException("Block InputStream meta file has no FileChannel.");
+      }
+      DataChecksum checksum = header.getChecksum();
+      final int bytesPerChecksum = checksum.getBytesPerChecksum();
+      final int checksumSize = checksum.getChecksumSize();
+      final int numChunks = (8*1024*1024) / bytesPerChecksum;
+      ByteBuffer blockBuf = ByteBuffer.allocate(numChunks*bytesPerChecksum);
+      ByteBuffer checksumBuf = ByteBuffer.allocate(numChunks*checksumSize);
+      // Verify the checksum
+      int bytesVerified = 0;
+      while (bytesVerified < length) {
+        Preconditions.checkState(bytesVerified % bytesPerChecksum == 0,
+            "Unexpected partial chunk before EOF");
+        assert bytesVerified % bytesPerChecksum == 0;
+        int bytesRead = fillBuffer(blockChannel, blockBuf);
+        if (bytesRead == -1) {
+          throw new IOException("checksum verification failed: premature EOF");
+        }
+        blockBuf.flip();
+        // Number of read chunks, including partial chunk at end
+        int chunks = (bytesRead+bytesPerChecksum-1) / bytesPerChecksum;
+        checksumBuf.limit(chunks*checksumSize);
+        fillBuffer(metaChannel, checksumBuf);
+        checksumBuf.flip();
+        checksum.verifyChunkedSums(blockBuf, checksumBuf, blockFileName,
+            bytesVerified);
+        // Success
+        bytesVerified += bytesRead;
+        blockBuf.clear();
+        checksumBuf.clear();
+      }
+    } finally {
+      IOUtils.closeQuietly(metaChannel);
+    }
+  }
 
   /**
-   * Get cached block's ExtendedBlockId.
-   * @return cached block's ExtendedBlockId..
+   * Reads bytes into a buffer until EOF or the buffer's limit is reached
    */
-  ExtendedBlockId getKey();
+  private static int fillBuffer(FileChannel channel, ByteBuffer buf)
+      throws IOException {
+    int bytesRead = channel.read(buf);
+    if (bytesRead < 0) {
+      //EOF
+      return bytesRead;
+    }
+    while (buf.remaining() > 0) {
+      int n = channel.read(buf);
+      if (n < 0) {
+        //EOF
+        return bytesRead;
+      }
+      bytesRead += n;
+    }
+    return bytesRead;
+  }
+
+  @Override
+  public void close() {
+    if (mmap != null) {
+      NativeIO.POSIX.munmap(mmap);
+      mmap = null;
+    }
+  }
 }
