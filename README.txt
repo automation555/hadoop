@@ -1,7 +1,3 @@
-For the latest information about Hadoop, please visit our website at:
+A mirror fork of Apache Hadoop for support of Deep Learning.
 
-   http://hadoop.apache.org/
-
-and our wiki, at:
-
-   https://cwiki.apache.org/confluence/display/HADOOP/
+We're working on this.
