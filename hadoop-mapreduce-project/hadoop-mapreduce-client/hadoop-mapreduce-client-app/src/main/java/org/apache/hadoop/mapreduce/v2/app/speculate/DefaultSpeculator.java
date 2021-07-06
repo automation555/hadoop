@@ -49,7 +49,7 @@ import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.util.Clock;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.yarn.event.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +100,8 @@ public class DefaultSpeculator extends AbstractService implements
   private AppContext context;
   private Thread speculationBackgroundThread = null;
   private volatile boolean stopped = false;
+  private BlockingQueue<SpeculatorEvent> eventQueue
+      = new LinkedBlockingQueue<SpeculatorEvent>();
   private TaskRuntimeEstimator estimator;
 
   private BlockingQueue<Object> scanControl = new LinkedBlockingQueue<Object>();
@@ -245,16 +247,14 @@ public class DefaultSpeculator extends AbstractService implements
   // This section is not part of the Speculator interface; it's used only for
   //  testing
   public boolean eventQueueEmpty() {
-    return scanControl.isEmpty();
+    return eventQueue.isEmpty();
   }
 
   // This interface is intended to be used only for test cases.
   public void scanForSpeculations() {
-    LOG.info("We got asked to run a debug speculation scan.");
-    // debug
-    System.out.println("We got asked to run a debug speculation scan.");
-    System.out.println("There are " + scanControl.size()
-        + " events stacked already.");
+    LOG.debug("We got asked to run a debug speculation scan.");
+    LOG.debug("There are " + scanControl.size()
+            + " events stacked already.");
     scanControl.add(new Object());
     Thread.yield();
   }
@@ -416,8 +416,7 @@ public class DefaultSpeculator extends AbstractService implements
           if (estimatedRunTime == data.getEstimatedRunTime()
               && progress == data.getProgress()) {
             // Previous stats are same as same stats
-            if (data.notHeartbeatedInAWhile(now)
-                || estimator.hasStagnatedProgress(runningTaskAttemptID, now)) {
+            if (data.notHeartbeatedInAWhile(now)) {
               // Stats have stagnated for a while, simulate heart-beat.
               TaskAttemptStatus taskAttemptStatus = new TaskAttemptStatus();
               taskAttemptStatus.id = runningTaskAttemptID;
