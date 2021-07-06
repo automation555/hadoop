@@ -17,15 +17,10 @@
  */
 package org.apache.hadoop.fs.ftp;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.ConnectException;
-import java.net.URI;
-
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
@@ -33,20 +28,17 @@ import org.apache.commons.net.ftp.FTPReply;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.ParentNotDirectoryException;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.Progressable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.ConnectException;
+import java.net.URI;
 
 /**
  * <p>
@@ -58,13 +50,12 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Stable
 public class FTPFileSystem extends FileSystem {
 
-  public static final Logger LOG = LoggerFactory
-      .getLogger(FTPFileSystem.class);
+  public static final Log LOG = LogFactory
+      .getLog(FTPFileSystem.class);
 
   public static final int DEFAULT_BUFFER_SIZE = 1024 * 1024;
 
   public static final int DEFAULT_BLOCK_SIZE = 4 * 1024;
-  public static final long DEFAULT_TIMEOUT = 0;
   public static final String FS_FTP_USER_PREFIX = "fs.ftp.user.";
   public static final String FS_FTP_HOST = "fs.ftp.host";
   public static final String FS_FTP_HOST_PORT = "fs.ftp.host.port";
@@ -74,13 +65,14 @@ public class FTPFileSystem extends FileSystem {
   public static final String FS_FTP_TRANSFER_MODE = "fs.ftp.transfer.mode";
   public static final String E_SAME_DIRECTORY_ONLY =
       "only same directory renames are supported";
-  public static final String FS_FTP_TIMEOUT = "fs.ftp.timeout";
 
   private URI uri;
+  private String fsFtpHost;
+  private int fsFtpHostPort;
 
   /**
    * Return the protocol scheme for the FileSystem.
-   * <p>
+   * <p/>
    *
    * @return <code>ftp</code>
    */
@@ -109,13 +101,13 @@ public class FTPFileSystem extends FileSystem {
       throw new IOException("Invalid host specified");
     }
     conf.set(FS_FTP_HOST, host);
+    fsFtpHost = host;
 
     // get port information from uri, (overrides info in conf)
     int port = uri.getPort();
-    if(port == -1){
-      port = conf.getInt(FS_FTP_HOST_PORT, FTP.DEFAULT_PORT);
-    }
+    port = (port == -1) ? FTP.DEFAULT_PORT : port;
     conf.setInt(FS_FTP_HOST_PORT, port);
+    fsFtpHostPort = port;
 
     // get user/password information from URI (overrides info in conf)
     String userAndPassword = uri.getUserInfo();
@@ -141,8 +133,8 @@ public class FTPFileSystem extends FileSystem {
   private FTPClient connect() throws IOException {
     FTPClient client = null;
     Configuration conf = getConf();
-    String host = conf.get(FS_FTP_HOST);
-    int port = conf.getInt(FS_FTP_HOST_PORT, FTP.DEFAULT_PORT);
+    String host = fsFtpHost;
+    int port = fsFtpHostPort;
     String user = conf.get(FS_FTP_USER_PREFIX + host);
     String password = conf.get(FS_FTP_PASSWORD_PREFIX + host);
     client = new FTPClient();
@@ -156,7 +148,6 @@ public class FTPFileSystem extends FileSystem {
       client.setFileTransferMode(getTransferMode(conf));
       client.setFileType(FTP.BINARY_FILE_TYPE);
       client.setBufferSize(DEFAULT_BUFFER_SIZE);
-      setTimeout(client, conf);
       setDataConnectionMode(client, conf);
     } else {
       throw new IOException("Login failed on server - " + host + ", port - "
@@ -167,19 +158,9 @@ public class FTPFileSystem extends FileSystem {
   }
 
   /**
-   * Set the FTPClient's timeout based on configuration.
-   * FS_FTP_TIMEOUT is set as timeout (defaults to DEFAULT_TIMEOUT).
-   */
-  @VisibleForTesting
-  void setTimeout(FTPClient client, Configuration conf) {
-    long timeout = conf.getLong(FS_FTP_TIMEOUT, DEFAULT_TIMEOUT);
-    client.setControlKeepAliveTimeout(timeout);
-  }
-
-  /**
    * Set FTP's transfer mode based on configuration. Valid values are
    * STREAM_TRANSFER_MODE, BLOCK_TRANSFER_MODE and COMPRESSED_TRANSFER_MODE.
-   * <p>
+   * <p/>
    * Defaults to BLOCK_TRANSFER_MODE.
    *
    * @param conf
@@ -212,7 +193,7 @@ public class FTPFileSystem extends FileSystem {
    * Set the FTPClient's data connection mode based on configuration. Valid
    * values are ACTIVE_LOCAL_DATA_CONNECTION_MODE,
    * PASSIVE_LOCAL_DATA_CONNECTION_MODE and PASSIVE_REMOTE_DATA_CONNECTION_MODE.
-   * <p>
+   * <p/>
    * Defaults to ACTIVE_LOCAL_DATA_CONNECTION_MODE.
    *
    * @param client
@@ -344,19 +325,8 @@ public class FTPFileSystem extends FileSystem {
     // file. The FTP client connection is closed when close() is called on the
     // FSDataOutputStream.
     client.changeWorkingDirectory(parent.toUri().getPath());
-    OutputStream outputStream = client.storeFileStream(file.getName());
-
-    if (!FTPReply.isPositivePreliminary(client.getReplyCode())) {
-      // The ftpClient is an inconsistent state. Must close the stream
-      // which in turn will logout and disconnect from FTP server
-      if (outputStream != null) {
-        IOUtils.closeStream(outputStream);
-      }
-      disconnect(client);
-      throw new IOException("Unable to create file: " + file + ", Aborting");
-    }
-
-    FSDataOutputStream fos = new FSDataOutputStream(outputStream, statistics) {
+    FSDataOutputStream fos = new FSDataOutputStream(client.storeFileStream(file
+        .getName()), statistics) {
       @Override
       public void close() throws IOException {
         super.close();
@@ -371,6 +341,12 @@ public class FTPFileSystem extends FileSystem {
         }
       }
     };
+    if (!FTPReply.isPositivePreliminary(client.getReplyCode())) {
+      // The ftpClient is an inconsistent state. Must close the stream
+      // which in turn will logout and disconnect from FTP server
+      fos.close();
+      throw new IOException("Unable to create file: " + file + ", Aborting");
+    }
     return fos;
   }
 
@@ -437,17 +413,16 @@ public class FTPFileSystem extends FileSystem {
     return client.removeDirectory(pathName);
   }
 
-  @VisibleForTesting
-  FsAction getFsAction(int accessGroup, FTPFile ftpFile) {
+  private FsAction getFsAction(int accessGroup, FTPFile ftpFile) {
     FsAction action = FsAction.NONE;
     if (ftpFile.hasPermission(accessGroup, FTPFile.READ_PERMISSION)) {
-      action = action.or(FsAction.READ);
+      action.or(FsAction.READ);
     }
     if (ftpFile.hasPermission(accessGroup, FTPFile.WRITE_PERMISSION)) {
-      action = action.or(FsAction.WRITE);
+      action.or(FsAction.WRITE);
     }
     if (ftpFile.hasPermission(accessGroup, FTPFile.EXECUTE_PERMISSION)) {
-      action = action.or(FsAction.EXECUTE);
+      action.or(FsAction.EXECUTE);
     }
     return action;
   }
@@ -527,7 +502,7 @@ public class FTPFileSystem extends FileSystem {
       long modTime = -1; // Modification time of root dir not known.
       Path root = new Path("/");
       return new FileStatus(length, isDir, blockReplication, blockSize,
-          modTime, this.makeQualified(root));
+          modTime, root.makeQualified(this));
     }
     String pathName = parentPath.toUri().getPath();
     FTPFile[] ftpFiles = client.listFiles(pathName);
@@ -568,7 +543,7 @@ public class FTPFileSystem extends FileSystem {
     String group = ftpFile.getGroup();
     Path filePath = new Path(parentPath, ftpFile.getName());
     return new FileStatus(length, isDir, blockReplication, blockSize, modTime,
-        accessTime, permission, user, group, this.makeQualified(filePath));
+        accessTime, permission, user, group, filePath.makeQualified(this));
   }
 
   @Override
