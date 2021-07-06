@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.webapp;
 
-import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -32,7 +32,7 @@ import java.util.Map;
 
 import javax.servlet.http.HttpServlet;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
@@ -42,7 +42,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.http.RestCsrfPreventionFilter;
 import org.apache.hadoop.security.http.XFrameOptionsFilter;
-import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import org.eclipse.jetty.webapp.WebAppContext;
@@ -83,8 +82,6 @@ public class WebApps {
       public Class<? extends HttpServlet> clazz;
       public String name;
       public String spec;
-      public Map<String, String> params;
-      public boolean loadExistingFilters = true;
     }
     
     final String name;
@@ -96,7 +93,6 @@ public class WebApps {
     boolean findPort = false;
     Configuration conf;
     Policy httpPolicy = null;
-    boolean needsClientAuth = false;
     String portRangeConfigKey = null;
     boolean devMode = false;
     private String spnegoPrincipalKey;
@@ -105,7 +101,6 @@ public class WebApps {
     private String xfsConfigPrefix;
     private final HashSet<ServletStruct> servlets = new HashSet<ServletStruct>();
     private final HashMap<String, Object> attributes = new HashMap<String, Object>();
-    private ApplicationClientProtocol appClientProtocol;
 
     Builder(String name, Class<T> api, T application, String wsName) {
       this.name = name;
@@ -152,20 +147,7 @@ public class WebApps {
       servlets.add(struct);
       return this;
     }
-
-    public Builder<T> withServlet(String name, String pathSpec,
-        Class<? extends HttpServlet> servlet,
-        Map<String, String> params,boolean loadExistingFilters) {
-      ServletStruct struct = new ServletStruct();
-      struct.clazz = servlet;
-      struct.name = name;
-      struct.spec = pathSpec;
-      struct.params = params;
-      struct.loadExistingFilters = loadExistingFilters;
-      servlets.add(struct);
-      return this;
-    }
-
+    
     public Builder<T> with(Configuration conf) {
       this.conf = conf;
       return this;
@@ -174,11 +156,6 @@ public class WebApps {
     public Builder<T> withHttpPolicy(Configuration conf, Policy httpPolicy) {
       this.conf = conf;
       this.httpPolicy = httpPolicy;
-      return this;
-    }
-
-    public Builder<T> needsClientAuth(boolean needsClientAuth) {
-      this.needsClientAuth = needsClientAuth;
       return this;
     }
 
@@ -234,12 +211,6 @@ public class WebApps {
       return this;
     }
 
-    public Builder<T> withAppClientProtocol(
-        ApplicationClientProtocol appClientProto) {
-      this.appClientProtocol = appClientProto;
-      return this;
-    }
-
     public WebApp build(WebApp webapp) {
       if (webapp == null) {
         webapp = new WebApp() {
@@ -270,17 +241,6 @@ public class WebApps {
           webapp.addServePathSpec("/" + wsName);
           webapp.addServePathSpec("/" + wsName + "/*");
           pathList.add("/" + wsName + "/*");
-        }
-      }
-
-      for (ServletStruct s : servlets) {
-        if (!pathList.contains(s.spec)) {
-          // The servlet told us to not load-existing filters, but we still want
-          // to add the default authentication filter always, so add it to the
-          // pathList
-          if (!s.loadExistingFilters) {
-            pathList.add(s.spec);
-          }
         }
       }
       if (conf == null) {
@@ -349,35 +309,13 @@ public class WebApps {
         }
 
         if (httpScheme.equals(WebAppUtils.HTTPS_PREFIX)) {
-          String amKeystoreLoc = System.getenv("KEYSTORE_FILE_LOCATION");
-          if (amKeystoreLoc != null) {
-            LOG.info("Setting keystore location to " + amKeystoreLoc);
-            String password = System.getenv("KEYSTORE_PASSWORD");
-            builder.keyStore(amKeystoreLoc, password, "jks");
-          } else {
-            LOG.info("Loading standard ssl config");
-            WebAppUtils.loadSslConfiguration(builder, conf);
-          }
-          builder.needsClientAuth(needsClientAuth);
-          if (needsClientAuth) {
-            String amTruststoreLoc = System.getenv("TRUSTSTORE_FILE_LOCATION");
-            if (amTruststoreLoc != null) {
-              LOG.info("Setting truststore location to " + amTruststoreLoc);
-              String password = System.getenv("TRUSTSTORE_PASSWORD");
-              builder.trustStore(amTruststoreLoc, password, "jks");
-            }
-          }
+          WebAppUtils.loadSslConfiguration(builder, conf);
         }
 
         HttpServer2 server = builder.build();
 
         for(ServletStruct struct: servlets) {
-          if (!struct.loadExistingFilters) {
-            server.addInternalServlet(struct.name, struct.spec,
-                struct.clazz, struct.params);
-          } else {
-            server.addServlet(struct.name, struct.spec, struct.clazz);
-          }
+          server.addServlet(struct.name, struct.spec, struct.clazz);
         }
         for(Map.Entry<String, Object> entry : attributes.entrySet()) {
           server.setAttribute(entry.getKey(), entry.getValue());
@@ -403,12 +341,9 @@ public class WebApps {
               xfsClassName, params,
               new String[] {"/*"});
         }
-
-        HttpServer2.defineFilter(server.getWebAppContext(), "guice",
-          GuiceFilter.class.getName(), null, new String[] { "/*" });
-
         webapp.setConf(conf);
         webapp.setHttpServer(server);
+
       } catch (ClassNotFoundException e) {
         throw new WebAppException("Error starting http server", e);
       } catch (IOException e) {
@@ -419,9 +354,6 @@ public class WebApps {
         protected void configure() {
           if (api != null) {
             bind(api).toInstance(application);
-          }
-          if (appClientProtocol != null) {
-            bind(ApplicationClientProtocol.class).toInstance(appClientProtocol);
           }
         }
       });
@@ -458,15 +390,21 @@ public class WebApps {
     }
 
     public WebApp start(WebApp webapp) {
-      return start(webapp, null);
+      return start(webapp, null, null);
     }
 
-    public WebApp start(WebApp webapp, WebAppContext ui2Context) {
+    public WebApp start(WebApp webapp, WebAppContext ui2Context,
+        Map<String, String> services) {
       WebApp webApp = build(webapp);
       HttpServer2 httpServer = webApp.httpServer();
       if (ui2Context != null) {
         addFiltersForNewContext(ui2Context);
         httpServer.addHandlerAtFront(ui2Context);
+      }
+      if (services!=null) {
+        String packageName = services.get("PackageName");
+        String pathSpec = services.get("PathSpec");
+        httpServer.addJerseyResourcePackage(packageName, pathSpec);
       }
       try {
         httpServer.start();
