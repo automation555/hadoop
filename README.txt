@@ -1,7 +1,7 @@
-For the latest information about Hadoop, please visit our website at:
+The branch for rewrite protobuf in hdfs saveFSImage and loadFSImage at LaterHadoopUseFlatBuffer.
 
-   http://hadoop.apache.org/
+At first, I just rewrite FileSummary replaced by IntelFileSummary using FlatBuffer.
 
-and our wiki, at:
+Test Method:Use TestStartup to test Startup and checkpoint tests and All Tests Passed.
 
-   https://cwiki.apache.org/confluence/display/HADOOP/
+

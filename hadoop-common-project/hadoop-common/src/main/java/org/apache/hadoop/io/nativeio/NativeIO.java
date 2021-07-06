@@ -35,19 +35,18 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.HardLink;
-import org.apache.hadoop.fs.PathIOException;
+import org.apache.hadoop.io.AltFileInputStream;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException;
-import org.apache.hadoop.util.CleanerUtil;
 import org.apache.hadoop.util.NativeCodeLoader;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.PerformanceAdvisory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import sun.misc.Unsafe;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * JNI wrappers for various native IO-related calls not available in Java.
@@ -58,99 +57,54 @@ import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTest
 @InterfaceStability.Unstable
 public class NativeIO {
   public static class POSIX {
-    // Flags for open() call from bits/fcntl.h - Set by JNI
-    public static int O_RDONLY = -1;
-    public static int O_WRONLY = -1;
-    public static int O_RDWR = -1;
-    public static int O_CREAT = -1;
-    public static int O_EXCL = -1;
-    public static int O_NOCTTY = -1;
-    public static int O_TRUNC = -1;
-    public static int O_APPEND = -1;
-    public static int O_NONBLOCK = -1;
-    public static int O_SYNC = -1;
+    // Flags for open() call from bits/fcntl.h
+    public static final int O_RDONLY   =    00;
+    public static final int O_WRONLY   =    01;
+    public static final int O_RDWR     =    02;
+    public static final int O_CREAT    =  0100;
+    public static final int O_EXCL     =  0200;
+    public static final int O_NOCTTY   =  0400;
+    public static final int O_TRUNC    = 01000;
+    public static final int O_APPEND   = 02000;
+    public static final int O_NONBLOCK = 04000;
+    public static final int O_SYNC   =  010000;
+    public static final int O_ASYNC  =  020000;
+    public static final int O_FSYNC = O_SYNC;
+    public static final int O_NDELAY = O_NONBLOCK;
 
-    // Flags for posix_fadvise() from bits/fcntl.h - Set by JNI
+    // Flags for posix_fadvise() from bits/fcntl.h
     /* No further special treatment.  */
-    public static int POSIX_FADV_NORMAL = -1;
+    public static final int POSIX_FADV_NORMAL = 0;
     /* Expect random page references.  */
-    public static int POSIX_FADV_RANDOM = -1;
+    public static final int POSIX_FADV_RANDOM = 1;
     /* Expect sequential page references.  */
-    public static int POSIX_FADV_SEQUENTIAL = -1;
+    public static final int POSIX_FADV_SEQUENTIAL = 2;
     /* Will need these pages.  */
-    public static int POSIX_FADV_WILLNEED = -1;
+    public static final int POSIX_FADV_WILLNEED = 3;
     /* Don't need these pages.  */
-    public static int POSIX_FADV_DONTNEED = -1;
+    public static final int POSIX_FADV_DONTNEED = 4;
     /* Data will be accessed once.  */
-    public static int POSIX_FADV_NOREUSE = -1;
+    public static final int POSIX_FADV_NOREUSE = 5;
 
 
-    // Updated by JNI when supported by glibc.  Leave defaults in case kernel
-    // supports sync_file_range, but glibc does not.
     /* Wait upon writeout of all pages
        in the range before performing the
        write.  */
-    public static int SYNC_FILE_RANGE_WAIT_BEFORE = 1;
+    public static final int SYNC_FILE_RANGE_WAIT_BEFORE = 1;
     /* Initiate writeout of all those
        dirty pages in the range which are
        not presently under writeback.  */
-    public static int SYNC_FILE_RANGE_WRITE = 2;
+    public static final int SYNC_FILE_RANGE_WRITE = 2;
+
     /* Wait upon writeout of all pages in
        the range after performing the
        write.  */
-    public static int SYNC_FILE_RANGE_WAIT_AFTER = 4;
+    public static final int SYNC_FILE_RANGE_WAIT_AFTER = 4;
 
-    /**
-     * Keeps the support state of PMDK.
-     */
-    public enum SupportState {
-      UNSUPPORTED(-1),
-      PMDK_LIB_NOT_FOUND(1),
-      SUPPORTED(0);
-
-      private byte stateCode;
-      SupportState(int stateCode) {
-        this.stateCode = (byte) stateCode;
-      }
-
-      public int getStateCode() {
-        return stateCode;
-      }
-
-      public String getMessage() {
-        String msg;
-        switch (stateCode) {
-        // -1 represents UNSUPPORTED.
-        case -1:
-          msg = "The native code was built without PMDK support.";
-          break;
-        // 1 represents PMDK_LIB_NOT_FOUND.
-        case 1:
-          msg = "The native code was built with PMDK support, but PMDK libs " +
-              "were NOT found in execution environment or failed to be loaded.";
-          break;
-        // 0 represents SUPPORTED.
-        case 0:
-          msg = "The native code was built with PMDK support, and PMDK libs " +
-              "were loaded successfully.";
-          break;
-        default:
-          msg = "The state code: " + stateCode + " is unrecognized!";
-        }
-        return msg;
-      }
-    }
-
-    // Denotes the state of supporting PMDK. The value is set by JNI.
-    private static SupportState pmdkSupportState =
-        SupportState.UNSUPPORTED;
-
-    private static final Logger LOG = LoggerFactory.getLogger(NativeIO.class);
-
-    // Set to true via JNI if possible
-    public static boolean fadvisePossible = false;
+    private static final Log LOG = LogFactory.getLog(NativeIO.class);
 
     private static boolean nativeLoaded = false;
+    private static boolean fadvisePossible = true;
     private static boolean syncFileRangePossible = true;
 
     static final String WORKAROUND_NON_THREADSAFE_CALLS_KEY =
@@ -168,109 +122,6 @@ public class NativeIO {
     public static void setCacheManipulator(CacheManipulator cacheManipulator) {
       POSIX.cacheManipulator = cacheManipulator;
     }
-
-    // This method is invoked by JNI.
-    public static void setPmdkSupportState(int stateCode) {
-      for (SupportState state : SupportState.values()) {
-        if (state.getStateCode() == stateCode) {
-          pmdkSupportState = state;
-          return;
-        }
-      }
-      LOG.error("The state code: " + stateCode + " is unrecognized!");
-    }
-
-    public static String getPmdkSupportStateMessage() {
-      if (getPmdkLibPath() != null) {
-        return pmdkSupportState.getMessage() +
-            " The pmdk lib path: " + getPmdkLibPath();
-      }
-      return pmdkSupportState.getMessage();
-    }
-
-    public static boolean isPmdkAvailable() {
-      LOG.info(pmdkSupportState.getMessage());
-      return pmdkSupportState == SupportState.SUPPORTED;
-    }
-
-    /**
-     * Denote memory region for a file mapped.
-     */
-    public static class PmemMappedRegion {
-      private long address;
-      private long length;
-      private boolean isPmem;
-
-      public PmemMappedRegion(long address, long length, boolean isPmem) {
-        this.address = address;
-        this.length = length;
-        this.isPmem = isPmem;
-      }
-
-      public boolean isPmem() {
-        return this.isPmem;
-      }
-
-      public long getAddress() {
-        return this.address;
-      }
-
-      public long getLength() {
-        return this.length;
-      }
-    }
-
-    /**
-     * JNI wrapper of persist memory operations.
-     */
-    public static class Pmem {
-      // Check whether the address is a Pmem address or DIMM address
-      public static boolean isPmem(long address, long length) {
-        return NativeIO.POSIX.isPmemCheck(address, length);
-      }
-
-      // Map a file in persistent memory, if the given file exists,
-      // directly map it. If not, create the named file on persistent memory
-      // and then map it.
-      public static PmemMappedRegion mapBlock(
-          String path, long length, boolean isFileExist) {
-        return NativeIO.POSIX.pmemMapFile(path, length, isFileExist);
-      }
-
-      // Unmap a pmem file
-      public static boolean unmapBlock(long address, long length) {
-        return NativeIO.POSIX.pmemUnMap(address, length);
-      }
-
-      // Copy data from disk file(src) to pmem file(dest), without flush
-      public static void memCopy(byte[] src, long dest, boolean isPmem,
-          long length) {
-        NativeIO.POSIX.pmemCopy(src, dest, isPmem, length);
-      }
-
-      // Flush the memory content to persistent storage
-      public static void memSync(PmemMappedRegion region) {
-        if (region.isPmem()) {
-          NativeIO.POSIX.pmemDrain();
-        } else {
-          NativeIO.POSIX.pmemSync(region.getAddress(), region.getLength());
-        }
-      }
-
-      public static String getPmdkLibPath() {
-        return POSIX.getPmdkLibPath();
-      }
-    }
-
-    private static native String getPmdkLibPath();
-    private static native boolean isPmemCheck(long address, long length);
-    private static native PmemMappedRegion pmemMapFile(String path,
-        long length, boolean isFileExist);
-    private static native boolean pmemUnMap(long address, long length);
-    private static native void pmemCopy(byte[] src, long dest, boolean isPmem,
-        long length);
-    private static native void pmemDrain();
-    private static native void pmemSync(long address, long length);
 
     /**
      * Used to manipulate the operating system cache.
@@ -291,8 +142,8 @@ public class NativeIO {
       }
 
       public void posixFadviseIfPossible(String identifier,
-          FileDescriptor fd, long offset, long len, int flags)
-          throws NativeIOException {
+        FileDescriptor fd, long offset, long len, int flags)
+            throws NativeIOException {
         NativeIO.POSIX.posixFadviseIfPossible(identifier, fd, offset,
             len, flags);
       }
@@ -371,8 +222,6 @@ public class NativeIO {
     public static native FileDescriptor open(String path, int flags, int mode) throws IOException;
     /** Wrapper around fstat(2) */
     private static native Stat fstat(FileDescriptor fd) throws IOException;
-    /** Wrapper around stat(2). */
-    private static native Stat stat(String path) throws IOException;
 
     /** Native chmod implementation. On UNIX, it is a wrapper around chmod(2) */
     private static native void chmodImpl(String path, int mode) throws IOException;
@@ -417,6 +266,8 @@ public class NativeIO {
       if (nativeLoaded && fadvisePossible) {
         try {
           posix_fadvise(fd, offset, len, flags);
+        } catch (UnsupportedOperationException uoe) {
+          fadvisePossible = false;
         } catch (UnsatisfiedLinkError ule) {
           fadvisePossible = false;
         }
@@ -464,7 +315,7 @@ public class NativeIO {
       }
       mlock_native(buffer, len);
     }
-
+    
     /**
      * Unmaps the block from memory. See munmap(2).
      *
@@ -478,14 +329,10 @@ public class NativeIO {
      * @param buffer    The buffer to unmap.
      */
     public static void munmap(MappedByteBuffer buffer) {
-      if (CleanerUtil.UNMAP_SUPPORTED) {
-        try {
-          CleanerUtil.getCleaner().freeBuffer(buffer);
-        } catch (IOException e) {
-          LOG.info("Failed to unmap the buffer", e);
-        }
-      } else {
-        LOG.trace(CleanerUtil.UNMAP_NOT_SUPPORTED_REASON);
+      if (buffer instanceof sun.nio.ch.DirectBuffer) {
+        sun.misc.Cleaner cleaner =
+            ((sun.nio.ch.DirectBuffer)buffer).cleaner();
+        cleaner.clean();
       }
     }
 
@@ -501,21 +348,22 @@ public class NativeIO {
       private String owner, group;
       private int mode;
 
-      // Mode constants - Set by JNI
-      public static int S_IFMT = -1;    /* type of file */
-      public static int S_IFIFO  = -1;  /* named pipe (fifo) */
-      public static int S_IFCHR  = -1;  /* character special */
-      public static int S_IFDIR  = -1;  /* directory */
-      public static int S_IFBLK  = -1;  /* block special */
-      public static int S_IFREG  = -1;  /* regular */
-      public static int S_IFLNK  = -1;  /* symbolic link */
-      public static int S_IFSOCK = -1;  /* socket */
-      public static int S_ISUID = -1;  /* set user id on execution */
-      public static int S_ISGID = -1;  /* set group id on execution */
-      public static int S_ISVTX = -1;  /* save swapped text even after use */
-      public static int S_IRUSR = -1;  /* read permission, owner */
-      public static int S_IWUSR = -1;  /* write permission, owner */
-      public static int S_IXUSR = -1;  /* execute/search permission, owner */
+      // Mode constants
+      public static final int S_IFMT = 0170000;      /* type of file */
+      public static final int   S_IFIFO  = 0010000;  /* named pipe (fifo) */
+      public static final int   S_IFCHR  = 0020000;  /* character special */
+      public static final int   S_IFDIR  = 0040000;  /* directory */
+      public static final int   S_IFBLK  = 0060000;  /* block special */
+      public static final int   S_IFREG  = 0100000;  /* regular */
+      public static final int   S_IFLNK  = 0120000;  /* symbolic link */
+      public static final int   S_IFSOCK = 0140000;  /* socket */
+      public static final int   S_IFWHT  = 0160000;  /* whiteout */
+      public static final int S_ISUID = 0004000;  /* set user id on execution */
+      public static final int S_ISGID = 0002000;  /* set group id on execution */
+      public static final int S_ISVTX = 0001000;  /* save swapped text even after use */
+      public static final int S_IRUSR = 0000400;  /* read permission, owner */
+      public static final int S_IWUSR = 0000200;  /* write permission, owner */
+      public static final int S_IXUSR = 0000100;  /* execute/search permission, owner */
 
       Stat(int ownerId, int groupId, int mode) {
         this.ownerId = ownerId;
@@ -580,37 +428,6 @@ public class NativeIO {
             throw new NativeIOException("Unknown error", Errno.UNKNOWN);
           }
         }
-      }
-      return stat;
-    }
-
-    /**
-     * Return the file stat for a file path.
-     *
-     * @param path  file path
-     * @return  the file stat
-     * @throws IOException  thrown if there is an IO error while obtaining the
-     * file stat
-     */
-    public static Stat getStat(String path) throws IOException {
-      if (path == null) {
-        String errMessage = "Path is null";
-        LOG.warn(errMessage);
-        throw new IOException(errMessage);
-      }
-      Stat stat = null;
-      try {
-        if (!Shell.WINDOWS) {
-          stat = stat(path);
-          stat.owner = getName(IdCache.USER, stat.ownerId);
-          stat.group = getName(IdCache.GROUP, stat.groupId);
-        } else {
-          stat = stat(path);
-        }
-      } catch (NativeIOException nioe) {
-        LOG.warn("NativeIO.getStat error ({}): {} -- file path: {}",
-            nioe.getErrorCode(), nioe.getMessage(), path);
-        throw new PathIOException(path, nioe);
       }
       return stat;
     }
@@ -757,7 +574,7 @@ public class NativeIO {
     private static native String getOwner(FileDescriptor fd) throws IOException;
 
     /** Supported list of Windows access right flags */
-    public enum AccessRight {
+    public static enum AccessRight {
       ACCESS_READ (0x0001),      // FILE_READ_DATA
       ACCESS_WRITE (0x0002),     // FILE_WRITE_DATA
       ACCESS_EXECUTE (0x0020);   // FILE_EXECUTE
@@ -821,7 +638,7 @@ public class NativeIO {
     }
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(NativeIO.class);
+  private static final Log LOG = LogFactory.getLog(NativeIO.class);
 
   private static boolean nativeLoaded = false;
 
@@ -896,7 +713,7 @@ public class NativeIO {
    * user account name, of the format DOMAIN\UserName. This method
    * will remove the domain part of the full logon name.
    *
-   * @param name the full principal name containing the domain
+   * @param Fthe full principal name containing the domain
    * @return name with domain removed
    */
   private static String stripDomain(String name) {
@@ -929,19 +746,47 @@ public class NativeIO {
   }
 
   /**
-   * Create a FileDescriptor that shares delete permission on the
+   * Create a FileInputStream that shares delete permission on the
+   * file opened, i.e. other process can delete the file the
+   * FileInputStream is reading. Only Windows implementation uses
+   * the native interface.
+   */
+  public static FileInputStream getShareDeleteFileInputStream(File f)
+      throws IOException {
+    if (!Shell.WINDOWS) {
+      // On Linux the default FileInputStream shares delete permission
+      // on the file opened.
+      //
+      return new FileInputStream(f);
+    } else {
+      // Use Windows native interface to create a FileInputStream that
+      // shares delete permission on the file opened.
+      //
+      FileDescriptor fd = Windows.createFile(
+          f.getAbsolutePath(),
+          Windows.GENERIC_READ,
+          Windows.FILE_SHARE_READ |
+              Windows.FILE_SHARE_WRITE |
+              Windows.FILE_SHARE_DELETE,
+          Windows.OPEN_EXISTING);
+      return new FileInputStream(fd);
+    }
+  }
+
+  /**
+   * Create a AltFileInputStream that shares delete permission on the
    * file opened at a given offset, i.e. other process can delete
-   * the file the FileDescriptor is reading. Only Windows implementation
+   * the file the FileInputStream is reading. Only Windows implementation
    * uses the native interface.
    */
-  public static FileDescriptor getShareDeleteFileDescriptor(
-      File f, long seekOffset) throws IOException {
+  public static AltFileInputStream getShareDeleteFileInputStream(File f, long seekOffset)
+      throws IOException {
     if (!Shell.WINDOWS) {
       RandomAccessFile rf = new RandomAccessFile(f, "r");
       if (seekOffset > 0) {
         rf.seek(seekOffset);
       }
-      return rf.getFD();
+      return new AltFileInputStream(rf.getFD(), rf.getChannel());
     } else {
       // Use Windows native interface to create a FileInputStream that
       // shares delete permission on the file opened, and set it to the
@@ -956,7 +801,7 @@ public class NativeIO {
           NativeIO.Windows.OPEN_EXISTING);
       if (seekOffset > 0)
         NativeIO.Windows.setFilePointer(fd, seekOffset, NativeIO.Windows.FILE_BEGIN);
-      return fd;
+      return new AltFileInputStream(new FileInputStream(fd));
     }
   }
 
@@ -1109,23 +954,28 @@ public class NativeIO {
     if (nativeLoaded && Shell.WINDOWS) {
       copyFileUnbuffered0(src.getAbsolutePath(), dst.getAbsolutePath());
     } else {
-      FileInputStream fis = new FileInputStream(src);
+      FileInputStream fis = null;
+      FileOutputStream fos = null;
       FileChannel input = null;
+      FileChannel output = null;
       try {
+        fis = new FileInputStream(src);
+        fos = new FileOutputStream(dst);
         input = fis.getChannel();
-        try (FileOutputStream fos = new FileOutputStream(dst);
-             FileChannel output = fos.getChannel()) {
-          long remaining = input.size();
-          long position = 0;
-          long transferred = 0;
-          while (remaining > 0) {
-            transferred = input.transferTo(position, remaining, output);
-            remaining -= transferred;
-            position += transferred;
-          }
+        output = fos.getChannel();
+        long remaining = input.size();
+        long position = 0;
+        long transferred = 0;
+        while (remaining > 0) {
+          transferred = input.transferTo(position, remaining, output);
+          remaining -= transferred;
+          position += transferred;
         }
       } finally {
-        IOUtils.cleanupWithLogger(LOG, input, fis);
+        IOUtils.cleanup(LOG, output);
+        IOUtils.cleanup(LOG, fos);
+        IOUtils.cleanup(LOG, input);
+        IOUtils.cleanup(LOG, fis);
       }
     }
   }

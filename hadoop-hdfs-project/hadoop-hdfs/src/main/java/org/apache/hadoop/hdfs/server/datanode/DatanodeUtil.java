@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
@@ -26,8 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
-import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.LengthInputStream;
+import org.apache.hadoop.io.AltFileInputStream;
 
 /** Provide utility methods for Datanode. */
 @InterfaceAudience.Private
@@ -56,17 +55,15 @@ public class DatanodeUtil {
    * @throws IOException 
    * if the file already exists or if the file cannot be created.
    */
-  public static File createFileWithExistsCheck(
-      FsVolumeSpi volume, Block b, File f,
-      FileIoProvider fileIoProvider) throws IOException {
-    if (fileIoProvider.exists(volume, f)) {
+  public static File createTmpFile(Block b, File f) throws IOException {
+    if (f.exists()) {
       throw new IOException("Failed to create temporary file for " + b
           + ".  File " + f + " should not be present, but is.");
     }
     // Create the zero-length temp file
     final boolean fileCreated;
     try {
-      fileCreated = fileIoProvider.createFile(volume, f);
+      fileCreated = f.createNewFile();
     } catch (IOException ioe) {
       throw new IOException(DISK_ERROR + "Failed to create " + f, ioe);
     }
@@ -95,17 +92,13 @@ public class DatanodeUtil {
    * @return true if there are no files
    * @throws IOException if unable to list subdirectories
    */
-  public static boolean dirNoFilesRecursive(
-      FsVolumeSpi volume, File dir,
-      FileIoProvider fileIoProvider) throws IOException {
-    File[] contents = fileIoProvider.listFiles(volume, dir);
+  public static boolean dirNoFilesRecursive(File dir) throws IOException {
+    File[] contents = dir.listFiles();
     if (contents == null) {
       throw new IOException("Cannot list contents of " + dir);
     }
     for (File f : contents) {
-      if (!f.isDirectory() ||
-          (f.isDirectory() && !dirNoFilesRecursive(
-              volume, f, fileIoProvider))) {
+      if (!f.isDirectory() || (f.isDirectory() && !dirNoFilesRecursive(f))) {
         return false;
       }
     }
@@ -120,26 +113,27 @@ public class DatanodeUtil {
    * @return
    */
   public static File idToBlockDir(File root, long blockId) {
-    int d1 = (int) ((blockId >> 16) & 0x1F);
-    int d2 = (int) ((blockId >> 8) & 0x1F);
+    int d1 = (int)((blockId >> 16) & 0xff);
+    int d2 = (int)((blockId >> 8) & 0xff);
     String path = DataStorage.BLOCK_SUBDIR_PREFIX + d1 + SEP +
         DataStorage.BLOCK_SUBDIR_PREFIX + d2;
     return new File(root, path);
   }
 
   /**
-   * @return the FileInputStream for the meta data of the given block.
+   * @return the AltFileInputStream for the meta data of the given block.
    * @throws FileNotFoundException
    *           if the file not found.
    * @throws ClassCastException
-   *           if the underlying input stream is not a FileInputStream.
+   *           if the underlying input stream is not a AltFileInputStream.
    */
-  public static FileInputStream getMetaDataInputStream(
-      ExtendedBlock b, FsDatasetSpi<?> data) throws IOException {
+  public static AltFileInputStream getMetaDataInputStream(
+      ExtendedBlock b, FsDatasetSpi<?> data) throws IOException
+  {
     final LengthInputStream lin = data.getMetaDataInputStream(b);
     if (lin == null) {
       throw new FileNotFoundException("Meta file for " + b + " not found.");
     }
-    return (FileInputStream)lin.getWrappedStream();
+    return (AltFileInputStream)lin.getWrappedStream();
   }
 }
