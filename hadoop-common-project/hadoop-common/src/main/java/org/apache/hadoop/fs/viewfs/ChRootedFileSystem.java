@@ -32,14 +32,12 @@ import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FSDataOutputStreamBuilder;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FilterFileSystem;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.FsStatus;
-import org.apache.hadoop.fs.FutureDataInputStreamBuilder;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.QuotaUsage;
@@ -98,12 +96,13 @@ class ChRootedFileSystem extends FilterFileSystem {
   
   /**
    * Constructor
-   * @param fs base file system
-   * @param uri base uri
+   * @param uri base file system
+   * @param conf configuration
    * @throws IOException 
    */
-  ChRootedFileSystem(final FileSystem fs, URI uri) throws IOException {
-    super(fs);
+  public ChRootedFileSystem(final URI uri, Configuration conf)
+      throws IOException {
+    super(FileSystem.get(uri, conf));
     String pathString = uri.getPath();
     if (pathString.isEmpty()) {
       pathString = "/";
@@ -114,18 +113,7 @@ class ChRootedFileSystem extends FilterFileSystem {
     workingDir = getHomeDirectory();
     // We don't use the wd of the myFs
   }
-
-  /**
-   * Constructor.
-   * @param uri base file system
-   * @param conf configuration
-   * @throws IOException
-   */
-  public ChRootedFileSystem(final URI uri, Configuration conf)
-      throws IOException {
-    this(FileSystem.get(uri, conf), uri);
-  }
-
+  
   /** 
    * Called after a new FileSystem instance is constructed.
    * @param name a uri whose authority section names the host, port, etc.
@@ -186,8 +174,8 @@ class ChRootedFileSystem extends FilterFileSystem {
   }
   
   @Override
-  public void setWorkingDirectory(final Path new_dir) {
-    workingDir = new_dir.isAbsolute() ? new_dir : new Path(workingDir, new_dir);
+  public void setWorkingDirectory(final Path newDir) {
+    workingDir = newDir.isAbsolute() ? newDir : new Path(workingDir, newDir);
   }
 
   @Override
@@ -277,11 +265,6 @@ class ChRootedFileSystem extends FilterFileSystem {
   public boolean mkdirs(final Path f, final FsPermission permission)
       throws IOException {
     return super.mkdirs(fullPath(f), permission);
-  }
-
-  @Override
-  public boolean mkdirs(final Path f) throws IOException {
-    return super.mkdirs(fullPath(f));
   }
 
   @Override
@@ -467,11 +450,6 @@ class ChRootedFileSystem extends FilterFileSystem {
   }
 
   @Override
-  public void satisfyStoragePolicy(Path src) throws IOException {
-    super.satisfyStoragePolicy(fullPath(src));
-  }
-
-  @Override
   public void setStoragePolicy(Path src, String policyName) throws IOException {
     super.setStoragePolicy(fullPath(src), policyName);
   }
@@ -481,20 +459,4 @@ class ChRootedFileSystem extends FilterFileSystem {
     super.unsetStoragePolicy(fullPath(src));
   }
 
-  @Override
-  public FSDataOutputStreamBuilder createFile(final Path path) {
-    return super.createFile(fullPath(path));
-  }
-
-  @Override
-  public FutureDataInputStreamBuilder openFile(final Path path)
-      throws IOException, UnsupportedOperationException {
-    return super.openFile(fullPath(path));
-  }
-
-  @Override
-  public boolean hasPathCapability(final Path path, final String capability)
-      throws IOException {
-    return super.hasPathCapability(fullPath(path), capability);
-  }
 }
