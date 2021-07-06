@@ -117,24 +117,19 @@ macro(hadoop_set_find_shared_library_without_version)
     endif()
 endmacro()
 
+#
+# Configuration.
+#
 
-# set the shared compiler flags
-# support for GNU C/C++, add other compilers as necessary
-
-if (CMAKE_C_COMPILER_ID STREQUAL "GNU" OR
-    CMAKE_C_COMPILER_ID STREQUAL "Clang" OR
-    CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
-  if(NOT DEFINED GCC_SHARED_FLAGS)
-    find_package(Threads REQUIRED)
-    if(CMAKE_USE_PTHREADS_INIT)
-      set(GCC_SHARED_FLAGS "-g -O2 -Wall -pthread -D_FILE_OFFSET_BITS=64")
-    else()
-      set(GCC_SHARED_FLAGS "-g -O2 -Wall -D_FILE_OFFSET_BITS=64")
-    endif()
-  endif()
+# Initialise the shared gcc/g++ flags if they aren't already defined.
+if(NOT DEFINED GCC_SHARED_FLAGS)
+    set(GCC_SHARED_FLAGS "-g -O2 -Wall -pthread -D_FILE_OFFSET_BITS=64")
 endif()
 
-# Set the shared linker flags.
+# Add in support other compilers here, if necessary,
+# the assumption is that GCC or a GCC-compatible compiler is being used.
+
+# Set the shared GCC-compatible compiler and linker flags.
 hadoop_add_compiler_flags("${GCC_SHARED_FLAGS}")
 hadoop_add_linker_flags("${LINKER_SHARED_FLAGS}")
 
@@ -158,42 +153,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         endif()
     endif()
 
-    # Determine float ABI of JVM on ARM.
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
-        find_program(READELF readelf)
-        if(READELF MATCHES "NOTFOUND")
-            message(WARNING "readelf not found; JVM float ABI detection disabled")
-        else(READELF MATCHES "NOTFOUND")
-            execute_process(
-                COMMAND ${READELF} -A ${JAVA_JVM_LIBRARY}
-                OUTPUT_VARIABLE JVM_ELF_ARCH
-                ERROR_QUIET)
-            if(NOT JVM_ELF_ARCH MATCHES "Tag_ABI_VFP_args: VFP registers")
-                # Test compilation with -mfloat-abi=softfp using an arbitrary libc function
-                # (typically fails with "fatal error: bits/predefs.h: No such file or directory"
-                # if soft-float dev libraries are not installed)
-                message("Soft-float JVM detected")
-                include(CMakePushCheckState)
-                cmake_push_check_state()
-                set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -mfloat-abi=softfp")
-                include(CheckSymbolExists)
-                check_symbol_exists(exit stdlib.h SOFTFP_AVAILABLE)
-                if(NOT SOFTFP_AVAILABLE)
-                    message(FATAL_ERROR "Soft-float dev libraries required (e.g. 'apt-get install libc6-dev-armel' on Debian/Ubuntu)")
-                endif()
-                cmake_pop_check_state()
-                hadoop_add_compiler_flags("-mfloat-abi=softfp")
-            endif()
-        endif()
-    endif()
-
 #
 # Solaris-specific configuration.
 #
 elseif(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
     # Solaris flags. 64-bit compilation is mandatory, and is checked earlier.
     hadoop_add_compiler_flags("-m64 -D_POSIX_C_SOURCE=200112L -D__EXTENSIONS__ -D_POSIX_PTHREAD_SEMANTICS")
-    set(CMAKE_CXX_STANDARD 98)
+    set(CMAKE_C_FLAGS "-std=gnu99 ${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-std=gnu++98 ${CMAKE_CXX_FLAGS}")
     hadoop_add_linker_flags("-m64")
 
     # CMAKE_SYSTEM_PROCESSOR is set to the output of 'uname -p', which on Solaris is
@@ -210,6 +177,3 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
         message(FATAL_ERROR "Unrecognised CMAKE_SYSTEM_PROCESSOR ${CMAKE_SYSTEM_PROCESSOR}")
     endif()
 endif()
-
-# Set GNU99 as the C standard to use
-set(CMAKE_C_STANDARD 99)
