@@ -22,7 +22,6 @@
  * for what changes are allowed for a *stable* .proto interface.
  */
 
-syntax = "proto2";
 option java_package = "org.apache.hadoop.yarn.proto";
 option java_outer_classname = "ContainerManagementProtocol";
 option java_generic_services = true;
@@ -37,16 +36,12 @@ service ContainerManagementProtocolService {
   rpc stopContainers(StopContainersRequestProto) returns (StopContainersResponseProto);
   rpc getContainerStatuses(GetContainerStatusesRequestProto) returns (GetContainerStatusesResponseProto);
   rpc increaseContainersResource(IncreaseContainersResourceRequestProto) returns (IncreaseContainersResourceResponseProto);
-  rpc updateContainer(ContainerUpdateRequestProto) returns (ContainerUpdateResponseProto);
   rpc signalToContainer(SignalContainerRequestProto) returns (SignalContainerResponseProto);
   rpc localize(ResourceLocalizationRequestProto) returns (ResourceLocalizationResponseProto);
+  rpc getContainerLaunchContext(GetContainerLaunchContextRequestProto) returns (GetContainerLaunchContextResponseProto);
 
   rpc reInitializeContainer(ReInitializeContainerRequestProto) returns (ReInitializeContainerResponseProto);
   rpc restartContainer(ContainerIdProto) returns (RestartContainerResponseProto);
   rpc rollbackLastReInitialization(ContainerIdProto) returns (RollbackResponseProto);
   rpc commitLastReInitialization(ContainerIdProto) returns (CommitResponseProto);
-
-  rpc getLocalizationStatuses(GetLocalizationStatusesRequestProto)
-    returns (GetLocalizationStatusesResponseProto);
-
 }

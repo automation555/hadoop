@@ -27,41 +27,32 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
-import org.apache.hadoop.util.Lists;
-import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
-import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.ReInitializeContainerRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.ResourceLocalizationRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.StopContainersResponse;
-
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.LocalResource;
-import org.apache.hadoop.yarn.api.records.LocalizationStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.client.api.impl.ContainerManagementProtocolProxy.ContainerManagementProtocolProxyData;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -91,8 +82,7 @@ import org.slf4j.LoggerFactory;
 @Unstable
 public class NMClientImpl extends NMClient {
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(NMClientImpl.class);
+  private static final Log LOG = LogFactory.getLog(NMClientImpl.class);
 
   // The logically coherent operations on startedContainers is synchronized to
   // ensure they are atomic
@@ -130,11 +120,11 @@ public class NMClientImpl extends NMClient {
       } catch (YarnException e) {
         LOG.error("Failed to stop Container " +
             startedContainer.getContainerId() +
-            " when stopping NMClientImpl");
+            "when stopping NMClientImpl");
       } catch (IOException e) {
         LOG.error("Failed to stop Container " +
             startedContainer.getContainerId() +
-            " when stopping NMClientImpl");
+            "when stopping NMClientImpl");
       }
     }
   }
@@ -182,14 +172,13 @@ public class NMClientImpl extends NMClient {
           + startedContainer.containerId.toString() + " is already started");
     }
   }
-
-  @Override
-  public Map<String, ByteBuffer> startContainer(
-      Container container, ContainerLaunchContext containerLaunchContext)
-          throws YarnException, IOException {
+  
+  public Map<String, ByteBuffer> startContainer(Container container, ContainerLaunchContext containerLaunchContext)
+      throws YarnException, IOException {
     // Do synchronization on StartedContainer to prevent race condition
     // between startContainer and stopContainer only when startContainer is
     // in progress for a given container.
+    
     StartedContainer startingContainer =
         new StartedContainer(container.getId(), container.getNodeId());
     synchronized (startingContainer) {
@@ -198,12 +187,24 @@ public class NMClientImpl extends NMClient {
       Map<String, ByteBuffer> allServiceResponse;
       ContainerManagementProtocolProxyData proxy = null;
       try {
+        StartContainerRequest scRequest = null;
+        
+        if (container.getIsMove()) {
+          // If the container corresponds to a relocation request, get the token
+          // for the origin node and put it into the StartContainerRequest. We
+          // do not need any container launch context here.
+          NodeId originNodeId = container.getOriginNodeId();
+          String containerManagerBindAddr = originNodeId.toString();
+          Token token = getNMTokenCache().getToken(containerManagerBindAddr);
+          scRequest = StartContainerRequest.newInstance(container.getContainerToken(),
+              container.getOriginContainerId(), originNodeId, token);
+        } else {
+          scRequest = StartContainerRequest.newInstance(containerLaunchContext,
+              container.getContainerToken());
+        }
         proxy =
             cmProxy.getProxy(container.getNodeId().toString(),
                 container.getId());
-        StartContainerRequest scRequest =
-            StartContainerRequest.newInstance(containerLaunchContext,
-              container.getContainerToken());
         List<StartContainerRequest> list = new ArrayList<StartContainerRequest>();
         list.add(scRequest);
         StartContainersRequest allRequests =
@@ -219,6 +220,11 @@ public class NMClientImpl extends NMClient {
         }
         allServiceResponse = response.getAllServicesMetaData();
         startingContainer.state = ContainerState.RUNNING;
+        if (container.getIsMove()) {
+          // After the relocation, the origin container will be shut down,
+          // so remove it from startedContainers
+          startedContainers.remove(container.getOriginContainerId());
+        }
       } catch (YarnException | IOException e) {
         startingContainer.state = ContainerState.COMPLETE;
         // Remove the started container if it failed to start
@@ -237,7 +243,6 @@ public class NMClientImpl extends NMClient {
     }
   }
 
-  @Deprecated
   @Override
   public void increaseContainerResource(Container container)
       throws YarnException, IOException {
@@ -247,44 +252,16 @@ public class NMClientImpl extends NMClient {
           container.getNodeId().toString(), container.getId());
       List<Token> increaseTokens = new ArrayList<>();
       increaseTokens.add(container.getContainerToken());
-
-      ContainerUpdateRequest request =
-          ContainerUpdateRequest.newInstance(increaseTokens);
-      ContainerUpdateResponse response =
-          proxy.getContainerManagementProtocol().updateContainer(request);
-
+      IncreaseContainersResourceRequest increaseRequest =
+          IncreaseContainersResourceRequest
+              .newInstance(increaseTokens);
+      IncreaseContainersResourceResponse response =
+          proxy.getContainerManagementProtocol()
+              .increaseContainersResource(increaseRequest);
       if (response.getFailedRequests() != null
           && response.getFailedRequests().containsKey(container.getId())) {
         Throwable t = response.getFailedRequests().get(container.getId())
             .deSerialize();
-        parseAndThrowException(t);
-      }
-    } finally {
-      if (proxy != null) {
-        cmProxy.mayBeCloseProxy(proxy);
-      }
-    }
-  }
-
-  @Override
-  public void updateContainerResource(Container container)
-      throws YarnException, IOException {
-    ContainerManagementProtocolProxyData proxy = null;
-    try {
-      proxy =
-          cmProxy.getProxy(container.getNodeId().toString(), container.getId());
-      List<Token> updateTokens = new ArrayList<>();
-      updateTokens.add(container.getContainerToken());
-
-      ContainerUpdateRequest request =
-          ContainerUpdateRequest.newInstance(updateTokens);
-      ContainerUpdateResponse response =
-          proxy.getContainerManagementProtocol().updateContainer(request);
-
-      if (response.getFailedRequests() != null && response.getFailedRequests()
-          .containsKey(container.getId())) {
-        Throwable t =
-            response.getFailedRequests().get(container.getId()).deSerialize();
         parseAndThrowException(t);
       }
     } finally {
@@ -345,84 +322,6 @@ public class NMClientImpl extends NMClient {
     }
   }
 
-  @Override
-  public void reInitializeContainer(ContainerId containerId,
-      ContainerLaunchContext containerLaunchContex, boolean autoCommit)
-      throws YarnException, IOException {
-    ContainerManagementProtocolProxyData proxy = null;
-    StartedContainer container = startedContainers.get(containerId);
-    if (container != null) {
-      synchronized (container) {
-        proxy = cmProxy.getProxy(container.getNodeId().toString(), containerId);
-        try {
-          proxy.getContainerManagementProtocol().reInitializeContainer(
-              ReInitializeContainerRequest.newInstance(
-                  containerId, containerLaunchContex, autoCommit));
-        } finally {
-          if (proxy != null) {
-            cmProxy.mayBeCloseProxy(proxy);
-          }
-        }
-      }
-    } else {
-      throw new YarnException("Unknown container [" + containerId + "]");
-    }
-  }
-
-  @Override
-  public void restartContainer(ContainerId containerId)
-      throws YarnException, IOException {
-    restartCommitOrRollbackContainer(containerId, UpgradeOp.RESTART);
-  }
-
-  @Override
-  public void rollbackLastReInitialization(ContainerId containerId)
-      throws YarnException, IOException {
-    restartCommitOrRollbackContainer(containerId, UpgradeOp.ROLLBACK);
-  }
-
-  @Override
-  public void commitLastReInitialization(ContainerId containerId)
-      throws YarnException, IOException {
-    restartCommitOrRollbackContainer(containerId, UpgradeOp.COMMIT);
-  }
-
-
-  private void restartCommitOrRollbackContainer(ContainerId containerId,
-      UpgradeOp upgradeOp) throws YarnException, IOException {
-    ContainerManagementProtocolProxyData proxy = null;
-    StartedContainer container = startedContainers.get(containerId);
-    if (container != null) {
-      synchronized (container) {
-        proxy = cmProxy.getProxy(container.getNodeId().toString(), containerId);
-        ContainerManagementProtocol cmp =
-            proxy.getContainerManagementProtocol();
-        try {
-          switch (upgradeOp) {
-          case RESTART:
-            cmp.restartContainer(containerId);
-            break;
-          case COMMIT:
-            cmp.commitLastReInitialization(containerId);
-            break;
-          case ROLLBACK:
-            cmp.rollbackLastReInitialization(containerId);
-            break;
-          default:
-            // Should not happen..
-            break;
-          }
-        } finally {
-          if (proxy != null) {
-            cmProxy.mayBeCloseProxy(proxy);
-          }
-        }
-      }
-    } else {
-      throw new YarnException("Unknown container [" + containerId + "]");
-    }
-  }
-
   private void stopContainerInternal(ContainerId containerId, NodeId nodeId)
       throws IOException, YarnException {
     ContainerManagementProtocolProxyData proxy = null;
@@ -458,66 +357,6 @@ public class NMClientImpl extends NMClient {
       throw (InvalidToken) t;
     } else {
       throw (IOException) t;
-    }
-  }
-
-  @Override
-  public NodeId getNodeIdOfStartedContainer(ContainerId containerId) {
-    StartedContainer container = startedContainers.get(containerId);
-    if (container != null) {
-      return container.getNodeId();
-    }
-    return null;
-  }
-
-  @Override
-  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
-  public void localize(ContainerId containerId, NodeId nodeId,
-      Map<String, LocalResource> localResources) throws YarnException,
-      IOException {
-    ContainerManagementProtocolProxyData proxy;
-    StartedContainer container = startedContainers.get(containerId);
-    if (container != null) {
-      synchronized (container) {
-        proxy = cmProxy.getProxy(container.getNodeId().toString(), containerId);
-        try {
-          proxy.getContainerManagementProtocol().localize(
-              ResourceLocalizationRequest.newInstance(containerId,
-                  localResources));
-        } finally {
-          if (proxy != null) {
-            cmProxy.mayBeCloseProxy(proxy);
-          }
-        }
-      }
-    } else {
-      throw new YarnException("Unknown container [" + containerId + "]");
-    }
-  }
-
-  @Override
-  public List<LocalizationStatus> getLocalizationStatuses(
-      ContainerId containerId, NodeId nodeId) throws YarnException,
-      IOException {
-
-    ContainerManagementProtocolProxyData proxy = null;
-    List<ContainerId> containerIds = Lists.newArrayList(containerId);
-    try {
-      proxy = cmProxy.getProxy(nodeId.toString(), containerId);
-      GetLocalizationStatusesResponse response =
-          proxy.getContainerManagementProtocol().getLocalizationStatuses(
-              GetLocalizationStatusesRequest.newInstance(containerIds));
-      if (response.getFailedRequests() != null
-          && response.getFailedRequests().containsKey(containerId)) {
-        Throwable t =
-            response.getFailedRequests().get(containerId).deSerialize();
-        parseAndThrowException(t);
-      }
-      return response.getLocalizationStatuses().get(containerId);
-    } finally {
-      if (proxy != null) {
-        cmProxy.mayBeCloseProxy(proxy);
-      }
     }
   }
 }

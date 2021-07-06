@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.yarn;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.net.NetUtils;
@@ -27,12 +27,10 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.CommitResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetContainerLaunchContextRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetContainerLaunchContextResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReInitializeContainerRequest;
@@ -74,7 +72,7 @@ import java.util.List;
  */
 public class TestContainerResourceIncreaseRPC {
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  static final Log LOG = LogFactory.getLog(
       TestContainerResourceIncreaseRPC.class);
 
   @Test
@@ -115,11 +113,11 @@ public class TestContainerResourceIncreaseRPC {
       // Construct container resource increase request,
       List<Token> increaseTokens = new ArrayList<>();
       increaseTokens.add(containerToken);
-      ContainerUpdateRequest request = ContainerUpdateRequest
-          .newInstance(increaseTokens);
-
+      IncreaseContainersResourceRequest increaseRequest =
+          IncreaseContainersResourceRequest
+              .newInstance(increaseTokens);
       try {
-        proxy.updateContainer(request);
+        proxy.increaseContainersResource(increaseRequest);
       } catch (Exception e) {
         LOG.info(StringUtils.stringifyException(e));
         Assert.assertEquals("Error, exception is not: "
@@ -174,21 +172,13 @@ public class TestContainerResourceIncreaseRPC {
     }
 
     @Override
-    @Deprecated
     public IncreaseContainersResourceResponse increaseContainersResource(
-        IncreaseContainersResourceRequest request)
-        throws YarnException, IOException {
-      return null;
-    }
-
-    @Override
-    public ContainerUpdateResponse updateContainer(ContainerUpdateRequest
-        request) throws YarnException, IOException {
+        IncreaseContainersResourceRequest request) throws YarnException, IOException {
       try {
         // make the thread sleep to look like its not going to respond
         Thread.sleep(10000);
       } catch (Exception e) {
-        LOG.error(e.toString());
+        LOG.error(e);
         throw new YarnException(e);
       }
       throw new YarnException("Shouldn't happen!!");
@@ -203,6 +193,13 @@ public class TestContainerResourceIncreaseRPC {
     @Override public ResourceLocalizationResponse localize(
         ResourceLocalizationRequest request) throws YarnException, IOException {
       return null;
+    }
+  
+    @Override
+    public GetContainerLaunchContextResponse getContainerLaunchContext(
+        GetContainerLaunchContextRequest request) throws YarnException, IOException {
+      throw new UnsupportedOperationException("getting the container launch context is not " +
+          "supported for this implementation of ContainerManagementProtocol");
     }
 
     @Override
@@ -226,13 +223,6 @@ public class TestContainerResourceIncreaseRPC {
 
     @Override
     public CommitResponse commitLastReInitialization(ContainerId containerId)
-        throws YarnException, IOException {
-      return null;
-    }
-
-    @Override
-    public GetLocalizationStatusesResponse getLocalizationStatuses(
-        GetLocalizationStatusesRequest request)
         throws YarnException, IOException {
       return null;
     }

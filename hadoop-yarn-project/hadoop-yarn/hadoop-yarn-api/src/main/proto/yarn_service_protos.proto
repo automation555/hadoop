@@ -22,7 +22,6 @@
  * for what changes are allowed for a *stable* .proto interface.
  */
 
-syntax = "proto2";
 option java_package = "org.apache.hadoop.yarn.proto";
 option java_outer_classname = "YarnServiceProtos";
 option java_generic_services = true;
@@ -39,7 +38,6 @@ message RegisterApplicationMasterRequestProto {
   optional string host = 1;
   optional int32 rpc_port = 2;
   optional string tracking_url = 3;
-  repeated PlacementConstraintMapEntryProto placement_constraints = 4;
 }
 
 message RegisterApplicationMasterResponseProto {
@@ -50,8 +48,6 @@ message RegisterApplicationMasterResponseProto {
   optional string queue = 5;
   repeated NMTokenProto nm_tokens_from_previous_attempts = 6;
   repeated SchedulerResourceTypes scheduler_resource_types = 7;
-  optional ResourceProfilesProto resource_profiles = 8;
-  repeated ResourceTypeInfoProto resource_types = 9;
 }
 
 message FinishApplicationMasterRequestProto {
@@ -67,8 +63,7 @@ message FinishApplicationMasterResponseProto {
 enum ContainerUpdateTypeProto {
   INCREASE_RESOURCE = 0;
   DECREASE_RESOURCE = 1;
-  PROMOTE_EXECUTION_TYPE = 2;
-  DEMOTE_EXECUTION_TYPE = 3;
+  UPDATE_EXECUTION_TYPE = 2;
 }
 
 message UpdateContainerRequestProto {
@@ -82,7 +77,6 @@ message UpdateContainerRequestProto {
 message UpdateContainerErrorProto {
   optional string reason = 1;
   optional UpdateContainerRequestProto update_request = 2;
-  optional int32 current_container_version = 3;
 }
 
 message AllocateRequestProto {
@@ -91,9 +85,8 @@ message AllocateRequestProto {
   optional ResourceBlacklistRequestProto blacklist_request = 3;
   optional int32 response_id = 4;
   optional float progress = 5;
-  repeated UpdateContainerRequestProto update_requests = 7;
-  repeated SchedulingRequestProto scheduling_requests = 10;
-  optional string tracking_url = 11;
+  repeated UpdateContainerRequestProto update_requests = 6;
+  repeated ContainerMoveRequestProto move_ask = 20;
 }
 
 message NMTokenProto {
@@ -116,13 +109,11 @@ message AllocateResponseProto {
   optional int32 num_cluster_nodes = 7;
   optional PreemptionMessageProto preempt = 8;
   repeated NMTokenProto nm_tokens = 9;
+  repeated UpdatedContainerProto updated_containers = 10;
   optional hadoop.common.TokenProto am_rm_token = 12;
   optional PriorityProto application_priority = 13;
-  optional CollectorInfoProto collector_info = 14;
+  optional string collector_addr = 14;
   repeated UpdateContainerErrorProto update_errors = 15;
-  repeated UpdatedContainerProto updated_containers = 16;
-  repeated ContainerProto containers_from_previous_attempts = 17;
-  repeated RejectedSchedulingRequestProto rejected_scheduling_requests = 18;
 }
 
 enum SchedulerResourceTypes {
@@ -206,7 +197,6 @@ message GetApplicationsRequestProto {
   optional int64 finish_end = 9;
   repeated string applicationTags = 10;
   optional ApplicationsRequestScopeProto scope = 11 [default = ALL];
-  optional string name = 12;
 }
 
 message GetApplicationsResponseProto {
@@ -243,7 +233,7 @@ message GetNodesToLabelsRequestProto {
 }
 
 message GetNodesToLabelsResponseProto {
-  repeated NodeIdToLabelsProto nodeToLabels = 1;
+  repeated NodeIdToLabelsInfoProto nodeToLabels = 1;
 }
 
 message GetLabelsToNodesRequestProto {
@@ -258,31 +248,7 @@ message GetClusterNodeLabelsRequestProto {
 }
 
 message GetClusterNodeLabelsResponseProto {
-  repeated string deprecatedNodeLabels = 1;
-  repeated NodeLabelProto nodeLabels = 2;
-}
-
-message GetClusterNodeAttributesRequestProto {
-}
-
-message GetClusterNodeAttributesResponseProto {
-  repeated NodeAttributeInfoProto nodeAttributes = 1;
-}
-
-message GetAttributesToNodesRequestProto {
-  repeated NodeAttributeKeyProto nodeAttributes = 1;
-}
-
-message GetAttributesToNodesResponseProto {
-  repeated AttributeToNodesProto attributesToNodes = 1;
-}
-
-message GetNodesToAttributesRequestProto {
-  repeated string hostnames = 1;
-}
-
-message GetNodesToAttributesResponseProto {
-  repeated NodeToAttributesProto nodesToAttributes = 1;
+  repeated NodeLabelProto nodeLabels = 1;
 }
 
 message UpdateApplicationPriorityRequestProto {
@@ -302,37 +268,6 @@ message SignalContainerRequestProto {
 message SignalContainerResponseProto {
 }
 
-message UpdateApplicationTimeoutsRequestProto {
-    required ApplicationIdProto applicationId = 1;
-    repeated ApplicationUpdateTimeoutMapProto application_timeouts = 2;
-}
-
-message UpdateApplicationTimeoutsResponseProto {
-    repeated ApplicationUpdateTimeoutMapProto application_timeouts = 1;
-}
-
-message GetAllResourceProfilesRequestProto {
-}
-
-message GetAllResourceProfilesResponseProto {
-  required ResourceProfilesProto resource_profiles = 1;
-}
-
-message GetResourceProfileRequestProto {
-  required string profile = 1;
-}
-
-message GetResourceProfileResponseProto {
-  required ResourceProto resources = 1;
-}
-
-message GetAllResourceTypeInfoRequestProto {
-}
-
-message GetAllResourceTypeInfoResponseProto {
-  repeated ResourceTypeInfoProto resource_type_info = 1;
-}
-
 //////////////////////////////////////////////////////
 /////// client_NM_Protocol ///////////////////////////
 //////////////////////////////////////////////////////
@@ -340,6 +275,10 @@ message GetAllResourceTypeInfoResponseProto {
 message StartContainerRequestProto {
   optional ContainerLaunchContextProto container_launch_context = 1;
   optional hadoop.common.TokenProto container_token = 2;
+  optional bool is_move = 20;
+  optional ContainerIdProto origin_container_id = 21;
+  optional NodeIdProto origin_node_id = 22;
+  optional hadoop.common.TokenProto origin_nm_token = 23;
 }
 
 message StartContainerResponseProto {
@@ -422,13 +361,12 @@ message IncreaseContainersResourceResponseProto {
   repeated ContainerExceptionMapProto failed_requests = 2;
 }
 
-message ContainerUpdateRequestProto {
-  repeated hadoop.common.TokenProto update_container_token = 1;
+message GetContainerLaunchContextRequestProto {
+  optional ContainerIdProto container_id = 1;
 }
 
-message ContainerUpdateResponseProto {
-  repeated ContainerIdProto succeeded_requests = 1;
-  repeated ContainerExceptionMapProto failed_requests = 2;
+message GetContainerLaunchContextResponseProto {
+  optional ContainerLaunchContextProto container_launch_context = 1;
 }
 
 //////////////////////////////////////////////////////
@@ -544,32 +482,4 @@ message RunSharedCacheCleanerTaskRequestProto {
 
 message RunSharedCacheCleanerTaskResponseProto {
   optional bool accepted = 1;
-}
-
-// Localization
-message GetLocalizationStatusesRequestProto {
-  repeated ContainerIdProto container_id = 1;
-}
-
-message GetLocalizationStatusesResponseProto {
-  repeated ContainerLocalizationStatusesProto cntn_localization_statuses = 1;
-  repeated ContainerExceptionMapProto failed_requests = 2;
-}
-
-enum LocalizationStateProto {
-  L_PENDING = 1;
-  L_COMPLETED = 2;
-  L_FAILED = 3;
-}
-
-
-message LocalizationStatusProto {
-  optional string resource_key = 1;
-  optional LocalizationStateProto localization_state= 2;
-  optional string diagnostics = 3;
-}
-
-message ContainerLocalizationStatusesProto {
-  optional ContainerIdProto container_id = 1;
-  repeated LocalizationStatusProto localization_statuses = 2;
 }

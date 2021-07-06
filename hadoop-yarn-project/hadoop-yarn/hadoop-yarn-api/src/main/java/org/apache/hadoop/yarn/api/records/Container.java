@@ -27,11 +27,6 @@ import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.util.Records;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * {@code Container} represents an allocated resource in the cluster.
  * <p>
@@ -52,6 +47,13 @@ import java.util.Set;
  *   <li>
  *     Container {@link Token} of the container, used to securely verify
  *     authenticity of the allocation.
+ *   </li>
+ *   <li>
+ *     A boolean <em>isMove</em> flag, defaulting to {@code false}.
+ *     This flag indicates whether this container is associated with a
+ *     container relocation. If true, then this container is meant to replace
+ *     an existing container identified by <em>originNodeId</em>
+ *     and <em>originContainerId</em>.
  *   </li>
  * </ul>
  * 
@@ -127,20 +129,7 @@ public abstract class Container implements Comparable<Container> {
   @Private
   @Unstable
   public abstract void setNodeHttpAddress(String nodeHttpAddress);
-
-  /**
-   * Get the exposed ports of the node on which the container is allocated.
-   * @return exposed ports of the node on which the container is allocated
-   */
-  @Public
-  @Stable
-  public abstract Map<String, List<Map<String, String>>> getExposedPorts();
-
-  @Private
-  @Unstable
-  public abstract void setExposedPorts(
-      Map<String, List<Map<String, String>>> ports);
-
+  
   /**
    * Get the <code>Resource</code> allocated to the container.
    * @return <code>Resource</code> allocated to the container
@@ -274,16 +263,66 @@ public abstract class Container implements Comparable<Container> {
   public void setVersion(int version) {
     throw new UnsupportedOperationException();
   }
-
-  @Private
+  
+  /**
+   * Gets whether this container is associated with a container relocation.
+   * @return whether this container is associated with a container relocation
+   */
+  @Public
   @Unstable
-  public Set<String> getAllocationTags() {
-    return Collections.emptySet();
-  }
-
-  @Private
+  public abstract boolean getIsMove();
+  
+  /**
+   * Sets whether this container is associated with a container relocation.
+   * @param isMove whether this container is associated with a container relocation
+   */
+  @Public
   @Unstable
-  public void setAllocationTags(Set<String> allocationTags) {
-
-  }
+  public abstract void setIsMove(boolean isMove);
+  
+  /**
+   * Gets the origin container id for this container.
+   * The origin container id is set if and only if this container is associated
+   * with a container relocation. It identifies the container that should be relocated.
+   *
+   * @return the origin container id for this container
+   */
+  @Public
+  @Unstable
+  public abstract ContainerId getOriginContainerId();
+  
+  /**
+   * Sets the origin container id for this container.
+   * The origin container id should be set if and only if this container is associated
+   * with a container relocation. It identifies the container that should be relocated.
+   *
+   * @param originContainerId the origin container id for this container
+   */
+  @Public
+  @Unstable
+  public abstract void setOriginContainerId(ContainerId originContainerId);
+  
+  /**
+   * Gets the origin node id for this container.
+   * The origin node id is set if and only if this container is associated
+   * with a container relocation. It identifies the node from which a container should
+   * be relocated.
+   *
+   * @return the origin node id for this container
+   */
+  @Public
+  @Unstable
+  public abstract NodeId getOriginNodeId();
+  
+  /**
+   * Sets the origin node id for this container.
+   * The origin node id should be set if and only if this container is associated
+   * with a container relocation. It identifies the node from which a container should
+   * be relocated.
+   *
+   * @param originNodeId the origin node id for this container
+   */
+  @Public
+  @Unstable
+  public abstract void setOriginNodeId(NodeId originNodeId);
 }
