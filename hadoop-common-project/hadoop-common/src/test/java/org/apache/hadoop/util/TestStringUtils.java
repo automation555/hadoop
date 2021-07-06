@@ -25,7 +25,6 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
@@ -34,14 +33,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.hadoop.test.UnitTestcaseTimeLimit;
 import org.apache.hadoop.util.StringUtils.TraditionalBinaryPrefix;
 import org.junit.Test;
@@ -57,9 +50,6 @@ public class TestStringUtils extends UnitTestcaseTimeLimit {
   final private static String STR_WITH_BOTH2 = ",A\\,,B\\\\,";
   final private static String ESCAPED_STR_WITH_BOTH2 = 
     "\\,A\\\\\\,\\,B\\\\\\\\\\,";
-
-  final private static FastDateFormat FAST_DATE_FORMAT =
-      FastDateFormat.getInstance("d-MMM-yyyy HH:mm:ss");
   
   @Test (timeout = 30000)
   public void testEscapeString() throws Exception {
@@ -216,16 +206,16 @@ public class TestStringUtils extends UnitTestcaseTimeLimit {
         assertEquals(n + "", long2String(n, null, decimalPlace));
         assertEquals(-n + "", long2String(-n, null, decimalPlace));
       }
-      assertEquals("1 K", long2String(1L << 10, null, decimalPlace));
-      assertEquals("-1 K", long2String(-1L << 10, null, decimalPlace));
+      assertEquals("1K", long2String(1L << 10, null, decimalPlace));
+      assertEquals("-1K", long2String(-1L << 10, null, decimalPlace));
     }
 
-    assertEquals("8.00 E", long2String(Long.MAX_VALUE, null, 2));
-    assertEquals("8.00 E", long2String(Long.MAX_VALUE - 1, null, 2));
-    assertEquals("-8 E", long2String(Long.MIN_VALUE, null, 2));
-    assertEquals("-8.00 E", long2String(Long.MIN_VALUE + 1, null, 2));
+    assertEquals("8.00E", long2String(Long.MAX_VALUE, null, 2));
+    assertEquals("8.00E", long2String(Long.MAX_VALUE - 1, null, 2));
+    assertEquals("-8E", long2String(Long.MIN_VALUE, null, 2));
+    assertEquals("-8.00E", long2String(Long.MIN_VALUE + 1, null, 2));
 
-    final String[] zeros = {" ", ".0 ", ".00 "};
+    final String[] zeros = {"", ".0", ".00"};
     for(int decimalPlace = 0; decimalPlace < zeros.length; decimalPlace++) {
       final String trailingZeros = zeros[decimalPlace]; 
 
@@ -235,7 +225,7 @@ public class TestStringUtils extends UnitTestcaseTimeLimit {
   
         { // n = 2^e
           final long n = 1L << e;
-          final String expected = (n/p.value) + " " + p.symbol;
+          final String expected = Long.toString(n/p.value) + p.symbol;
           assertEquals("n=" + n, expected, long2String(n, null, 2));
         }
   
@@ -253,19 +243,19 @@ public class TestStringUtils extends UnitTestcaseTimeLimit {
       }
     }
 
-    assertEquals("1.50 K", long2String(3L << 9, null, 2));
-    assertEquals("1.5 K", long2String(3L << 9, null, 1));
-    assertEquals("1.50 M", long2String(3L << 19, null, 2));
-    assertEquals("2 M", long2String(3L << 19, null, 0));
-    assertEquals("3 G", long2String(3L << 30, null, 2));
+    assertEquals("1.50K", long2String(3L << 9, null, 2));
+    assertEquals("1.5K", long2String(3L << 9, null, 1));
+    assertEquals("1.50M", long2String(3L << 19, null, 2));
+    assertEquals("2M", long2String(3L << 19, null, 0));
+    assertEquals("3G", long2String(3L << 30, null, 2));
 
     // test byteDesc(..)
-    assertEquals("0 B", StringUtils.byteDesc(0));
-    assertEquals("-100 B", StringUtils.byteDesc(-100));
-    assertEquals("1 KB", StringUtils.byteDesc(1024));
-    assertEquals("1.50 KB", StringUtils.byteDesc(3L << 9));
-    assertEquals("1.50 MB", StringUtils.byteDesc(3L << 19));
-    assertEquals("3 GB", StringUtils.byteDesc(3L << 30));
+    assertEquals("0B", StringUtils.byteDesc(0));
+    assertEquals("-100B", StringUtils.byteDesc(-100));
+    assertEquals("1KB", StringUtils.byteDesc(1024));
+    assertEquals("1.50KB", StringUtils.byteDesc(3L << 9));
+    assertEquals("1.50MB", StringUtils.byteDesc(3L << 19));
+    assertEquals("3GB", StringUtils.byteDesc(3L << 30));
     
     // test formatPercent(..)
     assertEquals("10%", StringUtils.formatPercent(0.1, 0));
@@ -287,12 +277,8 @@ public class TestStringUtils extends UnitTestcaseTimeLimit {
     s.add("c");
     assertEquals("", StringUtils.join(":", s.subList(0, 0)));
     assertEquals("a", StringUtils.join(":", s.subList(0, 1)));
-    assertEquals("", StringUtils.join(':', s.subList(0, 0)));
-    assertEquals("a", StringUtils.join(':', s.subList(0, 1)));
     assertEquals("a:b", StringUtils.join(":", s.subList(0, 2)));
     assertEquals("a:b:c", StringUtils.join(":", s.subList(0, 3)));
-    assertEquals("a:b", StringUtils.join(':', s.subList(0, 2)));
-    assertEquals("a:b:c", StringUtils.join(':', s.subList(0, 3)));
   }
   
   @Test (timeout = 30000)
@@ -396,6 +382,8 @@ public class TestStringUtils extends UnitTestcaseTimeLimit {
       pattern, replacements));
     assertEquals("___", StringUtils.replaceTokens("$UNDER_SCORES", pattern,
       replacements));
+    assertEquals("//one//two//", StringUtils.replaceTokens("//$FOO/$BAR/$BAZ//",
+      pattern, replacements));
   }
 
   @Test (timeout = 5000)
@@ -443,73 +431,6 @@ public class TestStringUtils extends UnitTestcaseTimeLimit {
     } finally {
       Locale.setDefault(defaultLocale);
     }
-  }
-
-  @Test
-  //Multithreaded Test GetFormattedTimeWithDiff()
-  public void testGetFormattedTimeWithDiff() throws InterruptedException {
-    ExecutorService executorService = Executors.newFixedThreadPool(16);
-    final CyclicBarrier cyclicBarrier = new CyclicBarrier(10);
-    for (int i = 0; i < 10; i++) {
-
-      executorService.execute(new Runnable() {
-        @Override
-        public void run() {
-          try {
-            cyclicBarrier.await();
-          } catch (InterruptedException | BrokenBarrierException e) {
-            //Ignored
-          }
-          final long end = System.currentTimeMillis();
-          final long start = end - 30000;
-          String formattedTime1 = StringUtils.getFormattedTimeWithDiff(
-              FAST_DATE_FORMAT, start, end);
-          String formattedTime2 = StringUtils.getFormattedTimeWithDiff(
-              FAST_DATE_FORMAT, start, end);
-          assertTrue("Method returned inconsistent results indicative of"
-              + " a race condition", formattedTime1.equals(formattedTime2));
-
-        }
-      });
-    }
-
-    executorService.shutdown();
-    executorService.awaitTermination(50, TimeUnit.SECONDS);
-  }
-
-  @Test
-  public void testFormatTimeSortable() {
-    long timeDiff = 523452311;
-    String timeDiffStr = "99hrs, 59mins, 59sec";
-
-    assertEquals("Incorrect time diff string returned", timeDiffStr,
-        StringUtils.formatTimeSortable(timeDiff));
-  }
-
-  @Test
-  public void testIsAlpha() {
-    assertTrue("Reported hello as non-alpha string",
-        StringUtils.isAlpha("hello"));
-    assertFalse("Reported hello1 as alpha string",
-        StringUtils.isAlpha("hello1"));
-  }
-
-  @Test
-  public void testEscapeHTML() {
-    String htmlStr = "<p>Hello. How are you?</p>";
-    String escapedStr = "&lt;p&gt;Hello. How are you?&lt;/p&gt;";
-
-    assertEquals("Incorrect escaped HTML string returned",
-        escapedStr, StringUtils.escapeHTML(htmlStr));
-  }
-
-  @Test
-  public void testCreateStartupShutdownMessage() {
-    //pass null args and method must still return a string beginning with
-    // "STARTUP_MSG"
-    String msg = StringUtils.createStartupShutdownMessage(
-        this.getClass().getName(), "test.host", null);
-    assertTrue(msg.startsWith("STARTUP_MSG:"));
   }
 
   // Benchmark for StringUtils split
