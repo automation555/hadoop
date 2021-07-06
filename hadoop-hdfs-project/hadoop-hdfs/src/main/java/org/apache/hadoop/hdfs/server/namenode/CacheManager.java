@@ -25,25 +25,25 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LIST_CACHE_POOLS
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LIST_CACHE_POOLS_NUM_RESPONSES_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_CACHING_ENABLED_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_CACHING_ENABLED_DEFAULT;
 
 import java.io.DataInput;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import com.google.flatbuffers.FlatBufferBuilder;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -51,6 +51,7 @@ import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -64,16 +65,15 @@ import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CacheDirectiveInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CachePoolInfoProto;
-import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
+import org.apache.hadoop.hdfs.protocolPB.PBHelper;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.CacheReplicationMonitor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.CachedBlocksList;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor.CachedBlocksList.Type;
-import org.apache.hadoop.hdfs.server.namenode.FSDirectory.DirOp;
+import org.apache.hadoop.hdfs.server.flatbuffer.IntelCacheManagerSection;
 import org.apache.hadoop.hdfs.server.namenode.FsImageProto.CacheManagerSection;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
 import org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot;
@@ -86,15 +86,12 @@ import org.apache.hadoop.hdfs.util.ReadOnlyList;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.GSet;
 import org.apache.hadoop.util.LightWeightGSet;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Time;
-
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.collect.HashMultimap;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Multimap;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 
 /**
  * The Cache Manager handles caching on DataNodes.
@@ -105,7 +102,7 @@ import org.slf4j.LoggerFactory;
  * caching directives, we will schedule caching and uncaching work.
  */
 @InterfaceAudience.LimitedPrivate({"HDFS"})
-public class CacheManager {
+public final class CacheManager {
   public static final Logger LOG = LoggerFactory.getLogger(CacheManager.class);
 
   private static final float MIN_CACHED_BLOCKS_PERCENT = 0.001f;
@@ -128,7 +125,8 @@ public class CacheManager {
    * listCacheDirectives relies on the ordering of elements in this map
    * to track what has already been listed by the client.
    */
-  private final TreeMap<Long, CacheDirective> directivesById = new TreeMap<>();
+  private final TreeMap<Long, CacheDirective> directivesById =
+      new TreeMap<Long, CacheDirective>();
 
   /**
    * The directive ID to use for a new directive.  IDs always increase, and are
@@ -137,10 +135,10 @@ public class CacheManager {
   private long nextDirectiveId;
 
   /**
-   * Cache directives
+   * Cache directives, sorted by path
    */
-  private final Multimap<String, CacheDirective> directivesByPath =
-      HashMultimap.create();
+  private final TreeMap<String, List<CacheDirective>> directivesByPath =
+      new TreeMap<String, List<CacheDirective>>();
 
   /**
    * Cache pools, sorted by name.
@@ -176,33 +174,20 @@ public class CacheManager {
   private final SerializerCompat serializerCompat = new SerializerCompat();
 
   /**
-   * Whether caching is enabled.
-   *
-   * If caching is disabled, we will not process cache reports or store
-   * information about what is cached where.  We also do not start the
-   * CacheReplicationMonitor thread.  This will save resources, but provide
-   * less functionality.
-   *
-   * Even when caching is disabled, we still store path-based cache
-   * information.  This information is stored in the edit log and fsimage.  We
-   * don't want to lose it just because a configuration setting was turned off.
-   * However, we will not act on this information if caching is disabled.
-   */
-  private final boolean enabled;
-
-  /**
    * The CacheReplicationMonitor.
    */
   private CacheReplicationMonitor monitor;
 
   public static final class PersistState {
     public final CacheManagerSection section;
+    public final IntelCacheManagerSection intelSection;
     public final List<CachePoolInfoProto> pools;
     public final List<CacheDirectiveInfoProto> directives;
 
-    public PersistState(CacheManagerSection section,
+    public PersistState(CacheManagerSection section, IntelCacheManagerSection intelSection,
         List<CachePoolInfoProto> pools, List<CacheDirectiveInfoProto> directives) {
       this.section = section;
+      this.intelSection = intelSection;
       this.pools = pools;
       this.directives = directives;
     }
@@ -213,8 +198,6 @@ public class CacheManager {
     this.namesystem = namesystem;
     this.blockManager = blockManager;
     this.nextDirectiveId = 1;
-    this.enabled = conf.getBoolean(DFS_NAMENODE_CACHING_ENABLED_KEY,
-        DFS_NAMENODE_CACHING_ENABLED_DEFAULT);
     this.maxListCachePoolsResponses = conf.getInt(
         DFS_NAMENODE_LIST_CACHE_POOLS_NUM_RESPONSES,
         DFS_NAMENODE_LIST_CACHE_POOLS_NUM_RESPONSES_DEFAULT);
@@ -232,13 +215,10 @@ public class CacheManager {
         DFS_NAMENODE_PATH_BASED_CACHE_BLOCK_MAP_ALLOCATION_PERCENT);
       cachedBlocksPercent = MIN_CACHED_BLOCKS_PERCENT;
     }
-    this.cachedBlocks = enabled ? new LightWeightGSet<CachedBlock, CachedBlock>(
+    this.cachedBlocks = new LightWeightGSet<CachedBlock, CachedBlock>(
           LightWeightGSet.computeCapacity(cachedBlocksPercent,
-              "cachedBlocks")) : new LightWeightGSet<>(0);
-  }
+              "cachedBlocks"));
 
-  public boolean isEnabled() {
-    return enabled;
   }
 
   /**
@@ -253,12 +233,6 @@ public class CacheManager {
   }
 
   public void startMonitorThread() {
-    if (!isEnabled()) {
-      LOG.info("Not starting CacheReplicationMonitor as name-node caching" +
-              " is disabled.");
-      return;
-    }
-
     crmLock.lock();
     try {
       if (this.monitor == null) {
@@ -272,10 +246,6 @@ public class CacheManager {
   }
 
   public void stopMonitorThread() {
-    if (!isEnabled()) {
-      return;
-    }
-
     crmLock.lock();
     try {
       if (this.monitor != null) {
@@ -431,7 +401,8 @@ public class CacheManager {
     if (pool.getLimit() == CachePoolInfo.LIMIT_UNLIMITED) {
       return;
     }
-    if (pool.getBytesNeeded() + stats.getBytesNeeded() > pool.getLimit()) {
+    if (pool.getBytesNeeded() + (stats.getBytesNeeded() * replication) > pool
+        .getLimit()) {
       throw new InvalidRequestException("Caching path " + path + " of size "
           + stats.getBytesNeeded() / replication + " bytes at replication "
           + replication + " would exceed pool " + pool.getPoolName()
@@ -451,9 +422,9 @@ public class CacheManager {
     long requestedFiles = 0;
     CacheDirectiveStats.Builder builder = new CacheDirectiveStats.Builder();
     try {
-      node = fsDir.getINode(path, DirOp.READ);
-    } catch (IOException e) {
-      // We don't cache through invalid paths
+      node = fsDir.getINode(path);
+    } catch (UnresolvedLinkException e) {
+      // We don't cache through symlinks
       return builder.build();
     }
     if (node == null) {
@@ -475,7 +446,7 @@ public class CacheManager {
       }
     }
     return new CacheDirectiveStats.Builder()
-        .setBytesNeeded(requestedBytes * replication)
+        .setBytesNeeded(requestedBytes)
         .setFilesCached(requestedFiles)
         .build();
   }
@@ -517,7 +488,12 @@ public class CacheManager {
     assert addedDirective;
     directivesById.put(directive.getId(), directive);
     String path = directive.getPath();
-    directivesByPath.put(path, directive);
+    List<CacheDirective> directives = directivesByPath.get(path);
+    if (directives == null) {
+      directives = new ArrayList<CacheDirective>(1);
+      directivesByPath.put(path, directives);
+    }
+    directives.add(directive);
     // Fix up pool stats
     CacheDirectiveStats stats =
         computeNeeded(directive.getPath(), directive.getReplication());
@@ -552,8 +528,7 @@ public class CacheManager {
       CachePool pool = getCachePool(validatePoolName(info));
       checkWritePermission(pc, pool);
       String path = validatePath(info);
-      short replication = validateReplication(
-              info, pool.getDefaultReplication());
+      short replication = validateReplication(info, (short)1);
       long expiryTime = validateExpiryTime(info, pool.getMaxRelativeExpiryMs());
       // Do quota validation if required
       if (!flags.contains(CacheFlag.FORCE)) {
@@ -678,9 +653,13 @@ public class CacheManager {
     assert namesystem.hasWriteLock();
     // Remove the corresponding entry in directivesByPath.
     String path = directive.getPath();
-    if (!directivesByPath.remove(path, directive)) {
-      throw new InvalidRequestException("Failed to locate entry "
-          + directive.getId() + " by path " + directive.getPath());
+    List<CacheDirective> directives = directivesByPath.get(path);
+    if (directives == null || !directives.remove(directive)) {
+      throw new InvalidRequestException("Failed to locate entry " +
+          directive.getId() + " by path " + directive.getPath());
+    }
+    if (directives.size() == 0) {
+      directivesByPath.remove(path);
     }
     // Fix up the stats from removing the pool
     final CachePool pool = directive.getPool();
@@ -852,13 +831,6 @@ public class CacheManager {
         // New limit changes stats, need to set needs refresh
         setNeedsRescan();
       }
-      if (info.getDefaultReplication() != null) {
-        final short defaultReplication = info.getDefaultReplication();
-        pool.setDefaultReplication(defaultReplication);
-        bld.append(prefix).append("set default replication to "
-            + defaultReplication);
-        prefix = "; ";
-      }
       if (info.getMaxRelativeExpiryMs() != null) {
         final Long maxRelativeExpiry = info.getMaxRelativeExpiryMs();
         pool.setMaxRelativeExpiryMs(maxRelativeExpiry);
@@ -899,7 +871,7 @@ public class CacheManager {
       Iterator<CacheDirective> iter = pool.getDirectiveList().iterator();
       while (iter.hasNext()) {
         CacheDirective directive = iter.next();
-        directivesByPath.removeAll(directive.getPath());
+        directivesByPath.remove(directive.getPath());
         directivesById.remove(directive.getId());
         iter.remove();
       }
@@ -928,21 +900,7 @@ public class CacheManager {
     return new BatchedListEntries<CachePoolEntry>(results, false);
   }
 
-  public void setCachedLocations(LocatedBlocks locations) {
-    // don't attempt lookups if there are no cached blocks
-    if (cachedBlocks.size() > 0) {
-      for (LocatedBlock lb : locations.getLocatedBlocks()) {
-        setCachedLocations(lb);
-      }
-    }
-  }
-
-  @SuppressFBWarnings(
-      value="EC_UNRELATED_TYPES",
-      justification="HDFS-15255 Asked Wei-Chiu and Pifta to review this" +
-          " warning and we all agree the code is OK and the warning is not " +
-          "needed")
-  private void setCachedLocations(LocatedBlock block) {
+  public void setCachedLocations(LocatedBlock block) {
     CachedBlock cachedBlock =
         new CachedBlock(block.getBlock().getBlockId(),
             (short)0, false);
@@ -975,19 +933,13 @@ public class CacheManager {
 
   public final void processCacheReport(final DatanodeID datanodeID,
       final List<Long> blockIds) throws IOException {
-    if (!enabled) {
-      LOG.debug("Ignoring cache report from {} because {} = false. " +
-              "number of blocks: {}", datanodeID,
-              DFS_NAMENODE_CACHING_ENABLED_KEY, blockIds.size());
-      return;
-    }
     namesystem.writeLock();
     final long startTime = Time.monotonicNow();
     final long endTime;
     try {
       final DatanodeDescriptor datanode = 
           blockManager.getDatanodeManager().getDatanode(datanodeID);
-      if (datanode == null || !datanode.isRegistered()) {
+      if (datanode == null || !datanode.isAlive) {
         throw new IOException(
             "processCacheReport from dead or unregistered datanode: " +
             datanode);
@@ -995,7 +947,7 @@ public class CacheManager {
       processCacheReportImpl(datanode, blockIds);
     } finally {
       endTime = Time.monotonicNow();
-      namesystem.writeUnlock("processCacheReport");
+      namesystem.writeUnlock();
     }
 
     // Log the block report processing stats from Namenode perspective
@@ -1078,10 +1030,6 @@ public class CacheManager {
       if (p.getLimit() != null)
         b.setLimit(p.getLimit());
 
-      if (p.getMaxRelativeExpiryMs() != null) {
-        b.setMaxRelativeExpiry(p.getMaxRelativeExpiryMs());
-      }
-
       pools.add(b.build());
     }
 
@@ -1105,7 +1053,7 @@ public class CacheManager {
       Expiration expiry = info.getExpiration();
       if (expiry != null) {
         assert (!expiry.isRelative());
-        b.setExpiration(PBHelperClient.convert(expiry));
+        b.setExpiration(PBHelper.convert(expiry));
       }
 
       directives.add(b.build());
@@ -1114,7 +1062,18 @@ public class CacheManager {
         .setNextDirectiveId(nextDirectiveId).setNumPools(pools.size())
         .setNumDirectives(directives.size()).build();
 
-    return new PersistState(s, pools, directives);
+    /**
+     * Get IntelCacheManagerSection
+     */
+    FlatBufferBuilder fbb = new FlatBufferBuilder();
+    int offset = IntelCacheManagerSection.createIntelCacheManagerSection(fbb,
+        nextDirectiveId, pools.size(), directives.size());
+    IntelCacheManagerSection.finishIntelCacheManagerSectionBuffer(fbb, offset);
+    ByteBuffer byteBuffer = fbb.dataBuffer();
+    IntelCacheManagerSection is =
+        IntelCacheManagerSection.getRootAsIntelCacheManagerSection(byteBuffer);
+
+    return new PersistState(s, is, pools, directives);
   }
 
   /**
@@ -1128,7 +1087,7 @@ public class CacheManager {
   }
 
   public void loadState(PersistState s) throws IOException {
-    nextDirectiveId = s.section.getNextDirectiveId();
+    nextDirectiveId = s.intelSection.nextDirectiveId();
     for (CachePoolInfoProto p : s.pools) {
       CachePoolInfo info = new CachePoolInfo(p.getPoolName());
       if (p.hasOwnerName())
@@ -1140,16 +1099,8 @@ public class CacheManager {
       if (p.hasMode())
         info.setMode(new FsPermission((short) p.getMode()));
 
-      if (p.hasDefaultReplication()) {
-        info.setDefaultReplication((short) p.getDefaultReplication());
-      }
-
       if (p.hasLimit())
         info.setLimit(p.getLimit());
-
-      if (p.hasMaxRelativeExpiry()) {
-        info.setMaxRelativeExpiryMs(p.getMaxRelativeExpiry());
-      }
 
       addCachePool(info);
     }
@@ -1177,7 +1128,12 @@ public class CacheManager {
       throw new IOException("A directive with ID " + directive.getId()
           + " already exists");
     }
-    directivesByPath.put(directive.getPath(), directive);
+    List<CacheDirective> directives = directivesByPath.get(directive.getPath());
+    if (directives == null) {
+      directives = new LinkedList<CacheDirective>();
+      directivesByPath.put(directive.getPath(), directives);
+    }
+    directives.add(directive);
   }
 
   private final class SerializerCompat {

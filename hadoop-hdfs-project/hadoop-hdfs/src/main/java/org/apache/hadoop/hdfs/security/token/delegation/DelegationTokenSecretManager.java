@@ -21,16 +21,21 @@ package org.apache.hadoop.hdfs.security.token.delegation;
 import java.io.DataInput;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 
-import org.apache.hadoop.util.Lists;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.flatbuffers.FlatBufferBuilder;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdfs.server.flatbuffer.IntelDelegationKey;
+import org.apache.hadoop.hdfs.server.flatbuffer.IntelPersistToken;
+import org.apache.hadoop.hdfs.server.flatbuffer.IntelSecretManagerSection;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.FsImageProto.SecretManagerSection;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -50,8 +55,9 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 
 /**
  * A HDFS specific delegation token secret manager.
@@ -62,8 +68,8 @@ import org.apache.hadoop.thirdparty.protobuf.ByteString;
 public class DelegationTokenSecretManager
     extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(DelegationTokenSecretManager.class);
+  private static final Log LOG = LogFactory
+      .getLog(DelegationTokenSecretManager.class);
   
   private final FSNamesystem namesystem;
   private final SerializerCompat serializerCompat = new SerializerCompat();
@@ -178,40 +184,47 @@ public class DelegationTokenSecretManager
 
   public static class SecretManagerState {
     public final SecretManagerSection section;
+    public final IntelSecretManagerSection intelSection;
     public final List<SecretManagerSection.DelegationKey> keys;
+    public final List<IntelDelegationKey> intelKeys;
     public final List<SecretManagerSection.PersistToken> tokens;
+    public final List<IntelPersistToken> intelTokens;
 
     public SecretManagerState(
         SecretManagerSection s,
+        IntelSecretManagerSection intelSection,
         List<SecretManagerSection.DelegationKey> keys,
+        List<IntelDelegationKey> intelKeys,
+        List<IntelPersistToken> intelTokens,
         List<SecretManagerSection.PersistToken> tokens) {
       this.section = s;
+      this.intelSection = intelSection;
       this.keys = keys;
+      this.intelKeys = intelKeys;
       this.tokens = tokens;
+      this.intelTokens = intelTokens;
     }
   }
 
-  public synchronized void loadSecretManagerState(SecretManagerState state, Counter counter)
+  public synchronized void loadSecretManagerState(SecretManagerState state)
       throws IOException {
     Preconditions.checkState(!running,
         "Can't load state from image in a running SecretManager.");
-
-    currentId = state.section.getCurrentId();
-    delegationTokenSequenceNumber = state.section.getTokenSequenceNumber();
-    for (SecretManagerSection.DelegationKey k : state.keys) {
-      addKey(new DelegationKey(k.getId(), k.getExpiryDate(), k.hasKey() ? k
-          .getKey().toByteArray() : null));
+    currentId = (int)state.intelSection.currentId();
+    delegationTokenSequenceNumber = (int)state.intelSection.tokenSequenceNumber();
+    for (IntelDelegationKey k : state.intelKeys) {
+      addKey(new DelegationKey((int)k.id(), k.expiryDate(), k.key() != null ? k
+          .key().getBytes() : null));
     }
 
-    for (SecretManagerSection.PersistToken t : state.tokens) {
+    for (IntelPersistToken t : state.intelTokens) {
       DelegationTokenIdentifier id = new DelegationTokenIdentifier(new Text(
-          t.getOwner()), new Text(t.getRenewer()), new Text(t.getRealUser()));
-      id.setIssueDate(t.getIssueDate());
-      id.setMaxDate(t.getMaxDate());
-      id.setSequenceNumber(t.getSequenceNumber());
-      id.setMasterKeyId(t.getMasterKeyId());
-      addPersistedDelegationToken(id, t.getExpiryDate());
-      counter.increment();
+          t.owner()), new Text(t.renewer()), new Text(t.realUser()));
+      id.setIssueDate(t.issueDate());
+      id.setMaxDate(t.maxDate());
+      id.setSequenceNumber((int)t.sequenceNumber());
+      id.setMasterKeyId((int)t.masterKeyId());
+      addPersistedDelegationToken(id, t.expiryDate());
     }
   }
 
@@ -228,39 +241,74 @@ public class DelegationTokenSecretManager
   }
 
   public synchronized SecretManagerState saveSecretManagerState() {
-    SecretManagerSection s = SecretManagerSection.newBuilder()
-        .setCurrentId(currentId)
-        .setTokenSequenceNumber(delegationTokenSequenceNumber)
-        .setNumKeys(allKeys.size()).setNumTokens(currentTokens.size()).build();
-    ArrayList<SecretManagerSection.DelegationKey> keys = Lists
+
+    FlatBufferBuilder fbb = new FlatBufferBuilder();
+    ByteBuffer byteBuffer = null;
+
+    int offset = IntelSecretManagerSection.createIntelSecretManagerSection(fbb,
+        currentId,
+        delegationTokenSequenceNumber,
+        allKeys.size(),
+        currentTokens.size());
+    IntelSecretManagerSection.finishIntelSecretManagerSectionBuffer(fbb, offset);
+    byteBuffer = fbb.dataBuffer();
+    IntelSecretManagerSection is = IntelSecretManagerSection.
+        getRootAsIntelSecretManagerSection(byteBuffer);
+
+    ArrayList<IntelDelegationKey> intelKeys = Lists
         .newArrayListWithCapacity(allKeys.size());
-    ArrayList<SecretManagerSection.PersistToken> tokens = Lists
+    ArrayList<IntelPersistToken> intelTokens = Lists
         .newArrayListWithCapacity(currentTokens.size());
 
     for (DelegationKey v : allKeys.values()) {
-      SecretManagerSection.DelegationKey.Builder b = SecretManagerSection.DelegationKey
-          .newBuilder().setId(v.getKeyId()).setExpiryDate(v.getExpiryDate());
+      FlatBufferBuilder fbb1 = new FlatBufferBuilder();
+      ByteBuffer byteBuffer1 = null;
+      IntelDelegationKey.startIntelDelegationKey(fbb1);
+      IntelDelegationKey.addId(fbb1, v.getKeyId());
+      IntelDelegationKey.addExpiryDate(fbb1, v.getExpiryDate());
+//      SecretManagerSection.DelegationKey.Builder b = SecretManagerSection.DelegationKey
+//          .newBuilder().setId(v.getKeyId()).setExpiryDate(v.getExpiryDate());
       if (v.getEncodedKey() != null) {
-        b.setKey(ByteString.copyFrom(v.getEncodedKey()));
+//        b.setKey(ByteString.copyFrom(v.getEncodedKey()));
+        int keyOffset = 0;
+        byte[] bytes = v.getEncodedKey();
+        keyOffset = fbb1.createString(ByteBuffer.wrap(bytes));
+        IntelDelegationKey.addKey(fbb1, keyOffset);
       }
-      keys.add(b.build());
+      int inv = IntelDelegationKey.endIntelDelegationKey(fbb1);
+      IntelDelegationKey.finishIntelDelegationKeyBuffer(fbb1, inv);
+      byteBuffer1 = fbb1.dataBuffer();
+      IntelDelegationKey intelDelegationKey =
+          IntelDelegationKey.getRootAsIntelDelegationKey(byteBuffer1);
+      intelKeys.add(intelDelegationKey);
     }
 
     for (Entry<DelegationTokenIdentifier, DelegationTokenInformation> e : currentTokens
         .entrySet()) {
+
       DelegationTokenIdentifier id = e.getKey();
-      SecretManagerSection.PersistToken.Builder b = SecretManagerSection.PersistToken
-          .newBuilder().setOwner(id.getOwner().toString())
-          .setRenewer(id.getRenewer().toString())
-          .setRealUser(id.getRealUser().toString())
-          .setIssueDate(id.getIssueDate()).setMaxDate(id.getMaxDate())
-          .setSequenceNumber(id.getSequenceNumber())
-          .setMasterKeyId(id.getMasterKeyId())
-          .setExpiryDate(e.getValue().getRenewDate());
-      tokens.add(b.build());
+
+      FlatBufferBuilder fbb2 = new FlatBufferBuilder();
+      ByteBuffer byteBuffer2 = null;
+
+      IntelPersistToken.startIntelPersistToken(fbb2);
+      IntelPersistToken.addOwner(fbb2, fbb2.createString(id.getOwner().toString()));
+      IntelPersistToken.addRenewer(fbb2, fbb2.createString(id.getRenewer().toString()));
+      IntelPersistToken.addRealUser(fbb2, fbb2.createString(id.getRealUser().toString()));
+      IntelPersistToken.addIssueDate(fbb2, id.getIssueDate());
+      IntelPersistToken.addMaxDate(fbb2, id.getMaxDate());
+      IntelPersistToken.addSequenceNumber(fbb2, id.getSequenceNumber());
+      IntelPersistToken.addMasterKeyId(fbb2, id.getMasterKeyId());
+      IntelPersistToken.addExpiryDate(fbb2, e.getValue().getRenewDate());
+      int inv = IntelPersistToken.endIntelPersistToken(fbb2);
+      IntelPersistToken.finishIntelPersistTokenBuffer(fbb2, inv);
+      byteBuffer2 = fbb2.dataBuffer();
+      IntelPersistToken intelPersistToken =
+          IntelPersistToken.getRootAsIntelPersistToken(byteBuffer2);
+      intelTokens.add(intelPersistToken);
     }
 
-    return new SecretManagerState(s, keys, tokens);
+    return new SecretManagerState(null, is, null, intelKeys, intelTokens, null);
   }
 
   /**
@@ -366,58 +414,34 @@ public class DelegationTokenSecretManager
   @Override //AbstractDelegationTokenManager
   protected void logUpdateMasterKey(DelegationKey key)
       throws IOException {
-    try {
+    synchronized (noInterruptsLock) {
       // The edit logging code will fail catastrophically if it
       // is interrupted during a logSync, since the interrupt
       // closes the edit log files. Doing this inside the
-      // fsn lock will prevent being interrupted when stopping
-      // the secret manager.
-      namesystem.readLockInterruptibly();
-      try {
-        // this monitor isn't necessary if stopped while holding write lock
-        // but for safety, guard against a stop with read lock.
-        synchronized (noInterruptsLock) {
-          if (Thread.currentThread().isInterrupted()) {
-            return; // leave flag set so secret monitor exits.
-          }
-          namesystem.logUpdateMasterKey(key);
-        }
-      } finally {
-        namesystem.readUnlock();
+      // above lock and then checking interruption status
+      // prevents this bug.
+      if (Thread.interrupted()) {
+        throw new InterruptedIOException(
+            "Interrupted before updating master key");
       }
-    } catch (InterruptedException ie) {
-      // AbstractDelegationTokenManager may crash if an exception is thrown.
-      // The interrupt flag will be detected when it attempts to sleep.
-      Thread.currentThread().interrupt();
+      namesystem.logUpdateMasterKey(key);
     }
   }
   
   @Override //AbstractDelegationTokenManager
   protected void logExpireToken(final DelegationTokenIdentifier dtId)
       throws IOException {
-    try {
+    synchronized (noInterruptsLock) {
       // The edit logging code will fail catastrophically if it
       // is interrupted during a logSync, since the interrupt
       // closes the edit log files. Doing this inside the
-      // fsn lock will prevent being interrupted when stopping
-      // the secret manager.
-      namesystem.readLockInterruptibly();
-      try {
-        // this monitor isn't necessary if stopped while holding write lock
-        // but for safety, guard against a stop with read lock.
-        synchronized (noInterruptsLock) {
-          if (Thread.currentThread().isInterrupted()) {
-            return; // leave flag set so secret monitor exits.
-          }
-          namesystem.logExpireDelegationToken(dtId);
-        }
-      } finally {
-        namesystem.readUnlock();
+      // above lock and then checking interruption status
+      // prevents this bug.
+      if (Thread.interrupted()) {
+        throw new InterruptedIOException(
+            "Interrupted before expiring delegation token");
       }
-    } catch (InterruptedException ie) {
-      // AbstractDelegationTokenManager may crash if an exception is thrown.
-      // The interrupt flag will be detected when it attempts to sleep.
-      Thread.currentThread().interrupt();
+      namesystem.logExpireDelegationToken(dtId);
     }
   }
 
