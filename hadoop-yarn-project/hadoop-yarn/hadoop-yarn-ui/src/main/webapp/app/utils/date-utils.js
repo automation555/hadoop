@@ -16,18 +16,12 @@
  * limitations under the License.
  */
 
+
 const defaultTz = "America/Los_Angeles";
 
 const getDefaultTimezone = () => {
-  let timezone = defaultTz;
-  try {
-    timezone = moment.tz.guess();
-  } catch (e) {
-    console.log(e);
-  }
-  return timezone || defaultTz;
+  return moment.tz.guess() || defaultTz;
 };
 
-export const convertTimestampWithTz = (timestamp, format = "YYYY/MM/DD") => {
-  return moment.tz(parseInt(timestamp), getDefaultTimezone()).format(format);
-};
+export const convertTimestampWithTz = (timestamp, format = "YYYY/MM/DD") =>
+  moment.tz(timestamp, getDefaultTimezone()).format(format);
