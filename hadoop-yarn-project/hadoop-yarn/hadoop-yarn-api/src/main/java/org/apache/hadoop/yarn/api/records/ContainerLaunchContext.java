@@ -108,22 +108,6 @@ public abstract class ContainerLaunchContext {
   public abstract void setTokens(ByteBuffer tokens);
 
   /**
-   * Get the configuration used by RM to renew tokens.
-   * @return The configuration used by RM to renew the tokens.
-   */
-  @Public
-  @Unstable
-  public abstract ByteBuffer getTokensConf();
-
-  /**
-   * Set the configuration used by RM to renew the tokens.
-   * @param tokensConf The configuration used by RM to renew the tokens
-   */
-  @Public
-  @Unstable
-  public abstract void setTokensConf(ByteBuffer tokensConf);
-
-  /**
    * Get <code>LocalResource</code> required by the container.
    * @return all <code>LocalResource</code> required by the container
    */
@@ -244,4 +228,36 @@ public abstract class ContainerLaunchContext {
   @Unstable
   public abstract void setContainerRetryContext(
       ContainerRetryContext containerRetryContext);
+  
+  /**
+   * Creates a deeper copy of this container launch context.
+   *
+   * @return the copy of this container launch context
+   * @throws InstantiationException
+   * @throws IllegalAccessException
+   */
+  public ContainerLaunchContext copy() throws InstantiationException,
+      IllegalAccessException {
+      return newInstance(
+          copyMap(getLocalResources()),
+          copyMap(getEnvironment()),
+          copyList(getCommands()),
+          copyMap(getServiceData()),
+          getTokens(),
+          copyMap(getApplicationACLs()));
+  }
+  
+  private static <K, V> Map<K, V> copyMap(final Map<K, V> source) throws InstantiationException,
+      IllegalAccessException {
+    final Map<K, V> newMap = source.getClass().newInstance();
+    newMap.putAll(source);
+    return newMap;
+  }
+  
+  private static <T> List<T> copyList(final List<T> source) throws InstantiationException,
+      IllegalAccessException {
+    final List<T> newList = source.getClass().newInstance();
+    newList.addAll(source);
+    return newList;
+  }
 }

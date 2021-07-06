@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.mapreduce.v2.app.launcher;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
@@ -32,10 +31,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.yarn.api.protocolrecords.CommitResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetContainerLaunchContextRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetContainerLaunchContextResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ReInitializeContainerRequest;
@@ -45,6 +42,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.ResourceLocalizationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RestartContainerResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RollbackResponse;
 import org.junit.Assert;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.Server;
@@ -94,8 +93,6 @@ import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.nodemanager.security.NMTokenSecretManagerInNM;
 import org.apache.hadoop.yarn.util.Records;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TestContainerLauncher {
 
@@ -104,8 +101,7 @@ public class TestContainerLauncher {
   Configuration conf;
   Server server;
 
-  static final Logger LOG =
-      LoggerFactory.getLogger(TestContainerLauncher.class);
+  static final Log LOG = LogFactory.getLog(TestContainerLauncher.class);
 
   @Test (timeout = 10000)
   public void testPoolSize() throws InterruptedException {
@@ -125,7 +121,7 @@ public class TestContainerLauncher {
     ThreadPoolExecutor threadPool = containerLauncher.getThreadPool();
 
     // No events yet
-    assertThat(containerLauncher.initialPoolSize).isEqualTo(
+    Assert.assertEquals(containerLauncher.initialPoolSize,
         MRJobConfig.DEFAULT_MR_AM_CONTAINERLAUNCHER_THREADPOOL_INITIAL_SIZE);
     Assert.assertEquals(0, threadPool.getPoolSize());
     Assert.assertEquals(containerLauncher.initialPoolSize,
@@ -191,7 +187,7 @@ public class TestContainerLauncher {
         20);
     containerLauncher = new CustomContainerLauncher(context);
     containerLauncher.init(conf);
-    assertThat(containerLauncher.initialPoolSize).isEqualTo(20);
+    Assert.assertEquals(containerLauncher.initialPoolSize, 20);
   }
 
   @Test(timeout = 5000)
@@ -450,7 +446,7 @@ public class TestContainerLauncher {
         // make the thread sleep to look like its not going to respond
         Thread.sleep(15000);
       } catch (Exception e) {
-        LOG.error("Setup thread sleep interrupted: ", e);
+        LOG.error(e);
         throw new UndeclaredThrowableException(e);
       }
       status.setState(ContainerState.RUNNING);
@@ -468,7 +464,6 @@ public class TestContainerLauncher {
     }
 
     @Override
-    @Deprecated
     public IncreaseContainersResourceResponse increaseContainersResource(
         IncreaseContainersResourceRequest request) throws IOException,
         IOException {
@@ -487,6 +482,13 @@ public class TestContainerLauncher {
     public ResourceLocalizationResponse localize(
         ResourceLocalizationRequest request) throws YarnException, IOException {
       return null;
+    }
+  
+    @Override
+    public GetContainerLaunchContextResponse getContainerLaunchContext(
+        GetContainerLaunchContextRequest request) throws YarnException, IOException {
+      throw new UnsupportedOperationException("getting the container launch context is not " +
+          "supported for this implementation of ContainerManagementProtocol");
     }
 
     @Override
@@ -511,19 +513,6 @@ public class TestContainerLauncher {
     @Override
     public CommitResponse commitLastReInitialization(ContainerId containerId)
         throws YarnException, IOException {
-      return null;
-    }
-
-    @Override
-    public ContainerUpdateResponse updateContainer(ContainerUpdateRequest
-        request) throws YarnException, IOException {
-      return null;
-    }
-
-    @Override
-    public GetLocalizationStatusesResponse getLocalizationStatuses(
-        GetLocalizationStatusesRequest request) throws YarnException,
-        IOException {
       return null;
     }
   }

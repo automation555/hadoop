@@ -35,12 +35,13 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.AbstractMap.SimpleEntry;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.Node;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateRequest;
@@ -51,6 +52,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterReque
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerMoveRequest;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.ContainerUpdateType;
 import org.apache.hadoop.yarn.api.records.ExecutionType;
@@ -60,14 +62,10 @@ import org.apache.hadoop.yarn.api.records.NMToken;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceBlacklistRequest;
-import org.apache.hadoop.yarn.api.records.ResourceInformation;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
-import org.apache.hadoop.yarn.api.records.SchedulingRequest;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.api.records.UpdateContainerRequest;
 import org.apache.hadoop.yarn.api.records.UpdatedContainer;
-import org.apache.hadoop.yarn.api.resource.PlacementConstraint;
-import org.apache.hadoop.yarn.client.AMRMClientUtils;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
@@ -79,19 +77,16 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.RackResolver;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.yarn.util.resource.Resources;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Private
 @Unstable
 public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(AMRMClientImpl.class);
+  private static final Log LOG = LogFactory.getLog(AMRMClientImpl.class);
   private static final List<String> ANY_LIST =
       Collections.singletonList(ResourceRequest.ANY);
   
@@ -100,7 +95,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
   protected String appHostName;
   protected int appHostPort;
   protected String appTrackingUrl;
-  protected String newTrackingUrl;
 
   protected ApplicationMasterProtocol rmClient;
   protected Resource clusterAvailableResources;
@@ -112,34 +106,56 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
   protected final Set<String> blacklistedNodes = new HashSet<String>();
   protected final Set<String> blacklistAdditions = new HashSet<String>();
   protected final Set<String> blacklistRemovals = new HashSet<String>();
-  private Map<Set<String>, PlacementConstraint> placementConstraints =
-      new HashMap<>();
-
-  protected Map<String, Resource> resourceProfilesMap;
-
+  
   static class ResourceRequestInfo<T> {
     ResourceRequest remoteRequest;
     LinkedHashSet<T> containerRequests;
-
+    
     ResourceRequestInfo(Long allocationRequestId, Priority priority,
         String resourceName, Resource capability, boolean relaxLocality) {
-      remoteRequest = ResourceRequest.newBuilder().priority(priority)
-          .resourceName(resourceName).capability(capability).numContainers(0)
-          .allocationRequestId(allocationRequestId).relaxLocality(relaxLocality)
-          .build();
+      remoteRequest = ResourceRequest.newInstance(priority, resourceName,
+          capability, 0);
+      remoteRequest.setAllocationRequestId(allocationRequestId);
+      remoteRequest.setRelaxLocality(relaxLocality);
       containerRequests = new LinkedHashSet<T>();
     }
   }
 
   /**
-   * Class compares Resource by memory, then cpu and then the remaining resource
-   * types in reverse order.
+   * Class compares Resource by memory then cpu in reverse order
    */
-  static class ResourceReverseComparator<T extends Resource>
-      implements Comparator<T>, Serializable {
-    public int compare(Resource res0, Resource res1) {
-      return res1.compareTo(res0);
-    }
+  static class ResourceReverseMemoryThenCpuComparator implements
+      Comparator<Resource>, Serializable {
+    static final long serialVersionUID = 12345L;
+    @Override
+    public int compare(Resource arg0, Resource arg1) {
+      long mem0 = arg0.getMemorySize();
+      long mem1 = arg1.getMemorySize();
+      long cpu0 = arg0.getVirtualCores();
+      long cpu1 = arg1.getVirtualCores();
+      if(mem0 == mem1) {
+        if(cpu0 == cpu1) {
+          return 0;
+        }
+        if(cpu0 < cpu1) {
+          return 1;
+        }
+        return -1;
+      }
+      if(mem0 < mem1) { 
+        return 1;
+      }
+      return -1;
+    }    
+  }
+
+  static boolean canFit(Resource arg0, Resource arg1) {
+    long mem0 = arg0.getMemorySize();
+    long mem1 = arg1.getMemorySize();
+    long cpu0 = arg0.getVirtualCores();
+    long cpu1 = arg1.getVirtualCores();
+    
+    return (mem0 <= mem1 && cpu0 <= cpu1);
   }
 
   private final Map<Long, RemoteRequestsTable<T>> remoteRequests =
@@ -147,6 +163,8 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
 
   protected final Set<ResourceRequest> ask = new TreeSet<ResourceRequest>(
       new org.apache.hadoop.yarn.api.records.ResourceRequest.ResourceRequestComparator());
+  protected final Map<ContainerId, ContainerMoveRequest> moveAsk = new HashMap<>();
+  protected final Map<ContainerId, ContainerMoveRequest> pendingMoveAsk = new HashMap<>();
   protected final Set<ContainerId> release = new TreeSet<ContainerId>();
   // pendingRelease holds history of release requests.
   // request is removed only if RM sends completedContainer.
@@ -154,20 +172,15 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
   protected Set<ContainerId> pendingRelease = new TreeSet<ContainerId>();
   // change map holds container resource change requests between two allocate()
   // calls, and are cleared after each successful allocate() call.
-  protected final Map<ContainerId,
-      SimpleEntry<Container, UpdateContainerRequest>> change = new HashMap<>();
+  protected final Map<ContainerId, SimpleEntry<Container, Resource>> change =
+      new HashMap<>();
   // pendingChange map holds history of container resource change requests in
   // case AM needs to reregister with the ResourceManager.
   // Change requests are removed from this map if RM confirms the change
   // through allocate response, or if RM confirms that the container has been
   // completed.
-  protected final Map<ContainerId,
-      SimpleEntry<Container, UpdateContainerRequest>> pendingChange =
-      new HashMap<>();
-
-  private List<SchedulingRequest> schedulingRequests = new ArrayList<>();
-  private Map<Set<String>, List<SchedulingRequest>> outstandingSchedRequests =
-      new HashMap<>();
+  protected final Map<ContainerId, SimpleEntry<Container, Resource>>
+      pendingChange = new HashMap<>();
 
   public AMRMClientImpl() {
     super(AMRMClientImpl.class.getName());
@@ -206,26 +219,14 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     }
     super.serviceStop();
   }
-
+  
   @Override
   public RegisterApplicationMasterResponse registerApplicationMaster(
       String appHostName, int appHostPort, String appTrackingUrl)
       throws YarnException, IOException {
-    return registerApplicationMaster(appHostName, appHostPort, appTrackingUrl,
-        null);
-  }
-
-  @Override
-  public RegisterApplicationMasterResponse registerApplicationMaster(
-      String appHostName, int appHostPort, String appTrackingUrl,
-      Map<Set<String>, PlacementConstraint> placementConstraintsMap)
-      throws YarnException, IOException {
     this.appHostName = appHostName;
     this.appHostPort = appHostPort;
     this.appTrackingUrl = appTrackingUrl;
-    if (placementConstraintsMap != null && !placementConstraintsMap.isEmpty()) {
-      this.placementConstraints.putAll(placementConstraintsMap);
-    }
     Preconditions.checkArgument(appHostName != null,
         "The host name should not be null");
     Preconditions.checkArgument(appHostPort >= -1, "Port number of the host"
@@ -234,15 +235,11 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     return registerApplicationMaster();
   }
 
-  @SuppressWarnings("unchecked")
   private RegisterApplicationMasterResponse registerApplicationMaster()
       throws YarnException, IOException {
     RegisterApplicationMasterRequest request =
         RegisterApplicationMasterRequest.newInstance(this.appHostName,
             this.appHostPort, this.appTrackingUrl);
-    if (!this.placementConstraints.isEmpty()) {
-      request.setPlacementConstraints(this.placementConstraints);
-    }
     RegisterApplicationMasterResponse response =
         rmClient.registerApplicationMaster(request);
     synchronized (this) {
@@ -250,21 +247,8 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
       if (!response.getNMTokensFromPreviousAttempts().isEmpty()) {
         populateNMTokens(response.getNMTokensFromPreviousAttempts());
       }
-      this.resourceProfilesMap = response.getResourceProfiles();
-      List<Container> prevContainers =
-          response.getContainersFromPreviousAttempts();
-      AMRMClientUtils.removeFromOutstandingSchedulingRequests(prevContainers,
-          this.outstandingSchedRequests);
     }
     return response;
-  }
-
-  @Override
-  public synchronized void addSchedulingRequests(
-      Collection<SchedulingRequest> newSchedulingRequests) {
-    this.schedulingRequests.addAll(newSchedulingRequests);
-    AMRMClientUtils.addToOutstandingSchedulingRequests(newSchedulingRequests,
-        this.outstandingSchedRequests);
   }
 
   @Override
@@ -274,28 +258,28 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
         "Progress indicator should not be negative");
     AllocateResponse allocateResponse = null;
     List<ResourceRequest> askList = null;
+    Map<ContainerId, ContainerMoveRequest> oldMoveAsk = new HashMap<>();
+    List<ContainerMoveRequest> moveAskList = null;
     List<ContainerId> releaseList = null;
     AllocateRequest allocateRequest = null;
     List<String> blacklistToAdd = new ArrayList<String>();
     List<String> blacklistToRemove = new ArrayList<String>();
-    Map<ContainerId, SimpleEntry<Container, UpdateContainerRequest>> oldChange =
+    Map<ContainerId, SimpleEntry<Container, Resource>> oldChange =
         new HashMap<>();
-    List<SchedulingRequest> schedulingRequestList = new LinkedList<>();
-
     try {
       synchronized (this) {
         askList = cloneAsks();
+        oldMoveAsk.putAll(moveAsk);
+        moveAskList = cloneMoveAsks();
         // Save the current change for recovery
         oldChange.putAll(change);
         List<UpdateContainerRequest> updateList = createUpdateList();
         releaseList = new ArrayList<ContainerId>(release);
-        schedulingRequestList = new ArrayList<>(schedulingRequests);
-
         // optimistically clear this collection assuming no RPC failure
         ask.clear();
+        moveAsk.clear();
         release.clear();
         change.clear();
-        schedulingRequests.clear();
 
         blacklistToAdd.addAll(blacklistAdditions);
         blacklistToRemove.addAll(blacklistRemovals);
@@ -303,18 +287,10 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
         ResourceBlacklistRequest blacklistRequest =
             ResourceBlacklistRequest.newInstance(blacklistToAdd,
                 blacklistToRemove);
-
-        allocateRequest = AllocateRequest.newBuilder()
-            .responseId(lastResponseId).progress(progressIndicator)
-            .askList(askList).resourceBlacklistRequest(blacklistRequest)
-            .releaseList(releaseList).updateRequests(updateList)
-            .schedulingRequests(schedulingRequestList).build();
-
-        if (this.newTrackingUrl != null) {
-          allocateRequest.setTrackingUrl(this.newTrackingUrl);
-          this.appTrackingUrl = this.newTrackingUrl;
-          this.newTrackingUrl = null;
-        }
+        
+        allocateRequest =
+            AllocateRequest.newInstance(lastResponseId, progressIndicator,
+                askList, releaseList, blacklistRequest, updateList, moveAskList);
         // clear blacklistAdditions and blacklistRemovals before
         // unsynchronized part
         blacklistAdditions.clear();
@@ -338,11 +314,8 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
               addResourceRequestToAsk(reqIter.next().remoteRequest);
             }
           }
+          moveAsk.putAll(pendingMoveAsk);
           change.putAll(this.pendingChange);
-          for (List<SchedulingRequest> schedReqs :
-              this.outstandingSchedRequests.values()) {
-            this.schedulingRequests.addAll(schedReqs);
-          }
         }
         // re register with RM
         registerApplicationMaster();
@@ -360,6 +333,24 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
         }
         if (allocateResponse.getAMRMToken() != null) {
           updateAMRMToken(allocateResponse.getAMRMToken());
+        }
+        if (!pendingMoveAsk.isEmpty()) {
+          List<ContainerStatus> completed =
+              allocateResponse.getCompletedContainersStatuses();
+          List<ContainerId> moved = new ArrayList<>();
+          for(Container container : allocateResponse.getAllocatedContainers()) {
+            if(container.getIsMove()) {
+              moved.add(container.getOriginContainerId());
+            }
+          }
+          for (ContainerStatus status : completed) {
+            ContainerId containerId = status.getContainerId();
+            pendingMoveAsk.remove(containerId);
+          }
+          // remove all container move requests that have been satisfied
+          if (!moved.isEmpty()) {
+            removePendingMoveRequests(moved);
+          }
         }
         if (!pendingRelease.isEmpty()
             && !allocateResponse.getCompletedContainersStatuses().isEmpty()) {
@@ -382,12 +373,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
             removePendingChangeRequests(changed);
           }
         }
-        AMRMClientUtils.removeFromOutstandingSchedulingRequests(
-            allocateResponse.getAllocatedContainers(),
-            this.outstandingSchedRequests);
-        AMRMClientUtils.removeFromOutstandingSchedulingRequests(
-            allocateResponse.getContainersFromPreviousAttempts(),
-            this.outstandingSchedRequests);
       }
     } finally {
       // TODO how to differentiate remote yarn exception vs error in rpc
@@ -409,27 +394,40 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
               ask.add(oldAsk);
             }
           }
+          // Container move requests could have been added or deleted during call to
+          // allocate. If container move requests were added/removed then there is
+          // nothing to do since the ContainerMoveRequest object in moveAsk would have
+          // the actual new value. If moveAsk does not have this ContainerMoveRequest
+          // then it was unchanged and so we can add the value back safely.
+          // This assumes that there will no concurrent calls to allocate() and
+          // so we dont have to worry about moveAsk being changed in the
+          // synchronized block at the beginning of this method.
+          for (Map.Entry<ContainerId, ContainerMoveRequest> entry :
+              oldMoveAsk.entrySet()) {
+            ContainerId oldContainerId = entry.getKey();
+            ContainerMoveRequest request = entry.getValue();
+            if (!moveAsk.containsKey(oldContainerId)) {
+              moveAsk.put(oldContainerId, request);
+            }
+          }
           // change requests could have been added during the allocate call.
           // Those are the newest requests which take precedence
           // over requests cached in the oldChange map.
           //
           // Only insert entries from the cached oldChange map
           // that do not exist in the current change map:
-          for (Map.Entry<ContainerId,
-              SimpleEntry<Container, UpdateContainerRequest>> entry :
+          for (Map.Entry<ContainerId, SimpleEntry<Container, Resource>> entry :
               oldChange.entrySet()) {
             ContainerId oldContainerId = entry.getKey();
             Container oldContainer = entry.getValue().getKey();
-            UpdateContainerRequest oldupdate = entry.getValue().getValue();
+            Resource oldResource = entry.getValue().getValue();
             if (change.get(oldContainerId) == null) {
               change.put(
-                  oldContainerId, new SimpleEntry<>(oldContainer, oldupdate));
+                  oldContainerId, new SimpleEntry<>(oldContainer, oldResource));
             }
           }
           blacklistAdditions.addAll(blacklistToAdd);
           blacklistRemovals.addAll(blacklistToRemove);
-
-          schedulingRequests.addAll(schedulingRequestList);
         }
       }
     }
@@ -438,17 +436,19 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
 
   private List<UpdateContainerRequest> createUpdateList() {
     List<UpdateContainerRequest> updateList = new ArrayList<>();
-    for (Map.Entry<ContainerId, SimpleEntry<Container,
-        UpdateContainerRequest>> entry : change.entrySet()) {
-      Resource targetCapability = entry.getValue().getValue().getCapability();
-      ExecutionType targetExecType =
-          entry.getValue().getValue().getExecutionType();
-      ContainerUpdateType updateType =
-          entry.getValue().getValue().getContainerUpdateType();
+    for (Map.Entry<ContainerId, SimpleEntry<Container, Resource>> entry :
+        change.entrySet()) {
+      Resource targetCapability = entry.getValue().getValue();
+      Resource currCapability = entry.getValue().getKey().getResource();
       int version = entry.getValue().getKey().getVersion();
+      ContainerUpdateType updateType =
+          ContainerUpdateType.INCREASE_RESOURCE;
+      if (Resources.fitsIn(targetCapability, currCapability)) {
+        updateType = ContainerUpdateType.DECREASE_RESOURCE;
+      }
       updateList.add(
           UpdateContainerRequest.newInstance(version, entry.getKey(),
-              updateType, targetCapability, targetExecType));
+              updateType, targetCapability, null));
     }
     return updateList;
   }
@@ -458,9 +458,41 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     for(ResourceRequest r : ask) {
       // create a copy of ResourceRequest as we might change it while the
       // RPC layer is using it to send info across
-      askList.add(ResourceRequest.clone(r));
+      ResourceRequest rr = ResourceRequest.newInstance(r.getPriority(),
+          r.getResourceName(), r.getCapability(), r.getNumContainers(),
+          r.getRelaxLocality(), r.getNodeLabelExpression(),
+          r.getExecutionTypeRequest());
+      rr.setAllocationRequestId(r.getAllocationRequestId());
+      askList.add(rr);
     }
     return askList;
+  }
+  
+  private List<ContainerMoveRequest> cloneMoveAsks() {
+    List<ContainerMoveRequest> moveAskList = new ArrayList<>(moveAsk.size());
+    for(ContainerMoveRequest mr : moveAsk.values()) {
+      // create a copy of ContainerMoveRequest as we might change it while the
+      // RPC layer is using it to send info across
+      moveAskList.add(ContainerMoveRequest.newInstance(mr.getPriority(),
+          mr.getOriginContainerId(), mr.getTargetHost()));
+    }
+    return moveAskList;
+  }
+  
+  protected void removePendingMoveRequests(
+      List<ContainerId> movedContainers) {
+    for (ContainerId containerId : movedContainers) {
+      if (pendingMoveAsk.get(containerId) == null) {
+        continue;
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("RM has confirmed move request for "
+            + "container " + containerId + "."
+            + "Remove pending move request:"
+            + pendingMoveAsk.get(containerId));
+      }
+      pendingMoveAsk.remove(containerId);
+    }
   }
 
   protected void removePendingReleaseRequests(
@@ -551,9 +583,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     Set<String> inferredRacks = resolveRacks(req.getNodes());
     inferredRacks.removeAll(dedupedRacks);
 
-    Resource resource = checkAndGetResourceProfile(req.getResourceProfile(),
-        req.getCapability());
-
     // check that specific and non-specific requests cannot be mixed within a
     // priority
     checkLocalityRelaxationConflict(req.getAllocationRequestId(),
@@ -578,35 +607,40 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
       }
       for (String node : dedupedNodes) {
         addResourceRequest(req.getPriority(), node,
-            req.getExecutionTypeRequest(), resource, req, true,
+            req.getExecutionTypeRequest(), req.getCapability(), req, true,
             req.getNodeLabelExpression());
       }
     }
 
     for (String rack : dedupedRacks) {
       addResourceRequest(req.getPriority(), rack, req.getExecutionTypeRequest(),
-          resource, req, true, req.getNodeLabelExpression());
+          req.getCapability(), req, true, req.getNodeLabelExpression());
     }
 
     // Ensure node requests are accompanied by requests for
     // corresponding rack
     for (String rack : inferredRacks) {
       addResourceRequest(req.getPriority(), rack, req.getExecutionTypeRequest(),
-          resource, req, req.getRelaxLocality(),
+          req.getCapability(), req, req.getRelaxLocality(),
           req.getNodeLabelExpression());
     }
     // Off-switch
     addResourceRequest(req.getPriority(), ResourceRequest.ANY,
-        req.getExecutionTypeRequest(), resource, req,
+        req.getExecutionTypeRequest(), req.getCapability(), req,
         req.getRelaxLocality(), req.getNodeLabelExpression());
+  }
+  
+  @Override
+  public void addContainerMoveRequest(ContainerMoveRequest req) {
+    ContainerId containerId = req.getOriginContainerId();
+    moveAsk.put(containerId, req);
+    pendingMoveAsk.put(containerId, req);
   }
 
   @Override
   public synchronized void removeContainerRequest(T req) {
     Preconditions.checkArgument(req != null,
         "Resource request can not be null.");
-    Resource resource = checkAndGetResourceProfile(req.getResourceProfile(),
-        req.getCapability());
     Set<String> allRacks = new HashSet<String>();
     if (req.getRacks() != null) {
       allRacks.addAll(req.getRacks());
@@ -617,61 +651,35 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     if (req.getNodes() != null) {
       for (String node : new HashSet<String>(req.getNodes())) {
         decResourceRequest(req.getPriority(), node,
-            req.getExecutionTypeRequest(), resource, req);
+            req.getExecutionTypeRequest(), req.getCapability(), req);
       }
     }
 
     for (String rack : allRacks) {
       decResourceRequest(req.getPriority(), rack,
-          req.getExecutionTypeRequest(), resource, req);
+          req.getExecutionTypeRequest(), req.getCapability(), req);
     }
 
     decResourceRequest(req.getPriority(), ResourceRequest.ANY,
-        req.getExecutionTypeRequest(), resource, req);
+        req.getExecutionTypeRequest(), req.getCapability(), req);
   }
 
   @Override
-  public synchronized void requestContainerUpdate(
-      Container container, UpdateContainerRequest updateContainerRequest) {
-    Preconditions.checkNotNull(container, "Container cannot be null!!");
-    Preconditions.checkNotNull(updateContainerRequest,
-        "UpdateContainerRequest cannot be null!!");
-    LOG.info("Requesting Container update : " +
-        "container=" + container + ", " +
-        "updateType=" + updateContainerRequest.getContainerUpdateType() + ", " +
-        "targetCapability=" + updateContainerRequest.getCapability() + ", " +
-        "targetExecType=" + updateContainerRequest.getExecutionType());
-    if (updateContainerRequest.getCapability() != null &&
-        updateContainerRequest.getExecutionType() == null) {
-      validateContainerResourceChangeRequest(
-          updateContainerRequest.getContainerUpdateType(),
-          container.getId(), container.getResource(),
-          updateContainerRequest.getCapability());
-    } else if (updateContainerRequest.getExecutionType() != null &&
-        updateContainerRequest.getCapability() == null) {
-      validateContainerExecTypeChangeRequest(
-          updateContainerRequest.getContainerUpdateType(),
-          container.getId(), container.getExecutionType(),
-          updateContainerRequest.getExecutionType());
-    } else if (updateContainerRequest.getExecutionType() == null &&
-        updateContainerRequest.getCapability() == null) {
-      throw new IllegalArgumentException("Both target Capability and" +
-          "target Execution Type are null");
-    } else {
-      throw new IllegalArgumentException("Support currently exists only for" +
-          " EITHER update of Capability OR update of Execution Type NOT both");
-    }
+  public synchronized void requestContainerResourceChange(
+      Container container, Resource capability) {
+    validateContainerResourceChangeRequest(
+        container.getId(), container.getResource(), capability);
     if (change.get(container.getId()) == null) {
       change.put(container.getId(),
-          new SimpleEntry<>(container, updateContainerRequest));
+          new SimpleEntry<>(container, capability));
     } else {
-      change.get(container.getId()).setValue(updateContainerRequest);
+      change.get(container.getId()).setValue(capability);
     }
     if (pendingChange.get(container.getId()) == null) {
       pendingChange.put(container.getId(),
-          new SimpleEntry<>(container, updateContainerRequest));
+          new SimpleEntry<>(container, capability));
     } else {
-      pendingChange.get(container.getId()).setValue(updateContainerRequest);
+      pendingChange.get(container.getId()).setValue(capability);
     }
   }
 
@@ -681,6 +689,7 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
         "ContainerId can not be null.");
     pendingRelease.add(containerId);
     release.add(containerId);
+    pendingMoveAsk.remove(containerId);
     pendingChange.remove(containerId);
   }
   
@@ -722,14 +731,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
   }
 
   @Override
-  public List<? extends Collection<T>> getMatchingRequests(Priority priority,
-      String resourceName, ExecutionType executionType,
-      Resource capability, String profile) {
-    capability = checkAndGetResourceProfile(profile, capability);
-    return getMatchingRequests(priority, resourceName, executionType, capability);
-  }
-
-  @Override
   @SuppressWarnings("unchecked")
   public synchronized List<? extends Collection<T>> getMatchingRequests(
       Priority priority, String resourceName, ExecutionType executionType,
@@ -738,37 +739,31 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
         "The Resource to be requested should not be null ");
     Preconditions.checkArgument(priority != null,
         "The priority at which to request containers should not be null ");
-    List<LinkedHashSet<T>> list = new LinkedList<>();
+    List<LinkedHashSet<T>> list = new LinkedList<LinkedHashSet<T>>();
 
     RemoteRequestsTable remoteRequestsTable = getTable(0);
-
-    if (null != remoteRequestsTable) {
-      List<ResourceRequestInfo<T>> matchingRequests = remoteRequestsTable
-          .getMatchingRequests(priority, resourceName, executionType,
-              capability);
-      if (null != matchingRequests) {
-        // If no exact match. Container may be larger than what was requested.
-        // get all resources <= capability. map is reverse sorted.
-        for (ResourceRequestInfo<T> resReqInfo : matchingRequests) {
-          if (Resources.fitsIn(resReqInfo.remoteRequest.getCapability(),
-              capability) && !resReqInfo.containerRequests.isEmpty()) {
-            list.add(resReqInfo.containerRequests);
-          }
-        }
+    List<ResourceRequestInfo<T>> matchingRequests =
+        remoteRequestsTable.getMatchingRequests(priority, resourceName,
+            executionType, capability);
+    // If no exact match. Container may be larger than what was requested.
+    // get all resources <= capability. map is reverse sorted.
+    for (ResourceRequestInfo<T> resReqInfo : matchingRequests) {
+      if (canFit(resReqInfo.remoteRequest.getCapability(), capability) &&
+        !resReqInfo.containerRequests.isEmpty()) {
+        list.add(resReqInfo.containerRequests);
       }
     }
     // no match found
-    return list;
+    return list;          
   }
   
   private Set<String> resolveRacks(List<String> nodes) {
     Set<String> racks = new HashSet<String>();    
     if (nodes != null) {
-      List<Node> tmpList = RackResolver.resolve(nodes);
-      for (Node node : tmpList) {
-        String rack = node.getNetworkLocation();
+      for (String node : nodes) {
         // Ensure node requests are accompanied by requests for
         // corresponding rack
+        String rack = RackResolver.resolve(node).getNetworkLocation();
         if (rack == null) {
           LOG.warn("Failed to resolve rack for node " + node + ".");
         } else {
@@ -776,6 +771,7 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
         }
       }
     }
+    
     return racks;
   }
 
@@ -806,36 +802,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
       }
     }
   }
-
-  // When profile and override resource are specified at the same time, override
-  // predefined resource value in profile if any resource type has a positive
-  // value.
-  private Resource checkAndGetResourceProfile(String profile,
-      Resource overrideResource) {
-    Resource returnResource = overrideResource;
-
-    // if application requested a non-empty/null profile, and the
-    if (profile != null && !profile.isEmpty()) {
-      if (resourceProfilesMap == null || (!resourceProfilesMap.containsKey(
-          profile))) {
-        throw new InvalidContainerRequestException(
-            "Invalid profile name specified=" + profile + (
-                resourceProfilesMap == null ?
-                    "" :
-                    (", valid profile names are " + resourceProfilesMap
-                        .keySet())));
-      }
-      returnResource = Resources.clone(resourceProfilesMap.get(profile));
-      for (ResourceInformation info : overrideResource
-          .getAllResourcesListCopy()) {
-        if (info.getValue() > 0) {
-          returnResource.setResourceInformation(info.getName(), info);
-        }
-      }
-    }
-
-    return returnResource;
-  }
   
   /**
    * Valid if a node label expression specified on container request is valid or
@@ -850,17 +816,16 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
       return;
     }
 
-    // Don't support specifying > 1 node labels in a node label expression now
+    // Don't support specifying >= 2 node labels in a node label expression now
     if (exp.contains("&&") || exp.contains("||")) {
       throw new InvalidContainerRequestException(
-          "Cannot specify more than one node label"
+          "Cannot specify more than two node labels"
               + " in a single node label expression");
     }
   }
 
   private void validateContainerResourceChangeRequest(
-      ContainerUpdateType updateType, ContainerId containerId,
-      Resource original, Resource target) {
+      ContainerId containerId, Resource original, Resource target) {
     Preconditions.checkArgument(containerId != null,
         "ContainerId cannot be null");
     Preconditions.checkArgument(original != null,
@@ -873,36 +838,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     Preconditions.checkArgument(!Resources.equals(Resources.none(), target)
             && Resources.fitsIn(Resources.none(), target),
         "Target resource capability must be greater than 0");
-    if (ContainerUpdateType.DECREASE_RESOURCE == updateType) {
-      Preconditions.checkArgument(Resources.fitsIn(target, original),
-          "Target resource capability must fit in Original capability");
-    } else {
-      Preconditions.checkArgument(Resources.fitsIn(original, target),
-          "Target resource capability must be more than Original capability");
-
-    }
-  }
-
-  private void validateContainerExecTypeChangeRequest(
-      ContainerUpdateType updateType, ContainerId containerId,
-      ExecutionType original, ExecutionType target) {
-    Preconditions.checkArgument(containerId != null,
-        "ContainerId cannot be null");
-    Preconditions.checkArgument(original != null,
-        "Original Execution Type cannot be null");
-    Preconditions.checkArgument(target != null,
-        "Target Execution Type cannot be null");
-    if (ContainerUpdateType.DEMOTE_EXECUTION_TYPE == updateType) {
-      Preconditions.checkArgument(target == ExecutionType.OPPORTUNISTIC
-              && original == ExecutionType.GUARANTEED,
-          "Incorrect Container update request, target should be" +
-              " OPPORTUNISTIC and original should be GUARANTEED");
-    } else {
-      Preconditions.checkArgument(target == ExecutionType.GUARANTEED
-                  && original == ExecutionType.OPPORTUNISTIC,
-          "Incorrect Container update request, target should be" +
-              " GUARANTEED and original should be OPPORTUNISTIC");
-    }
   }
 
   private void addResourceRequestToAsk(ResourceRequest remoteRequest) {
@@ -928,7 +863,7 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     RemoteRequestsTable<T> remoteRequestsTable =
         getTable(req.getAllocationRequestId());
     if (remoteRequestsTable == null) {
-      remoteRequestsTable = new RemoteRequestsTable<>();
+      remoteRequestsTable = new RemoteRequestsTable<T>();
       putTable(req.getAllocationRequestId(), remoteRequestsTable);
     }
     @SuppressWarnings("unchecked")
@@ -941,7 +876,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     addResourceRequestToAsk(resourceRequestInfo.remoteRequest);
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Adding request to ask " + resourceRequestInfo.remoteRequest);
       LOG.debug("addResourceRequest:" + " applicationId="
           + " priority=" + priority.getPriority()
           + " resourceName=" + resourceName + " numContainers="
@@ -961,7 +895,7 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
               execTypeReq, capability, req);
       // send the ResourceRequest to RM even if is 0 because it needs to
       // override a previously sent value. If ResourceRequest was not sent
-      // previously then sending 0 aught to be a no-op on RM
+      // previously then sending 0 ought to be a no-op on RM
       if (resourceRequestInfo != null) {
         addResourceRequestToAsk(resourceRequestInfo.remoteRequest);
 
@@ -1015,11 +949,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     }
   }
 
-  @Override
-  public synchronized void updateTrackingUrl(String trackingUrl) {
-    this.newTrackingUrl = trackingUrl;
-  }
-
   private void updateAMRMToken(Token token) throws IOException {
     org.apache.hadoop.security.token.Token<AMRMTokenIdentifier> amrmToken =
         new org.apache.hadoop.security.token.Token<AMRMTokenIdentifier>(token
@@ -1029,6 +958,7 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
     // to ensure we replace the previous token setup by the RM.
     // Afterwards we can update the service address for the RPC layer.
     UserGroupInformation currentUGI = UserGroupInformation.getCurrentUser();
+    LOG.info("Updating with new AMRMToken");
     currentUGI.addToken(amrmToken);
     amrmToken.setService(ClientRMProxy.getAMRMTokenService(getConfig()));
   }
@@ -1036,11 +966,6 @@ public class AMRMClientImpl<T extends ContainerRequest> extends AMRMClient<T> {
   @VisibleForTesting
   RemoteRequestsTable<T> getTable(long allocationRequestId) {
     return remoteRequests.get(Long.valueOf(allocationRequestId));
-  }
-
-  @VisibleForTesting
-  Map<Set<String>, List<SchedulingRequest>> getOutstandingSchedRequests() {
-    return outstandingSchedRequests;
   }
 
   RemoteRequestsTable<T> putTable(long allocationRequestId,
