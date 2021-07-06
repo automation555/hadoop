@@ -16,16 +16,14 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdfs;
-
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
-import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
-import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
-import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_KEY;
-import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_WRITE_PACKET_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_SYNCONCLOSE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HEARTBEAT_RECHECK_INTERVAL_KEY;
@@ -35,26 +33,24 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
-import static org.mockito.Mockito.doReturn;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.security.PrivilegedExceptionAction;
 import java.util.EnumSet;
-import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CreateFlag;
@@ -67,8 +63,8 @@ import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.ParentNotDirectoryException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
+import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
@@ -80,6 +76,8 @@ import org.apache.hadoop.hdfs.server.datanode.DataNodeTestUtils;
 import org.apache.hadoop.hdfs.server.datanode.SimulatedFSDataset;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.INodeId;
+import org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException;
 import org.apache.hadoop.hdfs.server.namenode.LeaseManager;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
@@ -89,9 +87,9 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
-import org.slf4j.event.Level;
 
 /**
  * This class tests various cases during file creation.
@@ -100,9 +98,10 @@ public class TestFileCreation {
   static final String DIR = "/" + TestFileCreation.class.getSimpleName() + "/";
 
   {
-    GenericTestUtils.setLogLevel(LeaseManager.LOG, Level.TRACE);
-    GenericTestUtils.setLogLevel(FSNamesystem.LOG, Level.TRACE);
-    GenericTestUtils.setLogLevel(DFSClient.LOG, Level.TRACE);
+    //((Log4JLogger)DataNode.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)LeaseManager.LOG).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)LogFactory.getLog(FSNamesystem.class)).getLogger().setLevel(Level.ALL);
+    ((Log4JLogger)DFSClient.LOG).getLogger().setLevel(Level.ALL);
   }
   private static final String RPC_DETAILED_METRICS =
       "RpcDetailedActivityForPort";
@@ -169,121 +168,14 @@ public class TestFileCreation {
     cluster.waitActive();
     FileSystem fs = cluster.getFileSystem();
     try {
-      FsServerDefaults serverDefaults = fs.getServerDefaults(new Path("/"));
+      FsServerDefaults serverDefaults = fs.getServerDefaults();
       assertEquals(DFS_BLOCK_SIZE_DEFAULT, serverDefaults.getBlockSize());
       assertEquals(DFS_BYTES_PER_CHECKSUM_DEFAULT, serverDefaults.getBytesPerChecksum());
       assertEquals(DFS_CLIENT_WRITE_PACKET_SIZE_DEFAULT, serverDefaults.getWritePacketSize());
       assertEquals(DFS_REPLICATION_DEFAULT + 1, serverDefaults.getReplication());
       assertEquals(IO_FILE_BUFFER_SIZE_DEFAULT, serverDefaults.getFileBufferSize());
-      assertEquals(7, serverDefaults.getDefaultStoragePolicyId());
     } finally {
       fs.close();
-      cluster.shutdown();
-    }
-  }
-
-  /**
-   * Test that server default values are cached on the client size
-   * and are stale after namenode update.
-   */
-  @Test
-  public void testServerDefaultsWithCaching()
-      throws IOException, InterruptedException {
-    // Create cluster with an explicit block size param
-    Configuration clusterConf = new HdfsConfiguration();
-    long originalBlockSize = DFS_BLOCK_SIZE_DEFAULT * 2;
-    clusterConf.setLong(DFS_BLOCK_SIZE_KEY, originalBlockSize);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(clusterConf)
-        .numDataNodes(0)
-        .build();
-    cluster.waitActive();
-    // Set a spy namesystem inside the namenode and return it
-    FSNamesystem spyNamesystem =
-        NameNodeAdapter.spyOnNamesystem(cluster.getNameNode());
-    InetSocketAddress nameNodeAddr = cluster.getNameNode().getNameNodeAddress();
-    try {
-      // Create a dfs client and set a long enough validity interval
-      Configuration clientConf = new HdfsConfiguration();
-      clientConf.setLong(DFS_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_KEY,
-          TimeUnit.MINUTES.toMillis(1));
-      DFSClient dfsClient = new DFSClient(nameNodeAddr, clientConf);
-      FsServerDefaults defaults = dfsClient.getServerDefaults();
-      assertEquals(originalBlockSize, defaults.getBlockSize());
-
-      // Update the namenode with a new parameter
-      long updatedDefaultBlockSize = DFS_BLOCK_SIZE_DEFAULT * 3;
-      FsServerDefaults newDefaults =
-          new FsServerDefaults(updatedDefaultBlockSize,
-              defaults.getBytesPerChecksum(), defaults.getWritePacketSize(),
-              defaults.getReplication(), defaults.getFileBufferSize(),
-              defaults.getEncryptDataTransfer(), defaults.getTrashInterval(),
-              defaults.getChecksumType(), defaults.getKeyProviderUri(),
-              defaults.getDefaultStoragePolicyId());
-      doReturn(newDefaults).when(spyNamesystem).getServerDefaults();
-
-      // The value is stale
-      Thread.sleep(1);
-      defaults = dfsClient.getServerDefaults();
-      assertEquals(originalBlockSize, defaults.getBlockSize());
-
-      // Another client reads the updated value correctly
-      DFSClient newDfsClient = new DFSClient(nameNodeAddr, clientConf);
-      defaults = newDfsClient.getServerDefaults();
-      assertEquals(updatedDefaultBlockSize, defaults.getBlockSize());
-    } finally {
-      cluster.shutdown();
-    }
-  }
-
-  /**
-   * Test that server defaults are updated on the client after cache expiration.
-   */
-  @Test
-  public void testServerDefaultsWithMinimalCaching() throws Exception  {
-    // Create cluster with an explicit block size param.
-    Configuration clusterConf = new HdfsConfiguration();
-    long originalBlockSize = DFS_BLOCK_SIZE_DEFAULT * 2;
-    clusterConf.setLong(DFS_BLOCK_SIZE_KEY, originalBlockSize);
-    MiniDFSCluster cluster = new MiniDFSCluster.Builder(clusterConf)
-        .numDataNodes(0)
-        .build();
-    cluster.waitActive();
-    // Set a spy namesystem inside the namenode and return it
-    FSNamesystem spyNamesystem =
-        NameNodeAdapter.spyOnNamesystem(cluster.getNameNode());
-    InetSocketAddress nameNodeAddr = cluster.getNameNode().getNameNodeAddress();
-    try {
-      // Create a dfs client and set a minimal validity interval
-      Configuration clientConf = new HdfsConfiguration();
-      // Invalidate cache in at most 1 ms, see DfsClient#getServerDefaults
-      clientConf.setLong(DFS_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_KEY, 0L);
-      DFSClient dfsClient = new DFSClient(nameNodeAddr, clientConf);
-      FsServerDefaults defaults = dfsClient.getServerDefaults();
-      assertEquals(originalBlockSize, defaults.getBlockSize());
-
-      // Update the namenode with a new FsServerDefaults
-      long updatedDefaultBlockSize = DFS_BLOCK_SIZE_DEFAULT * 3;
-      FsServerDefaults newDefaults =
-          new FsServerDefaults(updatedDefaultBlockSize,
-              defaults.getBytesPerChecksum(), defaults.getWritePacketSize(),
-              defaults.getReplication(), defaults.getFileBufferSize(),
-              defaults.getEncryptDataTransfer(), defaults.getTrashInterval(),
-              defaults.getChecksumType(), defaults.getKeyProviderUri(),
-              defaults.getDefaultStoragePolicyId());
-      doReturn(newDefaults).when(spyNamesystem).getServerDefaults();
-
-      // Verify that the value is updated correctly. Wait for 3 seconds.
-      GenericTestUtils.waitFor(()->{
-        try {
-          FsServerDefaults currDef = dfsClient.getServerDefaults();
-          return (currDef.getBlockSize() == updatedDefaultBlockSize);
-        } catch (IOException e) {
-          // do nothing;
-          return false;
-        }
-      }, 1, 3000);
-
-    } finally {
       cluster.shutdown();
     }
   }
@@ -325,9 +217,9 @@ public class TestFileCreation {
       throws IOException {
     Configuration conf = new HdfsConfiguration();
     if (netIf != null) {
-      conf.set(HdfsClientConfigKeys.DFS_CLIENT_LOCAL_INTERFACES, netIf);
+      conf.set(DFSConfigKeys.DFS_CLIENT_LOCAL_INTERFACES, netIf);
     }
-    conf.setBoolean(HdfsClientConfigKeys.DFS_CLIENT_USE_DN_HOSTNAME, useDnHostname);
+    conf.setBoolean(DFSConfigKeys.DFS_CLIENT_USE_DN_HOSTNAME, useDnHostname);
     if (useDnHostname) {
       // Since the mini cluster only listens on the loopback we have to
       // ensure the hostname used to access DNs maps to the loopback. We
@@ -485,7 +377,6 @@ public class TestFileCreation {
     Configuration conf = new HdfsConfiguration();
     SimulatedFSDataset.setFactory(conf);
     conf.setBoolean(DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY, false);
-
     final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     FileSystem fs = cluster.getFileSystem();
 
@@ -524,7 +415,8 @@ public class TestFileCreation {
         stm1.close();
         fail("Should have exception closing stm1 since it was deleted");
       } catch (IOException ioe) {
-        GenericTestUtils.assertExceptionContains("File does not exist", ioe);
+        GenericTestUtils.assertExceptionContains("No lease on /testfile", ioe);
+        GenericTestUtils.assertExceptionContains("File does not exist.", ioe);
       }
       
     } finally {
@@ -642,7 +534,7 @@ public class TestFileCreation {
 
       // add one block to the file
       LocatedBlock location = client.getNamenode().addBlock(file1.toString(),
-          client.clientName, null, null, HdfsConstants.GRANDFATHER_INODE_ID, null, null);
+          client.clientName, null, null, INodeId.GRANDFATHER_INODE_ID, null);
       System.out.println("testFileCreationError2: "
           + "Added block " + location.getBlock());
 
@@ -693,7 +585,7 @@ public class TestFileCreation {
       createFile(dfs, f, 3);
       try {
         cluster.getNameNodeRpc().addBlock(f.toString(), client.clientName,
-            null, null, HdfsConstants.GRANDFATHER_INODE_ID, null, null);
+            null, null, INodeId.GRANDFATHER_INODE_ID, null);
         fail();
       } catch(IOException ioe) {
         FileSystem.LOG.info("GOOD!", ioe);
@@ -710,8 +602,7 @@ public class TestFileCreation {
    * Test that file leases are persisted across namenode restarts.
    */
   @Test
-  public void testFileCreationNamenodeRestart()
-      throws IOException, NoSuchFieldException, IllegalAccessException {
+  public void testFileCreationNamenodeRestart() throws IOException {
     Configuration conf = new HdfsConfiguration();
     final int MAX_IDLE_TIME = 2000; // 2s
     conf.setInt("ipc.client.connection.maxidletime", MAX_IDLE_TIME);
@@ -783,7 +674,7 @@ public class TestFileCreation {
 
       // restart cluster with the same namenode port as before.
       // This ensures that leases are persisted in fsimage.
-      cluster.shutdown(false, false);
+      cluster.shutdown();
       try {
         Thread.sleep(2*MAX_IDLE_TIME);
       } catch (InterruptedException e) {
@@ -795,7 +686,7 @@ public class TestFileCreation {
 
       // restart cluster yet again. This triggers the code to read in
       // persistent leases from fsimage.
-      cluster.shutdown(false, false);
+      cluster.shutdown();
       try {
         Thread.sleep(5000);
       } catch (InterruptedException e) {
@@ -810,18 +701,11 @@ public class TestFileCreation {
       // new blocks for files that were renamed.
       DFSOutputStream dfstream = (DFSOutputStream)
                                                  (stm.getWrappedStream());
-
-      Field f = DFSOutputStream.class.getDeclaredField("src");
-      Field modifiersField = Field.class.getDeclaredField("modifiers");
-      modifiersField.setAccessible(true);
-      modifiersField.setInt(f, f.getModifiers() & ~Modifier.FINAL);
-      f.setAccessible(true);
-
-      f.set(dfstream, file1.toString());
+      dfstream.setTestFilename(file1.toString());
       dfstream = (DFSOutputStream) (stm3.getWrappedStream());
-      f.set(dfstream, file3new.toString());
+      dfstream.setTestFilename(file3new.toString());
       dfstream = (DFSOutputStream) (stm4.getWrappedStream());
-      f.set(dfstream, file4new.toString());
+      dfstream.setTestFilename(file4new.toString());
 
       // write 1 byte to file.  This should succeed because the 
       // namenode should have persisted leases.
@@ -901,92 +785,93 @@ public class TestFileCreation {
     }
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).build();
     FileSystem fs = cluster.getFileSystem();
+    final Path path = new Path("/" + Time.now()
+        + "-testFileCreationNonRecursive");
+    FSDataOutputStream out = null;
 
     try {
-      testFileCreationNonRecursive(fs);
+      IOException expectedException = null;
+      final String nonExistDir = "/non-exist-" + Time.now();
+
+      fs.delete(new Path(nonExistDir), true);
+      EnumSet<CreateFlag> createFlag = EnumSet.of(CreateFlag.CREATE);
+      // Create a new file in root dir, should succeed
+      out = createNonRecursive(fs, path, 1, createFlag);
+      out.close();
+      // Create a file when parent dir exists as file, should fail
+      try {
+        createNonRecursive(fs, new Path(path, "Create"), 1, createFlag);
+      } catch (IOException e) {
+        expectedException = e;
+      }
+      assertTrue("Create a file when parent directory exists as a file"
+          + " should throw ParentNotDirectoryException ",
+          expectedException != null
+              && expectedException instanceof ParentNotDirectoryException);
+      fs.delete(path, true);
+      // Create a file in a non-exist directory, should fail
+      final Path path2 = new Path(nonExistDir + "/testCreateNonRecursive");
+      expectedException = null;
+      try {
+        createNonRecursive(fs, path2, 1, createFlag);
+      } catch (IOException e) {
+        expectedException = e;
+      }
+      assertTrue("Create a file in a non-exist dir using"
+          + " createNonRecursive() should throw FileNotFoundException ",
+          expectedException != null
+              && expectedException instanceof FileNotFoundException);
+
+      EnumSet<CreateFlag> overwriteFlag = 
+        EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE);
+      // Overwrite a file in root dir, should succeed
+      out = createNonRecursive(fs, path, 1, overwriteFlag);
+      out.close();
+      // Overwrite a file when parent dir exists as file, should fail
+      expectedException = null;
+      try {
+        createNonRecursive(fs, new Path(path, "Overwrite"), 1, overwriteFlag);
+      } catch (IOException e) {
+        expectedException = e;
+      }
+      assertTrue("Overwrite a file when parent directory exists as a file"
+          + " should throw ParentNotDirectoryException ",
+          expectedException != null
+              && expectedException instanceof ParentNotDirectoryException);
+      fs.delete(path, true);
+      // Overwrite a file in a non-exist directory, should fail
+      final Path path3 = new Path(nonExistDir + "/testOverwriteNonRecursive");
+      expectedException = null;
+      try {
+        createNonRecursive(fs, path3, 1, overwriteFlag);
+      } catch (IOException e) {
+        expectedException = e;
+      }
+      assertTrue("Overwrite a file in a non-exist dir using"
+          + " createNonRecursive() should throw FileNotFoundException ",
+          expectedException != null
+              && expectedException instanceof FileNotFoundException);
     } finally {
       fs.close();
       cluster.shutdown();
     }
   }
 
-  // Worker method for testing non-recursive. Extracted to allow other
-  // FileSystem implementations to re-use the tests
-  public static void testFileCreationNonRecursive(FileSystem fs) throws IOException {
-    final Path path = new Path("/" + Time.now()
-        + "-testFileCreationNonRecursive");
-    IOException expectedException = null;
-    final String nonExistDir = "/non-exist-" + Time.now();
-
-    fs.delete(new Path(nonExistDir), true);
-    EnumSet<CreateFlag> createFlag = EnumSet.of(CreateFlag.CREATE);
-    // Create a new file in root dir, should succeed
-    assertNull(createNonRecursive(fs, path, 1, createFlag));
-
-    // Create a file when parent dir exists as file, should fail
-    expectedException = createNonRecursive(fs, new Path(path, "Create"), 1, createFlag);
-
-    assertTrue("Create a file when parent directory exists as a file"
-        + " should throw ParentNotDirectoryException ",
-        expectedException != null
-            && expectedException instanceof ParentNotDirectoryException);
-    fs.delete(path, true);
-    // Create a file in a non-exist directory, should fail
-    final Path path2 = new Path(nonExistDir + "/testCreateNonRecursive");
-    expectedException =  createNonRecursive(fs, path2, 1, createFlag);
-
-    assertTrue("Create a file in a non-exist dir using"
-        + " createNonRecursive() should throw FileNotFoundException ",
-        expectedException != null
-            && expectedException instanceof FileNotFoundException);
-
-    EnumSet<CreateFlag> overwriteFlag =
-      EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE);
-    // Overwrite a file in root dir, should succeed
-    assertNull(createNonRecursive(fs, path, 1, overwriteFlag));
-
-    // Overwrite a file when parent dir exists as file, should fail
-    expectedException = createNonRecursive(fs, new Path(path, "Overwrite"), 1, overwriteFlag);
-
-    assertTrue("Overwrite a file when parent directory exists as a file"
-        + " should throw ParentNotDirectoryException ",
-        expectedException != null
-            && expectedException instanceof ParentNotDirectoryException);
-    fs.delete(path, true);
-
-    // Overwrite a file in a non-exist directory, should fail
-    final Path path3 = new Path(nonExistDir + "/testOverwriteNonRecursive");
-    expectedException = createNonRecursive(fs, path3, 1, overwriteFlag);
-
-    assertTrue("Overwrite a file in a non-exist dir using"
-        + " createNonRecursive() should throw FileNotFoundException ",
-        expectedException != null
-            && expectedException instanceof FileNotFoundException);
-  }
-
-  // Attempts to create and close a file using FileSystem.createNonRecursive(),
-  // catching and returning an exception if one occurs or null
-  // if the operation is successful.
-  static IOException createNonRecursive(FileSystem fs, Path name,
+  // creates a file using DistributedFileSystem.createNonRecursive()
+  static FSDataOutputStream createNonRecursive(FileSystem fs, Path name,
       int repl, EnumSet<CreateFlag> flag) throws IOException {
-    try {
-      System.out.println("createNonRecursive: Attempting to create " + name +
-          " with " + repl + " replica.");
-      int bufferSize = fs.getConf()
-          .getInt(CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096);
-      FSDataOutputStream stm = fs.createNonRecursive(name,
-          FsPermission.getDefault(), flag, bufferSize, (short) repl,  blockSize,
-          null);
-      stm.close();
-    } catch (IOException e) {
-      return e;
-    }
-    return null;
+    System.out.println("createNonRecursive: Created " + name + " with " + repl
+        + " replica.");
+    FSDataOutputStream stm = ((DistributedFileSystem) fs).createNonRecursive(
+        name, FsPermission.getDefault(), flag, fs.getConf().getInt(
+            CommonConfigurationKeys.IO_FILE_BUFFER_SIZE_KEY, 4096), (short) repl,  blockSize, null);
+    return stm;
   }
+  
 
-  /**
-   * Test that file data becomes available before file is closed.
-  */
+/**
+ * Test that file data becomes available before file is closed.
+ */
   @Test
   public void testFileCreationSimulated() throws IOException {
     simulatedStorage = true;
@@ -1107,9 +992,15 @@ public class TestFileCreation {
       for(DatanodeInfo datanodeinfo: locatedblock.getLocations()) {
         DataNode datanode = cluster.getDataNode(datanodeinfo.getIpcPort());
         ExtendedBlock blk = locatedblock.getBlock();
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(
-            datanode.getFSDataset().getBlockInputStream(blk, 0)))) {
+        Block b = DataNodeTestUtils.getFSDataset(datanode).getStoredBlock(
+            blk.getBlockPoolId(), blk.getBlockId());
+        final File blockfile = DataNodeTestUtils.getFile(datanode,
+            blk.getBlockPoolId(), b.getBlockId());
+        System.out.println("blockfile=" + blockfile);
+        if (blockfile != null) {
+          BufferedReader in = new BufferedReader(new FileReader(blockfile));
           assertEquals("something", in.readLine());
+          in.close();
           successcount++;
         }
       }
@@ -1232,7 +1123,7 @@ public class TestFileCreation {
     doCreateTest(CreationMethod.PATH_FROM_URI);
   }
   
-  private enum CreationMethod {
+  private static enum CreationMethod {
     DIRECT_NN_RPC,
     PATH_FROM_URI,
     PATH_FROM_STRING
@@ -1252,7 +1143,7 @@ public class TestFileCreation {
           try {
             nnrpc.create(pathStr, new FsPermission((short)0755), "client",
                 new EnumSetWritable<CreateFlag>(EnumSet.of(CreateFlag.CREATE)),
-                true, (short) 1, 128 * 1024 * 1024L, null, null, null);
+                true, (short)1, 128*1024*1024L, null, false);
             fail("Should have thrown exception when creating '"
                 + pathStr + "'" + " by " + method);
           } catch (InvalidPathException ipe) {
@@ -1311,8 +1202,8 @@ public class TestFileCreation {
         cluster.getNameNodeRpc()
             .complete(f.toString(), client.clientName, null, someOtherFileId);
         fail();
-      } catch(FileNotFoundException e) {
-        FileSystem.LOG.info("Caught Expected FileNotFoundException: ", e);
+      } catch(LeaseExpiredException e) {
+        FileSystem.LOG.info("Caught Expected LeaseExpiredException: ", e);
       }
     } finally {
       IOUtils.closeStream(dfs);
