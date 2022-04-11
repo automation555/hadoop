@@ -156,7 +156,7 @@ public final class ECSchema implements Serializable {
   }
 
   /**
-   * Get extra options specific to a erasure code.
+   * Get extra options specific to an erasure code.
    * @return extra options
    */
   public Map<String, String> getExtraOptions() {
@@ -187,10 +187,10 @@ public final class ECSchema implements Serializable {
   public String toString() {
     StringBuilder sb = new StringBuilder("ECSchema=[");
 
-    sb.append("Codec=" + codecName + ", ");
-    sb.append(NUM_DATA_UNITS_KEY + "=" + numDataUnits + ", ");
-    sb.append(NUM_PARITY_UNITS_KEY + "=" + numParityUnits);
-    sb.append((extraOptions.isEmpty() ? "" : ", "));
+    sb.append("Codec=" + codecName + ", ")
+        .append(NUM_DATA_UNITS_KEY + "=" + numDataUnits + ", ")
+        .append(NUM_PARITY_UNITS_KEY + "=" + numParityUnits)
+        .append((extraOptions.isEmpty() ? "" : ", "));
 
     int i = 0;
     for (Map.Entry<String, String> entry : extraOptions.entrySet()) {

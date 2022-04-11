@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher;
 
 import static org.apache.hadoop.fs.CreateFlag.CREATE;
 import static org.apache.hadoop.fs.CreateFlag.OVERWRITE;
+import static org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.TOKEN_FILE_NAME_FMT;
 
 import org.apache.hadoop.yarn.server.nodemanager.executor.DeletionAsUserContext;
 
@@ -91,10 +92,11 @@ import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerReapContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerSignalContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerStartContext;
 import org.apache.hadoop.yarn.server.nodemanager.util.ProcessIdFileReader;
+import org.apache.hadoop.yarn.server.security.AMSecretKeys;
 import org.apache.hadoop.yarn.util.Apps;
 import org.apache.hadoop.yarn.util.AuxiliaryServiceHelper;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,6 +114,12 @@ public class ContainerLaunch implements Callable<Integer> {
 
   public static final String FINAL_CONTAINER_TOKENS_FILE = "container_tokens";
   public static final String SYSFS_DIR = "sysfs";
+<<<<<<< HEAD
+
+  public static final String KEYSTORE_FILE = "yarn_provided.keystore";
+  public static final String TRUSTSTORE_FILE = "yarn_provided.truststore";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private static final String PID_FILE_NAME_FMT = "%s.pid";
   static final String EXIT_CODE_FILE_SUFFIX = ".exitcode";
@@ -174,15 +182,36 @@ public class ContainerLaunch implements Callable<Integer> {
     return var;
   }
 
-  private Map<String, String> expandAllEnvironmentVars(
-      ContainerLaunchContext launchContext, Path containerLogDir) {
-    Map<String, String> environment = launchContext.getEnvironment();
+  private void expandAllEnvironmentVars(
+      Map<String, String> environment, Path containerLogDir) {
     for (Entry<String, String> entry : environment.entrySet()) {
       String value = entry.getValue();
       value = expandEnvironment(value, containerLogDir);
       entry.setValue(value);
     }
-    return environment;
+  }
+
+  private void addKeystoreVars(Map<String, String> environment,
+      Path containerWorkDir) {
+    environment.put(ApplicationConstants.KEYSTORE_FILE_LOCATION_ENV_NAME,
+        new Path(containerWorkDir,
+            ContainerLaunch.KEYSTORE_FILE).toUri().getPath());
+    environment.put(ApplicationConstants.KEYSTORE_PASSWORD_ENV_NAME,
+        new String(container.getCredentials().getSecretKey(
+            AMSecretKeys.YARN_APPLICATION_AM_KEYSTORE_PASSWORD),
+            StandardCharsets.UTF_8));
+  }
+
+  private void addTruststoreVars(Map<String, String> environment,
+                               Path containerWorkDir) {
+    environment.put(
+        ApplicationConstants.TRUSTSTORE_FILE_LOCATION_ENV_NAME,
+        new Path(containerWorkDir,
+            ContainerLaunch.TRUSTSTORE_FILE).toUri().getPath());
+    environment.put(ApplicationConstants.TRUSTSTORE_PASSWORD_ENV_NAME,
+        new String(container.getCredentials().getSecretKey(
+            AMSecretKeys.YARN_APPLICATION_AM_TRUSTSTORE_PASSWORD),
+            StandardCharsets.UTF_8));
   }
 
   @Override
@@ -217,8 +246,10 @@ public class ContainerLaunch implements Callable<Integer> {
       }
       launchContext.setCommands(newCmds);
 
-      Map<String, String> environment = expandAllEnvironmentVars(
-          launchContext, containerLogDir);
+      // The actual expansion of environment variables happens after calling
+      // sanitizeEnv.  This allows variables specified in NM_ADMIN_USER_ENV
+      // to reference user or container-defined variables.
+      Map<String, String> environment = launchContext.getEnvironment();
       // /////////////////////////// End of variable expansion
 
       // Use this to track variables that are added to the environment by nm.
@@ -231,14 +262,23 @@ public class ContainerLaunch implements Callable<Integer> {
               + CONTAINER_SCRIPT);
       Path nmPrivateTokensPath = dirsHandler.getLocalPathForWrite(
           getContainerPrivateDir(appIdStr, containerIdStr) + Path.SEPARATOR
-              + String.format(ContainerLocalizer.TOKEN_FILE_NAME_FMT,
-              containerIdStr));
+              + String.format(TOKEN_FILE_NAME_FMT, containerIdStr));
+      Path nmPrivateKeystorePath = dirsHandler.getLocalPathForWrite(
+          getContainerPrivateDir(appIdStr, containerIdStr) + Path.SEPARATOR
+              + KEYSTORE_FILE);
+      Path nmPrivateTruststorePath = dirsHandler.getLocalPathForWrite(
+          getContainerPrivateDir(appIdStr, containerIdStr) + Path.SEPARATOR
+              + TRUSTSTORE_FILE);
       Path nmPrivateClasspathJarDir = dirsHandler.getLocalPathForWrite(
           getContainerPrivateDir(appIdStr, containerIdStr));
 
       // Select the working directory for the container
       Path containerWorkDir = deriveContainerWorkDir();
       recordContainerWorkDir(containerID, containerWorkDir.toString());
+
+      // Select a root dir for all csi volumes for the container
+      Path csiVolumesRoot = deriveCsiVolumesRootDir();
+      recordContainerCsiVolumesRootDir(containerID, csiVolumesRoot.toString());
 
       String pidFileSubpath = getPidFileSubpath(appIdStr, containerIdStr);
       // pid file should be in nm private dir so that it is not
@@ -268,6 +308,29 @@ public class ContainerLaunch implements Callable<Integer> {
         appDirs.add(new Path(appsdir, appIdStr));
       }
 
+      byte[] keystore = container.getCredentials().getSecretKey(
+          AMSecretKeys.YARN_APPLICATION_AM_KEYSTORE);
+      if (keystore != null) {
+        try (DataOutputStream keystoreOutStream =
+                 lfs.create(nmPrivateKeystorePath,
+                     EnumSet.of(CREATE, OVERWRITE))) {
+          keystoreOutStream.write(keystore);
+        }
+      } else {
+        nmPrivateKeystorePath = null;
+      }
+      byte[] truststore = container.getCredentials().getSecretKey(
+          AMSecretKeys.YARN_APPLICATION_AM_TRUSTSTORE);
+      if (truststore != null) {
+        try (DataOutputStream truststoreOutStream =
+                 lfs.create(nmPrivateTruststorePath,
+                     EnumSet.of(CREATE, OVERWRITE))) {
+          truststoreOutStream.write(truststore);
+        }
+      } else {
+        nmPrivateTruststorePath = null;
+      }
+
       // Set the token location too.
       addToEnvMap(environment, nmEnvVars,
           ApplicationConstants.CONTAINER_TOKEN_FILE_ENV_NAME,
@@ -282,6 +345,16 @@ public class ContainerLaunch implements Callable<Integer> {
         sanitizeEnv(environment, containerWorkDir, appDirs, userLocalDirs,
             containerLogDirs, localResources, nmPrivateClasspathJarDir,
             nmEnvVars);
+
+        expandAllEnvironmentVars(environment, containerLogDir);
+
+        // Add these if needed after expanding so we don't expand key values.
+        if (keystore != null) {
+          addKeystoreVars(environment, containerWorkDir);
+        }
+        if (truststore != null) {
+          addTruststoreVars(environment, containerWorkDir);
+        }
 
         prepareContainer(localResources, containerLocalDirs);
 
@@ -305,9 +378,12 @@ public class ContainerLaunch implements Callable<Integer> {
           .setLocalizedResources(localResources)
           .setNmPrivateContainerScriptPath(nmPrivateContainerScriptPath)
           .setNmPrivateTokensPath(nmPrivateTokensPath)
+          .setNmPrivateKeystorePath(nmPrivateKeystorePath)
+          .setNmPrivateTruststorePath(nmPrivateTruststorePath)
           .setUser(user)
           .setAppId(appIdStr)
           .setContainerWorkDir(containerWorkDir)
+          .setContainerCsiVolumesRootDir(csiVolumesRoot)
           .setLocalDirs(localDirs)
           .setLogDirs(logDirs)
           .setFilecacheDirs(filecacheDirs)
@@ -336,6 +412,27 @@ public class ContainerLaunch implements Callable<Integer> {
 
     handleContainerExitCode(ret, containerLogDir);
     return ret;
+  }
+
+  /**
+   * Volumes mount point root:
+   *   ${YARN_LOCAL_DIR}/usercache/${user}/filecache/csiVolumes/app/container
+   * CSI volumes may creates the mount point with different permission bits.
+   * If we create the volume mount under container work dir, it may
+   * mess up the existing permission structure, which is restricted by
+   * linux container executor. So we put all volume mounts under a same
+   * root dir so it is easier cleanup.
+   **/
+  private Path deriveCsiVolumesRootDir() throws IOException {
+    final String containerVolumePath =
+        ContainerLocalizer.USERCACHE + Path.SEPARATOR
+            + container.getUser() + Path.SEPARATOR
+            + ContainerLocalizer.FILECACHE + Path.SEPARATOR
+            + ContainerLocalizer.CSI_VOLIUME_MOUNTS_ROOT + Path.SEPARATOR
+            + app.getAppId().toString() + Path.SEPARATOR
+            + container.getContainerId().toString();
+    return dirsHandler.getLocalPathForWrite(containerVolumePath,
+        LocalDirAllocator.SIZE_UNKNOWN, false);
   }
 
   private Path deriveContainerWorkDir() throws IOException {
@@ -571,11 +668,8 @@ public class ContainerLaunch implements Callable<Integer> {
 
   protected void handleContainerExitCode(int exitCode, Path containerLogDir) {
     ContainerId containerId = container.getContainerId();
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Container " + containerId + " completed with exit code "
-          + exitCode);
-    }
+    LOG.debug("Container {} completed with exit code {}", containerId,
+        exitCode);
 
     StringBuilder diagnosticInfo =
         new StringBuilder("Container exited with a non-zero exit code ");
@@ -712,7 +806,8 @@ public class ContainerLaunch implements Callable<Integer> {
     StringBuilder analysis = new StringBuilder();
     if (errorMsg.indexOf("Error: Could not find or load main class"
         + " org.apache.hadoop.mapreduce") != -1) {
-      analysis.append("Please check whether your etc/hadoop/mapred-site.xml "
+      analysis.append(
+          "Please check whether your <HADOOP_HOME>/etc/hadoop/mapred-site.xml "
           + "contains the below configuration:\n");
       analysis.append("<property>\n")
           .append("  <name>yarn.app.mapreduce.am.env</name>\n")
@@ -764,22 +859,17 @@ public class ContainerLaunch implements Callable<Integer> {
       return;
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Getting pid for container " + containerIdStr
-          + " to send signal to from pid file "
-          + (pidFilePath != null ? pidFilePath.toString() : "null"));
-    }
+    LOG.debug("Getting pid for container {} to send signal to from pid"
+        + " file {}", containerIdStr,
+        (pidFilePath != null ? pidFilePath.toString() : "null"));
 
     try {
       // get process id from pid file if available
       // else if shell is still active, get it from the shell
       String processId = getContainerPid();
       if (processId != null) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sending signal to pid " + processId
-              + " as user " + user
-              + " for container " + containerIdStr);
-        }
+        LOG.debug("Sending signal to pid {} as user {} for container {}",
+            processId, user, containerIdStr);
 
         boolean result = exec.signalContainer(
             new ContainerSignalContext.Builder()
@@ -937,10 +1027,15 @@ public class ContainerLaunch implements Callable<Integer> {
     String containerIdStr = 
         container.getContainerId().toString();
     String processId;
+<<<<<<< HEAD
+    LOG.debug("Accessing pid for container {} from pid file {}",
+        containerIdStr, pidFilePath);
+=======
     if (LOG.isDebugEnabled()) {
       LOG.debug("Accessing pid for container " + containerIdStr
           + " from pid file " + pidFilePath);
     }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     int sleepCounter = 0;
     final int sleepInterval = 100;
 
@@ -949,10 +1044,7 @@ public class ContainerLaunch implements Callable<Integer> {
     while (true) {
       processId = ProcessIdFileReader.getProcessId(pidFilePath);
       if (processId != null) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(
-              "Got pid " + processId + " for container " + containerIdStr);
-        }
+        LOG.debug("Got pid {} for container {}", processId, containerIdStr);
         break;
       }
       else if ((sleepCounter*sleepInterval) > maxKillWaitTime) {
@@ -1556,18 +1648,42 @@ public class ContainerLaunch implements Callable<Integer> {
 
     addToEnvMap(environment, nmVars, Environment.PWD.name(), pwd.toString());
 
+    addToEnvMap(environment, nmVars, Environment.LOCALIZATION_COUNTERS.name(),
+        container.localizationCountersAsString());
+
     if (!Shell.WINDOWS) {
       addToEnvMap(environment, nmVars, "JVM_PID", "$$");
     }
 
     // variables here will be forced in, even if the container has
-    // specified them.
+    // specified them.  Note: we do not track these in nmVars, to
+    // allow them to be ordered properly if they reference variables
+    // defined by the user.
     String defEnvStr = conf.get(YarnConfiguration.DEFAULT_NM_ADMIN_USER_ENV);
     Apps.setEnvFromInputProperty(environment,
         YarnConfiguration.NM_ADMIN_USER_ENV, defEnvStr, conf,
         File.pathSeparator);
-    nmVars.addAll(Apps.getEnvVarsFromInputProperty(
-        YarnConfiguration.NM_ADMIN_USER_ENV, defEnvStr, conf));
+
+    if (!Shell.WINDOWS) {
+      // maybe force path components
+      String forcePath = conf.get(YarnConfiguration.NM_ADMIN_FORCE_PATH,
+          YarnConfiguration.DEFAULT_NM_ADMIN_FORCE_PATH);
+      if (!forcePath.isEmpty()) {
+        String userPath = environment.get(Environment.PATH.name());
+        environment.remove(Environment.PATH.name());
+        if (userPath == null || userPath.isEmpty()) {
+          Apps.addToEnvironment(environment, Environment.PATH.name(),
+              forcePath, File.pathSeparator);
+          Apps.addToEnvironment(environment, Environment.PATH.name(),
+              "$PATH", File.pathSeparator);
+        } else {
+          Apps.addToEnvironment(environment, Environment.PATH.name(),
+              forcePath, File.pathSeparator);
+          Apps.addToEnvironment(environment, Environment.PATH.name(),
+              userPath, File.pathSeparator);
+        }
+      }
+    }
 
     // TODO: Remove Windows check and use this approach on all platforms after
     // additional testing.  See YARN-358.
@@ -1700,6 +1816,12 @@ public class ContainerLaunch implements Callable<Integer> {
     if (container.isRetryContextSet()) {
       context.getNMStateStore().storeContainerWorkDir(containerId, workDir);
     }
+  }
+
+  private void recordContainerCsiVolumesRootDir(ContainerId containerId,
+      String volumesRoot) throws IOException {
+    container.setCsiVolumesRootDir(volumesRoot);
+    // TODO persistent to the NM store...
   }
 
   protected Path getContainerWorkDir() throws IOException {

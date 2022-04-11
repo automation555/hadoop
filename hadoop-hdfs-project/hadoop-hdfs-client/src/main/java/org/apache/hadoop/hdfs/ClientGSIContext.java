@@ -29,7 +29,11 @@ import java.util.concurrent.atomic.LongAccumulator;
 
 /**
  * Global State Id context for the client.
+<<<<<<< HEAD
+ * <p>
+=======
  * <p/>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
  * This is the client side implementation responsible for receiving
  * state alignment info from server(s).
  */

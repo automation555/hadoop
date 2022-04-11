@@ -29,7 +29,7 @@ import org.apache.hadoop.util.Daemon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 /**
  * A Class to track the block collection IDs (Inode's ID) for which physical
@@ -106,8 +106,8 @@ public class BlockStorageMovementNeeded {
    * Add the itemInfo to tracking list for which storage movement expected if
    * necessary.
    *
-   * @param itemInfoList
-   *          - List of child in the directory
+   * @param itemInfo
+   *          - child in the directory
    * @param scanCompleted
    *          -Indicates whether the ItemInfo start id directory has no more
    *          elements to scan.
@@ -191,7 +191,6 @@ public class BlockStorageMovementNeeded {
   /**
    * Clean all the movements in spsDirsToBeTraveresed/storageMovementNeeded
    * and notify to clean up required resources.
-   * @throws IOException
    */
   public synchronized void clearQueuesWithNotification() {
     // Remove xAttr from directories

@@ -23,12 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -61,6 +58,12 @@ import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
+
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.yarn.exceptions
         .InvalidResourceRequestException
@@ -103,7 +106,8 @@ public class SchedulerUtils {
     }
   }
 
-  private static final Log LOG = LogFactory.getLog(SchedulerUtils.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SchedulerUtils.class);
 
   private static final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);
@@ -193,7 +197,7 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility method to normalize a resource request, by insuring that the
+   * Utility method to normalize a resource request, by ensuring that the
    * requested memory is a multiple of minMemory and is not zero.
    */
   @VisibleForTesting
@@ -208,7 +212,7 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility method to normalize a resource request, by insuring that the
+   * Utility method to normalize a resource request, by ensuring that the
    * requested memory is a multiple of increment resource and is not zero.
    *
    * @return normalized resource
@@ -238,10 +242,8 @@ public class SchedulerUtils {
     // default label expression of queue
     if (labelExp == null && queueInfo != null && ResourceRequest.ANY
         .equals(resReq.getResourceName())) {
-      if ( LOG.isDebugEnabled()) {
-        LOG.debug("Setting default node label expression : " + queueInfo
-            .getDefaultNodeLabelExpression());
-      }
+      LOG.debug("Setting default node label expression : {}", queueInfo
+          .getDefaultNodeLabelExpression());
       labelExp = queueInfo.getDefaultNodeLabelExpression();
     }
 
@@ -303,7 +305,30 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility method to validate a resource request, by insuring that the
+   * If RM should enforce partition exclusivity for enforced partition "x":
+   * 1) If request is "x" and app label is not "x",
+   *    override request to app's label.
+   * 2) If app label is "x", ensure request is "x".
+   * @param resReq resource request
+   * @param enforcedPartitions list of exclusive enforced partitions
+   * @param appLabel app's node label expression
+   */
+  public static void enforcePartitionExclusivity(ResourceRequest resReq,
+      Set<String> enforcedPartitions, String appLabel) {
+    if (enforcedPartitions == null || enforcedPartitions.isEmpty()) {
+      return;
+    }
+    if (!enforcedPartitions.contains(appLabel)
+        && enforcedPartitions.contains(resReq.getNodeLabelExpression())) {
+      resReq.setNodeLabelExpression(appLabel);
+    }
+    if (enforcedPartitions.contains(appLabel)) {
+      resReq.setNodeLabelExpression(appLabel);
+    }
+  }
+
+  /**
+   * Utility method to validate a resource request, by ensuring that the
    * requested memory/vcore is non-negative and not greater than max
    *
    * @throws InvalidResourceRequestException when there is invalid request
@@ -355,7 +380,7 @@ public class SchedulerUtils {
   private static Map<String, ResourceInformation> getZeroResources(
       Resource resource) {
     Map<String, ResourceInformation> resourceInformations = Maps.newHashMap();
-    int maxLength = ResourceUtils.getNumberOfKnownResourceTypes();
+    int maxLength = ResourceUtils.getNumberOfCountableResourceTypes();
 
     for (int i = 0; i < maxLength; i++) {
       ResourceInformation resourceInformation =
@@ -372,7 +397,7 @@ public class SchedulerUtils {
   @VisibleForTesting
   static void checkResourceRequestAgainstAvailableResource(Resource reqResource,
       Resource availableResource) throws InvalidResourceRequestException {
-    for (int i = 0; i < ResourceUtils.getNumberOfKnownResourceTypes(); i++) {
+    for (int i = 0; i < ResourceUtils.getNumberOfCountableResourceTypes(); i++) {
       final ResourceInformation requestedRI =
           reqResource.getResourceInformation(i);
       final String reqResourceName = requestedRI.getName();
@@ -404,7 +429,7 @@ public class SchedulerUtils {
     }
 
     List<ResourceInformation> invalidResources = Lists.newArrayList();
-    for (int i = 0; i < ResourceUtils.getNumberOfKnownResourceTypes(); i++) {
+    for (int i = 0; i < ResourceUtils.getNumberOfCountableResourceTypes(); i++) {
       final ResourceInformation requestedRI =
           reqResource.getResourceInformation(i);
       final String reqResourceName = requestedRI.getName();
@@ -579,5 +604,12 @@ public class SchedulerUtils {
     appAttempt.addRMContainer(container.getId(), rmContainer);
     node.allocateContainer(rmContainer);
     return rmContainer;
+  }
+
+  public static boolean isNodeHeartbeated(SchedulerNode node,
+      long skipNodeInterval) {
+    long timeElapsedFromLastHeartbeat =
+        Time.monotonicNow() - node.getLastHeartbeatMonotonicTime();
+    return timeElapsedFromLastHeartbeat <= skipNodeInterval;
   }
 }

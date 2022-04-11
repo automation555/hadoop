@@ -18,6 +18,13 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.gpu;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.util.Sets;
+=======
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -25,6 +32,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -35,6 +43,8 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourceHandlerException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.AssignedGpuDevice;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.GpuDevice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -53,7 +63,9 @@ import static org.apache.hadoop.yarn.api.records.ResourceInformation.GPU_URI;
  * Allocate GPU resources according to requirements.
  */
 public class GpuResourceAllocator {
-  final static Log LOG = LogFactory.getLog(GpuResourceAllocator.class);
+  final static Logger LOG = LoggerFactory.
+      getLogger(GpuResourceAllocator.class);
+
   private static final int WAIT_MS_PER_LOOP = 1000;
 
   private Set<GpuDevice> allowedGpuDevices = new TreeSet<>();
@@ -122,6 +134,7 @@ public class GpuResourceAllocator {
               ", this should not occur under normal circumstances!");
     }
 
+    LOG.info("Starting recovery of GpuDevice for {}.", containerId);
     for (Serializable gpuDeviceSerializable : c.getResourceMappings()
         .getAssignedResources(GPU_URI)) {
       if (!(gpuDeviceSerializable instanceof GpuDevice)) {
@@ -150,7 +163,10 @@ public class GpuResourceAllocator {
       }
 
       usedDevices.put(gpuDevice, containerId);
+      LOG.info("ContainerId {} is assigned to GpuDevice {} on recovery.",
+          containerId, gpuDevice);
     }
+    LOG.info("Finished recovery of GpuDevice for {}.", containerId);
   }
 
   /**
@@ -265,7 +281,7 @@ public class GpuResourceAllocator {
       }
 
       return new GpuAllocation(assignedGpus,
-          Sets.difference(allowedGpuDevices, assignedGpus));
+          Sets.differenceInTreeSets(allowedGpuDevices, assignedGpus));
     }
     return new GpuAllocation(null, allowedGpuDevices);
   }

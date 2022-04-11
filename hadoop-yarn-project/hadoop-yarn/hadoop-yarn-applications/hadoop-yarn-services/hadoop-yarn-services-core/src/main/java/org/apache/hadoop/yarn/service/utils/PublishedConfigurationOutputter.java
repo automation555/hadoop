@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.yarn.service.utils;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -99,8 +99,6 @@ public abstract class PublishedConfigurationOutputter {
         return new PropertiesOutputter(owner);
       case JSON:
         return new JsonOutputter(owner);
-      case ENV:
-        return new EnvOutputter(owner);
       case TEMPLATE:
         return new TemplateOutputter(owner);
       case YAML:

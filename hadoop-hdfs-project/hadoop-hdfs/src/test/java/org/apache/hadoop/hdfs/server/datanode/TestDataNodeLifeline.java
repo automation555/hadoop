@@ -55,10 +55,7 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.HeartbeatResponse;
 import org.apache.hadoop.hdfs.server.protocol.SlowPeerReports;
 import org.apache.hadoop.hdfs.server.protocol.StorageReport;
-import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.test.GenericTestUtils;
-
-import org.apache.log4j.Level;
 
 import org.junit.After;
 import org.junit.Before;
@@ -71,8 +68,9 @@ import org.mockito.stubbing.Answer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 
 /**
  * Test suite covering lifeline protocol handling in the DataNode.
@@ -83,7 +81,7 @@ public class TestDataNodeLifeline {
       TestDataNodeLifeline.class);
 
   static {
-    GenericTestUtils.setLogLevel(DataNode.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(DataNode.LOG, Level.TRACE);
   }
 
   @Rule
@@ -170,7 +168,7 @@ public class TestDataNodeLifeline {
             anyInt(),
             anyInt(),
             anyInt(),
-            any(VolumeFailureSummary.class),
+            any(),
             anyBoolean(),
             any(SlowPeerReports.class),
             any(SlowDiskReports.class));
@@ -185,7 +183,7 @@ public class TestDataNodeLifeline {
             anyInt(),
             anyInt(),
             anyInt(),
-            any(VolumeFailureSummary.class));
+            any());
 
     // While waiting on the latch for the expected number of lifeline messages,
     // poll DataNode tracking information.  Thanks to the lifeline, we expect
@@ -212,7 +210,7 @@ public class TestDataNodeLifeline {
         anyInt(),
         anyInt(),
         anyInt(),
-        any(VolumeFailureSummary.class));
+        any());
 
     // Also verify lifeline call through metrics.  We expect at least
     // numLifelines, guaranteed by waiting on the latch.  There is a small
@@ -239,7 +237,7 @@ public class TestDataNodeLifeline {
             anyInt(),
             anyInt(),
             anyInt(),
-            any(VolumeFailureSummary.class),
+            any(),
             anyBoolean(),
             any(SlowPeerReports.class),
             any(SlowDiskReports.class));
@@ -265,7 +263,7 @@ public class TestDataNodeLifeline {
         anyInt(),
         anyInt(),
         anyInt(),
-        any(VolumeFailureSummary.class));
+        any());
 
     // Also verify no lifeline calls through metrics.
     assertEquals("Expect metrics to count no lifeline calls.", 0,

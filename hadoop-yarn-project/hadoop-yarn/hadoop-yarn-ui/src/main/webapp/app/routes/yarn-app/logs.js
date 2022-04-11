@@ -32,6 +32,14 @@ export default AbstractRoute.extend(AppAttemptMixin, {
         return [];
       }),
       app: this.fetchAppInfoFromRMorATS(app_id, this.store),
+<<<<<<< HEAD
+      jhsHealth: this.store.queryRecord('jhs-health', {}).catch(function(error) {
+        Ember.Logger.log("jhs-health querying failed");
+        Ember.Logger.log(error);
+        return null;
+      }),
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       timelineHealth: this.store.queryRecord('timeline-health', {}).catch(function() {
         return null;
       })
@@ -55,6 +63,7 @@ export default AbstractRoute.extend(AppAttemptMixin, {
     this.store.unloadAll('yarn-timeline-appattempt');
     this.store.unloadAll('yarn-container');
     this.store.unloadAll('yarn-timeline-container');
+    this.store.unloadAll('yarn-jhs-container');
     this.store.unloadAll('yarn-log');
     if (this.controller) {
       this.controller.resetAfterRefresh();

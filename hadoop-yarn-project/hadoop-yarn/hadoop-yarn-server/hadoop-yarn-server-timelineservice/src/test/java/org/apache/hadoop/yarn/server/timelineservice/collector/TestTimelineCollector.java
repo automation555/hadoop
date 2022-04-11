@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.timelineservice.collector;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineDomain;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetricOperation;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -33,19 +34,25 @@ import org.apache.hadoop.yarn.server.timelineservice.collector.TimelineCollector
 import org.apache.hadoop.yarn.server.timelineservice.storage.TimelineWriter;
 import org.junit.Test;
 
+<<<<<<< HEAD
+import org.mockito.internal.stubbing.answers.AnswersWithDelay;
+import org.mockito.internal.stubbing.answers.Returns;
+=======
 import com.google.common.collect.Sets;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -109,7 +116,7 @@ public class TestTimelineCollector {
     TimelineEntities testEntities = generateTestEntities(groups, n);
     TimelineEntity resultEntity = TimelineCollector.aggregateEntities(
         testEntities, "test_result", "TEST_AGGR", true);
-    assertEquals(resultEntity.getMetrics().size(), groups * 3);
+    assertThat(resultEntity.getMetrics()).hasSize(groups * 3);
 
     for (int i = 0; i < groups; i++) {
       Set<TimelineMetric> metrics = resultEntity.getMetrics();
@@ -130,7 +137,7 @@ public class TestTimelineCollector {
     TimelineEntities testEntities1 = generateTestEntities(1, n);
     TimelineEntity resultEntity1 = TimelineCollector.aggregateEntities(
         testEntities1, "test_result", "TEST_AGGR", false);
-    assertEquals(resultEntity1.getMetrics().size(), 3);
+    assertThat(resultEntity1.getMetrics()).hasSize(3);
 
     Set<TimelineMetric> metrics = resultEntity1.getMetrics();
     for (TimelineMetric m : metrics) {
@@ -193,6 +200,10 @@ public class TestTimelineCollector {
   public void testAsyncEntityDiscard() throws Exception {
     TimelineWriter writer = mock(TimelineWriter.class);
 
+<<<<<<< HEAD
+    when(writer.write(any(), any(), any())).thenAnswer(
+        new AnswersWithDelay(500, new Returns(new TimelineWriteResponse())));
+=======
     when(writer.write(any(), any(), any()))
         .thenAnswer(new Answer<TimelineWriteResponse>() {
           @Override
@@ -203,6 +214,7 @@ public class TestTimelineCollector {
           }
         });
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     TimelineCollector collector = new TimelineCollectorForTest(writer);
     Configuration config = new Configuration();
     config

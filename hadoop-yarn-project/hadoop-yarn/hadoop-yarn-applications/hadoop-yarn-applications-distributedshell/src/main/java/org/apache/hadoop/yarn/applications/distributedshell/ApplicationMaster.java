@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -47,7 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Strings;
+import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -57,6 +58,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -77,6 +79,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.StartContainerRequest;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -125,7 +128,7 @@ import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.log4j.LogManager;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.api.client.ClientHandlerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -223,6 +226,8 @@ public class ApplicationMaster {
   @VisibleForTesting
   UserGroupInformation appSubmitterUgi;
 
+  private Path homeDirectory;
+
   // Handle to communicate with the Node Manager
   private NMClientAsync nmClientAsync;
   // Listen to process the response from the Node Manager
@@ -231,6 +236,9 @@ public class ApplicationMaster {
   // Application Attempt Id ( combination of attemptId and fail count )
   @VisibleForTesting
   protected ApplicationAttemptId appAttemptID;
+
+  private ApplicationId appId;
+  private String appName;
 
   // TODO
   // For status update for clients - yet to be implemented
@@ -318,6 +326,8 @@ public class ApplicationMaster {
   private int containrRetryInterval = 0;
   private long containerFailuresValidityInterval = -1;
 
+  private List<String> localizableFiles = new ArrayList<>();
+
   // Timeline domain ID
   private String domainId = null;
 
@@ -381,8 +391,9 @@ public class ApplicationMaster {
    */
   public static void main(String[] args) {
     boolean result = false;
+    ApplicationMaster appMaster = null;
     try {
-      ApplicationMaster appMaster = new ApplicationMaster();
+      appMaster = new ApplicationMaster();
       LOG.info("Initializing ApplicationMaster");
       boolean doRun = appMaster.init(args);
       if (!doRun) {
@@ -394,6 +405,10 @@ public class ApplicationMaster {
       LOG.error("Error running ApplicationMaster", t);
       LogManager.shutdown();
       ExitUtil.terminate(1, t);
+    } finally {
+      if (appMaster != null) {
+        appMaster.cleanup();
+      }
     }
     if (result) {
       LOG.info("Application Master completed successfully. exiting");
@@ -449,6 +464,8 @@ public class ApplicationMaster {
    */
   public boolean init(String[] args) throws ParseException, IOException {
     Options opts = new Options();
+    opts.addOption("appname", true,
+        "Application Name. Default value - DistributedShell");
     opts.addOption("app_attempt_id", true,
         "App Attempt ID. Not to be used unless for testing purposes");
     opts.addOption("shell_env", true,
@@ -497,6 +514,8 @@ public class ApplicationMaster {
             + " application attempt fails and these containers will be "
             + "retrieved by"
             + " the new application attempt ");
+    opts.addOption("localized_files", true, "List of localized files");
+    opts.addOption("homedir", true, "Home Directory of Job Owner");
 
     opts.addOption("help", false, "Print usage");
     CommandLine cliParser = new GnuParser().parse(opts, args);
@@ -517,6 +536,8 @@ public class ApplicationMaster {
       }
     }
 
+    appName = cliParser.getOptionValue("appname", "DistributedShell");
+
     if (cliParser.hasOption("help")) {
       printUsage(opts);
       return false;
@@ -525,6 +546,11 @@ public class ApplicationMaster {
     if (cliParser.hasOption("debug")) {
       dumpOutDebugInfo();
     }
+
+    homeDirectory = cliParser.hasOption("homedir") ?
+        new Path(cliParser.getOptionValue("homedir")) :
+        new Path("/user/" + System.getenv(ApplicationConstants.
+        Environment.USER.name()));
 
     if (cliParser.hasOption("placement_spec")) {
       String placementSpec = cliParser.getOptionValue("placement_spec");
@@ -557,6 +583,7 @@ public class ApplicationMaster {
       ContainerId containerId = ContainerId.fromString(envs
           .get(Environment.CONTAINER_ID.name()));
       appAttemptID = containerId.getApplicationAttemptId();
+      appId = appAttemptID.getApplicationId();
     }
 
     if (!envs.containsKey(ApplicationConstants.APP_SUBMIT_TIME_ENV)) {
@@ -705,6 +732,16 @@ public class ApplicationMaster {
       LOG.warn("Timeline service is not enabled");
     }
 
+    if (cliParser.hasOption("localized_files")) {
+      String localizedFilesArg = cliParser.getOptionValue("localized_files");
+      if (localizedFilesArg.contains(",")) {
+        String[] files = localizedFilesArg.split(",");
+        localizableFiles = Arrays.asList(files);
+      } else {
+        localizableFiles.add(localizedFilesArg);
+      }
+    }
+
     return true;
   }
 
@@ -742,6 +779,23 @@ public class ApplicationMaster {
    */
   private void printUsage(Options opts) {
     new HelpFormatter().printHelp("ApplicationMaster", opts);
+  }
+
+  protected void cleanup() {
+    try {
+      appSubmitterUgi.doAs(new PrivilegedExceptionAction<Void>() {
+        @Override
+        public Void run() throws IOException {
+          FileSystem fs = FileSystem.get(conf);
+          Path dst = new Path(homeDirectory,
+              getRelativePath(appName, appId.toString(), ""));
+          fs.delete(dst, true);
+          return null;
+        }
+      });
+    } catch(Exception e) {
+      LOG.warn("Failed to remove application staging directory", e);
+    }
   }
 
   /**
@@ -1009,6 +1063,11 @@ public class ApplicationMaster {
     return success;
   }
 
+  public static String getRelativePath(String appName,
+      String appId, String fileDstPath) {
+    return appName + "/" + appId + "/" + fileDstPath;
+  }
+
   @VisibleForTesting
   class RMCallbackHandler extends AMRMClientAsync.AbstractCallbackHandler {
     @SuppressWarnings("unchecked")
@@ -1240,19 +1299,15 @@ public class ApplicationMaster {
 
     @Override
     public void onContainerStopped(ContainerId containerId) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Succeeded to stop Container " + containerId);
-      }
+      LOG.debug("Succeeded to stop Container {}", containerId);
       containers.remove(containerId);
     }
 
     @Override
     public void onContainerStatusReceived(ContainerId containerId,
         ContainerStatus containerStatus) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Container Status: id=" + containerId + ", status=" +
-            containerStatus);
-      }
+      LOG.debug("Container Status: id={}, status={}", containerId,
+          containerStatus);
 
       // If promote_opportunistic_after_start is set, automatically promote
       // opportunistic containers to guaranteed.
@@ -1276,9 +1331,7 @@ public class ApplicationMaster {
     @Override
     public void onContainerStarted(ContainerId containerId,
         Map<String, ByteBuffer> allServiceResponse) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Succeeded to start Container " + containerId);
-      }
+      LOG.debug("Succeeded to start Container {}", containerId);
       Container container = containers.get(containerId);
       if (container != null) {
         applicationMaster.nmClientAsync.getContainerStatusAsync(
@@ -1427,6 +1480,39 @@ public class ApplicationMaster {
         localResources.put(Shell.WINDOWS ? EXEC_BAT_SCRIPT_STRING_PATH :
             EXEC_SHELL_STRING_PATH, shellRsrc);
         shellCommand = Shell.WINDOWS ? windows_command : linux_bash_command;
+      }
+
+      // Set up localization for the container which runs the command
+      if (localizableFiles.size() > 0) {
+        FileSystem fs;
+        try {
+          fs = FileSystem.get(conf);
+        } catch (IOException e) {
+          numCompletedContainers.incrementAndGet();
+          numFailedContainers.incrementAndGet();
+          throw new UncheckedIOException("Cannot get FileSystem", e);
+        }
+
+        localizableFiles.stream().forEach(fileName -> {
+          try {
+            String relativePath =
+                getRelativePath(appName, appId.toString(), fileName);
+            Path dst =
+                new Path(homeDirectory, relativePath);
+            FileStatus fileStatus = fs.getFileStatus(dst);
+            LocalResource localRes = LocalResource.newInstance(
+                URL.fromURI(dst.toUri()),
+                LocalResourceType.FILE, LocalResourceVisibility.APPLICATION,
+                fileStatus.getLen(), fileStatus.getModificationTime());
+            LOG.info("Setting up file for localization: " + dst);
+            localResources.put(fileName, localRes);
+          } catch (IOException e) {
+            numCompletedContainers.incrementAndGet();
+            numFailedContainers.incrementAndGet();
+            throw new UncheckedIOException(
+                "Error during localization setup", e);
+          }
+        });
       }
 
       // Set the necessary command to execute on the allocated container

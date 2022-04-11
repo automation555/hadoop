@@ -29,7 +29,6 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.AMLauncherEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.amlauncher.ApplicationMasterLauncher;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
@@ -82,6 +81,35 @@ public class MockAMLauncher extends ApplicationMasterLauncher
   @Override
   @SuppressWarnings("unchecked")
   public void handle(AMLauncherEvent event) {
+<<<<<<< HEAD
+    ApplicationId appId =
+        event.getAppAttempt().getAppAttemptId().getApplicationId();
+    // find AMSimulator
+    AMSimulator ams = appIdAMSim.get(appId);
+    if (ams == null) {
+      throw new YarnRuntimeException(
+          "Didn't find any AMSimulator for applicationId=" + appId);
+    }
+    Container amContainer = event.getAppAttempt().getMasterContainer();
+    switch (event.getType()) {
+    case LAUNCH:
+      try {
+        setupAMRMToken(event.getAppAttempt());
+        // Notify RMAppAttempt to change state
+        super.context.getDispatcher().getEventHandler().handle(
+            new RMAppAttemptEvent(event.getAppAttempt().getAppAttemptId(),
+                RMAppAttemptEventType.LAUNCHED));
+
+        ams.notifyAMContainerLaunched(
+            event.getAppAttempt().getMasterContainer());
+        LOG.info("Notify AM launcher launched:" + amContainer.getId());
+
+        se.getNmMap().get(amContainer.getNodeId())
+            .addNewContainer(amContainer, -1);
+        return;
+      } catch (Exception e) {
+        throw new YarnRuntimeException(e);
+=======
     if (AMLauncherEventType.LAUNCH == event.getType()) {
       ApplicationId appId =
           event.getAppAttempt().getAppAttemptId().getApplicationId();
@@ -110,8 +138,13 @@ public class MockAMLauncher extends ApplicationMasterLauncher
         } catch (Exception e) {
           throw new YarnRuntimeException(e);
         }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
-
+    case CLEANUP:
+      se.getNmMap().get(amContainer.getNodeId())
+          .cleanupContainer(amContainer.getId());
+      break;
+    default:
       throw new YarnRuntimeException(
           "Didn't find any AMSimulator for applicationId=" + appId);
     }

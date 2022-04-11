@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.yarn.server.webapp;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import com.google.inject.Inject;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;

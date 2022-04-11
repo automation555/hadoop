@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -56,6 +57,9 @@ public final class ErasureCodingPolicyManager {
       ErasureCodingPolicyManager.class);
   private int maxCellSize =
       DFSConfigKeys.DFS_NAMENODE_EC_POLICIES_MAX_CELLSIZE_DEFAULT;
+
+  private boolean userDefinedAllowed =
+      DFSConfigKeys.DFS_NAMENODE_EC_POLICIES_USERPOLICIES_ALLOWED_KEY_DEFAULT;
 
   // Supported storage policies for striped EC files
   private static final byte[] SUITABLE_STORAGE_POLICIES_FOR_EC_STRIPED_MODE =
@@ -142,6 +146,11 @@ public final class ErasureCodingPolicyManager {
     maxCellSize = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_EC_POLICIES_MAX_CELLSIZE_KEY,
         DFSConfigKeys.DFS_NAMENODE_EC_POLICIES_MAX_CELLSIZE_DEFAULT);
+
+    userDefinedAllowed = conf.getBoolean(
+        DFSConfigKeys.DFS_NAMENODE_EC_POLICIES_USERPOLICIES_ALLOWED_KEY,
+        DFSConfigKeys.
+            DFS_NAMENODE_EC_POLICIES_USERPOLICIES_ALLOWED_KEY_DEFAULT);
   }
 
   /**
@@ -204,6 +213,17 @@ public final class ErasureCodingPolicyManager {
         .toArray(new ErasureCodingPolicyInfo[0]);
   }
 
+<<<<<<< HEAD
+  public ErasureCodingPolicy[] getCopyOfEnabledPolicies() {
+    ErasureCodingPolicy[] copy;
+    synchronized (this) {
+      copy = Arrays.copyOf(enabledPolicies, enabledPolicies.length);
+    }
+    return copy;
+  }
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Get a {@link ErasureCodingPolicy} by policy ID, including system policy
    * and user defined policy.
@@ -277,6 +297,11 @@ public final class ErasureCodingPolicyManager {
    */
   public synchronized ErasureCodingPolicy addPolicy(
       ErasureCodingPolicy policy) {
+    if (!userDefinedAllowed) {
+      throw new HadoopIllegalArgumentException(
+          "Addition of user defined erasure coding policy is disabled.");
+    }
+
     if (!CodecUtil.hasCodec(policy.getCodecName())) {
       throw new HadoopIllegalArgumentException("Codec name "
           + policy.getCodecName() + " is not supported");
@@ -321,6 +346,10 @@ public final class ErasureCodingPolicyManager {
         policiesByName.values().toArray(new ErasureCodingPolicyInfo[0]);
     allPersistedPolicies.put(policy.getId(),
         new ErasureCodingPolicyInfo(policy));
+<<<<<<< HEAD
+    LOG.info("Added erasure coding policy " + policy);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return policy;
   }
 
@@ -392,7 +421,11 @@ public final class ErasureCodingPolicyManager {
       enabledPolicies =
           enabledPoliciesByName.values().toArray(new ErasureCodingPolicy[0]);
       info.setState(ErasureCodingPolicyState.DISABLED);
+<<<<<<< HEAD
+      LOG.info("Disabled the erasure coding policy " + name);
+=======
       LOG.info("Disable the erasure coding policy " + name);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       allPersistedPolicies.put(info.getPolicy().getId(),
           createPolicyInfo(info.getPolicy(),
               ErasureCodingPolicyState.DISABLED));
@@ -426,7 +459,11 @@ public final class ErasureCodingPolicyManager {
         enabledPoliciesByName.values().toArray(new ErasureCodingPolicy[0]);
     allPersistedPolicies.put(ecPolicy.getId(),
         createPolicyInfo(info.getPolicy(), ErasureCodingPolicyState.ENABLED));
+<<<<<<< HEAD
+    LOG.info("Enabled the erasure coding policy " + name);
+=======
     LOG.info("Enable the erasure coding policy " + name);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return true;
   }
 

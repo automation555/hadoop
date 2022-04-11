@@ -31,7 +31,11 @@ import java.util.Set;
 import java.util.TimerTask;
 import java.util.concurrent.TimeoutException;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+=======
 import com.google.common.collect.ImmutableSet;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.ServerSocketUtil;
 import org.apache.hadoop.service.ServiceOperations;
@@ -56,6 +60,10 @@ import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
+<<<<<<< HEAD
+import org.apache.hadoop.yarn.server.nodemanager.health.NodeHealthCheckerService;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeAttributesProvider;
 import org.apache.hadoop.yarn.server.utils.YarnServerBuilderUtils;
 import org.junit.After;

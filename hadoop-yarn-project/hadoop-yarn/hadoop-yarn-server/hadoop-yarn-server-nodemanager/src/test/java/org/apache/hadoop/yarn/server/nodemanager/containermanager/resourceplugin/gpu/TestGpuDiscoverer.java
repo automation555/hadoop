@@ -79,12 +79,32 @@ public class TestGpuDiscoverer {
   }
 
   private File setupFakeBinary(Configuration conf) {
+<<<<<<< HEAD
+    return setupFakeBinary(conf,
+        GpuDiscoverer.DEFAULT_BINARY_NAME, false);
+  }
+
+  private File setupFakeBinary(Configuration conf, String filename,
+      boolean useFullPath) {
+    File fakeBinary;
+    try {
+      fakeBinary = new File(getTestParentFolder(),
+          filename);
+      touchFile(fakeBinary);
+      if (useFullPath) {
+        conf.set(YarnConfiguration.NM_GPU_PATH_TO_EXEC,
+            fakeBinary.getAbsolutePath());
+      } else {
+        conf.set(YarnConfiguration.NM_GPU_PATH_TO_EXEC, getTestParentFolder());
+      }
+=======
     File fakeBinary;
     try {
       fakeBinary = new File(getTestParentFolder(),
           GpuDiscoverer.DEFAULT_BINARY_NAME);
       touchFile(fakeBinary);
       conf.set(YarnConfiguration.NM_GPU_PATH_TO_EXEC, getTestParentFolder());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } catch (Exception e) {
       throw new RuntimeException("Failed to init fake binary", e);
     }
@@ -289,6 +309,28 @@ public class TestGpuDiscoverer {
     LOG.debug("Verifying if GPUs are still hold the value of " +
         "first successful query");
     assertNotNull(discoverer.getGpusUsableByYarn());
+<<<<<<< HEAD
+  }
+
+  @Test
+  public void testGetGpuDeviceInformationNvidiaSmiScriptWithInvalidXml()
+      throws YarnException, IOException {
+    Configuration conf = new Configuration(false);
+
+    File fakeBinary = createFakeNvidiaSmiScriptAsRunnableFile(
+        this::createNvidiaSmiScriptWithInvalidXml);
+
+    GpuDiscoverer discoverer = creatediscovererWithGpuPathDefined(conf);
+    assertEquals(fakeBinary.getAbsolutePath(),
+        discoverer.getPathOfGpuBinary());
+    assertNull(discoverer.getEnvironmentToRunCommand().get(PATH));
+
+    exception.expect(YarnException.class);
+    exception.expectMessage("Failed to parse XML output of " +
+        "GPU device detection script");
+    discoverer.getGpuDeviceInformation();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Test
@@ -365,6 +407,7 @@ public class TestGpuDiscoverer {
 
     assertEquals(1, usableGpuDevices.get(1).getIndex());
     assertEquals(1, usableGpuDevices.get(1).getMinorNumber());
+<<<<<<< HEAD
 
     assertEquals(2, usableGpuDevices.get(2).getIndex());
     assertEquals(2, usableGpuDevices.get(2).getMinorNumber());
@@ -400,6 +443,43 @@ public class TestGpuDiscoverer {
       throws YarnException {
     Configuration conf = createConfigWithAllowedDevices("0 : 0,1 : 1");
 
+=======
+
+    assertEquals(2, usableGpuDevices.get(2).getIndex());
+    assertEquals(2, usableGpuDevices.get(2).getMinorNumber());
+
+    assertEquals(3, usableGpuDevices.get(3).getIndex());
+    assertEquals(4, usableGpuDevices.get(3).getMinorNumber());
+  }
+
+  @Test
+  public void testGetNumberOfUsableGpusFromConfigDuplicateValues()
+      throws YarnException {
+    Configuration conf = createConfigWithAllowedDevices("0:0,1:1,2:2,1:1");
+
+    exception.expect(GpuDeviceSpecificationException.class);
+    GpuDiscoverer discoverer = new GpuDiscoverer();
+    discoverer.initialize(conf, binaryHelper);
+    discoverer.getGpusUsableByYarn();
+  }
+
+  @Test
+  public void testGetNumberOfUsableGpusFromConfigDuplicateValues2()
+      throws YarnException {
+    Configuration conf = createConfigWithAllowedDevices("0:0,1:1,2:2,1:1,2:2");
+
+    exception.expect(GpuDeviceSpecificationException.class);
+    GpuDiscoverer discoverer = new GpuDiscoverer();
+    discoverer.initialize(conf, binaryHelper);
+    discoverer.getGpusUsableByYarn();
+  }
+
+  @Test
+  public void testGetNumberOfUsableGpusFromConfigIncludingSpaces()
+      throws YarnException {
+    Configuration conf = createConfigWithAllowedDevices("0 : 0,1 : 1");
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     exception.expect(GpuDeviceSpecificationException.class);
     GpuDiscoverer discoverer = new GpuDiscoverer();
     discoverer.initialize(conf, binaryHelper);
@@ -506,11 +586,32 @@ public class TestGpuDiscoverer {
     Configuration conf = new Configuration();
     conf.set(YarnConfiguration.NM_GPU_ALLOWED_DEVICES, "0:1,2:3");
 
+<<<<<<< HEAD
+    GpuDiscoverer gpuSpy = spy(GpuDiscoverer.class);
+=======
     GpuDiscoverer gpuSpy = spy(new GpuDiscoverer());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     gpuSpy.initialize(conf, binaryHelper);
     gpuSpy.getGpusUsableByYarn();
 
     verify(gpuSpy, never()).getGpuDeviceInformation();
+<<<<<<< HEAD
+  }
+
+  @Test
+  public void testBinaryIsNotNvidiaSmi() throws YarnException {
+    exception.expect(YarnException.class);
+    exception.expectMessage(String.format(
+        "It should point to an %s binary, which is now %s",
+        "nvidia-smi", "badfile"));
+
+    Configuration conf = new Configuration(false);
+    setupFakeBinary(conf, "badfile", true);
+
+    GpuDiscoverer plugin = new GpuDiscoverer();
+    plugin.initialize(conf, binaryHelper);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

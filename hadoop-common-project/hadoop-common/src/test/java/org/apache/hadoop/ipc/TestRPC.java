@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.ipc;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
+=======
 import com.google.protobuf.ServiceException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -29,6 +33,7 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.Client.ConnectionId;
 import org.apache.hadoop.ipc.Server.Call;
 import org.apache.hadoop.ipc.Server.Connection;
+import org.apache.hadoop.ipc.metrics.RpcMetrics;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto;
 import org.apache.hadoop.ipc.protobuf.TestProtos;
@@ -81,9 +86,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounterGt;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
@@ -95,8 +102,13 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+<<<<<<< HEAD
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+=======
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -486,14 +498,14 @@ public class TestRPC extends TestRpcBase {
               .setParam2(2).build();
       TestProtos.AddResponseProto addResponse =
           proxy.add(null, addRequest);
-      assertEquals(addResponse.getResult(), 3);
+      assertThat(addResponse.getResult()).isEqualTo(3);
 
       Integer[] integers = new Integer[] {1, 2};
       TestProtos.AddRequestProto2 addRequest2 =
           TestProtos.AddRequestProto2.newBuilder().addAllParams(
               Arrays.asList(integers)).build();
       addResponse = proxy.add2(null, addRequest2);
-      assertEquals(addResponse.getResult(), 3);
+      assertThat(addResponse.getResult()).isEqualTo(3);
 
       boolean caught = false;
       try {
@@ -1094,7 +1106,13 @@ public class TestRPC extends TestRpcBase {
 
       proxy.lockAndSleep(null, newSleepRequest(5));
       rpcMetrics = getMetrics(server.getRpcMetrics().name());
+<<<<<<< HEAD
+      assertGauge("RpcLockWaitTimeAvgTime",
+          (double)(RpcMetrics.TIMEUNIT.convert(10L, TimeUnit.SECONDS)),
+          rpcMetrics);
+=======
       assertGauge("RpcLockWaitTimeAvgTime", 10000.0, rpcMetrics);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } finally {
       if (proxy2 != null) {
         RPC.stopProxy(proxy2);
@@ -1289,6 +1307,46 @@ public class TestRPC extends TestRpcBase {
     }
   }
 
+<<<<<<< HEAD
+  @Test (timeout=30000)
+  public void testProtocolUserPriority() throws Exception {
+    final String ns = CommonConfigurationKeys.IPC_NAMESPACE + ".0";
+    conf.set(CLIENT_PRINCIPAL_KEY, "clientForProtocol");
+    Server server = null;
+    try {
+      server = setupDecayRpcSchedulerandTestServer(ns + ".");
+
+      UserGroupInformation ugi = UserGroupInformation.createRemoteUser("user");
+      // normal users start with priority 0.
+      Assert.assertEquals(0, server.getPriorityLevel(ugi));
+      // calls for a protocol defined client will have priority of 0.
+      Assert.assertEquals(0, server.getPriorityLevel(newSchedulable(ugi)));
+
+      // protocol defined client will have top priority of -1.
+      ugi = UserGroupInformation.createRemoteUser("clientForProtocol");
+      Assert.assertEquals(-1, server.getPriorityLevel(ugi));
+      // calls for a protocol defined client will have priority of 0.
+      Assert.assertEquals(0, server.getPriorityLevel(newSchedulable(ugi)));
+    } finally {
+      stop(server, null);
+    }
+  }
+
+  private static Schedulable newSchedulable(UserGroupInformation ugi) {
+    return new Schedulable(){
+      @Override
+      public UserGroupInformation getUserGroupInformation() {
+        return ugi;
+      }
+      @Override
+      public int getPriorityLevel() {
+        return 0; // doesn't matter.
+      }
+    };
+  }
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private Server setupDecayRpcSchedulerandTestServer(String ns)
       throws Exception {
     final int queueSizePerHandler = 3;
@@ -1547,6 +1605,18 @@ public class TestRPC extends TestRpcBase {
     } finally {
       stop(server, proxy);
     }
+  }
+
+  @Test
+  public void testSetProtocolEngine() {
+    Configuration conf = new Configuration();
+    RPC.setProtocolEngine(conf, StoppedProtocol.class, StoppedRpcEngine.class);
+    RpcEngine rpcEngine = RPC.getProtocolEngine(StoppedProtocol.class, conf);
+    assertTrue(rpcEngine instanceof StoppedRpcEngine);
+
+    RPC.setProtocolEngine(conf, StoppedProtocol.class, ProtobufRpcEngine.class);
+    rpcEngine = RPC.getProtocolEngine(StoppedProtocol.class, conf);
+    assertTrue(rpcEngine instanceof StoppedRpcEngine);
   }
 
   public static void main(String[] args) throws Exception {

@@ -22,6 +22,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -31,7 +33,10 @@ import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.slf4j.event.Level;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_KERBEROS_KEYTAB_LOGIN_AUTORENEWAL_ENABLED;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -98,11 +103,34 @@ public class TestUGILoginFromKeytab {
   }
 
   /**
+   * Login from keytab using the MiniKDC.
+   */
+  @Test
+  public void testUGILoginFromKeytab() throws Exception {
+    long beforeLogin = Time.now();
+    String principal = "foo";
+    File keytab = new File(workDir, "foo.keytab");
+    kdc.createPrincipal(keytab, principal);
+
+    UserGroupInformation.loginUserFromKeytab(principal, keytab.getPath());
+    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+    Assert.assertTrue("UGI should be configured to login from keytab",
+        ugi.isFromKeytab());
+
+    User user = getUser(ugi.getSubject());
+    Assert.assertNotNull(user.getLogin());
+ 
+    Assert.assertTrue("User login time is less than before login time, "
+        + "beforeLoginTime:" + beforeLogin + " userLoginTime:" + user.getLastLogin(),
+            user.getLastLogin() > beforeLogin);
+  }
+
+  /**
    * Login from keytab using the MiniKDC and verify the UGI can successfully
    * relogin from keytab as well. This will catch regressions like HADOOP-10786.
    */
   @Test
-  public void testUGILoginFromKeytab() throws Exception {
+  public void testUGIReLoginFromKeytab() throws Exception {
     String principal = "foo";
     File keytab = new File(workDir, "foo.keytab");
     kdc.createPrincipal(keytab, principal);
@@ -118,7 +146,46 @@ public class TestUGILoginFromKeytab {
     final LoginContext login1 = user.getLogin();
     Assert.assertNotNull(login1);
 
+    // Sleep for 2 secs to have a difference between first and second login
+    Thread.sleep(2000);
+
     ugi.reloginFromKeytab();
+    final long secondLogin = user.getLastLogin();
+    final LoginContext login2 = user.getLogin();
+    Assert.assertTrue("User should have been able to relogin from keytab",
+        secondLogin > firstLogin);
+    Assert.assertNotNull(login2);
+    Assert.assertNotSame(login1, login2);
+  }
+
+  /**
+   * Force re-login from keytab using the MiniKDC and verify the UGI can
+   * successfully relogin from keytab as well.
+   */
+  @Test
+  public void testUGIForceReLoginFromKeytab() throws Exception {
+    // Set this to false as we are testing force re-login anyways
+    UserGroupInformation.setShouldRenewImmediatelyForTests(false);
+    String principal = "foo";
+    File keytab = new File(workDir, "foo.keytab");
+    kdc.createPrincipal(keytab, principal);
+
+    UserGroupInformation.loginUserFromKeytab(principal, keytab.getPath());
+    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+    Assert.assertTrue("UGI should be configured to login from keytab",
+        ugi.isFromKeytab());
+
+    // Verify relogin from keytab.
+    User user = getUser(ugi.getSubject());
+    final long firstLogin = user.getLastLogin();
+    final LoginContext login1 = user.getLogin();
+    Assert.assertNotNull(login1);
+
+    // Sleep for 2 secs to have a difference between first and second login
+    Thread.sleep(2000);
+
+    // Force relogin from keytab
+    ugi.forceReloginFromKeytab();
     final long secondLogin = user.getLastLogin();
     final LoginContext login2 = user.getLogin();
     Assert.assertTrue("User should have been able to relogin from keytab",
@@ -199,6 +266,58 @@ public class TestUGILoginFromKeytab {
     Assert.assertSame(dummyLogin, user.getLogin());
   }
 
+  @Test
+  public void testUGIRefreshFromKeytab() throws Exception {
+    final Configuration conf = new Configuration();
+    conf.setBoolean(HADOOP_KERBEROS_KEYTAB_LOGIN_AUTORENEWAL_ENABLED, true);
+    SecurityUtil.setAuthenticationMethod(
+            UserGroupInformation.AuthenticationMethod.KERBEROS, conf);
+    UserGroupInformation.setConfiguration(conf);
+
+    String principal = "bar";
+    File keytab = new File(workDir, "bar.keytab");
+    kdc.createPrincipal(keytab, principal);
+
+    UserGroupInformation.loginUserFromKeytab(principal, keytab.getPath());
+
+    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+
+    Assert.assertEquals(UserGroupInformation.AuthenticationMethod.KERBEROS,
+        ugi.getAuthenticationMethod());
+    Assert.assertTrue(ugi.isFromKeytab());
+    Assert.assertTrue(
+            UserGroupInformation.isKerberosKeyTabLoginRenewalEnabled());
+    Assert.assertTrue(
+            UserGroupInformation.getKerberosLoginRenewalExecutor()
+                    .isPresent());
+  }
+
+  @Test
+  public void testUGIRefreshFromKeytabDisabled() throws Exception {
+    GenericTestUtils.setLogLevel(UserGroupInformation.LOG, Level.DEBUG);
+    final Configuration conf = new Configuration();
+    conf.setLong(HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN, 1);
+    conf.setBoolean(HADOOP_KERBEROS_KEYTAB_LOGIN_AUTORENEWAL_ENABLED, false);
+    SecurityUtil.setAuthenticationMethod(
+            UserGroupInformation.AuthenticationMethod.KERBEROS, conf);
+    UserGroupInformation.setConfiguration(conf);
+
+    String principal = "bar";
+    File keytab = new File(workDir, "bar.keytab");
+    kdc.createPrincipal(keytab, principal);
+
+    UserGroupInformation.loginUserFromKeytab(principal, keytab.getPath());
+
+    UserGroupInformation ugi = UserGroupInformation.getLoginUser();
+    Assert.assertEquals(UserGroupInformation.AuthenticationMethod.KERBEROS,
+            ugi.getAuthenticationMethod());
+    Assert.assertTrue(ugi.isFromKeytab());
+    Assert.assertFalse(
+            UserGroupInformation.isKerberosKeyTabLoginRenewalEnabled());
+    Assert.assertFalse(
+            UserGroupInformation.getKerberosLoginRenewalExecutor()
+                    .isPresent());
+  }
 
   private static KerberosTicket getTicket(UserGroupInformation ugi) {
     Set<KerberosTicket> tickets =

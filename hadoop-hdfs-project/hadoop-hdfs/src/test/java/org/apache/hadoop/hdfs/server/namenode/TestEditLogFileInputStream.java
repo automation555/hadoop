@@ -20,7 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -33,7 +33,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.EnumMap;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+=======
 import com.google.protobuf.ByteString;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;

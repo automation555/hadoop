@@ -21,7 +21,9 @@ package org.apache.hadoop.fs;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.JceAesCtrCryptoCodec;
+import org.apache.hadoop.crypto.JceSm4CtrCryptoCodec;
 import org.apache.hadoop.crypto.OpensslAesCtrCryptoCodec;
+import org.apache.hadoop.crypto.OpensslSm4CtrCryptoCodec;
 
 /** 
  * This class contains constants for configuration keys used
@@ -72,6 +74,25 @@ public class CommonConfigurationKeysPublic {
   public static final String  FS_DU_INTERVAL_KEY = "fs.du.interval";
   /** Default value for FS_DU_INTERVAL_KEY */
   public static final long    FS_DU_INTERVAL_DEFAULT = 600000;
+
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String FS_GETSPACEUSED_CLASSNAME =
+      "fs.getspaceused.classname";
+
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String FS_GETSPACEUSED_JITTER_KEY =
+      "fs.getspaceused.jitterMillis";
+  /** Default value for FS_GETSPACEUSED_JITTER_KEY */
+  public static final long FS_GETSPACEUSED_JITTER_DEFAULT = 60000;
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
@@ -145,6 +166,27 @@ public class CommonConfigurationKeysPublic {
   public static final String  FS_AUTOMATIC_CLOSE_KEY = "fs.automatic.close";
   /** Default value for FS_AUTOMATIC_CLOSE_KEY */
   public static final boolean FS_AUTOMATIC_CLOSE_DEFAULT = true;
+
+  /**
+   * Number of filesystems instances can be created in parallel.
+   * <p></p>
+   * A higher number here does not necessarily improve performance, especially
+   * for object stores, where multiple threads may be attempting to create an FS
+   * instance for the same URI.
+   * <p></p>
+   * Default value: {@value}.
+   */
+  public static final String FS_CREATION_PARALLEL_COUNT =
+      "fs.creation.parallel.count";
+
+  /**
+   * Default value for {@link #FS_CREATION_PARALLEL_COUNT}.
+   * <p></p>
+   * Default value: {@value}.
+   */
+  public static final int FS_CREATION_PARALLEL_COUNT_DEFAULT =
+      64;
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
@@ -331,6 +373,9 @@ public class CommonConfigurationKeysPublic {
       "hadoop.caller.context.signature.max.size";
   public static final int     HADOOP_CALLER_CONTEXT_SIGNATURE_MAX_SIZE_DEFAULT =
       40;
+  public static final String HADOOP_CALLER_CONTEXT_SEPARATOR_KEY =
+      "hadoop.caller.context.separator";
+  public static final String HADOOP_CALLER_CONTEXT_SEPARATOR_DEFAULT = ",";
 
   /**
    * @see
@@ -398,7 +443,7 @@ public class CommonConfigurationKeysPublic {
   public static final String  IPC_SERVER_LISTEN_QUEUE_SIZE_KEY =
     "ipc.server.listen.queue.size";
   /** Default value for IPC_SERVER_LISTEN_QUEUE_SIZE_KEY */
-  public static final int     IPC_SERVER_LISTEN_QUEUE_SIZE_DEFAULT = 128;
+  public static final int     IPC_SERVER_LISTEN_QUEUE_SIZE_DEFAULT = 256;
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
@@ -425,6 +470,15 @@ public class CommonConfigurationKeysPublic {
     "ipc.server.tcpnodelay";
   /** Default value for IPC_SERVER_TCPNODELAY_KEY */
   public static final boolean IPC_SERVER_TCPNODELAY_DEFAULT = true;
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String  IPC_SERVER_REUSEADDR_KEY =
+      "ipc.server.reuseaddr";
+  /** Default value for IPC_SERVER_REUSEADDR_KEY. */
+  public static final boolean IPC_SERVER_REUSEADDR_DEFAULT = true;
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
@@ -630,6 +684,8 @@ public class CommonConfigurationKeysPublic {
    */
   public static final String HADOOP_TOKEN_FILES =
       "hadoop.token.files";
+  public static final String HADOOP_TOKENS =
+      "hadoop.tokens";
   public static final String HADOOP_HTTP_AUTHENTICATION_TYPE =
     "hadoop.http.authentication.type";
 
@@ -643,6 +699,18 @@ public class CommonConfigurationKeysPublic {
   /** Default value for HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN */
   public static final int HADOOP_KERBEROS_MIN_SECONDS_BEFORE_RELOGIN_DEFAULT =
           60;
+
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String HADOOP_KERBEROS_KEYTAB_LOGIN_AUTORENEWAL_ENABLED =
+          "hadoop.kerberos.keytab.login.autorenewal.enabled";
+  /** Default value for HADOOP_KERBEROS_KEYTAB_LOGIN_AUTORENEWAL_ENABLED. */
+  public static final boolean
+          HADOOP_KERBEROS_KEYTAB_LOGIN_AUTORENEWAL_ENABLED_DEFAULT = false;
+
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
@@ -660,9 +728,17 @@ public class CommonConfigurationKeysPublic {
       HADOOP_SECURITY_CRYPTO_CODEC_CLASSES_KEY_PREFIX
           + CipherSuite.AES_CTR_NOPADDING.getConfigSuffix();
   public static final String
+      HADOOP_SECURITY_CRYPTO_CODEC_CLASSES_SM4_CTR_NOPADDING_KEY =
+      HADOOP_SECURITY_CRYPTO_CODEC_CLASSES_KEY_PREFIX
+          + CipherSuite.SM4_CTR_NOPADDING.getConfigSuffix();
+  public static final String
       HADOOP_SECURITY_CRYPTO_CODEC_CLASSES_AES_CTR_NOPADDING_DEFAULT =
       OpensslAesCtrCryptoCodec.class.getName() + "," +
           JceAesCtrCryptoCodec.class.getName();
+  public static final String
+      HADOOP_SECURITY_CRYPTO_CODEC_CLASSES_SM4_CTR_NOPADDING_DEFAULT =
+      OpensslSm4CtrCryptoCodec.class.getName() + "," +
+          JceSm4CtrCryptoCodec.class.getName();
   /**
    * @see
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
@@ -831,6 +907,13 @@ public class CommonConfigurationKeysPublic {
    * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
    * core-default.xml</a>
    */
+  public static final String HADOOP_SECURITY_OPENSSL_ENGINE_ID_KEY =
+          "hadoop.security.openssl.engine.id";
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
   public static final String HADOOP_SECURITY_SECURE_RANDOM_DEVICE_FILE_PATH_KEY = 
     "hadoop.security.random.device.file.path";
   public static final String HADOOP_SECURITY_SECURE_RANDOM_DEVICE_FILE_PATH_DEFAULT = 
@@ -865,6 +948,15 @@ public class CommonConfigurationKeysPublic {
       "hadoop.http.logs.enabled";
   /** Defalt value for HADOOP_HTTP_LOGS_ENABLED */
   public static final boolean HADOOP_HTTP_LOGS_ENABLED_DEFAULT = true;
+
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String HADOOP_HTTP_METRICS_ENABLED =
+      "hadoop.http.metrics.enabled";
+  public static final boolean HADOOP_HTTP_METRICS_ENABLED_DEFAULT = true;
 
   /**
    * @see
@@ -938,5 +1030,22 @@ public class CommonConfigurationKeysPublic {
   /** Default shutdown hook timeout: {@value} seconds. */
   public static final long SERVICE_SHUTDOWN_TIMEOUT_DEFAULT = 30;
 
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String HADOOP_PROMETHEUS_ENABLED =
+      "hadoop.prometheus.endpoint.enabled";
+  public static final boolean HADOOP_PROMETHEUS_ENABLED_DEFAULT = false;
+
+  /**
+   * @see
+   * <a href="{@docRoot}/../hadoop-project-dist/hadoop-common/core-default.xml">
+   * core-default.xml</a>
+   */
+  public static final String HADOOP_HTTP_IDLE_TIMEOUT_MS_KEY =
+      "hadoop.http.idle_timeout.ms";
+  public static final int HADOOP_HTTP_IDLE_TIMEOUT_MS_DEFAULT = 60000;
 }
 

@@ -17,10 +17,17 @@
  */
 package org.apache.hadoop.yarn.client.api.impl;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import com.sun.jersey.core.util.MultivaluedMapImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+=======
 import com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -53,8 +60,13 @@ import static org.apache.hadoop.yarn.util.StringHelper.PATH_JOINER;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class TimelineReaderClientImpl extends TimelineReaderClient {
+<<<<<<< HEAD
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TimelineReaderClientImpl.class);
+=======
   private static final Log LOG =
       LogFactory.getLog(TimelineReaderClientImpl.class);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   private static final String RESOURCE_URI_STR_V2 = "/ws/v2/timeline/";
 

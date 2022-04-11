@@ -45,12 +45,11 @@ import org.apache.hadoop.hdfs.protocol.OpenFileEntry;
 import org.apache.hadoop.hdfs.protocol.OpenFilesIterator;
 import org.apache.hadoop.hdfs.protocol.OpenFilesIterator.OpenFilesType;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockStoragePolicySuite;
+import org.apache.hadoop.util.Sets;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.google.common.collect.Sets;
 
 public class TestHdfsAdmin {
   
@@ -262,7 +261,11 @@ public class TestHdfsAdmin {
     while (openFilesRemoteItr.hasNext()) {
       String filePath = openFilesRemoteItr.next().getFilePath();
       assertFalse(filePath + " should not be listed under open files!",
+<<<<<<< HEAD
+          closedFiles.contains(new Path(filePath)));
+=======
           closedFiles.contains(filePath));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       assertTrue(filePath + " is not listed under open files!",
           openFiles.remove(new Path(filePath)));
     }

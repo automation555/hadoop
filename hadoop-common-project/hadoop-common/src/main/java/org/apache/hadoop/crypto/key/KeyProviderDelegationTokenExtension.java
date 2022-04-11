@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.crypto.key;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.Credentials;
@@ -124,7 +128,7 @@ public class KeyProviderDelegationTokenExtension extends
   /**
    * Creates a <code>KeyProviderDelegationTokenExtension</code> using a given 
    * {@link KeyProvider}.
-   * <p/>
+   * <p>
    * If the given <code>KeyProvider</code> implements the 
    * {@link DelegationTokenExtension} interface the <code>KeyProvider</code> 
    * itself will provide the extension functionality, otherwise a default 

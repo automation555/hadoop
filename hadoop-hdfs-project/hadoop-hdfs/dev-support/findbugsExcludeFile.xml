@@ -181,10 +181,27 @@
      <!-- More complex cleanup logic confuses findbugs -->
      <Match>
        <Class name="org.apache.hadoop.hdfs.qjournal.server.Journal" />
-       <Method name="persistPaxosData" />
-       <Bug pattern="OS_OPEN_STREAM" />
+       <Method name="getPersistedPaxosData" />
+       <Bug pattern="NP_NULL_PARAM_DEREF" />
      </Match>
 
+     <!-- guava 27.0 update: @Nullable is not detected, however it's there -->
+     <Match>
+       <Class name="org.apache.hadoop.hdfs.qjournal.server.Journal" />
+       <Method name="persistPaxosData" />
+       <Bug pattern="NP_NULL_PARAM_DEREF" />
+     </Match>
+
+
+     <!-- guava 27.0 update: @Nullable is not detected, however it's there -->
+     <Match>
+       <Class name="org.apache.hadoop.hdfs.qjournal.server.JournalNode" />
+       <Method name="getLogDir" />
+       <Bug pattern="NP_NULL_PARAM_DEREF" />
+     </Match>
+
+<<<<<<< HEAD
+=======
      <!-- guava 27.0 update: @Nullable is not detected, however it's there -->
      <Match>
        <Class name="org.apache.hadoop.hdfs.qjournal.server.Journal" />
@@ -206,6 +223,7 @@
        <Bug pattern="NP_NULL_PARAM_DEREF" />
      </Match>
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       <!-- guava 27.0 update: redundant nullcheck (assert for not null) -->
       <Match>
         <Class name="org.apache.hadoop.hdfs.qjournal.server.JournalNode" />
@@ -311,4 +329,9 @@
       <Method name="setInteractiveFormat" />
       <Bug pattern="ME_ENUM_FIELD_SETTER" />
     </Match>
- </FindBugsFilter>
+    <Match>
+      <Class name="org.apache.hadoop.hdfs.server.datanode.DirectoryScanner" />
+      <Method name="reconcile" />
+      <Bug pattern="SWL_SLEEP_WITH_LOCK_HELD" />
+    </Match>
+</FindBugsFilter>

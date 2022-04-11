@@ -64,10 +64,10 @@ import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.timeline.NameValuePair;
 import org.apache.hadoop.yarn.server.timeline.TimelineDataManager;
 import org.apache.hadoop.yarn.server.timeline.TimelineReader.Field;
-import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.apache.hadoop.yarn.util.Apps;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -250,6 +250,10 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     String type = null;
     boolean unmanagedApplication = false;
     long createdTime = 0;
+<<<<<<< HEAD
+    long launchTime = 0;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     long submittedTime = 0;
     long finishedTime = 0;
     float progress = 0.0f;
@@ -379,6 +383,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
             ApplicationMetricsConstants.CREATED_EVENT_TYPE)) {
           createdTime = event.getTimestamp();
         } else if (event.getEventType().equals(
+            ApplicationMetricsConstants.LAUNCHED_EVENT_TYPE)) {
+          launchTime = event.getTimestamp();
+        } else if (event.getEventType().equals(
             ApplicationMetricsConstants.UPDATED_EVENT_TYPE)) {
           // This type of events are parsed in time-stamp descending order
           // which means the previous event could override the information
@@ -408,7 +415,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
           }
           if (eventInfo.containsKey(
               ApplicationMetricsConstants.STATE_EVENT_INFO)) {
-            if (!isFinalState(state)) {
+            if (!Apps.isApplicationFinalState(state)) {
               state = YarnApplicationState.valueOf(eventInfo.get(
                   ApplicationMetricsConstants.STATE_EVENT_INFO).toString());
             }
@@ -454,7 +461,12 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return new ApplicationReportExt(ApplicationReport.newInstance(
         ApplicationId.fromString(entity.getEntityId()),
         latestApplicationAttemptId, user, queue, name, null, -1, null, state,
+<<<<<<< HEAD
+        diagnosticsInfo, null, createdTime,
+        submittedTime, launchTime, finishedTime,
+=======
         diagnosticsInfo, null, createdTime, submittedTime, 0, finishedTime,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         finalStatus, appResources, null, progress, type, null, appTags,
         unmanagedApplication, Priority.newInstance(applicationPriority),
         appNodeLabelExpression, amNodeLabelExpression), appViewACLs);
@@ -468,12 +480,6 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
       result = Long.parseLong(infoValue.toString());
     }
     return result;
-  }
-
-  private static boolean isFinalState(YarnApplicationState state) {
-    return state == YarnApplicationState.FINISHED
-        || state == YarnApplicationState.FAILED
-        || state == YarnApplicationState.KILLED;
   }
 
   private static ApplicationAttemptReport convertToApplicationAttemptReport(
@@ -576,6 +582,8 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     int exitStatus = ContainerExitStatus.INVALID;
     ContainerState state = null;
     String nodeHttpAddress = null;
+    Map<String, List<Map<String, String>>> exposedPorts = null;
+
     Map<String, Object> entityInfo = entity.getOtherInfo();
     if (entityInfo != null) {
       if (entityInfo
@@ -610,6 +618,12 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         nodeHttpAddress =
             (String) entityInfo
               .get(ContainerMetricsConstants.ALLOCATED_HOST_HTTP_ADDRESS_INFO);
+      }
+      if (entityInfo.containsKey(
+          ContainerMetricsConstants.ALLOCATED_EXPOSED_PORTS)) {
+        exposedPorts =
+            (Map<String, List<Map<String, String>>>) entityInfo
+                .get(ContainerMetricsConstants.ALLOCATED_EXPOSED_PORTS);
       }
     }
     List<TimelineEvent> events = entity.getEvents();
@@ -659,12 +673,15 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
           containerId.toString(),
           user);
     }
-    return ContainerReport.newInstance(
+    ContainerReport container = ContainerReport.newInstance(
         ContainerId.fromString(entity.getEntityId()),
         Resource.newInstance(allocatedMem, allocatedVcore), allocatedNode,
         Priority.newInstance(allocatedPriority),
         createdTime, finishedTime, diagnosticsInfo, logUrl, exitStatus, state,
         nodeHttpAddress);
+    container.setExposedPorts(exposedPorts);
+
+    return container;
   }
 
   private ApplicationReportExt generateApplicationReport(TimelineEntity entity,

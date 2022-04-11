@@ -30,9 +30,11 @@ import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
+import org.apache.hadoop.fs.FsTracer;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -49,13 +51,13 @@ import org.apache.hadoop.io.ReadaheadPool.ReadaheadRequest;
 import org.apache.hadoop.net.SocketOutputStream;
 import org.apache.hadoop.util.AutoCloseableLock;
 import org.apache.hadoop.util.DataChecksum;
-import org.apache.htrace.core.TraceScope;
+import org.apache.hadoop.tracing.TraceScope;
 
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_DONTNEED;
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_SEQUENTIAL;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 
 /**
@@ -254,13 +256,13 @@ class BlockSender implements java.io.Closeable {
       // the append write.
       ChunkChecksum chunkChecksum = null;
       final long replicaVisibleLength;
-      try(AutoCloseableLock lock = datanode.data.acquireDatasetLock()) {
+      try(AutoCloseableLock lock = datanode.data.acquireDatasetReadLock()) {
         replica = getReplica(block, datanode);
         replicaVisibleLength = replica.getVisibleLength();
       }
       if (replica.getState() == ReplicaState.RBW) {
         final ReplicaInPipeline rbw = (ReplicaInPipeline) replica;
-        waitForMinLength(rbw, startOffset + length);
+        rbw.waitForMinLength(startOffset + length, 3, TimeUnit.SECONDS);
         chunkChecksum = rbw.getLastChecksumAndDataLen();
       }
       if (replica instanceof FinalizedReplica) {
@@ -430,6 +432,7 @@ class BlockSender implements java.io.Closeable {
       ris = new ReplicaInputStreams(
           blockIn, checksumIn, volumeRef, fileIoProvider);
     } catch (IOException ioe) {
+      IOUtils.cleanupWithLogger(null, volumeRef);
       IOUtils.closeStream(this);
       org.apache.commons.io.IOUtils.closeQuietly(blockIn);
       org.apache.commons.io.IOUtils.closeQuietly(checksumIn);
@@ -503,30 +506,6 @@ class BlockSender implements java.io.Closeable {
       throw new ReplicaNotFoundException(block);
     }
     return replica;
-  }
-  
-  /**
-   * Wait for rbw replica to reach the length
-   * @param rbw replica that is being written to
-   * @param len minimum length to reach
-   * @throws IOException on failing to reach the len in given wait time
-   */
-  private static void waitForMinLength(ReplicaInPipeline rbw, long len)
-      throws IOException {
-    // Wait for 3 seconds for rbw replica to reach the minimum length
-    for (int i = 0; i < 30 && rbw.getBytesOnDisk() < len; i++) {
-      try {
-        Thread.sleep(100);
-      } catch (InterruptedException ie) {
-        throw new IOException(ie);
-      }
-    }
-    long bytesOnDisk = rbw.getBytesOnDisk();
-    if (bytesOnDisk < len) {
-      throw new IOException(
-          String.format("Need %d bytes, but only %d bytes available", len,
-              bytesOnDisk));
-    }
   }
 
   /**
@@ -664,6 +643,23 @@ class BlockSender implements java.io.Closeable {
          * It was done here because the NIO throws an IOException for EPIPE.
          */
         String ioem = e.getMessage();
+<<<<<<< HEAD
+        if (ioem != null) {
+          /*
+           * If we got an EIO when reading files or transferTo the client
+           * socket, it's very likely caused by bad disk track or other file
+           * corruptions.
+           */
+          if (ioem.startsWith(EIO_ERROR)) {
+            throw new DiskFileCorruptException("A disk IO error occurred", e);
+          }
+          if (!ioem.startsWith("Broken pipe")
+              && !ioem.startsWith("Connection reset")) {
+            LOG.error("BlockSender.sendChunks() exception: ", e);
+            datanode.getBlockScanner().markSuspectBlock(
+                ris.getVolumeRef().getVolume().getStorageID(), block);
+          }
+=======
         /*
          * If we got an EIO when reading files or transferTo the client socket,
          * it's very likely caused by bad disk track or other file corruptions.
@@ -676,6 +672,7 @@ class BlockSender implements java.io.Closeable {
           datanode.getBlockScanner().markSuspectBlock(
               ris.getVolumeRef().getVolume().getStorageID(),
               block);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         }
       }
       throw ioeToSocketException(e);
@@ -770,8 +767,8 @@ class BlockSender implements java.io.Closeable {
    */
   long sendBlock(DataOutputStream out, OutputStream baseStream, 
                  DataTransferThrottler throttler) throws IOException {
-    final TraceScope scope = datanode.getTracer().
-        newScope("sendBlock_" + block.getBlockId());
+    final TraceScope scope = FsTracer.get(null)
+        .newScope("sendBlock_" + block.getBlockId());
     try {
       return doSendBlock(out, baseStream, throttler);
     } finally {

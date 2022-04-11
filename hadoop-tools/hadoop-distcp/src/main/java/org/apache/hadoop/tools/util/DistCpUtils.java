@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.tools.util;
 
-import com.google.common.collect.Maps;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +35,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputFormat;
+import org.apache.hadoop.tools.DistCpConstants;
 import org.apache.hadoop.tools.CopyListing.AclsNotSupportedException;
 import org.apache.hadoop.tools.CopyListing.XAttrsNotSupportedException;
 import org.apache.hadoop.tools.CopyListingFileStatus;
@@ -198,6 +199,9 @@ public class DistCpUtils {
                               EnumSet<FileAttribute> attributes,
                               boolean preserveRawXattrs) throws IOException {
 
+    // strip out those attributes we don't need any more
+    attributes.remove(FileAttribute.BLOCKSIZE);
+    attributes.remove(FileAttribute.CHECKSUMTYPE);
     // If not preserving anything from FileStatus, don't bother fetching it.
     FileStatus targetFileStatus = attributes.isEmpty() ? null :
         targetFS.getFileStatus(path);
@@ -565,13 +569,15 @@ public class DistCpUtils {
    * @throws IOException if there's an exception while retrieving checksums.
    */
   public static boolean checksumsAreEqual(FileSystem sourceFS, Path source,
-      FileChecksum sourceChecksum, FileSystem targetFS, Path target)
+                                          FileChecksum sourceChecksum,
+                                          FileSystem targetFS,
+                                          Path target, long sourceLen)
       throws IOException {
     FileChecksum targetChecksum = null;
     try {
       sourceChecksum = sourceChecksum != null
           ? sourceChecksum
-          : sourceFS.getFileChecksum(source);
+          : sourceFS.getFileChecksum(source, sourceLen);
       if (sourceChecksum != null) {
         // iff there's a source checksum, look for one at the destination.
         targetChecksum = targetFS.getFileChecksum(target);
@@ -595,6 +601,16 @@ public class DistCpUtils {
    * @param skipCrc The flag to indicate whether to skip checksums.
    * @throws IOException if there's a mismatch in file lengths or checksums.
    */
+<<<<<<< HEAD
+  public static void compareFileLengthsAndChecksums(long srcLen,
+             FileSystem sourceFS, Path source, FileChecksum sourceChecksum,
+             FileSystem targetFS, Path target, boolean skipCrc,
+             long targetLen) throws IOException {
+    if (srcLen != targetLen) {
+      throw new IOException(
+          DistCpConstants.LENGTH_MISMATCH_ERROR_MSG + source + " (" + srcLen
+              + ") and target:" + target + " (" + targetLen + ")");
+=======
   public static void compareFileLengthsAndChecksums(
       FileSystem sourceFS, Path source, FileChecksum sourceChecksum,
       FileSystem targetFS, Path target, boolean skipCrc) throws IOException {
@@ -604,14 +620,21 @@ public class DistCpUtils {
       throw new IOException(
           "Mismatch in length of source:" + source + " (" + srcLen
               + ") and target:" + target + " (" + tgtLen + ")");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
 
     //At this point, src & dest lengths are same. if length==0, we skip checksum
     if ((srcLen != 0) && (!skipCrc)) {
       if (!checksumsAreEqual(sourceFS, source, sourceChecksum,
+<<<<<<< HEAD
+          targetFS, target, srcLen)) {
+        StringBuilder errorMessage =
+            new StringBuilder(DistCpConstants.CHECKSUM_MISMATCH_ERROR_MSG)
+=======
           targetFS, target)) {
         StringBuilder errorMessage =
             new StringBuilder("Checksum mismatch between ")
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                 .append(source).append(" and ").append(target).append(".");
         boolean addSkipHint = false;
         String srcScheme = sourceFS.getScheme();

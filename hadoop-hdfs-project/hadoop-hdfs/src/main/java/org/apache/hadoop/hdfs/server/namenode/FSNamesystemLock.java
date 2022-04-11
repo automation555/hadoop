@@ -21,15 +21,19 @@ package org.apache.hadoop.hdfs.server.namenode;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.log.LogThrottlingHelper;
 import org.apache.hadoop.metrics2.lib.MutableRatesWithAggregation;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Timer;
 
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_LOCK_SUPPRESS_WARNING_INTERVAL_DEFAULT;
@@ -99,8 +103,23 @@ class FSNamesystemLock {
       new AtomicInteger(0);
   /** Time stamp (ms) of the last time a read lock report was written. */
   private final AtomicLong timeStampOfLastReadLockReportMs = new AtomicLong(0);
-  /** Longest time (ms) a read lock was held since the last report. */
-  private final AtomicLong longestReadLockHeldIntervalMs = new AtomicLong(0);
+  /**
+   * The info (lock held time and stack trace) when longest time (ms) a read
+   * lock was held since the last report.
+   */
+  private final AtomicReference<LockHeldInfo> longestReadLockHeldInfo =
+      new AtomicReference<>(new LockHeldInfo());
+  private LockHeldInfo longestWriteLockHeldInfo = new LockHeldInfo();
+  /**
+   * The number of time the read lock
+   * has been held longer than the threshold.
+   */
+  private final LongAdder numReadLockLongHold = new LongAdder();
+  /**
+   * The number of time the write lock
+   * has been held for longer than the threshold.
+   */
+  private final LongAdder numWriteLockLongHold = new LongAdder();
 
   @VisibleForTesting
   static final String OP_NAME_OTHER = "OTHER";
@@ -152,13 +171,19 @@ class FSNamesystemLock {
   }
 
   public void readUnlock() {
-    readUnlock(OP_NAME_OTHER);
+    readUnlock(OP_NAME_OTHER, null);
   }
 
   public void readUnlock(String opName) {
+    readUnlock(opName, null);
+  }
+
+  public void readUnlock(String opName,
+      Supplier<String> lockReportInfoSupplier) {
     final boolean needReport = coarseLock.getReadHoldCount() == 1;
     final long readLockIntervalNanos =
         timer.monotonicNowNanos() - readLockHeldTimeStampNanos.get();
+    final long currentTimeMs = timer.now();
     coarseLock.readLock().unlock();
 
     if (needReport) {
@@ -168,12 +193,26 @@ class FSNamesystemLock {
     final long readLockIntervalMs =
         TimeUnit.NANOSECONDS.toMillis(readLockIntervalNanos);
     if (needReport && readLockIntervalMs >= this.readLockReportingThresholdMs) {
-      long localLongestReadLock;
-      do {
-        localLongestReadLock = longestReadLockHeldIntervalMs.get();
-      } while (localLongestReadLock - readLockIntervalMs < 0 &&
-          !longestReadLockHeldIntervalMs.compareAndSet(localLongestReadLock,
-              readLockIntervalMs));
+      numReadLockLongHold.increment();
+      String lockReportInfo = null;
+      boolean done = false;
+      while (!done) {
+        LockHeldInfo localLockHeldInfo = longestReadLockHeldInfo.get();
+        if (localLockHeldInfo.getIntervalMs() <= readLockIntervalMs) {
+          if (lockReportInfo == null) {
+            lockReportInfo = lockReportInfoSupplier != null ? " (" +
+                lockReportInfoSupplier.get() + ")" : "";
+          }
+          if (longestReadLockHeldInfo.compareAndSet(localLockHeldInfo,
+              new LockHeldInfo(currentTimeMs, readLockIntervalMs,
+              StringUtils.getStackTrace(Thread.currentThread()), opName,
+              lockReportInfo))) {
+            done = true;
+          }
+        } else {
+          done = true;
+        }
+      }
 
       long localTimeStampOfLastReadLockReport;
       long nowMs;
@@ -189,13 +228,14 @@ class FSNamesystemLock {
       } while (!timeStampOfLastReadLockReportMs.compareAndSet(
           localTimeStampOfLastReadLockReport, nowMs));
       int numSuppressedWarnings = numReadLockWarningsSuppressed.getAndSet(0);
-      long longestLockHeldIntervalMs =
-          longestReadLockHeldIntervalMs.getAndSet(0);
-      FSNamesystem.LOG.info("FSNamesystem read lock held for " +
-          readLockIntervalMs + " ms via\n" +
-          StringUtils.getStackTrace(Thread.currentThread()) +
-          "\tNumber of suppressed read-lock reports: " + numSuppressedWarnings +
-          "\n\tLongest read-lock held interval: " + longestLockHeldIntervalMs);
+      LockHeldInfo lockHeldInfo =
+          longestReadLockHeldInfo.getAndSet(new LockHeldInfo());
+      FSNamesystem.LOG.info(
+          "\tNumber of suppressed read-lock reports: {}"
+              + "\n\tLongest read-lock held at {} for {}ms by {}{} via {}",
+          numSuppressedWarnings, Time.formatTime(lockHeldInfo.getStartTimeMs()),
+          lockHeldInfo.getIntervalMs(), lockHeldInfo.getOpName(),
+          lockHeldInfo.getLockReportInfo(), lockHeldInfo.getStackTrace());
     }
   }
   
@@ -209,20 +249,44 @@ class FSNamesystemLock {
 
   /**
    * Unlocks FSNameSystem write lock. This internally calls {@link
-   * FSNamesystemLock#writeUnlock(String, boolean)}
+   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
    */
   public void writeUnlock() {
-    writeUnlock(OP_NAME_OTHER, false);
+    writeUnlock(OP_NAME_OTHER, false, null);
   }
 
   /**
    * Unlocks FSNameSystem write lock. This internally calls {@link
-   * FSNamesystemLock#writeUnlock(String, boolean)}
+   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
    *
    * @param opName Operation name.
    */
   public void writeUnlock(String opName) {
-    writeUnlock(opName, false);
+    writeUnlock(opName, false, null);
+  }
+
+  /**
+   * Unlocks FSNameSystem write lock. This internally calls {@link
+   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
+   *
+   * @param opName Operation name.
+   * @param lockReportInfoSupplier The info shown in the lock report
+   */
+  public void writeUnlock(String opName,
+      Supplier<String> lockReportInfoSupplier) {
+    writeUnlock(opName, false, lockReportInfoSupplier);
+  }
+
+  /**
+   * Unlocks FSNameSystem write lock. This internally calls {@link
+   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
+   *
+   * @param opName Operation name.
+   * @param suppressWriteLockReport When false, event of write lock being held
+   * for long time will be logged in logs and metrics.
+   */
+  public void writeUnlock(String opName, boolean suppressWriteLockReport) {
+    writeUnlock(opName, suppressWriteLockReport, null);
   }
 
   /**
@@ -231,22 +295,38 @@ class FSNamesystemLock {
    * @param opName Operation name
    * @param suppressWriteLockReport When false, event of write lock being held
    * for long time will be logged in logs and metrics.
+   * @param lockReportInfoSupplier The info shown in the lock report
    */
-  public void writeUnlock(String opName, boolean suppressWriteLockReport) {
+  private void writeUnlock(String opName, boolean suppressWriteLockReport,
+      Supplier<String> lockReportInfoSupplier) {
     final boolean needReport = !suppressWriteLockReport && coarseLock
         .getWriteHoldCount() == 1 && coarseLock.isWriteLockedByCurrentThread();
-    final long currentTimeNanos = timer.monotonicNowNanos();
     final long writeLockIntervalNanos =
-        currentTimeNanos - writeLockHeldTimeStampNanos;
-    final long currentTimeMs = TimeUnit.NANOSECONDS.toMillis(currentTimeNanos);
+        timer.monotonicNowNanos() - writeLockHeldTimeStampNanos;
+    final long currentTimeMs = timer.now();
     final long writeLockIntervalMs =
         TimeUnit.NANOSECONDS.toMillis(writeLockIntervalNanos);
 
     LogAction logAction = LogThrottlingHelper.DO_NOT_LOG;
     if (needReport &&
         writeLockIntervalMs >= this.writeLockReportingThresholdMs) {
+      numWriteLockLongHold.increment();
+      if (longestWriteLockHeldInfo.getIntervalMs() <= writeLockIntervalMs) {
+        String lockReportInfo = lockReportInfoSupplier != null ? " (" +
+            lockReportInfoSupplier.get() + ")" : "";
+        longestWriteLockHeldInfo = new LockHeldInfo(currentTimeMs,
+            writeLockIntervalMs,
+            StringUtils.getStackTrace(Thread.currentThread()), opName,
+            lockReportInfo);
+      }
+
       logAction = writeLockReportLogger
           .record("write", currentTimeMs, writeLockIntervalMs);
+    }
+
+    LockHeldInfo lockHeldInfo = longestWriteLockHeldInfo;
+    if (logAction.shouldLog()) {
+      longestWriteLockHeldInfo = new LockHeldInfo();
     }
 
     coarseLock.writeLock().unlock();
@@ -256,13 +336,15 @@ class FSNamesystemLock {
     }
 
     if (logAction.shouldLog()) {
-      FSNamesystem.LOG.info("FSNamesystem write lock held for {} ms via {}\t" +
-          "Number of suppressed write-lock reports: {}\n\tLongest write-lock " +
-          "held interval: {} \n\tTotal suppressed write-lock held time: {}",
-          writeLockIntervalMs,
-          StringUtils.getStackTrace(Thread.currentThread()),
-          logAction.getCount() - 1, logAction.getStats(0).getMax(),
-          logAction.getStats(0).getSum() - writeLockIntervalMs);
+      FSNamesystem.LOG.info(
+          "\tNumber of suppressed write-lock reports: {}"
+              + "\n\tLongest write-lock held at {} for {}ms by {}{} via {}"
+              + "\n\tTotal suppressed write-lock held time: {}",
+          logAction.getCount() - 1,
+          Time.formatTime(lockHeldInfo.getStartTimeMs()),
+          lockHeldInfo.getIntervalMs(), lockHeldInfo.getOpName(),
+          lockHeldInfo.getLockReportInfo(), lockHeldInfo.getStackTrace(),
+          logAction.getStats(0).getSum() - lockHeldInfo.getIntervalMs());
     }
   }
 
@@ -291,6 +373,28 @@ class FSNamesystemLock {
    */
   public int getQueueLength() {
     return coarseLock.getQueueLength();
+  }
+
+  /**
+   * Returns the number of time the read lock
+   * has been held longer than the threshold.
+   *
+   * @return long - Number of time the read lock
+   * has been held longer than the threshold
+   */
+  public long getNumOfReadLockLongHold() {
+    return numReadLockLongHold.longValue();
+  }
+
+  /**
+   * Returns the number of time the write lock
+   * has been held longer than the threshold.
+   *
+   * @return long - Number of time the write lock
+   * has been held longer than the threshold.
+   */
+  public long getNumOfWriteLockLongHold() {
+    return numWriteLockLongHold.longValue();
   }
 
   /**
@@ -356,5 +460,58 @@ class FSNamesystemLock {
     return (isWrite ? WRITE_LOCK_METRIC_PREFIX : READ_LOCK_METRIC_PREFIX) +
         org.apache.commons.lang3.StringUtils.capitalize(operationName) +
         LOCK_METRIC_SUFFIX;
+  }
+
+  /**
+   * Read lock Held Info.
+   */
+  private static class LockHeldInfo {
+    /** Lock held start time. */
+    private final Long startTimeMs;
+    /** Lock held time. */
+    private final Long intervalMs;
+    /** The stack trace lock was held. */
+    private final String stackTrace;
+    /** The operation name. */
+    private final String opName;
+    /** The info shown in a lock report. */
+    private final String lockReportInfo;
+
+    LockHeldInfo() {
+      this.startTimeMs = 0L;
+      this.intervalMs = 0L;
+      this.stackTrace = null;
+      this.opName = null;
+      this.lockReportInfo = null;
+    }
+
+    LockHeldInfo(long startTimeMs, long intervalMs, String stackTrace,
+        String opName, String lockReportInfo) {
+      this.startTimeMs = startTimeMs;
+      this.intervalMs = intervalMs;
+      this.stackTrace = stackTrace;
+      this.opName = opName;
+      this.lockReportInfo = lockReportInfo;
+    }
+
+    public Long getStartTimeMs() {
+      return this.startTimeMs;
+    }
+
+    public Long getIntervalMs() {
+      return this.intervalMs;
+    }
+
+    public String getStackTrace() {
+      return this.stackTrace;
+    }
+
+    public String getOpName() {
+      return opName;
+    }
+
+    public String getLockReportInfo() {
+      return lockReportInfo;
+    }
   }
 }

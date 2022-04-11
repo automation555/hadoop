@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.ams.ApplicationMasterServiceContext;
 import org.apache.hadoop.yarn.ams.ApplicationMasterServiceUtils;
@@ -76,6 +76,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ContainerUpdates;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler
     .SchedulerNodeReport;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
@@ -103,7 +104,8 @@ import static org.apache.hadoop.yarn.exceptions
  */
 final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
 
-  private static final Log LOG = LogFactory.getLog(DefaultAMSProcessor.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DefaultAMSProcessor.class);
 
   private final static List<Container> EMPTY_CONTAINER_LIST =
       new ArrayList<Container>();
@@ -117,6 +119,10 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
   private ResourceProfilesManager resourceProfilesManager;
   private boolean timelineServiceV2Enabled;
   private boolean nodelabelsEnabled;
+<<<<<<< HEAD
+  private Set<String> exclusiveEnforcedPartitions;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   @Override
   public void init(ApplicationMasterServiceContext amsContext,
@@ -127,6 +133,11 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
         timelineServiceV2Enabled(rmContext.getYarnConfiguration());
     this.nodelabelsEnabled = YarnConfiguration
         .areNodeLabelsEnabled(rmContext.getYarnConfiguration());
+<<<<<<< HEAD
+    this.exclusiveEnforcedPartitions = YarnConfiguration
+        .getExclusiveEnforcedPartitions(rmContext.getYarnConfiguration());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override
@@ -234,6 +245,10 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
       if (null == req.getNodeLabelExpression()
           && ResourceRequest.ANY.equals(req.getResourceName())) {
         req.setNodeLabelExpression(asc.getNodeLabelExpression());
+      }
+      if (ResourceRequest.ANY.equals(req.getResourceName())) {
+        SchedulerUtils.enforcePartitionExclusivity(req,
+            exclusiveEnforcedPartitions, asc.getNodeLabelExpression());
       }
     }
 
@@ -348,6 +363,9 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
 
     response.setContainersFromPreviousAttempts(
         allocation.getPreviousAttemptContainers());
+
+    response.setRejectedSchedulingRequests(allocation.getRejectedRequest());
+
   }
 
   private void handleInvalidResourceException(InvalidResourceRequestException e,

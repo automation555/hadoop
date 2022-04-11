@@ -18,8 +18,13 @@
 
 package org.apache.hadoop.hdfs.server.datanode.checker;
 
+<<<<<<< HEAD
+import java.util.function.Supplier;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListenableFuture;
+=======
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.ListenableFuture;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.FakeTimer;
 import org.junit.Test;

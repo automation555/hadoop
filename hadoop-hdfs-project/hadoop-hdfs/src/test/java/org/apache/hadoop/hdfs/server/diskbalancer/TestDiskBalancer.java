@@ -16,8 +16,8 @@
  */
 package org.apache.hadoop.hdfs.server.diskbalancer;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Supplier;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import java.util.function.Supplier;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurationException;
@@ -70,7 +70,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
 /**
@@ -219,9 +219,71 @@ public class TestDiskBalancer {
     } finally {
       cluster.shutdown();
     }
-
   }
 
+  @Test
+  public void testDiskBalancerComputeDelay() throws Exception {
+
+    Configuration conf = new HdfsConfiguration();
+    conf.setBoolean(DFSConfigKeys.DFS_DISK_BALANCER_ENABLED, true);
+
+    final int blockCount = 100;
+    final int blockSize = 11 * 1024 * 1024;
+    final int diskCount = 2;
+    final int dataNodeCount = 1;
+    final int dataNodeIndex = 0;
+    final long cap = blockSize * 2L * blockCount;
+
+    conf.setInt(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, blockSize);
+    conf.setInt(DFSConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY, blockSize);
+
+    final MiniDFSCluster cluster = new ClusterBuilder()
+        .setBlockCount(blockCount).setBlockSize(blockSize)
+        .setDiskCount(diskCount).setNumDatanodes(dataNodeCount).setConf(conf)
+        .setCapacities(new long[] {cap, cap }).build();
+
+    try {
+      DataNode node = cluster.getDataNodes().get(dataNodeIndex);
+
+      final FsDatasetSpi<?> fsDatasetSpy = Mockito.spy(node.getFSDataset());
+      DiskBalancerWorkItem item = Mockito.spy(new DiskBalancerWorkItem());
+      // Mocking bandwidth as 10mb/sec.
+      Mockito.doReturn((long) 10).when(item).getBandwidth();
+
+      doAnswer(new Answer<Object>() {
+        public Object answer(InvocationOnMock invocation) {
+          try {
+            node.getFSDataset().moveBlockAcrossVolumes(
+                (ExtendedBlock) invocation.getArguments()[0],
+                (FsVolumeSpi) invocation.getArguments()[1]);
+          } catch (Exception e) {
+            LOG.error(e.getMessage());
+          }
+          return null;
+        }
+      }).when(fsDatasetSpy).moveBlockAcrossVolumes(any(ExtendedBlock.class),
+          any(FsVolumeSpi.class));
+
+      DiskBalancerMover diskBalancerMover = new DiskBalancerMover(fsDatasetSpy,
+          conf);
+
+      diskBalancerMover.setRunnable();
+
+      // bytesCopied - 20 * 1024 *1024 byteCopied.
+      // timeUsed - 1200 in milliseconds
+      // item - set DiskBalancerWorkItem bandwidth as 10
+      // Expect return sleep delay in Milliseconds. sleep value = bytesCopied /
+      // (1024*1024*bandwidth in MB/milli) - timeUsed;
+      long val = diskBalancerMover.computeDelay(20 * 1024 * 1024, 1200, item);
+      Assert.assertEquals(val, (long) 800);
+    } catch (Exception e) {
+      Assert.fail("Unexpected exception: " + e);
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
 
   @Test
   public void testDiskBalancerWithFedClusterWithOneNameServiceEmpty() throws
@@ -253,13 +315,11 @@ public class TestDiskBalancer {
     final Path filePath = new Path(fileName);
     long fileLen = blockCount * blockSize;
 
-
     //Writing data only to one nameservice.
     FileSystem fs = cluster.getFileSystem(0);
     TestBalancer.createFile(cluster, filePath, fileLen, (short) 1,
         0);
     DFSTestUtil.waitReplication(fs, filePath, (short) 1);
-
 
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(DiskBalancer.LOG);
@@ -271,15 +331,14 @@ public class TestDiskBalancer {
       NodePlan plan = dataMover.generatePlan();
       dataMover.executePlan(plan);
       dataMover.verifyPlanExectionDone();
-      //Because here we have one nameservice empty, don't check
-      // blockPoolCount.
+      // Because here we have one nameservice empty, don't check blockPoolCount.
       dataMover.verifyAllVolumesHaveData(false);
     } finally {
-      Assert.assertTrue(logCapturer.getOutput().contains("There are no " +
-          "blocks in the blockPool"));
+      String logOut = logCapturer.getOutput();
+      Assert.assertTrue("Wrong log: " + logOut, logOut.contains(
+          "NextBlock call returned null. No valid block to copy."));
       cluster.shutdown();
     }
-
   }
 
   @Test
@@ -583,7 +642,7 @@ public class TestDiskBalancer {
 
       node = cluster.getDataNodes().get(dataNodeIndex);
       String planJson = plan.toJson();
-      String planID = DigestUtils.shaHex(planJson);
+      String planID = DigestUtils.sha1Hex(planJson);
 
       // Submit the plan and wait till the execution is done.
       node.submitDiskBalancerPlan(planID, 1, PLAN_FILE, planJson,
@@ -681,7 +740,7 @@ public class TestDiskBalancer {
       reconfigThread.start();
 
       String planJson = plan.toJson();
-      String planID = DigestUtils.shaHex(planJson);
+      String planID = DigestUtils.sha1Hex(planJson);
       diskBalancer.submitPlan(planID, 1, PLAN_FILE, planJson, false);
 
       GenericTestUtils.waitFor(new Supplier<Boolean>() {
@@ -698,7 +757,7 @@ public class TestDiskBalancer {
         }
       }, 1000, 100000);
 
-      assertTrue("Disk balancer operation hit max errors!", errorCount.get() <
+      assertTrue("Disk balancer operation hit max errors!", errorCount.get() <=
           DFSConfigKeys.DFS_DISK_BALANCER_MAX_DISK_ERRORS_DEFAULT);
       createWorkPlanLatch.await();
       removeDiskLatch.await();

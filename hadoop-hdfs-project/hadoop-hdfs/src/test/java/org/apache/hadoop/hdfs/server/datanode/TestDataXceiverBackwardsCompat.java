@@ -18,8 +18,12 @@
 
 package org.apache.hadoop.hdfs.server.datanode;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+=======
 import com.google.protobuf.ByteString;
 import javax.crypto.SecretKey;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.net.*;
@@ -42,7 +46,6 @@ import org.junit.rules.Timeout;
 import org.mockito.ArgumentCaptor;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -52,7 +55,13 @@ import java.net.Socket;
 import java.util.UUID;
 
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 
 /**
  * Mock-based unit test to verify that DataXceiver does not fail when no
@@ -87,8 +96,13 @@ public class TestDataXceiverBackwardsCompat {
 
       doReturn(pair).when(saslClient).socketSend(
           any(Socket.class), any(OutputStream.class), any(InputStream.class),
+<<<<<<< HEAD
+          any(DataEncryptionKeyFactory.class), any(),
+          any(DatanodeID.class), any());
+=======
           any(DataEncryptionKeyFactory.class), any(Token.class),
           any(DatanodeID.class), any(SecretKey.class));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       doReturn(mock(ReplicaHandler.class)).when(data).createTemporary(
           any(StorageType.class), any(String.class), any(ExtendedBlock.class),
           anyBoolean());
@@ -155,12 +169,12 @@ public class TestDataXceiverBackwardsCompat {
 
     doReturn(mockBlockReceiver).when(xceiver).getBlockReceiver(
         any(ExtendedBlock.class), any(StorageType.class),
-        any(DataInputStream.class), anyString(), anyString(),
+        any(), anyString(), any(),
         any(BlockConstructionStage.class), anyLong(), anyLong(), anyLong(),
         anyString(), any(DatanodeInfo.class), any(DataNode.class),
         any(DataChecksum.class), any(CachingStrategy.class),
         ArgumentCaptor.forClass(Boolean.class).capture(),
-        anyBoolean(), any(String.class));
+        anyBoolean(), any());
 
     Token<BlockTokenIdentifier> token = (Token<BlockTokenIdentifier>)mock(
         Token.class);

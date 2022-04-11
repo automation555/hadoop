@@ -17,10 +17,13 @@
  */
 package org.apache.hadoop.hdfs.qjournal.server;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+=======
 import com.google.protobuf.ByteString;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
@@ -72,11 +75,11 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StopWatch;
 import org.apache.hadoop.util.Time;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.protobuf.TextFormat;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
  * A JournalNode can manage journals for several clusters at once.
@@ -265,9 +268,9 @@ public class Journal implements Closeable {
    */
   @Override // Closeable
   public void close() throws IOException {
-    storage.close();
     IOUtils.closeStream(committedTxnId);
     IOUtils.closeStream(curSegment);
+    storage.close();
   }
   
   JNStorage getStorage() {
@@ -1066,7 +1069,7 @@ public class Journal implements Closeable {
       return null;
     }
     
-    InputStream in = new FileInputStream(f);
+    InputStream in = Files.newInputStream(f.toPath());
     try {
       PersistedRecoveryPaxosData ret = PersistedRecoveryPaxosData.parseDelimitedFrom(in);
       Preconditions.checkState(ret != null &&
@@ -1092,11 +1095,12 @@ public class Journal implements Closeable {
       fos.write('\n');
       // Write human-readable data after the protobuf. This is only
       // to assist in debugging -- it's not parsed at all.
-      OutputStreamWriter writer = new OutputStreamWriter(fos, Charsets.UTF_8);
-      
-      writer.write(String.valueOf(newData));
-      writer.write('\n');
-      writer.flush();
+      try(OutputStreamWriter writer =
+          new OutputStreamWriter(fos, Charsets.UTF_8)) {
+        writer.write(String.valueOf(newData));
+        writer.write('\n');
+        writer.flush();
+      }
       
       fos.flush();
       success = true;
@@ -1178,6 +1182,8 @@ public class Journal implements Closeable {
     // directory will be renamed.  It will be reopened lazily on next access.
     IOUtils.cleanupWithLogger(LOG, committedTxnId);
     storage.getJournalManager().doRollback();
+    // HADOOP-17142: refresh properties after rollback performed.
+    storage.refreshStorage();
   }
 
   synchronized void discardSegments(long startTxId) throws IOException {

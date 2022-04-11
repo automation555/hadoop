@@ -21,7 +21,6 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -29,11 +28,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.util.concurrent.Uninterruptibles;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -51,6 +51,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
 
 /**
  * This class implements debug operations on the HDFS command-line.
@@ -64,7 +65,7 @@ public class DebugAdmin extends Configured implements Tool {
   /**
    * All the debug commands we can run.
    */
-  private DebugCommand DEBUG_COMMANDS[] = {
+  private final DebugCommand[] DEBUG_COMMANDS = {
       new VerifyMetaCommand(),
       new ComputeMetaCommand(),
       new RecoverLeaseCommand(),
@@ -74,7 +75,7 @@ public class DebugAdmin extends Configured implements Tool {
   /**
    * The base class for debug commands.
    */
-  private abstract class DebugCommand {
+  private abstract static class DebugCommand {
     final String name;
     final String usageText;
     final String helpText;
@@ -93,15 +94,15 @@ public class DebugAdmin extends Configured implements Tool {
   /**
    * The command for verifying a block metadata file and possibly block file.
    */
-  private class VerifyMetaCommand extends DebugCommand {
+  private static class VerifyMetaCommand extends DebugCommand {
     VerifyMetaCommand() {
       super("verifyMeta",
-"verifyMeta -meta <metadata-file> [-block <block-file>]",
-"  Verify HDFS metadata and block files.  If a block file is specified, we" +
-    System.lineSeparator() +
-"  will verify that the checksums in the metadata file match the block" +
-    System.lineSeparator() +
-"  file.");
+          "verifyMeta -meta <metadata-file> [-block <block-file>]",
+          "  Verify HDFS metadata and block files.  If a block file is specified, we" +
+              System.lineSeparator() +
+              "  will verify that the checksums in the metadata file match the block" +
+              System.lineSeparator() +
+              "  file.");
     }
 
     int run(List<String> args) throws IOException {
@@ -201,7 +202,7 @@ public class DebugAdmin extends Configured implements Tool {
             blockFile);
         return 0;
       } finally {
-        IOUtils.cleanup(null, metaStream, dataStream, checksumStream);
+        IOUtils.cleanupWithLogger(null, metaStream, dataStream, checksumStream);
       }
     }
   }
@@ -209,7 +210,7 @@ public class DebugAdmin extends Configured implements Tool {
   /**
    * The command for verifying a block metadata file and possibly block file.
    */
-  private class ComputeMetaCommand extends DebugCommand {
+  private static class ComputeMetaCommand extends DebugCommand {
     ComputeMetaCommand() {
       super("computeMeta",
           "computeMeta -block <block-file> -out <output-metadata-file>",
@@ -275,7 +276,7 @@ public class DebugAdmin extends Configured implements Tool {
 
         final int smallBufferSize = DFSUtilClient.getSmallBufferSize(conf);
         metaOut = new DataOutputStream(
-            new BufferedOutputStream(new FileOutputStream(srcMeta),
+            new BufferedOutputStream(Files.newOutputStream(srcMeta.toPath()),
                 smallBufferSize));
         BlockMetadataHeader.writeHeader(metaOut, checksum);
         metaOut.close();
@@ -286,7 +287,7 @@ public class DebugAdmin extends Configured implements Tool {
                 + " saved metadata to meta file " + outFile);
         return 0;
       } finally {
-        IOUtils.cleanup(null, metaOut);
+        IOUtils.cleanupWithLogger(null, metaOut);
       }
     }
   }
@@ -458,11 +459,14 @@ public class DebugAdmin extends Configured implements Tool {
       if (!command.name.equals("help")) {
         System.out.println(command.usageText);
       }
+      System.out.println();
+      ToolRunner.printGenericCommandUsage(System.out);
     }
   }
 
-  public static void main(String[] argsArray) throws IOException {
+  public static void main(String[] argsArray) throws Exception {
     DebugAdmin debugAdmin = new DebugAdmin(new Configuration());
-    System.exit(debugAdmin.run(argsArray));
+    int res = ToolRunner.run(debugAdmin, argsArray);
+    System.exit(res);
   }
 }

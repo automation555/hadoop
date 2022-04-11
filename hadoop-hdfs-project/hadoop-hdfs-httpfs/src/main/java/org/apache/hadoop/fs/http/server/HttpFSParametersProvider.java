@@ -22,6 +22,8 @@ import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem.Operation;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.lib.service.FileSystemAccess;
 import org.apache.hadoop.lib.wsrs.BooleanParam;
 import org.apache.hadoop.lib.wsrs.EnumParam;
 import org.apache.hadoop.lib.wsrs.EnumSetParam;
@@ -31,13 +33,10 @@ import org.apache.hadoop.lib.wsrs.ParametersProvider;
 import org.apache.hadoop.lib.wsrs.ShortParam;
 import org.apache.hadoop.lib.wsrs.StringParam;
 import org.apache.hadoop.util.StringUtils;
-
 import javax.ws.rs.ext.Provider;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
-
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT;
 
 /**
  * HttpFS ParametersProvider.
@@ -117,6 +116,16 @@ public class HttpFSParametersProvider extends ParametersProvider {
         new Class[] {OldSnapshotNameParam.class,
             SnapshotNameParam.class});
     PARAMS_DEF.put(Operation.GETSNAPSHOTTABLEDIRECTORYLIST, new Class[] {});
+<<<<<<< HEAD
+    PARAMS_DEF.put(Operation.GETSNAPSHOTLIST, new Class[] {});
+    PARAMS_DEF.put(Operation.GETSERVERDEFAULTS, new Class[] {});
+    PARAMS_DEF.put(Operation.CHECKACCESS, new Class[] {FsActionParam.class});
+    PARAMS_DEF.put(Operation.SETECPOLICY, new Class[] {ECPolicyParam.class});
+    PARAMS_DEF.put(Operation.GETECPOLICY, new Class[] {});
+    PARAMS_DEF.put(Operation.UNSETECPOLICY, new Class[] {});
+    PARAMS_DEF.put(Operation.SATISFYSTORAGEPOLICY, new Class[] {});
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public HttpFSParametersProvider() {
@@ -450,7 +459,11 @@ public class HttpFSParametersProvider extends ParametersProvider {
      */
     public AclPermissionParam() {
       super(NAME, HttpFSFileSystem.ACLSPEC_DEFAULT,
-              Pattern.compile(DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT));
+        Pattern.compile(HttpFSServerWebApp.get()
+          .get(FileSystemAccess.class)
+          .getFileSystemConfiguration()
+          .get(HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_KEY,
+            HdfsClientConfigKeys.DFS_WEBHDFS_ACL_PERMISSION_PATTERN_DEFAULT)));
     }
   }
 
@@ -659,4 +672,52 @@ public class HttpFSParametersProvider extends ParametersProvider {
     }
   }
 
+  /**
+   * Class for FsAction parameter.
+   */
+  @InterfaceAudience.Private
+  public static class FsActionParam extends StringParam {
+
+    private static final String FILE_SYSTEM_ACTION = "[r-][w-][x-]";
+    private static final Pattern FSACTION_PATTERN =
+        Pattern.compile(FILE_SYSTEM_ACTION);
+
+    /**
+     * Parameter name.
+     */
+    public static final String NAME = HttpFSFileSystem.FSACTION_MODE_PARAM;
+
+    /**
+     * Constructor.
+     */
+    public FsActionParam() {
+      super(NAME, null);
+    }
+
+    /**
+     * Constructor.
+     * @param str a string representation of the parameter value.
+     */
+    public FsActionParam(final String str) {
+      super(NAME, str, FSACTION_PATTERN);
+    }
+  }
+
+  /**
+   * Class for ecpolicy parameter.
+   */
+  @InterfaceAudience.Private
+  public static class ECPolicyParam extends StringParam {
+    /**
+     * Parameter name.
+     */
+    public static final String NAME = HttpFSFileSystem.EC_POLICY_NAME_PARAM;
+
+    /**
+     * Constructor.
+     */
+    public ECPolicyParam() {
+      super(NAME, null);
+    }
+  }
 }

@@ -17,17 +17,29 @@
  */
 package org.apache.hadoop.yarn.client.util;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.conf.HAUtil;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is a container for utility methods that are useful when creating
@@ -35,6 +47,9 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
  */
 public abstract class YarnClientUtils {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(YarnClientUtils.class);
+  private static final Base64 BASE_64_CODEC = new Base64(0);
   private static final String ADD_LABEL_FORMAT_ERR_MSG =
       "Input format for adding node-labels is not correct, it should be "
           + "labelName1[(exclusive=true/false)],LabelName2[] ..";
@@ -186,5 +201,53 @@ public abstract class YarnClientUtils {
     }
 
     return yarnConf;
+  }
+
+  /**
+   * Generate SPNEGO challenge request token.
+   *
+   * @param server - hostname to contact
+   * @throws IOException thrown if doAs failed
+   * @throws InterruptedException thrown if doAs is interrupted
+   * @return SPNEGO token challenge
+   */
+  public static String generateToken(String server) throws IOException,
+      InterruptedException {
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    LOG.debug("The user credential is {}", currentUser);
+    String challenge = currentUser
+        .doAs(new PrivilegedExceptionAction<String>() {
+          @Override
+          public String run() throws Exception {
+            try {
+              GSSManager manager = GSSManager.getInstance();
+              // GSS name for server
+              GSSName serverName = manager.createName("HTTP@" + server,
+                  GSSName.NT_HOSTBASED_SERVICE);
+              // Create a GSSContext for authentication with the service.
+              // We're passing client credentials as null since we want them to
+              // be read from the Subject.
+              // We're passing Oid as null to use the default.
+              GSSContext gssContext = manager.createContext(
+                  serverName.canonicalize(null), null, null,
+                  GSSContext.DEFAULT_LIFETIME);
+              gssContext.requestMutualAuth(true);
+              gssContext.requestCredDeleg(true);
+              // Establish context
+              byte[] inToken = new byte[0];
+              byte[] outToken = gssContext.initSecContext(inToken, 0,
+                  inToken.length);
+              gssContext.dispose();
+              // Base64 encoded and stringified token for server
+              LOG.debug("Got valid challenge for host {}", serverName);
+              return new String(BASE_64_CODEC.encode(outToken),
+                  StandardCharsets.US_ASCII);
+            } catch (GSSException e) {
+              LOG.error("Error: ", e);
+              throw new AuthenticationException(e);
+            }
+          }
+        });
+    return challenge;
   }
 }

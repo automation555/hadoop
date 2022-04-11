@@ -208,6 +208,7 @@ public class TestSystemMetricsPublisherForV2 {
     RMApp app = createAppAndRegister(appId);
 
     metricsPublisher.appCreated(app, app.getStartTime());
+    metricsPublisher.appLaunched(app, app.getLaunchTime());
     metricsPublisher.appACLsUpdated(app, "user1,user2", 4L);
     metricsPublisher.appFinished(app, RMAppState.FINISHED, app.getFinishTime());
     dispatcher.await();
@@ -226,7 +227,7 @@ public class TestSystemMetricsPublisherForV2 {
     File appFile = new File(outputDirApp, timelineServiceFileName);
     Assert.assertTrue(appFile.exists());
     verifyEntity(
-        appFile, 3, ApplicationMetricsConstants.CREATED_EVENT_TYPE, 8, 0);
+        appFile, 4, ApplicationMetricsConstants.CREATED_EVENT_TYPE, 8, 0);
   }
 
   @Test(timeout = 10000)
@@ -404,6 +405,7 @@ public class TestSystemMetricsPublisherForV2 {
     when(app.getQueue()).thenReturn("test queue");
     when(app.getSubmitTime()).thenReturn(Integer.MAX_VALUE + 1L);
     when(app.getStartTime()).thenReturn(Integer.MAX_VALUE + 2L);
+    when(app.getLaunchTime()).thenReturn(Integer.MAX_VALUE + 2L);
     when(app.getFinishTime()).thenReturn(Integer.MAX_VALUE + 3L);
     when(app.getDiagnostics()).thenReturn(
         new StringBuilder("test diagnostics info"));
@@ -420,7 +422,7 @@ public class TestSystemMetricsPublisherForV2 {
         .put(ResourceInformation.VCORES.getName(), Long.MAX_VALUE);
     when(app.getRMAppMetrics()).thenReturn(
         new RMAppMetrics(Resource.newInstance(0, 0), 0, 0, resourceSecondsMap,
-            new HashMap<>()));
+            new HashMap<>(), 0));
     when(app.getApplicationTags()).thenReturn(Collections.<String>emptySet());
     ApplicationSubmissionContext appSubmissionContext =
         mock(ApplicationSubmissionContext.class);

@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+<<<<<<< HEAD
+import static org.assertj.core.api.Assertions.assertThat;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -61,7 +65,14 @@ public class TestAHSv2ClientImpl {
     Configuration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, true);
     conf.setFloat(YarnConfiguration.TIMELINE_SERVICE_VERSION, 2.0f);
+<<<<<<< HEAD
+    conf.set(YarnConfiguration.YARN_LOG_SERVER_URL,
+        "https://localhost:8188/ahs");
     client = new AHSv2ClientImpl();
+    client.init(conf);
+=======
+    client = new AHSv2ClientImpl();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     spyTimelineReaderClient = mock(TimelineReaderClient.class);
     client.setReaderClient(spyTimelineReaderClient);
   }
@@ -74,11 +85,25 @@ public class TestAHSv2ClientImpl {
     final ContainerId containerId = ContainerId.newContainerId(appAttemptId, 1);
     when(spyTimelineReaderClient.getContainerEntity(containerId, "ALL", null))
         .thenReturn(createContainerEntity(containerId));
+<<<<<<< HEAD
+    when(spyTimelineReaderClient.getApplicationEntity(appId, "ALL", null))
+        .thenReturn(createApplicationTimelineEntity(appId, true, false));
+    ContainerReport report = client.getContainerReport(containerId);
+    assertThat(report.getContainerId()).isEqualTo(containerId);
+    assertThat(report.getAssignedNode().getHost()).isEqualTo("test host");
+    assertThat(report.getAssignedNode().getPort()).isEqualTo(100);
+    assertThat(report.getAllocatedResource().getVirtualCores()).isEqualTo(8);
+    assertThat(report.getCreationTime()).isEqualTo(123456);
+    assertThat(report.getLogUrl()).isEqualTo("https://localhost:8188/ahs/logs/"
+        + "test host:100/container_0_0001_01_000001/"
+        + "container_0_0001_01_000001/user1");
+=======
     ContainerReport report = client.getContainerReport(containerId);
     Assert.assertEquals(report.getContainerId(), containerId);
     Assert.assertEquals(report.getAssignedNode().getHost(), "test host");
     Assert.assertEquals(report.getAssignedNode().getPort(), 100);
     Assert.assertEquals(report.getAllocatedResource().getVirtualCores(), 8);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Test
@@ -91,10 +116,17 @@ public class TestAHSv2ClientImpl {
         .thenReturn(createAppAttemptTimelineEntity(appAttemptId));
     ApplicationAttemptReport report =
         client.getApplicationAttemptReport(appAttemptId);
+<<<<<<< HEAD
+    assertThat(report.getApplicationAttemptId()).isEqualTo(appAttemptId);
+    assertThat(report.getFinishTime()).isEqualTo(Integer.MAX_VALUE + 2L);
+    assertThat(report.getOriginalTrackingUrl()).
+        isEqualTo("test original tracking url");
+=======
     Assert.assertEquals(report.getApplicationAttemptId(), appAttemptId);
     Assert.assertEquals(report.getFinishTime(), Integer.MAX_VALUE + 2L);
     Assert.assertEquals(report.getOriginalTrackingUrl(),
         "test original tracking url");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Test
@@ -103,11 +135,20 @@ public class TestAHSv2ClientImpl {
     when(spyTimelineReaderClient.getApplicationEntity(appId, "ALL", null))
         .thenReturn(createApplicationTimelineEntity(appId, false, false));
     ApplicationReport report = client.getApplicationReport(appId);
+<<<<<<< HEAD
+    assertThat(report.getApplicationId()).isEqualTo(appId);
+    assertThat(report.getAppNodeLabelExpression()).
+        isEqualTo("test_node_label");
+    Assert.assertTrue(report.getApplicationTags().contains("Test_APP_TAGS_1"));
+    assertThat(report.getYarnApplicationState()).
+        isEqualTo(YarnApplicationState.FINISHED);
+=======
     Assert.assertEquals(report.getApplicationId(), appId);
     Assert.assertEquals(report.getAppNodeLabelExpression(), "test_node_label");
     Assert.assertTrue(report.getApplicationTags().contains("Test_APP_TAGS_1"));
     Assert.assertEquals(report.getYarnApplicationState(),
         YarnApplicationState.FINISHED);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   private static TimelineEntity createApplicationTimelineEntity(

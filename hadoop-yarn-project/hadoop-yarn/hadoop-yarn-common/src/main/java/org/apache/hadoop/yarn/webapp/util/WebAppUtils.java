@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.webapp.util;
 import static org.apache.hadoop.yarn.util.StringHelper.PATH_JOINER;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -97,6 +98,19 @@ public class WebAppUtils {
    */
   public static <T, R> R execOnActiveRM(Configuration conf,
       ThrowingBiFunction<String, T, R> func, T arg) throws Exception {
+<<<<<<< HEAD
+    int haIndex = 0;
+    if (HAUtil.isHAEnabled(conf)) {
+      String activeRMId = RMHAUtils.findActiveRMHAId(conf);
+      if (activeRMId != null) {
+        haIndex = new ArrayList<>(HAUtil.getRMHAIds(conf)).indexOf(activeRMId);
+      } else {
+        throw new ConnectException("No Active RM available");
+      }
+    }
+    String rm1Address = getRMWebAppURLWithScheme(conf, haIndex);
+    return func.apply(rm1Address, arg);
+=======
     String rm1Address = getRMWebAppURLWithScheme(conf, 0);
     try {
       return func.apply(rm1Address, arg);
@@ -115,6 +129,7 @@ public class WebAppUtils {
       }
       throw e;
     }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /** A BiFunction which throws on Exception. */

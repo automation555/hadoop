@@ -19,7 +19,6 @@ package org.apache.hadoop.hdfs.server.federation.router;
 
 import static org.apache.hadoop.util.StringUtils.getTrimmedStringCollection;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -27,13 +26,10 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
-import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
-import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
-import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
+import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
@@ -42,7 +38,6 @@ import javax.ws.rs.core.Response;
 import com.sun.jersey.spi.container.ResourceFilters;
 import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hadoop.hdfs.web.ParamFilter;
-import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.resources.AccessTimeParam;
 import org.apache.hadoop.hdfs.web.resources.AclPermissionParam;
@@ -62,6 +57,7 @@ import org.apache.hadoop.hdfs.web.resources.GroupParam;
 import org.apache.hadoop.hdfs.web.resources.HttpOpParam;
 import org.apache.hadoop.hdfs.web.resources.LengthParam;
 import org.apache.hadoop.hdfs.web.resources.ModificationTimeParam;
+import org.apache.hadoop.hdfs.web.resources.NameSpaceQuotaParam;
 import org.apache.hadoop.hdfs.web.resources.NewLengthParam;
 import org.apache.hadoop.hdfs.web.resources.NoRedirectParam;
 import org.apache.hadoop.hdfs.web.resources.OffsetParam;
@@ -78,6 +74,8 @@ import org.apache.hadoop.hdfs.web.resources.ReplicationParam;
 import org.apache.hadoop.hdfs.web.resources.SnapshotNameParam;
 import org.apache.hadoop.hdfs.web.resources.StartAfterParam;
 import org.apache.hadoop.hdfs.web.resources.StoragePolicyParam;
+import org.apache.hadoop.hdfs.web.resources.StorageSpaceQuotaParam;
+import org.apache.hadoop.hdfs.web.resources.StorageTypeParam;
 import org.apache.hadoop.hdfs.web.resources.TokenArgumentParam;
 import org.apache.hadoop.hdfs.web.resources.TokenKindParam;
 import org.apache.hadoop.hdfs.web.resources.TokenServiceParam;
@@ -91,24 +89,24 @@ import org.apache.hadoop.hdfs.web.resources.XAttrValueParam;
 import org.apache.hadoop.ipc.ExternalCall;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.security.PrivilegedAction;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * WebHDFS Router implementation. This is an extension of
@@ -120,20 +118,18 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterWebHdfsMethods.class);
 
-  private static final ThreadLocal<String> REMOTE_ADDRESS =
-      new ThreadLocal<String>();
-
   private @Context HttpServletRequest request;
   private String method;
   private String query;
   private String reqPath;
+  private String remoteAddr;
 
   public RouterWebHdfsMethods(@Context HttpServletRequest request) {
     super(request);
     this.method = request.getMethod();
     this.query = request.getQueryString();
     this.reqPath = request.getServletPath();
-    REMOTE_ADDRESS.set(JspHelper.getRemoteAddr(request));
+    this.remoteAddr = JspHelper.getRemoteAddr(request);
   }
 
   @Override
@@ -144,7 +140,7 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
                       final Param<?, ?>... parameters) {
     super.init(ugi, delegation, username, doAsUser, path, op, parameters);
 
-    REMOTE_ADDRESS.set(JspHelper.getRemoteAddr(request));
+    remoteAddr = JspHelper.getRemoteAddr(request);
   }
 
   @Override
@@ -158,12 +154,12 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
   }
 
   private void reset() {
-    REMOTE_ADDRESS.set(null);
+    remoteAddr = null;
   }
 
   @Override
   protected String getRemoteAddr() {
-    return REMOTE_ADDRESS.get();
+    return remoteAddr;
   }
 
   @Override
@@ -217,14 +213,25 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
       final CreateFlagParam createFlagParam,
       final NoRedirectParam noredirectParam,
       final StoragePolicyParam policyName,
+<<<<<<< HEAD
+      final ECPolicyParam ecpolicy,
+      final NameSpaceQuotaParam namespaceQuota,
+      final StorageSpaceQuotaParam storagespaceQuota,
+      final StorageTypeParam storageType
+=======
       final ECPolicyParam ecpolicy
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   ) throws IOException, URISyntaxException {
 
     switch(op.getValue()) {
     case CREATE:
     {
       final Router router = getRouter();
-      final URI uri = redirectURI(router, fullpath);
+      final URI uri = redirectURI(router, ugi, delegation, username,
+          doAsUser, fullpath, op.getValue(), -1L,
+          exclDatanodes.getValue(), permission, unmaskedPermission,
+          overwrite, bufferSize, replication, blockSize, createParent,
+          createFlagParam);
       if (!noredirectParam.getValue()) {
         return Response.temporaryRedirect(uri)
             .type(MediaType.APPLICATION_OCTET_STREAM).build();
@@ -256,6 +263,10 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
     case SETSTORAGEPOLICY:
     case ENABLEECPOLICY:
     case DISABLEECPOLICY:
+<<<<<<< HEAD
+    case SATISFYSTORAGEPOLICY:
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     {
       // Whitelist operations that can handled by NamenodeWebHdfsMethods
       return super.put(ugi, delegation, username, doAsUser, fullpath, op,
@@ -264,7 +275,11 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
           accessTime, renameOptions, createParent, delegationTokenArgument,
           aclPermission, xattrName, xattrValue, xattrSetFlag, snapshotName,
           oldSnapshotName, exclDatanodes, createFlagParam, noredirectParam,
+<<<<<<< HEAD
+          policyName, ecpolicy, namespaceQuota, storagespaceQuota, storageType);
+=======
           policyName, ecpolicy);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
     default:
       throw new UnsupportedOperationException(op + " is not supported");
@@ -365,6 +380,7 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
           return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
         }
       }
+      case GETDELEGATIONTOKEN:
       case GET_BLOCK_LOCATIONS:
       case GETFILESTATUS:
       case LISTSTATUS:
@@ -389,6 +405,8 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
   }
 
   /**
+<<<<<<< HEAD
+=======
    * Get the redirect URI from the Namenode responsible for a path.
    * @param router Router to check.
    * @param path Path to get location for.
@@ -487,6 +505,7 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
   }
 
   /**
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Get a URI to redirect an operation to.
    * @param router Router to check.
    * @param ugi User group information.
@@ -525,7 +544,7 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
     } else {
       // generate a token
       final Token<? extends TokenIdentifier> t = generateDelegationToken(
-          router, ugi, request.getUserPrincipal().getName());
+          ugi, ugi.getUserName());
       delegationQuery = "&delegation=" + t.encodeToUrlString();
     }
 
@@ -548,31 +567,34 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
   private DatanodeInfo chooseDatanode(final Router router,
       final String path, final HttpOpParam.Op op, final long openOffset,
       final String excludeDatanodes) throws IOException {
-    // We need to get the DNs as a privileged user
     final RouterRpcServer rpcServer = getRPCServer(router);
-    UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+    DatanodeInfo[] dns = {};
+    String resolvedNs = "";
+    try {
+      dns = rpcServer.getCachedDatanodeReport(DatanodeReportType.LIVE);
+    } catch (IOException e) {
+      LOG.error("Cannot get the datanodes from the RPC server", e);
+    }
 
-    DatanodeInfo[] dns = loginUser.doAs(
-        new PrivilegedAction<DatanodeInfo[]>() {
-          @Override
-          public DatanodeInfo[] run() {
-            try {
-              return rpcServer.getDatanodeReport(DatanodeReportType.LIVE);
-            } catch (IOException e) {
-              LOG.error("Cannot get the datanodes from the RPC server", e);
-              return null;
-            }
-          }
-        });
+    if (op == PutOpParam.Op.CREATE) {
+      try {
+        resolvedNs = rpcServer.getCreateLocation(path).getNameserviceId();
+      } catch (IOException e) {
+        LOG.error("Cannot get the name service " +
+            "to create file for path {} ", path, e);
+      }
+    }
 
     HashSet<Node> excludes = new HashSet<Node>();
-    if (excludeDatanodes != null) {
-      Collection<String> collection =
-          getTrimmedStringCollection(excludeDatanodes);
-      for (DatanodeInfo dn : dns) {
-        if (collection.contains(dn.getName())) {
-          excludes.add(dn);
-        }
+    Collection<String> collection =
+        getTrimmedStringCollection(excludeDatanodes);
+    for (DatanodeInfo dn : dns) {
+      String ns = getNsFromDataNodeNetworkLocation(dn.getNetworkLocation());
+      if (collection.contains(dn.getName())) {
+        excludes.add(dn);
+      } else if (op == PutOpParam.Op.CREATE && !ns.equals(resolvedNs)) {
+        // for CREATE, the dest dn should be in the resolved ns
+        excludes.add(dn);
       }
     }
 
@@ -605,6 +627,22 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
     }
 
     return getRandomDatanode(dns, excludes);
+  }
+
+  /**
+   * Get the nameservice info from datanode network location.
+   * @param location network location with format `/ns0/rack1`
+   * @return nameservice this datanode is in
+   */
+  @VisibleForTesting
+  public static String getNsFromDataNodeNetworkLocation(String location) {
+    // network location should be in the format of /ns/rack
+    Pattern pattern = Pattern.compile("^/([^/]*)/");
+    Matcher matcher = pattern.matcher(location);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return "";
   }
 
   /**
@@ -645,17 +683,19 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
   }
 
   /**
-   * Generate the delegation tokens for this request.
-   * @param router Router.
+   * Generate the credentials for this request.
    * @param ugi User group information.
    * @param renewer Who is asking for the renewal.
-   * @return The delegation tokens.
-   * @throws IOException If it cannot create the tokens.
+   * @return Credentials holding delegation token.
+   * @throws IOException If it cannot create the credentials.
    */
-  private Token<? extends TokenIdentifier> generateDelegationToken(
-      final Router router, final UserGroupInformation ugi,
+  @Override
+  public Credentials createCredentials(
+      final UserGroupInformation ugi,
       final String renewer) throws IOException {
-    throw new UnsupportedOperationException("TODO Generate token for ugi=" +
-        ugi + " request=" + request);
+    final Router router = (Router)getContext().getAttribute("name.node");
+    final Credentials c = RouterSecurityManager.createCredentials(router, ugi,
+        renewer != null? renewer: ugi.getShortUserName());
+    return c;
   }
 }

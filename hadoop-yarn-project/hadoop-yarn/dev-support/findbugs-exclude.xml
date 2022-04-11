@@ -404,6 +404,10 @@
     <Class name="org.apache.hadoop.yarn.server.nodemanager.security.authorize.NMPolicyProvider" />
     <Bug pattern="EI_EXPOSE_REP" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.yarn.server.router.security.authorize.RouterPolicyProvider" />
+    <Bug pattern="EI_EXPOSE_REP" />
+  </Match>
 
 
   <!-- Ignore EI_EXPOSE_REP2 in Log services -->
@@ -639,22 +643,6 @@
     <Bug pattern="MS_EXPOSE_REP" />
   </Match>
 
-  <Match>
-    <Class name="org.apache.hadoop.registry.server.dns.RegistryDNS" />
-    <Method name="addNIOTCP" />
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.registry.server.dns.RegistryDNS" />
-    <Method name="addNIOUDP" />
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.registry.server.dns.RegistryDNS" />
-    <Method name="serveNIOTCP" />
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-
   <!-- EQ_OVERRIDING_EQUALS_NOT_SYMMETRIC -->
   <Match>
     <Class name="org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.AssignedGpuDevice" />
@@ -711,4 +699,24 @@
     <Bug pattern="NP_NONNULL_PARAM_VIOLATION"/>
   </Match>
 
+<<<<<<< HEAD
+  <!-- Device files are always under /dev in production, but it's necessary to override in tests -->
+  <Match>
+    <Class name="org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.com.nec.NECVEPlugin"/>
+    <Method name="getDevices" />
+    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+  </Match>
+
+  <!-- Suppress warning about anonymous class for mocking. -->
+  <Match>
+    <Class name="~org\.apache\.hadoop\.yarn\.server\.timelineservice\.reader\.TestTimelineReaderWebServicesHBaseStorage.*" />
+    <Bug pattern="UMAC_UNCALLABLE_METHOD_OF_ANONYMOUS_CLASS" />
+  </Match>
+
+  <!-- Generated files from JSON schema -->
+  <Match>
+    <Package name="org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.placement.schema" />
+  </Match>
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 </FindBugsFilter>

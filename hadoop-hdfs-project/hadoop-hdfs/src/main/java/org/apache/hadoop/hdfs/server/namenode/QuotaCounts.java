@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.util.ConstEnumCounters;
@@ -275,7 +279,7 @@ public class QuotaCounts {
   public boolean equals(Object obj) {
     if (obj == this) {
       return true;
-    } else if (obj == null || !(obj instanceof QuotaCounts)) {
+    } else if (!(obj instanceof QuotaCounts)) {
       return false;
     }
     final QuotaCounts that = (QuotaCounts)obj;

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -34,9 +34,6 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.privileg
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-
-import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_PARAM_MEMORY_OOM_CONTROL;
 
 /**
  * Handler class to handle the memory controller. YARN already ships a
@@ -176,25 +173,8 @@ public class CGroupsMemoryResourceHandlerImpl implements MemoryResourceHandler {
   }
 
   @Override
-  public Optional<Boolean> isUnderOOM(ContainerId containerId) {
-    try {
-      String status = cGroupsHandler.getCGroupParam(
-          CGroupsHandler.CGroupController.MEMORY,
-          containerId.toString(),
-          CGROUP_PARAM_MEMORY_OOM_CONTROL);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("cgroups OOM status for " + containerId + ": " + status);
-      }
-      if (status.contains(CGroupsHandler.UNDER_OOM)) {
-        LOG.warn("Container " + containerId + " under OOM based on cgroups.");
-        return Optional.of(true);
-      } else {
-        return Optional.of(false);
-      }
-    } catch (ResourceHandlerException e) {
-      LOG.warn("Could not read cgroups" + containerId, e);
-    }
-    return Optional.empty();
+  public String toString() {
+    return CGroupsMemoryResourceHandlerImpl.class.getName();
   }
 
   @Override

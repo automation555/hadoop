@@ -19,7 +19,11 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-project</artifactId>
+<<<<<<< HEAD
+    <version>3.4.0-SNAPSHOT</version>
+=======
     <version>3.2.1</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     <relativePath>../hadoop-project</relativePath>
   </parent>
   <artifactId>hadoop-maven-plugins</artifactId>
@@ -27,7 +31,7 @@
   <name>Apache Hadoop Maven Plugins</name>
   <properties>
     <maven.dependency.version>3.0.5</maven.dependency.version>
-    <maven.plugin-tools.version>3.5.1</maven.plugin-tools.version>
+    <maven.plugin-tools.version>3.6.0</maven.plugin-tools.version>
   </properties>
   <dependencies>
     <dependency>
@@ -100,6 +104,10 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-guava</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -122,8 +130,8 @@
       classes during plugin execution when running a build with Clover enabled.
       -->
       <plugin>
-        <groupId>com.atlassian.maven.plugins</groupId>
-        <artifactId>maven-clover2-plugin</artifactId>
+        <groupId>org.openclover</groupId>
+        <artifactId>clover-maven-plugin</artifactId>
         <configuration>
           <skip>true</skip>
         </configuration>

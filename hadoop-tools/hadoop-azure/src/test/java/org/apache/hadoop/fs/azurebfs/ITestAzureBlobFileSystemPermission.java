@@ -76,7 +76,11 @@ public class ITestAzureBlobFileSystemPermission extends AbstractAbfsIntegrationT
   public void testFilePermission() throws Exception {
 
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     fs.getConf().set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, DEFAULT_UMASK_VALUE);
     path = new Path(testRoot, UUID.randomUUID().toString());
 
@@ -92,7 +96,11 @@ public class ITestAzureBlobFileSystemPermission extends AbstractAbfsIntegrationT
   @Test
   public void testFolderPermission() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     fs.getConf().set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, "027");
 
     path = new Path(testRoot, UUID.randomUUID().toString());

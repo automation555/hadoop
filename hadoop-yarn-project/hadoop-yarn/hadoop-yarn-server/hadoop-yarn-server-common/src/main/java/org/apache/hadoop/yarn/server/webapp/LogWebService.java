@@ -18,8 +18,13 @@
 
 package org.apache.hadoop.yarn.server.webapp;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+=======
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import com.google.inject.Singleton;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
@@ -35,8 +40,11 @@ import org.apache.hadoop.http.JettyUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+<<<<<<< HEAD
+=======
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEntity;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEntityType;
@@ -44,8 +52,11 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileControllerFactory;
 import org.apache.hadoop.yarn.server.metrics.ApplicationMetricsConstants;
 import org.apache.hadoop.yarn.server.metrics.ContainerMetricsConstants;
+<<<<<<< HEAD
+=======
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.webapp.YarnJacksonJaxbJsonProvider;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import org.slf4j.Logger;
@@ -71,7 +82,13 @@ import java.security.PrivilegedExceptionAction;
 /**
  * Support only ATSv2 client only.
  */
+<<<<<<< HEAD
+@Singleton
+@Path("/ws/v2/applicationlog")
+public class LogWebService implements AppInfoProvider {
+=======
 @Singleton @Path("/ws/v2/applicationlog") public class LogWebService {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private static final Logger LOG =
       LoggerFactory.getLogger(LogWebService.class);
   private static final String RESOURCE_URI_STR_V2 = "/ws/v2/timeline/";
@@ -81,6 +98,11 @@ import java.security.PrivilegedExceptionAction;
   private static LogAggregationFileControllerFactory factory;
   private static String base;
   private static String defaultClusterid;
+<<<<<<< HEAD
+
+  private final LogServlet logServlet;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private volatile Client webTimelineClient;
 
   static {
@@ -99,6 +121,13 @@ import java.security.PrivilegedExceptionAction;
         + " for URI: " + base);
   }
 
+<<<<<<< HEAD
+  public LogWebService() {
+    this.logServlet = new LogServlet(yarnConf, this);
+  }
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private Client createTimelineWebClient() {
     ClientConfig cfg = new DefaultClientConfig();
     cfg.getClasses().add(YarnJacksonJaxbJsonProvider.class);
@@ -136,7 +165,12 @@ import java.security.PrivilegedExceptionAction;
    * @param redirectedFromNode Whether this is a redirected request from NM
    * @return The log file's name and current file size
    */
+<<<<<<< HEAD
+  @GET
+  @Path("/containers/{containerid}/logs")
+=======
   @GET @Path("/containers/{containerid}/logs")
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   public Response getContainerLogsInfo(@Context HttpServletRequest req,
       @Context HttpServletResponse res,
@@ -144,6 +178,23 @@ import java.security.PrivilegedExceptionAction;
       @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
       @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
       @DefaultValue("false") boolean redirectedFromNode,
+<<<<<<< HEAD
+      @QueryParam(YarnWebServiceParams.CLUSTER_ID) String clusterId,
+      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
+      @DefaultValue("false") boolean manualRedirection) {
+    initForReadableEndpoints(res);
+
+    WrappedLogMetaRequest.Builder logMetaRequestBuilder =
+        LogServlet.createRequestFromContainerId(containerIdStr);
+
+    return logServlet.getContainerLogsInfo(req, logMetaRequestBuilder, nmId,
+        redirectedFromNode, clusterId, manualRedirection);
+  }
+
+  @Override
+  public String getNodeHttpAddress(HttpServletRequest req, String appId,
+      String appAttemptId, String containerId, String clusterId) {
+=======
       @QueryParam(YarnWebServiceParams.CLUSTER_ID) String clusterId) {
     ContainerId containerId = null;
     initForReadableEndpoints(res);
@@ -232,6 +283,7 @@ import java.security.PrivilegedExceptionAction;
 
   protected ContainerInfo getContainer(HttpServletRequest req, String appId,
       String containerId, String clusterId) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     UserGroupInformation callerUGI = LogWebServiceUtils.getUser(req);
     String cId = clusterId != null ? clusterId : defaultClusterid;
     MultivaluedMap<String, String> params = new MultivaluedMapImpl();
@@ -257,6 +309,14 @@ import java.security.PrivilegedExceptionAction;
     if (conEntity == null) {
       return null;
     }
+<<<<<<< HEAD
+    return (String) conEntity.getInfo()
+        .get(ContainerMetricsConstants.ALLOCATED_HOST_HTTP_ADDRESS_INFO);
+  }
+
+  @Override
+  public BasicAppInfo getApp(HttpServletRequest req, String appId,
+=======
     String nodeHttpAddress = (String) conEntity.getInfo()
         .get(ContainerMetricsConstants.ALLOCATED_HOST_HTTP_ADDRESS_INFO);
 
@@ -265,6 +325,7 @@ import java.security.PrivilegedExceptionAction;
   }
 
   protected AppInfo getApp(HttpServletRequest req, String appId,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       String clusterId) {
     UserGroupInformation callerUGI = LogWebServiceUtils.getUser(req);
 
@@ -298,8 +359,12 @@ import java.security.PrivilegedExceptionAction;
     String state = (String) appEntity.getInfo()
         .get(ApplicationMetricsConstants.STATE_EVENT_INFO);
     YarnApplicationState appState = YarnApplicationState.valueOf(state);
+<<<<<<< HEAD
+    return new BasicAppInfo(appState, appOwner);
+=======
     AppInfo info = new AppInfo(appState, appOwner);
     return info;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -315,9 +380,18 @@ import java.security.PrivilegedExceptionAction;
    * @param redirectedFromNode Whether this is the redirect request from NM
    * @return The contents of the container's log file
    */
+<<<<<<< HEAD
+  @GET
+  @Path("/containers/{containerid}/logs/{filename}")
+  @Produces({ MediaType.TEXT_PLAIN })
+  @InterfaceAudience.Public
+  @InterfaceStability.Unstable
+  public Response getContainerLogFile(
+=======
   @GET @Path("/containers/{containerid}/logs/{filename}")
   @Produces({ MediaType.TEXT_PLAIN }) @InterfaceAudience.Public
   @InterfaceStability.Unstable public Response getContainerLogFile(
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       @Context HttpServletRequest req, @Context HttpServletResponse res,
       @PathParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
       @PathParam(YarnWebServiceParams.CONTAINER_LOG_FILE_NAME) String filename,
@@ -326,17 +400,33 @@ import java.security.PrivilegedExceptionAction;
       @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
       @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
           boolean redirectedFromNode,
+<<<<<<< HEAD
+      @QueryParam(YarnWebServiceParams.CLUSTER_ID) String clusterId,
+      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
+      @DefaultValue("false") boolean manualRedirection) {
+    return getLogs(req, res, containerIdStr, filename, format, size, nmId,
+        redirectedFromNode, clusterId, manualRedirection);
+=======
       @QueryParam(YarnWebServiceParams.CLUSTER_ID) String clusterId) {
     return getLogs(req, res, containerIdStr, filename, format, size, nmId,
         redirectedFromNode, clusterId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   //TODO: YARN-4993: Refactory ContainersLogsBlock, AggregatedLogsBlock and
   //      container log webservice introduced in AHS to minimize
   //      the duplication.
+<<<<<<< HEAD
+  @GET
+  @Path("/containerlogs/{containerid}/{filename}")
+  @Produces({ MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8 })
+  @InterfaceAudience.Public
+  @InterfaceStability.Unstable
+=======
   @GET @Path("/containerlogs/{containerid}/{filename}")
   @Produces({ MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8 })
   @InterfaceAudience.Public @InterfaceStability.Unstable
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public Response getLogs(@Context HttpServletRequest req,
       @Context HttpServletResponse res,
       @PathParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
@@ -346,6 +436,14 @@ import java.security.PrivilegedExceptionAction;
       @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
       @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
       @DefaultValue("false") boolean redirectedFromNode,
+<<<<<<< HEAD
+      @QueryParam(YarnWebServiceParams.CLUSTER_ID) String clusterId,
+      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
+      @DefaultValue("false") boolean manualRedirection) {
+    initForReadableEndpoints(res);
+    return logServlet.getLogFile(req, containerIdStr, filename, format, size,
+        nmId, redirectedFromNode, clusterId, manualRedirection);
+=======
       @QueryParam(YarnWebServiceParams.CLUSTER_ID) String clusterId) {
     initForReadableEndpoints(res);
     ContainerId containerId;
@@ -461,6 +559,7 @@ import java.security.PrivilegedExceptionAction;
     public String getNodeHttpAddress() {
       return nodeHttpAddress;
     }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @VisibleForTesting protected TimelineEntity getEntity(String path,

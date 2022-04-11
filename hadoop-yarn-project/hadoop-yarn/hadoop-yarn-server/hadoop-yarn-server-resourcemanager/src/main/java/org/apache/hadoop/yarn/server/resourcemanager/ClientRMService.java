@@ -40,8 +40,8 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.cli.UnrecognizedOptionException;
 import org.apache.commons.lang3.Range;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -198,7 +198,7 @@ import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.UTCClock;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 
@@ -211,7 +211,8 @@ public class ClientRMService extends AbstractService implements
     ApplicationClientProtocol {
   private static final ArrayList<ApplicationReport> EMPTY_APPS_REPORT = new ArrayList<ApplicationReport>();
 
-  private static final Log LOG = LogFactory.getLog(ClientRMService.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ClientRMService.class);
 
   final private AtomicInteger applicationCounter = new AtomicInteger(0);
   final private YarnScheduler scheduler;
@@ -508,6 +509,9 @@ public class ClientRMService extends AbstractService implements
   public GetContainerReportResponse getContainerReport(
       GetContainerReportRequest request) throws YarnException, IOException {
     ContainerId containerId = request.getContainerId();
+    if (containerId == null) {
+      throw new ContainerNotFoundException("Invalid container id: null");
+    }
     ApplicationAttemptId appAttemptId = containerId.getApplicationAttemptId();
     ApplicationId appId = appAttemptId.getApplicationId();
     UserGroupInformation callerUGI = getCallerUgi(appId,
@@ -609,6 +613,11 @@ public class ClientRMService extends AbstractService implements
       throw RPCUtil.getRemoteException(ie);
     }
 
+<<<<<<< HEAD
+    checkTags(submissionContext.getApplicationTags());
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (timelineServiceV2Enabled) {
       // Sanity check for flow run
       String value = null;
@@ -694,13 +703,23 @@ public class ClientRMService extends AbstractService implements
           " submitted by user " + user);
       RMAuditLogger.logSuccess(user, AuditConstants.SUBMIT_APP_REQUEST,
           "ClientRMService", applicationId, callerContext,
+<<<<<<< HEAD
+          submissionContext.getQueue(),
+          submissionContext.getNodeLabelExpression());
+=======
           submissionContext.getQueue());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } catch (YarnException e) {
       LOG.info("Exception in submitting " + applicationId, e);
       RMAuditLogger.logFailure(user, AuditConstants.SUBMIT_APP_REQUEST,
           e.getMessage(), "ClientRMService",
           "Exception in submitting application", applicationId, callerContext,
+<<<<<<< HEAD
+          submissionContext.getQueue(),
+          submissionContext.getNodeLabelExpression());
+=======
           submissionContext.getQueue());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       throw e;
     }
 
@@ -747,6 +766,31 @@ public class ClientRMService extends AbstractService implements
         attemptId);
 
     return response;
+  }
+
+  private void checkTags(Set<String> tags) throws YarnException {
+    int appMaxTags = getConfig().getInt(
+        YarnConfiguration.RM_APPLICATION_MAX_TAGS,
+        YarnConfiguration.DEFAULT_RM_APPLICATION_MAX_TAGS);
+    int appMaxTagLength = getConfig().getInt(
+        YarnConfiguration.RM_APPLICATION_MAX_TAG_LENGTH,
+        YarnConfiguration.DEFAULT_RM_APPLICATION_MAX_TAG_LENGTH);
+    if (tags.size() > appMaxTags) {
+      throw RPCUtil.getRemoteException(new IllegalArgumentException(
+          "Too many applicationTags, a maximum of only " + appMaxTags
+              + " are allowed!"));
+    }
+    for (String tag : tags) {
+      if (tag.length() > appMaxTagLength) {
+        throw RPCUtil.getRemoteException(
+            new IllegalArgumentException("Tag " + tag + " is too long, "
+                + "maximum allowed length of a tag is " + appMaxTagLength));
+      }
+      if (!org.apache.commons.lang3.StringUtils.isAsciiPrintable(tag)) {
+        throw RPCUtil.getRemoteException(new IllegalArgumentException(
+            "A tag can only have ASCII " + "characters! Invalid tag - " + tag));
+      }
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -804,8 +848,8 @@ public class ClientRMService extends AbstractService implements
     String diagnostics = org.apache.commons.lang3.StringUtils
         .trimToNull(request.getDiagnostics());
     if (diagnostics != null) {
-      message.append(" with diagnostic message: ");
-      message.append(diagnostics);
+      message.append(" with diagnostic message: ")
+          .append(diagnostics);
     }
 
     this.rmContext.getDispatcher().getEventHandler()
@@ -862,48 +906,10 @@ public class ClientRMService extends AbstractService implements
     Range<Long> start = request.getStartRange();
     Range<Long> finish = request.getFinishRange();
     ApplicationsRequestScope scope = request.getScope();
+    String name = request.getName();
 
     final Map<ApplicationId, RMApp> apps = rmContext.getRMApps();
-    Iterator<RMApp> appsIter;
-    // If the query filters by queues, we can avoid considering apps outside
-    // of those queues by asking the scheduler for the apps in those queues.
-    if (queues != null && !queues.isEmpty()) {
-      // Construct an iterator over apps in given queues
-      // Collect list of lists to avoid copying all apps
-      final List<List<ApplicationAttemptId>> queueAppLists =
-          new ArrayList<List<ApplicationAttemptId>>();
-      for (String queue : queues) {
-        List<ApplicationAttemptId> appsInQueue = scheduler.getAppsInQueue(queue);
-        if (appsInQueue != null && !appsInQueue.isEmpty()) {
-          queueAppLists.add(appsInQueue);
-        }
-      }
-      appsIter = new Iterator<RMApp>() {
-        Iterator<List<ApplicationAttemptId>> appListIter = queueAppLists.iterator();
-        Iterator<ApplicationAttemptId> schedAppsIter;
-
-        @Override
-        public boolean hasNext() {
-          // Because queueAppLists has no empty lists, hasNext is whether the
-          // current list hasNext or whether there are any remaining lists
-          return (schedAppsIter != null && schedAppsIter.hasNext())
-              || appListIter.hasNext();
-        }
-        @Override
-        public RMApp next() {
-          if (schedAppsIter == null || !schedAppsIter.hasNext()) {
-            schedAppsIter = appListIter.next().iterator();
-          }
-          return apps.get(schedAppsIter.next().getApplicationId());
-        }
-        @Override
-        public void remove() {
-          throw new UnsupportedOperationException("Remove not supported");
-        }
-      };
-    } else {
-      appsIter = apps.values().iterator();
-    }
+    Iterator<RMApp> appsIter = apps.values().iterator();
     
     List<ApplicationReport> reports = new ArrayList<ApplicationReport>();
     while (appsIter.hasNext() && reports.size() < limit) {
@@ -913,6 +919,12 @@ public class ClientRMService extends AbstractService implements
       if (scope == ApplicationsRequestScope.OWN &&
           !callerUGI.getUserName().equals(application.getUser())) {
         continue;
+      }
+
+      if (queues != null && !queues.isEmpty()) {
+        if (!queues.contains(application.getQueue())) {
+          continue;
+        }
       }
 
       if (applicationTypes != null && !applicationTypes.isEmpty()) {
@@ -970,6 +982,10 @@ public class ClientRMService extends AbstractService implements
       // Given RM is configured to display apps per user, skip apps to which
       // this caller doesn't have access to view.
       if (filterAppsByUser && !allowAccess) {
+        continue;
+      }
+
+      if (name != null && !name.equals(application.getName())) {
         continue;
       }
 
@@ -1527,10 +1543,8 @@ public class ClientRMService extends AbstractService implements
       ReservationDefinition contract, String reservationId) {
     if ((contract.getArrival() - clock.getTime()) < reservationSystem
         .getPlanFollowerTimeStep()) {
-      LOG.debug(MessageFormat
-          .format(
-              "Reservation {0} is within threshold so attempting to create synchronously.",
-              reservationId));
+      LOG.debug("Reservation {} is within threshold so attempting to"
+          + " create synchronously.", reservationId);
       reservationSystem.synchronizePlan(planName, true);
       LOG.info(MessageFormat.format("Created reservation {0} synchronously.",
           reservationId));

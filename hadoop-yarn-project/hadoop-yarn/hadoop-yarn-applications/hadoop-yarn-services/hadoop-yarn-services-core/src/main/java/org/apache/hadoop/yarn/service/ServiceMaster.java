@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.service;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +45,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenSecretManager;
+import org.apache.hadoop.yarn.service.api.records.Service;
 import org.apache.hadoop.yarn.service.api.records.ServiceState;
 import org.apache.hadoop.yarn.service.exceptions.BadClusterStateException;
 import org.apache.hadoop.yarn.service.monitor.ServiceMonitor;
@@ -128,7 +129,7 @@ public class ServiceMaster extends CompositeService {
     DefaultMetricsSystem.initialize("ServiceAppMaster");
 
     context.secretManager = new ClientToAMTokenSecretManager(attemptId, null);
-    ClientAMService clientAMService = new ClientAMService(context);
+    ClientAMService clientAMService = createClientAMService();
     context.clientAMService = clientAMService;
     addService(clientAMService);
 
@@ -140,6 +141,11 @@ public class ServiceMaster extends CompositeService {
     addService(monitor);
 
     super.serviceInit(conf);
+  }
+
+  @VisibleForTesting
+  protected ClientAMService createClientAMService() {
+    return new ClientAMService(context);
   }
 
   // Record the tokens and use them for launching containers.
@@ -302,6 +308,12 @@ public class ServiceMaster extends CompositeService {
       LOG.info("Service state changed from {} -> {}", curState,
           scheduler.getApp().getState());
     }
+    populateYarnSysFS(scheduler);
+  }
+
+  private static void populateYarnSysFS(ServiceScheduler scheduler) {
+    Service service = scheduler.getApp();
+    scheduler.syncSysFs(service);
   }
 
   private void printSystemEnv() {

@@ -18,14 +18,15 @@
 
 package org.apache.hadoop.yarn.service.component;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.ExecutionType;
 import static org.apache.hadoop.yarn.service.api.records.Component
     .RestartPolicyEnum;
 import org.apache.hadoop.yarn.api.records.ExecutionTypeRequest;
+import org.apache.hadoop.yarn.api.records.NodeAttributeOpCode;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceSizing;
@@ -56,6 +57,7 @@ import org.apache.hadoop.yarn.service.monitor.ComponentHealthThresholdMonitor;
 import org.apache.hadoop.yarn.service.monitor.probe.MonitorUtils;
 import org.apache.hadoop.yarn.service.monitor.probe.Probe;
 import org.apache.hadoop.yarn.service.containerlaunch.ContainerLaunchService;
+import org.apache.hadoop.yarn.service.provider.ProviderService;
 import org.apache.hadoop.yarn.service.provider.ProviderUtils;
 import org.apache.hadoop.yarn.service.utils.ServiceApiUtil;
 import org.apache.hadoop.yarn.service.utils.ServiceUtils;
@@ -79,6 +81,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -695,19 +698,22 @@ public class Component implements EventHandler<ComponentEvent> {
         "[COMPONENT {}]: Assigned {} to component instance {} and launch on host {} ",
         getName(), container.getId(), instance.getCompInstanceName(),
         container.getNodeId());
+    Future<ProviderService.ResolvedLaunchParams> resolvedParamFuture;
     if (!(upgradeStatus.isCompleted() && cancelUpgradeStatus.isCompleted())) {
       UpgradeStatus status = !cancelUpgradeStatus.isCompleted() ?
           cancelUpgradeStatus : upgradeStatus;
 
-      scheduler.getContainerLaunchService()
+      resolvedParamFuture = scheduler.getContainerLaunchService()
           .launchCompInstance(scheduler.getApp(), instance, container,
               createLaunchContext(status.getTargetSpec(),
                   status.getTargetVersion()));
     } else {
-      scheduler.getContainerLaunchService().launchCompInstance(
+      resolvedParamFuture = scheduler.getContainerLaunchService()
+          .launchCompInstance(
           scheduler.getApp(), instance, container,
           createLaunchContext(componentSpec, scheduler.getApp().getVersion()));
     }
+    instance.updateResolvedLaunchParams(resolvedParamFuture);
   }
 
   public ContainerLaunchService.ComponentLaunchContext createLaunchContext(
@@ -754,7 +760,9 @@ public class Component implements EventHandler<ComponentEvent> {
             org.apache.hadoop.yarn.api.records.ResourceInformation.newInstance(
                 entry.getKey(),
                 specInfo.getUnit(),
-                specInfo.getValue());
+                specInfo.getValue(),
+                specInfo.getTags(),
+                specInfo.getAttributes());
         resource.setResourceInformation(resourceName, ri);
       }
     }
@@ -804,16 +812,12 @@ public class Component implements EventHandler<ComponentEvent> {
           PlacementConstraint constraint = null;
           switch (yarnServiceConstraint.getType()) {
           case AFFINITY:
-            constraint = PlacementConstraints
-                .targetIn(yarnServiceConstraint.getScope().getValue(),
-                    targetExpressions.toArray(new TargetExpression[0]))
-                .build();
+            constraint = getAffinityConstraint(yarnServiceConstraint,
+              targetExpressions);
             break;
           case ANTI_AFFINITY:
-            constraint = PlacementConstraints
-                .targetNotIn(yarnServiceConstraint.getScope().getValue(),
-                    targetExpressions.toArray(new TargetExpression[0]))
-                .build();
+            constraint = getAntiAffinityConstraint(yarnServiceConstraint,
+              targetExpressions);
             break;
           case AFFINITY_WITH_CARDINALITY:
             constraint = PlacementConstraints.targetCardinality(
@@ -825,6 +829,11 @@ public class Component implements EventHandler<ComponentEvent> {
                     : yarnServiceConstraint.getMaxCardinality().intValue(),
                 targetExpressions.toArray(new TargetExpression[0])).build();
             break;
+          }
+          if (constraint == null) {
+            LOG.info("[COMPONENT {}] Placement constraint: null ",
+                componentSpec.getName());
+            continue;
           }
           // The default AND-ed final composite constraint
           if (finalConstraint != null) {
@@ -856,6 +865,46 @@ public class Component implements EventHandler<ComponentEvent> {
       schedulingRequests.add(request);
       amrmClient.addSchedulingRequests(schedulingRequests);
     }
+  }
+
+  private PlacementConstraint getAffinityConstraint(
+      org.apache.hadoop.yarn.service.api.records.PlacementConstraint
+      yarnServiceConstraint, List<TargetExpression> targetExpressions) {
+    PlacementConstraint constraint = null;
+    if (!yarnServiceConstraint.getTargetTags().isEmpty() ||
+        !yarnServiceConstraint.getNodePartitions().isEmpty()) {
+      constraint = PlacementConstraints
+        .targetIn(yarnServiceConstraint.getScope().getValue(),
+            targetExpressions.toArray(new TargetExpression[0]))
+                .build();
+    }
+    if (!yarnServiceConstraint.getNodeAttributes().isEmpty()) {
+      constraint = PlacementConstraints
+        .targetNodeAttribute(yarnServiceConstraint.getScope().getValue(),
+            NodeAttributeOpCode.EQ, targetExpressions.toArray(
+                new TargetExpression[0])).build();
+    }
+    return constraint;
+  }
+
+  private PlacementConstraint getAntiAffinityConstraint(
+      org.apache.hadoop.yarn.service.api.records.PlacementConstraint
+      yarnServiceConstraint, List<TargetExpression> targetExpressions) {
+    PlacementConstraint constraint = null;
+    if (!yarnServiceConstraint.getTargetTags().isEmpty() ||
+        !yarnServiceConstraint.getNodePartitions().isEmpty()) {
+      constraint = PlacementConstraints
+        .targetNotIn(yarnServiceConstraint.getScope().getValue(),
+            targetExpressions.toArray(new TargetExpression[0]))
+                .build();
+    }
+    if (!yarnServiceConstraint.getNodeAttributes().isEmpty()) {
+      constraint = PlacementConstraints
+        .targetNodeAttribute(yarnServiceConstraint.getScope().getValue(),
+            NodeAttributeOpCode.NE, targetExpressions.toArray(
+                new TargetExpression[0])).build();
+    }
+    return constraint;
   }
 
   private void setDesiredContainers(int n) {
@@ -1083,8 +1132,8 @@ public class Component implements EventHandler<ComponentEvent> {
 
   @Override
   public void handle(ComponentEvent event) {
+    writeLock.lock();
     try {
-      writeLock.lock();
       ComponentState oldState = getState();
       try {
         stateMachine.doTransition(event.getType(), event);

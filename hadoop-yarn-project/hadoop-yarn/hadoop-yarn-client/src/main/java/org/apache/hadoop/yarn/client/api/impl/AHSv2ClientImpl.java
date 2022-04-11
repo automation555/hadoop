@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.yarn.client.api.impl;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -31,6 +35,10 @@ import org.apache.hadoop.yarn.api.records.ContainerReport;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEntity;
 import org.apache.hadoop.yarn.client.api.AHSClient;
 import org.apache.hadoop.yarn.client.api.TimelineReaderClient;
+<<<<<<< HEAD
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.timeline.TimelineEntityV2Converter;
 
@@ -48,6 +56,10 @@ import java.util.Map;
 @InterfaceStability.Unstable
 public class AHSv2ClientImpl extends AHSClient {
   private TimelineReaderClient readerClient;
+<<<<<<< HEAD
+  private String logServerUrl;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public AHSv2ClientImpl() {
     super(AHSv2ClientImpl.class.getName());
@@ -55,6 +67,11 @@ public class AHSv2ClientImpl extends AHSClient {
 
   @Override
   public void serviceInit(Configuration conf) {
+<<<<<<< HEAD
+    logServerUrl = conf.get(
+        YarnConfiguration.YARN_LOG_SERVER_URL);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     readerClient = TimelineReaderClient.createTimelineReaderClient();
     readerClient.init(conf);
   }
@@ -119,15 +136,28 @@ public class AHSv2ClientImpl extends AHSClient {
   @Override
   public ContainerReport getContainerReport(ContainerId containerId)
       throws YarnException, IOException {
+<<<<<<< HEAD
+    ApplicationReport appReport = getApplicationReport(
+        containerId.getApplicationAttemptId().getApplicationId());
+    TimelineEntity entity = readerClient.getContainerEntity(containerId,
+        "ALL", null);
+    return TimelineEntityV2Converter.convertToContainerReport(
+        entity, logServerUrl, appReport.getUser());
+=======
     TimelineEntity entity = readerClient.getContainerEntity(containerId,
         "ALL", null);
     return TimelineEntityV2Converter.convertToContainerReport(entity);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override
   public List<ContainerReport> getContainers(ApplicationAttemptId
       applicationAttemptId) throws  YarnException, IOException {
     ApplicationId appId = applicationAttemptId.getApplicationId();
+<<<<<<< HEAD
+    ApplicationReport appReport = getApplicationReport(appId);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Map<String, String> filters = new HashMap<>();
     filters.put("infofilters", "SYSTEM_INFO_PARENT_ENTITY eq {\"id\":\"" +
         applicationAttemptId.toString() +
@@ -140,7 +170,11 @@ public class AHSv2ClientImpl extends AHSClient {
       for (TimelineEntity entity : entities) {
         ContainerReport container =
             TimelineEntityV2Converter.convertToContainerReport(
+<<<<<<< HEAD
+            entity, logServerUrl, appReport.getUser());
+=======
             entity);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         containers.add(container);
       }
     }

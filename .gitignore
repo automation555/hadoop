@@ -9,6 +9,7 @@
 *.suo
 *.vcxproj.user
 *.patch
+*.diff
 .idea
 .svn
 .classpath
@@ -50,4 +51,17 @@ patchprocess/
 .history/
 hadoop-yarn-project/hadoop-yarn/hadoop-yarn-ui/src/main/webapp/package-lock.json
 hadoop-yarn-project/hadoop-yarn/hadoop-yarn-ui/src/main/webapp/yarn-error.log
+<<<<<<< HEAD
+hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/capacity/placement/schema
+phantomjsdriver.log
 
+#robotframework outputs
+log.html
+output.xml
+report.html
+
+
+.mvn
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776

@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.ipc;
 
+<<<<<<< HEAD
+import org.apache.hadoop.ipc.metrics.RpcMetrics;
+=======
 import java.util.concurrent.TimeUnit;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 /**
  * Implement this interface to be used for RPC scheduling and backoff.
@@ -62,12 +66,21 @@ public interface RpcScheduler {
     // this interface, a default implementation is supplied which uses the old
     // method. All new implementations MUST override this interface and should
     // NOT use the other addResponseTime method.
+<<<<<<< HEAD
+    int queueTime = (int)
+        details.get(ProcessingDetails.Timing.QUEUE, RpcMetrics.TIMEUNIT);
+    int processingTime = (int)
+        details.get(ProcessingDetails.Timing.PROCESSING, RpcMetrics.TIMEUNIT);
+    addResponseTime(callName, schedulable.getPriorityLevel(),
+        queueTime, processingTime);
+=======
     int queueTimeMs = (int)
         details.get(ProcessingDetails.Timing.QUEUE, TimeUnit.MILLISECONDS);
     int processingTimeMs = (int)
         details.get(ProcessingDetails.Timing.PROCESSING, TimeUnit.MILLISECONDS);
     addResponseTime(callName, schedulable.getPriorityLevel(),
         queueTimeMs, processingTimeMs);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   void stop();

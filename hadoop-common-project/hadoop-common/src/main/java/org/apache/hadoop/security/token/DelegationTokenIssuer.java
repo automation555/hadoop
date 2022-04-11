@@ -21,6 +21,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
+<<<<<<< HEAD
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,7 +37,11 @@ import java.util.List;
 @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce", "Yarn"})
 @InterfaceStability.Unstable
 public interface DelegationTokenIssuer {
+<<<<<<< HEAD
+  Logger TOKEN_LOG = LoggerFactory.getLogger(DelegationTokenIssuer.class);
+=======
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * The service name used as the alias for the  token in the credential
    * token map.  addDelegationTokens will use this to determine if
@@ -88,15 +97,37 @@ public interface DelegationTokenIssuer {
       final List<Token<?>> tokens) throws IOException {
     final String serviceName = issuer.getCanonicalServiceName();
     // Collect token of the this issuer and then of its embedded children
+<<<<<<< HEAD
+    if (TOKEN_LOG.isDebugEnabled()) {
+      TOKEN_LOG.debug("Search token for service {} in credentials",
+          serviceName);
+    }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (serviceName != null) {
       final Text service = new Text(serviceName);
       Token<?> token = credentials.getToken(service);
       if (token == null) {
+<<<<<<< HEAD
+        if (TOKEN_LOG.isDebugEnabled()) {
+          TOKEN_LOG.debug("Token for service {} not found in credentials," +
+              " try getDelegationToken.", serviceName);
+        }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         token = issuer.getDelegationToken(renewer);
         if (token != null) {
           tokens.add(token);
           credentials.addToken(service, token);
         }
+<<<<<<< HEAD
+      } else {
+        if (TOKEN_LOG.isDebugEnabled()) {
+          TOKEN_LOG.debug("Token for service {} found in credentials," +
+              "skip getDelegationToken.", serviceName);
+        }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     }
     // Now collect the tokens from the children.

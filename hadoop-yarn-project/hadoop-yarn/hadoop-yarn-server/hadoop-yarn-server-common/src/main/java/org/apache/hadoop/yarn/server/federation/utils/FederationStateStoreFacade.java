@@ -69,7 +69,7 @@ import org.apache.hadoop.yarn.server.federation.store.records.UpdateApplicationH
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import com.zaxxer.hikari.pool.HikariPool.PoolInitializationException;
 
 /**
@@ -463,8 +463,9 @@ public final class FederationStateStoreFacade {
 
   private Object buildGetSubClustersCacheRequest(
       final boolean filterInactiveSubClusters) {
-    final String cacheKey = buildCacheKey(getClass().getSimpleName(),
-        GET_SUBCLUSTERS_CACHEID, null);
+    final String cacheKey =
+        buildCacheKey(getClass().getSimpleName(), GET_SUBCLUSTERS_CACHEID,
+            Boolean.toString(filterInactiveSubClusters));
     CacheRequest<String, Map<SubClusterId, SubClusterInfo>> cacheRequest =
         new CacheRequest<String, Map<SubClusterId, SubClusterInfo>>(cacheKey,
             new Func<String, Map<SubClusterId, SubClusterInfo>>() {
@@ -515,8 +516,8 @@ public final class FederationStateStoreFacade {
   protected String buildCacheKey(String typeName, String methodName,
       String argName) {
     StringBuilder buffer = new StringBuilder();
-    buffer.append(typeName).append(".");
-    buffer.append(methodName);
+    buffer.append(typeName).append(".")
+        .append(methodName);
     if (argName != null) {
       buffer.append("::");
       buffer.append(argName);

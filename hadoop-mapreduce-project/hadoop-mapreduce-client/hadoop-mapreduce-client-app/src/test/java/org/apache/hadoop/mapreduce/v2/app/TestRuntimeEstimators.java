@@ -57,6 +57,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
 import org.apache.hadoop.mapreduce.v2.app.speculate.DefaultSpeculator;
 import org.apache.hadoop.mapreduce.v2.app.speculate.ExponentiallySmoothedTaskRuntimeEstimator;
 import org.apache.hadoop.mapreduce.v2.app.speculate.LegacyTaskRuntimeEstimator;
+import org.apache.hadoop.mapreduce.v2.app.speculate.SimpleExponentialTaskRuntimeEstimator;
 import org.apache.hadoop.mapreduce.v2.app.speculate.Speculator;
 import org.apache.hadoop.mapreduce.v2.app.speculate.SpeculatorEvent;
 import org.apache.hadoop.mapreduce.v2.app.speculate.TaskRuntimeEstimator;
@@ -81,6 +82,9 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.offset;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class TestRuntimeEstimators {
@@ -152,10 +156,10 @@ public class TestRuntimeEstimators {
         500L, speculator.getSoonestRetryAfterNoSpeculate());
     Assert.assertEquals("wrong SPECULATIVE_RETRY_AFTER_SPECULATE value",
         5000L, speculator.getSoonestRetryAfterSpeculate());
-    Assert.assertEquals(speculator.getProportionRunningTasksSpeculatable(),
-        0.1, 0.00001);
-    Assert.assertEquals(speculator.getProportionTotalTasksSpeculatable(),
-        0.001, 0.00001);
+    assertThat(speculator.getProportionRunningTasksSpeculatable())
+        .isCloseTo(0.1, offset(0.00001));
+    assertThat(speculator.getProportionTotalTasksSpeculatable())
+        .isCloseTo(0.001, offset(0.00001));
     Assert.assertEquals("wrong SPECULATIVE_MINIMUM_ALLOWED_TASKS value",
         5, speculator.getMinimumAllowedSpeculativeTasks());
 
@@ -254,6 +258,13 @@ public class TestRuntimeEstimators {
   public void testExponentialEstimator() throws Exception {
     TaskRuntimeEstimator specificEstimator
         = new ExponentiallySmoothedTaskRuntimeEstimator();
+    coreTestEstimator(specificEstimator, 3);
+  }
+
+  @Test
+  public void testSimpleExponentialEstimator() throws Exception {
+    TaskRuntimeEstimator specificEstimator
+        = new SimpleExponentialTaskRuntimeEstimator();
     coreTestEstimator(specificEstimator, 3);
   }
 

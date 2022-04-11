@@ -19,8 +19,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -53,6 +53,7 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.resourcemanager.MockAM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockNM;
 import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
+import org.apache.hadoop.yarn.server.resourcemanager.MockRMAppSubmitter;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
@@ -75,7 +76,7 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Matchers;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -107,8 +108,9 @@ public class TestRMContainerImpl {
     ConcurrentMap<ApplicationId, RMApp> rmApps =
         spy(new ConcurrentHashMap<ApplicationId, RMApp>());
     RMApp rmApp = mock(RMApp.class);
-    when(rmApp.getRMAppAttempt((ApplicationAttemptId)Matchers.any())).thenReturn(null);
-    Mockito.doReturn(rmApp).when(rmApps).get((ApplicationId)Matchers.any());
+    when(rmApp.getRMAppAttempt(any())).thenReturn(null);
+    Mockito.doReturn(rmApp)
+        .when(rmApps).get(ArgumentMatchers.<ApplicationId>any());
 
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     SystemMetricsPublisher publisher = mock(SystemMetricsPublisher.class);
@@ -149,7 +151,7 @@ public class TestRMContainerImpl {
         RMContainerEventType.LAUNCHED));
     drainDispatcher.await();
     assertEquals(RMContainerState.RUNNING, rmContainer.getState());
-    verify(publisher, times(2)).containerCreated(any(RMContainer.class),
+    verify(publisher, times(1)).containerCreated(any(RMContainer.class),
         anyLong());
     assertEquals("http://host:3465/node/containerlogs/container_1_0001_01_000001/user",
         rmContainer.getLogURL());
@@ -252,7 +254,7 @@ public class TestRMContainerImpl {
         RMContainerEventType.ACQUIRED));
     drainDispatcher.await();
     assertEquals(RMContainerState.ACQUIRED, rmContainer.getState());
-    verify(publisher, times(2)).containerCreated(any(RMContainer.class),
+    verify(publisher, times(1)).containerCreated(any(RMContainer.class),
         anyLong());
 
     rmContainer.handle(new RMContainerEvent(containerId,
@@ -283,7 +285,7 @@ public class TestRMContainerImpl {
     MockRM rm1 = new MockRM(conf);
     rm1.start();
     MockNM nm1 = rm1.registerNode("unknownhost:1234", 8000);
-    RMApp app1 = rm1.submitApp(1024);
+    RMApp app1 = MockRMAppSubmitter.submitWithMemory(1024, rm1);
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
     ResourceScheduler scheduler = rm1.getResourceScheduler();
 
@@ -323,7 +325,7 @@ public class TestRMContainerImpl {
 
     rm1.start();
     MockNM nm1 = rm1.registerNode("unknownhost:1234", 8000);
-    RMApp app1 = rm1.submitApp(1024);
+    RMApp app1 = MockRMAppSubmitter.submitWithMemory(1024, rm1);
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
     nm1.nodeHeartbeat(am1.getApplicationAttemptId(), 1, ContainerState.RUNNING);
 
@@ -344,7 +346,7 @@ public class TestRMContainerImpl {
     // RMContainer should be publishing system metrics for all containers.
     // Since there is 1 AM container and 1 non-AM container, there should be 2
     // container created events and 2 container finished events.
-    verify(publisher, times(4)).containerCreated(any(RMContainer.class),
+    verify(publisher, times(2)).containerCreated(any(RMContainer.class),
         anyLong());
     verify(publisher, times(2)).containerFinished(any(RMContainer.class), anyLong());
   }
@@ -363,7 +365,7 @@ public class TestRMContainerImpl {
 
     rm1.start();
     MockNM nm1 = rm1.registerNode("unknownhost:1234", 8000);
-    RMApp app1 = rm1.submitApp(1024);
+    RMApp app1 = MockRMAppSubmitter.submitWithMemory(1024, rm1);
     MockAM am1 = MockRM.launchAndRegisterAM(app1, rm1, nm1);
     nm1.nodeHeartbeat(am1.getApplicationAttemptId(), 1, ContainerState.RUNNING);
 
@@ -414,8 +416,9 @@ public class TestRMContainerImpl {
     ConcurrentMap<ApplicationId, RMApp> rmApps =
         spy(new ConcurrentHashMap<ApplicationId, RMApp>());
     RMApp rmApp = mock(RMApp.class);
-    when(rmApp.getRMAppAttempt(Matchers.any())).thenReturn(null);
-    Mockito.doReturn(rmApp).when(rmApps).get(Matchers.any());
+    when(rmApp.getRMAppAttempt(any())).thenReturn(null);
+    Mockito.doReturn(rmApp).when(rmApps).get(
+        ArgumentMatchers.<ApplicationId>any());
 
     RMApplicationHistoryWriter writer = mock(RMApplicationHistoryWriter.class);
     SystemMetricsPublisher publisher = mock(SystemMetricsPublisher.class);

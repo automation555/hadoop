@@ -13,6 +13,7 @@
  */
 package org.apache.hadoop.security.authentication.server;
 
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.authentication.client.KerberosAuthenticator;
 import org.apache.commons.codec.binary.Base64;
@@ -38,6 +39,8 @@ import java.io.IOException;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -94,10 +97,21 @@ public class KerberosAuthenticationHandler implements AuthenticationHandler {
    */
   public static final String RULE_MECHANISM = TYPE + ".name.rules.mechanism";
 
+<<<<<<< HEAD
+  /**
+   * Constant for the list of endpoints that skips Kerberos authentication.
+   */
+  @VisibleForTesting
+  static final String ENDPOINT_WHITELIST = TYPE + ".endpoint.whitelist";
+  private static final Pattern ENDPOINT_PATTERN = Pattern.compile("^/[\\w]+");
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private String type;
   private String keytab;
   private GSSManager gssManager;
   private Subject serverSubject = new Subject();
+  private final Collection<String> whitelist = new HashSet<>();
 
   /**
    * Creates a Kerberos SPNEGO authentication handler with the default
@@ -173,6 +187,25 @@ public class KerberosAuthenticationHandler implements AuthenticationHandler {
       if (ruleMechanism != null) {
         KerberosName.setRuleMechanism(ruleMechanism);
       }
+<<<<<<< HEAD
+
+      final String whitelistStr = config.getProperty(ENDPOINT_WHITELIST, null);
+      if (whitelistStr != null) {
+        final String[] strs = whitelistStr.trim().split("\\s*[,\n]\\s*");
+        for (String s: strs) {
+          if (s.isEmpty()) continue;
+          if (ENDPOINT_PATTERN.matcher(s).matches()) {
+            whitelist.add(s);
+          } else {
+            throw new ServletException(
+                "The element of the whitelist: " + s + " must start with '/'"
+                    + " and must not contain special characters afterwards");
+          }
+        }
+      }
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       try {
         gssManager = Subject.doAs(serverSubject,
             new PrivilegedExceptionAction<GSSManager>() {
@@ -269,6 +302,16 @@ public class KerberosAuthenticationHandler implements AuthenticationHandler {
   public AuthenticationToken authenticate(HttpServletRequest request,
       final HttpServletResponse response)
       throws IOException, AuthenticationException {
+
+    // If the request servlet path is in the whitelist,
+    // skip Kerberos authentication and return anonymous token.
+    final String path = request.getServletPath();
+    for(final String endpoint: whitelist) {
+      if (endpoint.equals(path)) {
+        return AuthenticationToken.ANONYMOUS;
+      }
+    }
+
     AuthenticationToken token = null;
     String authorization = request.getHeader(
         KerberosAuthenticator.AUTHORIZATION);

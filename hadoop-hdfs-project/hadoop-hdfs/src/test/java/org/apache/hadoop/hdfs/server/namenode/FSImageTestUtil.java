@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.namenode;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -44,8 +45,6 @@ import java.util.Properties;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -60,16 +59,18 @@ import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.util.Holder;
 import org.apache.hadoop.hdfs.util.MD5FileUtils;
 import org.apache.hadoop.io.IOUtils;
-import org.mockito.Matchers;
+import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.util.Sets;
 import org.mockito.Mockito;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.io.Files;
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import org.apache.hadoop.thirdparty.com.google.common.io.Files;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility functions for testing fsimage storage.
@@ -201,7 +202,7 @@ public abstract class FSImageTestUtil {
     List<StorageDirectory> sds = Lists.newArrayList(sd);
     Mockito.doReturn(sds).when(storage).dirIterable(NameNodeDirType.EDITS);
     Mockito.doReturn(sd).when(storage)
-      .getStorageDirectory(Matchers.<URI>anyObject());
+      .getStorageDirectory(any());
 
     FSEditLog editLog = new FSEditLog(new Configuration(), 
                          storage,
@@ -622,5 +623,28 @@ public abstract class FSImageTestUtil {
     StorageDirectory sDir = getFSImage(node).getStorage().
         getStorageDirectory(storageUri);
     return NNStorage.readTransactionIdFile(sDir);
+  }
+
+  /**
+   * Returns the summary section from the latest fsimage stored on the cluster.
+   * This is effectively the image index which contains the offset of each
+   * section and subsection.
+   * @param cluster The cluster to load the image from
+   * @return The FileSummary section of the fsimage
+   * @throws IOException
+   */
+  public static FsImageProto.FileSummary getLatestImageSummary(
+      MiniDFSCluster cluster) throws IOException {
+    RandomAccessFile raFile = null;
+    try {
+      File image = FSImageTestUtil.findLatestImageFile(FSImageTestUtil
+          .getFSImage(cluster.getNameNode()).getStorage().getStorageDir(0));
+      raFile = new RandomAccessFile(image, "r");
+      return FSImageUtil.loadSummary(raFile);
+    } finally {
+      if (raFile != null) {
+        raFile.close();
+      }
+    }
   }
 }

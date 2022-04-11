@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.yarn.service.utils;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ArrayListMultimap;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Multimap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -30,7 +30,9 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.registry.client.api.RegistryConstants;
 import org.apache.hadoop.registry.client.binding.RegistryUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.service.api.records.ComponentContainers;
 import org.apache.hadoop.yarn.service.api.records.ComponentState;
 import org.apache.hadoop.yarn.service.api.records.Container;
 import org.apache.hadoop.yarn.service.api.records.ContainerState;
@@ -50,7 +52,6 @@ import org.apache.hadoop.yarn.service.exceptions.RestApiErrorMessages;
 import org.apache.hadoop.yarn.service.monitor.probe.MonitorUtils;
 import org.apache.hadoop.yarn.service.provider.AbstractClientProvider;
 import org.apache.hadoop.yarn.service.provider.ProviderFactory;
-import org.codehaus.jackson.map.PropertyNamingStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,23 +75,26 @@ public class ServiceApiUtil {
       LoggerFactory.getLogger(ServiceApiUtil.class);
   public static JsonSerDeser<Service> jsonSerDeser =
       new JsonSerDeser<>(Service.class,
-          PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+          PropertyNamingStrategy.SNAKE_CASE);
 
   public static final JsonSerDeser<Container[]> CONTAINER_JSON_SERDE =
       new JsonSerDeser<>(Container[].class,
-          PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+          PropertyNamingStrategy.SNAKE_CASE);
+
+  public static final JsonSerDeser<ComponentContainers[]>
+      COMP_CONTAINERS_JSON_SERDE = new JsonSerDeser<>(
+          ComponentContainers[].class,
+          PropertyNamingStrategy.SNAKE_CASE);
 
   public static final JsonSerDeser<Component[]> COMP_JSON_SERDE =
       new JsonSerDeser<>(Component[].class,
-          PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+          PropertyNamingStrategy.SNAKE_CASE);
 
   private static final PatternValidator namePattern
       = new PatternValidator("[a-z][a-z0-9-]*");
 
   private static final PatternValidator userNamePattern
       = new PatternValidator("[a-z][a-z0-9-.]*");
-
-
 
   @VisibleForTesting
   public static void setJsonSerDeser(JsonSerDeser jsd) {
@@ -246,7 +250,11 @@ public class ServiceApiUtil {
 
   public static void validateJvmOpts(String jvmOpts)
       throws IllegalArgumentException {
+<<<<<<< HEAD
+    Pattern pattern = Pattern.compile("[!~#?@*&%${}()<>\\[\\]|\",`;]");
+=======
     Pattern pattern = Pattern.compile("[!~#?@*&%${}()<>\\[\\]|\"\\/,`;]");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Matcher matcher = pattern.matcher(jvmOpts);
     if (matcher.find()) {
       throw new IllegalArgumentException(
@@ -349,19 +357,6 @@ public class ServiceApiUtil {
               RestApiErrorMessages.ERROR_PLACEMENT_POLICY_CONSTRAINT_SCOPE_NULL,
               constraint.getName() == null ? "" : constraint.getName() + " ",
               comp.getName()));
-          }
-          if (constraint.getTargetTags().isEmpty()) {
-            throw new IllegalArgumentException(String.format(
-              RestApiErrorMessages.ERROR_PLACEMENT_POLICY_CONSTRAINT_TAGS_NULL,
-              constraint.getName() == null ? "" : constraint.getName() + " ",
-              comp.getName()));
-          }
-          for (String targetTag : constraint.getTargetTags()) {
-            if (!comp.getName().equals(targetTag)) {
-              throw new IllegalArgumentException(String.format(
-                  RestApiErrorMessages.ERROR_PLACEMENT_POLICY_TAG_NAME_NOT_SAME,
-                  targetTag, comp.getName(), comp.getName(), comp.getName()));
-            }
           }
         }
       }

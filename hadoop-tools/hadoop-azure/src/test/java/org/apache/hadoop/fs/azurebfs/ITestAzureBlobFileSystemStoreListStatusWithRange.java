@@ -107,7 +107,12 @@ public class ITestAzureBlobFileSystemStoreListStatusWithRange extends
   @Test
   public void testListWithRange() throws IOException {
     try {
+<<<<<<< HEAD
+      FileStatus[] listResult = store.listStatus(new Path(path), startFrom,
+          getTestTracingContext(fs, true));
+=======
       FileStatus[] listResult = store.listStatus(new Path(path), startFrom);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       if (!expectedResult) {
         Assert.fail("Excepting failure with IllegalArgumentException");
       }

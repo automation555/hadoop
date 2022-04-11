@@ -17,20 +17,20 @@
 
 package org.apache.hadoop.yarn.service.webapp;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Lists;
+import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.service.api.records.Component;
+import org.apache.hadoop.yarn.service.api.records.ComponentContainers;
 import org.apache.hadoop.yarn.service.api.records.ComponentState;
 import org.apache.hadoop.yarn.service.api.records.Container;
 import org.apache.hadoop.yarn.service.api.records.ContainerState;
@@ -42,6 +42,8 @@ import org.apache.hadoop.yarn.service.conf.RestApiConstants;
 import org.apache.hadoop.yarn.service.utils.ServiceApiUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
@@ -844,12 +846,24 @@ public class ApiServer {
       public Integer run() throws YarnException, IOException {
         int result = 0;
         ServiceClient sc = new ServiceClient();
+<<<<<<< HEAD
+        try {
+          sc.init(YARN_CONFIG);
+          sc.start();
+          result = sc
+              .actionDecommissionInstances(appName, instances);
+          return Integer.valueOf(result);
+        } finally {
+          sc.close();
+        }
+=======
         sc.init(YARN_CONFIG);
         sc.start();
         result = sc
             .actionDecommissionInstances(appName, instances);
         sc.close();
         return Integer.valueOf(result);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       }
     });
     if (result == EXIT_SUCCESS) {
@@ -880,12 +894,12 @@ public class ApiServer {
     });
   }
 
-  private Container[] getContainers(UserGroupInformation ugi,
+  private ComponentContainers[] getContainers(UserGroupInformation ugi,
       String serviceName, List<String> componentNames, String version,
       List<ContainerState> containerStates) throws IOException,
       InterruptedException {
-    return ugi.doAs((PrivilegedExceptionAction<Container[]>) () -> {
-      Container[] result;
+    return ugi.doAs((PrivilegedExceptionAction<ComponentContainers[]>) () -> {
+      ComponentContainers[] result;
       ServiceClient sc = getServiceClient();
       try {
         sc.init(YARN_CONFIG);

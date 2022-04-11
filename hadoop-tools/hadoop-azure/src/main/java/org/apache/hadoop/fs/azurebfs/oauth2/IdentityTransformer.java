@@ -21,7 +21,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+=======
 import com.google.common.base.Preconditions;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +46,11 @@ import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE
 /**
  * Perform transformation for Azure Active Directory identities used in owner, group and acls.
  */
+<<<<<<< HEAD
+public class IdentityTransformer implements IdentityTransformerInterface {
+=======
 public class IdentityTransformer {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private static final Logger LOG = LoggerFactory.getLogger(IdentityTransformer.class);
 
   private boolean isSecure;
@@ -100,7 +108,12 @@ public class IdentityTransformer {
    * @param localIdentity the local user or group, should be parsed from UserGroupInformation.
    * @return owner or group after transformation.
    * */
+<<<<<<< HEAD
+  public String transformIdentityForGetRequest(String originalIdentity, boolean isUserName, String localIdentity)
+      throws IOException {
+=======
   public String transformIdentityForGetRequest(String originalIdentity, boolean isUserName, String localIdentity) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (originalIdentity == null) {
       originalIdentity = localIdentity;
       // localIdentity might be a full name, so continue the transformation.
@@ -198,7 +211,11 @@ public class IdentityTransformer {
       if (isInSubstitutionList(name)) {
         transformedName = servicePrincipalId;
       } else if (aclEntry.getType().equals(AclEntryType.USER) // case 2: when the owner is a short name
+<<<<<<< HEAD
+          && shouldUseFullyQualifiedUserName(name)) {     //         of the user principal name (UPN).
+=======
               && shouldUseFullyQualifiedUserName(name)) {     //         of the user principal name (UPN).
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         // Notice: for group type ACL entry, if name is shortName.
         //         It won't be converted to Full Name. This is
         //         to make the behavior consistent with HDI.
@@ -242,7 +259,12 @@ public class IdentityTransformer {
    * @param localUser local user name
    * @param localGroup local primary group
    * */
+<<<<<<< HEAD
+  public void transformAclEntriesForGetRequest(final List<AclEntry> aclEntries, String localUser, String localGroup)
+      throws IOException {
+=======
   public void transformAclEntriesForGetRequest(final List<AclEntry> aclEntries, String localUser, String localGroup) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     if (skipUserIdentityReplacement) {
       return;
     }

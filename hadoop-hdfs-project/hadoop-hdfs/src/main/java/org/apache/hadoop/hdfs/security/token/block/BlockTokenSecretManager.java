@@ -18,7 +18,11 @@
 
 package org.apache.hadoop.hdfs.security.token.block;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
+=======
 import com.google.common.base.Charsets;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -44,10 +48,10 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Timer;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.HashMultiset;
-import com.google.common.collect.Multiset;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.HashMultiset;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Multiset;
 
 /**
  * BlockTokenSecretManager can be instantiated in 2 modes, master mode
@@ -133,8 +137,11 @@ public class BlockTokenSecretManager extends
         encryptionAlgorithm, nnIndex, numNNs, useProto, shouldWrapQOP);
     Preconditions.checkArgument(nnIndex >= 0);
     Preconditions.checkArgument(numNNs > 0);
+<<<<<<< HEAD
+=======
     setSerialNo(new SecureRandom().nextInt());
     generateKeys();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -152,7 +159,12 @@ public class BlockTokenSecretManager extends
   private BlockTokenSecretManager(boolean isMaster, long keyUpdateInterval,
       long tokenLifetime, String blockPoolId, String encryptionAlgorithm,
       int nnIndex, int numNNs, boolean useProto, boolean shouldWrapQOP) {
+<<<<<<< HEAD
+    this.intRange = Integer.MAX_VALUE / numNNs;
+    this.nnRangeStart = intRange * nnIndex;
+=======
     this.nnIndex = nnIndex;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     this.isMaster = isMaster;
     this.keyUpdateInterval = keyUpdateInterval;
     this.tokenLifetime = tokenLifetime;
@@ -162,12 +174,24 @@ public class BlockTokenSecretManager extends
     this.useProto = useProto;
     this.shouldWrapQOP = shouldWrapQOP;
     this.timer = new Timer();
+    setSerialNo(new SecureRandom().nextInt(Integer.MAX_VALUE));
+    LOG.info("Block token key range: [{}, {})",
+        nnRangeStart, nnRangeStart + intRange);
     generateKeys();
   }
 
   @VisibleForTesting
+<<<<<<< HEAD
+  public synchronized void setSerialNo(int nextNo) {
+    // we mod the serial number by the range and then add that times the index
+    this.serialNo = (nextNo % intRange) + (nnRangeStart);
+    assert serialNo >= nnRangeStart && serialNo < (nnRangeStart + intRange) :
+      "serialNo " + serialNo + " is not in the designated range: [" +
+      nnRangeStart + ", " + (nnRangeStart + intRange) + ")";
+=======
   public synchronized void setSerialNo(int serialNo) {
     this.serialNo = (serialNo & LOW_MASK) | (nnIndex << NUM_VALID_BITS);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public void setBlockPoolId(String blockPoolId) {
@@ -242,7 +266,7 @@ public class BlockTokenSecretManager extends
   }
 
   /**
-   * Update block keys if update time > update interval.
+   * Update block keys if update time {@literal >} update interval.
    * @return true if the keys are updated.
    */
   public synchronized boolean updateKeys(final long updateTime) throws IOException {
@@ -295,7 +319,11 @@ public class BlockTokenSecretManager extends
         .getBlockPoolId(), block.getBlockId(), modes, storageTypes,
         storageIds, useProto);
     if (shouldWrapQOP) {
+<<<<<<< HEAD
+      String qop = Server.getAuxiliaryPortEstablishedQOP();
+=======
       String qop = Server.getEstablishedQOP();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       if (qop != null) {
         id.setHandshakeMsg(qop.getBytes(Charsets.UTF_8));
       }
@@ -412,6 +440,26 @@ public class BlockTokenSecretManager extends
               + ", block=" + block + ", access mode=" + mode);
     }
     checkAccess(id, userId, block, mode, storageTypes, storageIds);
+    if (!Arrays.equals(retrievePassword(id), token.getPassword())) {
+      throw new InvalidToken("Block token with " + id
+          + " doesn't have the correct token password");
+    }
+  }
+
+  /** Check if access should be allowed. userID is not checked if null */
+  public void checkAccess(Token<BlockTokenIdentifier> token, String userId,
+      ExtendedBlock block, BlockTokenIdentifier.AccessMode mode)
+      throws InvalidToken {
+    BlockTokenIdentifier id = new BlockTokenIdentifier();
+    try {
+      id.readFields(new DataInputStream(new ByteArrayInputStream(token
+          .getIdentifier())));
+    } catch (IOException e) {
+      throw new InvalidToken(
+          "Unable to de-serialize block token identifier for user=" + userId
+              + ", block=" + block + ", access mode=" + mode);
+    }
+    checkAccess(id, userId, block, mode);
     if (!Arrays.equals(retrievePassword(id), token.getPassword())) {
       throw new InvalidToken("Block token with " + id
           + " doesn't have the correct token password");

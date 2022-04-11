@@ -29,7 +29,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.azure.metrics.AzureFileSystemInstrumentation;
 import org.apache.hadoop.fs.permission.PermissionStatus;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 /**
  * <p>
@@ -75,6 +75,10 @@ interface NativeFileSystemStore {
 
   void changePermissionStatus(String key, PermissionStatus newPermission)
       throws AzureException;
+
+  byte[] retrieveAttribute(String key, String attribute) throws IOException;
+
+  void storeAttribute(String key, String attribute, byte[] value) throws IOException;
 
   /**
    * API to delete a blob in the back end azure storage.

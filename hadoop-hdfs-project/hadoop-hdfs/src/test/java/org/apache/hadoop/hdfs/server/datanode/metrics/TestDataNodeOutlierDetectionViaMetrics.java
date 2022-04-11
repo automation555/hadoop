@@ -18,18 +18,22 @@
 
 package org.apache.hadoop.hdfs.server.datanode.metrics;
 
+<<<<<<< HEAD
+import java.util.function.Supplier;
+=======
 import com.google.common.base.Supplier;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.metrics2.lib.MetricsTestHelper;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.util.Map;
 import java.util.Random;
@@ -67,8 +71,13 @@ public class TestDataNodeOutlierDetectionViaMetrics {
 
   @Before
   public void setup() {
+<<<<<<< HEAD
+    GenericTestUtils.setLogLevel(DataNodePeerMetrics.LOG, Level.TRACE);
+    GenericTestUtils.setLogLevel(OutlierDetector.LOG, Level.TRACE);
+=======
     GenericTestUtils.setLogLevel(DataNodePeerMetrics.LOG, Level.ALL);
     GenericTestUtils.setLogLevel(OutlierDetector.LOG, Level.ALL);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     conf = new HdfsConfiguration();
   }
 

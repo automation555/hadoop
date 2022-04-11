@@ -27,6 +27,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.LocalizationStatus;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.event.Dispatcher;
@@ -39,6 +40,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerState;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ResourceMappings;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceSet;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerExecutionException;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 
 import java.io.IOException;
@@ -122,6 +124,11 @@ public class MockContainer implements Container {
   }
 
   @Override
+  public String localizationCountersAsString() {
+    return "";
+  }
+
+  @Override
   public ResourceSet getResourceSet() {
     return null;
   }
@@ -174,6 +181,16 @@ public class MockContainer implements Container {
   }
 
   @Override
+  public String getCsiVolumesRootDir() {
+    return null;
+  }
+
+  @Override
+  public void setCsiVolumesRootDir(String volumesRootDir) {
+
+  }
+
+  @Override
   public String getLogDir() {
     return null;
   }
@@ -190,6 +207,10 @@ public class MockContainer implements Container {
   @Override
   public void setIpAndHost(String[] ipAndHost) {
 
+  }
+
+  @Override
+  public void setExposedPorts(String ports) {
   }
 
   @Override
@@ -257,5 +278,20 @@ public class MockContainer implements Container {
   }
   @Override public boolean isContainerInFinalStates() {
     return false;
+  }
+
+  @Override
+  public List<LocalizationStatus> getLocalizationStatuses() {
+    return null;
+  }
+
+  @Override
+  public void setContainerRuntimeData(Object containerRuntimeData) {
+  }
+
+  @Override
+  public <T> T getContainerRuntimeData(Class<T> runtimeClazz)
+      throws ContainerExecutionException {
+    return null;
   }
 }

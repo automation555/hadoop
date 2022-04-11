@@ -151,10 +151,7 @@ public abstract class TimelineCollector extends CompositeService {
    */
   public TimelineWriteResponse putEntities(TimelineEntities entities,
       UserGroupInformation callerUgi) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("putEntities(entities=" + entities + ", callerUgi="
-          + callerUgi + ")");
-    }
+    LOG.debug("putEntities(entities={}, callerUgi={})", entities, callerUgi);
 
     TimelineWriteResponse response;
     // synchronize on the writer object so that no other threads can
@@ -180,10 +177,7 @@ public abstract class TimelineCollector extends CompositeService {
    */
   public TimelineWriteResponse putDomain(TimelineDomain domain,
       UserGroupInformation callerUgi) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "putDomain(domain=" + domain + ", callerUgi=" + callerUgi + ")");
-    }
+    LOG.debug("putDomain(domain={}, callerUgi={})", domain, callerUgi);
 
     TimelineWriteResponse response;
     synchronized (writer) {
@@ -230,10 +224,15 @@ public abstract class TimelineCollector extends CompositeService {
    */
   public void putEntitiesAsync(TimelineEntities entities,
       UserGroupInformation callerUgi) throws IOException {
+<<<<<<< HEAD
+    LOG.debug("putEntitiesAsync(entities={}, callerUgi={})", entities,
+        callerUgi);
+=======
     if (LOG.isDebugEnabled()) {
       LOG.debug("putEntitiesAsync(entities=" + entities + ", callerUgi=" +
           callerUgi + ")");
     }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     pool.execute(new Runnable() {
       @Override public void run() {

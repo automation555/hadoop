@@ -24,10 +24,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -43,8 +43,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -121,7 +121,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
-import org.mockito.Matchers;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -129,8 +128,8 @@ import org.mockito.stubbing.Answer;
 @RunWith(value = Parameterized.class)
 public class TestRMAppAttemptTransitions {
 
-  private static final Log LOG = 
-      LogFactory.getLog(TestRMAppAttemptTransitions.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestRMAppAttemptTransitions.class);
   
   private static final String EMPTY_DIAGNOSTICS = "";
   private static final String FAILED_DIAGNOSTICS = "Attempt failed by user.";
@@ -302,7 +301,7 @@ public class TestRMAppAttemptTransitions {
     when(appResUsgRpt.getMemorySeconds()).thenReturn(0L);
     when(appResUsgRpt.getVcoreSeconds()).thenReturn(0L);
     when(resourceScheduler
-        .getAppResourceUsageReport((ApplicationAttemptId)Matchers.any()))
+        .getAppResourceUsageReport(any()))
      .thenReturn(appResUsgRpt);
     spyRMContext = spy(rmContext);
     Mockito.doReturn(resourceScheduler).when(spyRMContext).getScheduler();
@@ -417,13 +416,8 @@ public class TestRMAppAttemptTransitions {
         unregisterAttempt(applicationAttempt.getAppAttemptId());
     // ATTEMPT_FAILED should be notified to app if app attempt is submitted to
     // failed state.
-    ArgumentMatcher<RMAppEvent> matcher = new ArgumentMatcher<RMAppEvent>() {
-      @Override
-      public boolean matches(Object o) {
-        RMAppEvent event = (RMAppEvent) o;
-        return event.getType() == RMAppEventType.ATTEMPT_FAILED;
-      }
-    };
+    ArgumentMatcher<RMAppEvent> matcher =
+        event -> event.getType() == RMAppEventType.ATTEMPT_FAILED;
     verify(application).handle(argThat(matcher));
     verifyTokenCount(applicationAttempt.getAppAttemptId(), 1);
     verifyApplicationAttemptFinished(RMAppAttemptState.FAILED);
@@ -495,7 +489,7 @@ public class TestRMAppAttemptTransitions {
     // Check events
     verify(applicationMasterLauncher).handle(any(AMLauncherEvent.class));
     verify(scheduler, times(2)).allocate(any(ApplicationAttemptId.class),
-        any(List.class), any(List.class), any(List.class), any(List.class), any(List.class),
+        any(List.class), any(), any(List.class), any(), any(),
         any(ContainerUpdates.class));
     verify(nmTokenManager).clearNodeSetForAttempt(
       applicationAttempt.getAppAttemptId());
@@ -643,12 +637,14 @@ public class TestRMAppAttemptTransitions {
     when(allocation.getContainers()).
         thenReturn(Collections.singletonList(container));
     when(scheduler.allocate(any(ApplicationAttemptId.class), any(List.class),
-        any(List.class), any(List.class), any(List.class), any(List.class),
+        any(), any(List.class), any(), any(),
         any(ContainerUpdates.class))).
     thenReturn(allocation);
     RMContainer rmContainer = mock(RMContainerImpl.class);
     when(scheduler.getRMContainer(container.getId())).
         thenReturn(rmContainer);
+    when(container.getNodeId()).thenReturn(
+        BuilderUtils.newNodeId("localhost", 0));
     
     applicationAttempt.handle(
         new RMAppAttemptEvent(applicationAttempt.getAppAttemptId(),
@@ -1211,7 +1207,7 @@ public class TestRMAppAttemptTransitions {
     when(allocation.getContainers()).
         thenReturn(Collections.singletonList(amContainer));
     when(scheduler.allocate(any(ApplicationAttemptId.class), any(List.class),
-        any(List.class), any(List.class), any(List.class), any(List.class),
+        any(), any(List.class), any(), any(),
         any(ContainerUpdates.class)))
         .thenReturn(allocation);
     RMContainer rmContainer = mock(RMContainerImpl.class);
@@ -1534,6 +1530,119 @@ public class TestRMAppAttemptTransitions {
     Assert.assertEquals(0, containerStatuses.size());
     Mockito.verify(rmnodeEventHandler, times(1))
         .handle(Mockito.any(RMNodeEvent.class));
+  }
+
+  /**
+   * Check a completed container that is not yet pulled by AM heartbeat,
+   * is ACKed to NM for cleanup when the AM container exits.
+   */
+  @Test
+  public void testFinishedContainerNotBeingPulledByAMHeartbeat() {
+    Container amContainer = allocateApplicationAttempt();
+    launchApplicationAttempt(amContainer);
+    runApplicationAttempt(amContainer, "host", 8042, "oldtrackingurl", false);
+
+    application.handle(new RMAppRunningOnNodeEvent(application
+        .getApplicationId(), amContainer.getNodeId()));
+
+    // Complete a non-AM container
+    ContainerId containerId1 = BuilderUtils.newContainerId(applicationAttempt
+        .getAppAttemptId(), 2);
+    Container container1 = mock(Container.class);
+    ContainerStatus containerStatus1 = mock(ContainerStatus.class);
+    when(container1.getId()).thenReturn(
+        containerId1);
+    when(containerStatus1.getContainerId()).thenReturn(containerId1);
+    when(container1.getNodeId()).thenReturn(NodeId.newInstance("host", 1234));
+    applicationAttempt.handle(new RMAppAttemptContainerFinishedEvent(
+        applicationAttempt.getAppAttemptId(), containerStatus1,
+        container1.getNodeId()));
+
+    // Verify justFinishedContainers
+    ArgumentCaptor<RMNodeFinishedContainersPulledByAMEvent> captor =
+        ArgumentCaptor.forClass(RMNodeFinishedContainersPulledByAMEvent.class);
+    Assert.assertEquals(1, applicationAttempt.getJustFinishedContainers()
+        .size());
+    Assert.assertEquals(container1.getId(), applicationAttempt
+        .getJustFinishedContainers().get(0).getContainerId());
+    Assert.assertTrue(
+        getFinishedContainersSentToAM(applicationAttempt).isEmpty());
+
+    // finish AM container to emulate AM exit event
+    containerStatus1 = mock(ContainerStatus.class);
+    ContainerId amContainerId = amContainer.getId();
+    when(containerStatus1.getContainerId()).thenReturn(amContainerId);
+    applicationAttempt.handle(new RMAppAttemptContainerFinishedEvent(
+        applicationAttempt.getAppAttemptId(), containerStatus1,
+        amContainer.getNodeId()));
+
+    Mockito.verify(rmnodeEventHandler, times(2)).handle(captor.capture());
+    List<RMNodeFinishedContainersPulledByAMEvent> containerPulledEvents =
+        captor.getAllValues();
+    // Verify AM container is acked to NM via the RMNodeEvent immediately
+    Assert.assertEquals(amContainer.getId(),
+        containerPulledEvents.get(0).getContainers().get(0));
+    // Verify the non-AM container is acked to NM via the RMNodeEvent
+    Assert.assertEquals(container1.getId(),
+        containerPulledEvents.get(1).getContainers().get(0));
+    Assert.assertTrue("No container shall be added to justFinishedContainers" +
+            " as soon as AM container exits",
+        applicationAttempt.getJustFinishedContainers().isEmpty());
+    Assert.assertTrue(
+        getFinishedContainersSentToAM(applicationAttempt).isEmpty());
+  }
+
+  /**
+   * Check a completed container is ACKed to NM for cleanup after the AM
+   * container has exited.
+   */
+  @Test
+  public void testFinishedContainerAfterAMExit() {
+    Container amContainer = allocateApplicationAttempt();
+    launchApplicationAttempt(amContainer);
+    runApplicationAttempt(amContainer, "host", 8042, "oldtrackingurl", false);
+
+    // finish AM container to emulate AM exit event
+    ContainerStatus containerStatus1 = mock(ContainerStatus.class);
+    ContainerId amContainerId = amContainer.getId();
+    when(containerStatus1.getContainerId()).thenReturn(amContainerId);
+    application.handle(new RMAppRunningOnNodeEvent(application
+        .getApplicationId(),
+        amContainer.getNodeId()));
+    applicationAttempt.handle(new RMAppAttemptContainerFinishedEvent(
+        applicationAttempt.getAppAttemptId(), containerStatus1,
+        amContainer.getNodeId()));
+
+    // Verify AM container is acked to NM via the RMNodeEvent immediately
+    ArgumentCaptor<RMNodeFinishedContainersPulledByAMEvent> captor =
+        ArgumentCaptor.forClass(RMNodeFinishedContainersPulledByAMEvent.class);
+    Mockito.verify(rmnodeEventHandler).handle(captor.capture());
+    Assert.assertEquals(amContainer.getId(),
+        captor.getValue().getContainers().get(0));
+
+    // Complete a non-AM container
+    ContainerId containerId1 = BuilderUtils.newContainerId(applicationAttempt
+        .getAppAttemptId(), 2);
+    Container container1 = mock(Container.class);
+    containerStatus1 = mock(ContainerStatus.class);
+    when(container1.getId()).thenReturn(containerId1);
+    when(containerStatus1.getContainerId()).thenReturn(containerId1);
+    when(container1.getNodeId()).thenReturn(NodeId.newInstance("host", 1234));
+    applicationAttempt.handle(new RMAppAttemptContainerFinishedEvent(
+        applicationAttempt.getAppAttemptId(), containerStatus1,
+        container1.getNodeId()));
+
+    // Verify container is acked to NM via the RMNodeEvent immediately
+    captor = ArgumentCaptor.forClass(
+        RMNodeFinishedContainersPulledByAMEvent.class);
+    Mockito.verify(rmnodeEventHandler, times(2)).handle(captor.capture());
+    Assert.assertEquals(container1.getId(),
+        captor.getAllValues().get(1).getContainers().get(0));
+    Assert.assertTrue("No container shall be added to justFinishedContainers" +
+            " after AM container exited",
+        applicationAttempt.getJustFinishedContainers().isEmpty());
+    Assert.assertTrue(
+        getFinishedContainersSentToAM(applicationAttempt).isEmpty());
   }
 
   private static List<ContainerStatus> getFinishedContainersSentToAM(

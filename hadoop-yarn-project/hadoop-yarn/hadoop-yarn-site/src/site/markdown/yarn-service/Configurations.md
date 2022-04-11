@@ -131,6 +131,8 @@ The above config allows the service AM to be retried a maximum of 10 times.
 |yarn.service.log.exclude-pattern | Regex expression for excluding log files by name when aggregating the logs after the application completes. If the log file name matches both include and exclude pattern, this file will be excluded (default does not exclude any files).|
 |yarn.service.rolling-log.include-pattern | Regex expression for including log files by name when aggregating the logs while app is running.|
 |yarn.service.rolling-log.exclude-pattern | Regex expression for excluding log files by name when aggregating the logs while app is running. If the log file name matches both include and exclude pattern, this file will be excluded.|
+|yarn.service.classpath | Comma separated extra class path parameters for yarn services AM. These path elements will be appended to the end of the YARN service AM classpath. |
+|yarn.service.am.client.port-range | Range of ports that the Yarn Service AM can use when binding. Leave blank if you want all possible ports. For example 50000-50050,50100-50200. |
 
 ### Component-level configuration properties
 Component-level service AM configuration properties can be specified either in the cluster `yarn-site.xml` at the global level (effectively overriding the default values system-wide), specified per service in the `properties` field of the `Configuration` object, or specified per component in the `properties` field of the component's `Configuration` object.
@@ -147,6 +149,7 @@ Component-level service AM configuration properties can be specified either in t
 |yarn.service.container-health-threshold.poll-frequency-secs | Health check monitor poll frequency. It is an advanced setting and does not need to be set unless the service owner understands the implication and does not want the default. The default is 10 secs.
 |yarn.service.container-health-threshold.window-secs | The amount of time the health check monitor allows a specific component to be below the health threshold after which it considers the service to be unhealthy. The default is 600 secs (10 mins).
 |yarn.service.container-health-threshold.init-delay-secs | The amount of initial time the health check monitor waits before the first check kicks in. It gives a lead time for the service containers to come up for the first time. The default is 600 secs (10 mins).
+|yarn.service.container-state-report-as-service-state | The boolean flag indicates that if this component is finished, the service is also terminated. The default is false.
 
 There is one component-level configuration property that is set differently in the `yarn-site.xml` file than it is in the service specification.
 To select the docker network type that will be used for docker containers, `docker.network` may be set in the service `Configuration` `properties` or the component `Configuration` `properties`.

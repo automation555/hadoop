@@ -20,14 +20,22 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+=======
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
@@ -66,7 +74,8 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class RMContainerImpl implements RMContainer {
 
-  private static final Log LOG = LogFactory.getLog(RMContainerImpl.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RMContainerImpl.class);
 
   private static final StateMachineFactory<RMContainerImpl, RMContainerState, 
                                            RMContainerEventType, RMContainerEvent> 
@@ -304,8 +313,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public Resource getAllocatedResource() {
+    readLock.lock();
     try {
-      readLock.lock();
       return container.getResource();
     } finally {
       readLock.unlock();
@@ -314,8 +323,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public Resource getLastConfirmedResource() {
+    readLock.lock();
     try {
-      readLock.lock();
       return this.lastConfirmedResource;
     } finally {
       readLock.unlock();
@@ -344,8 +353,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public long getFinishTime() {
+    readLock.lock();
     try {
-      readLock.lock();
       return finishTime;
     } finally {
       readLock.unlock();
@@ -354,8 +363,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public String getDiagnosticsInfo() {
+    readLock.lock();
     try {
-      readLock.lock();
       if (finishedStatus != null) {
         return finishedStatus.getDiagnostics();
       } else {
@@ -368,8 +377,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public String getLogURL() {
+    readLock.lock();
     try {
-      readLock.lock();
       StringBuilder logURL = new StringBuilder();
       logURL.append(WebAppUtils.getHttpSchemePrefix(rmContext
           .getYarnConfiguration()));
@@ -384,8 +393,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public int getContainerExitStatus() {
+    readLock.lock();
     try {
-      readLock.lock();
       if (finishedStatus != null) {
         return finishedStatus.getExitStatus();
       } else {
@@ -398,8 +407,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public ContainerState getContainerState() {
+    readLock.lock();
     try {
-      readLock.lock();
       if (finishedStatus != null) {
         return finishedStatus.getState();
       } else {
@@ -412,8 +421,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public ContainerRequest getContainerRequest() {
+    readLock.lock();
     try {
-      readLock.lock();
       return containerRequestForRecovery;
     } finally {
       readLock.unlock();
@@ -436,8 +445,8 @@ public class RMContainerImpl implements RMContainer {
   
   @Override
   public boolean isAMContainer() {
+    readLock.lock();
     try {
-      readLock.lock();
       return isAMContainer;
     } finally {
       readLock.unlock();
@@ -445,8 +454,8 @@ public class RMContainerImpl implements RMContainer {
   }
 
   public void setAMContainer(boolean isAMContainer) {
+    writeLock.lock();
     try {
-      writeLock.lock();
       this.isAMContainer = isAMContainer;
     } finally {
       writeLock.unlock();
@@ -464,12 +473,11 @@ public class RMContainerImpl implements RMContainer {
   
   @Override
   public void handle(RMContainerEvent event) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing " + event.getContainerId() + " of type " + event
-              .getType());
-    }
+    LOG.debug("Processing {} of type {}", event.getContainerId(),
+        event.getType());
+
+    writeLock.lock();
     try {
-      writeLock.lock();
       RMContainerState oldState = getState();
       try {
          stateMachine.doTransition(event.getType(), event);
@@ -606,7 +614,10 @@ public class RMContainerImpl implements RMContainer {
       container.eventHandler.handle(new RMAppRunningOnNodeEvent(container
           .getApplicationAttemptId().getApplicationId(), container.nodeId));
 
-      publishNonAMContainerEventstoATS(container);
+      // Opportunistic containers move directly from NEW to ACQUIRED
+      if (container.getState() == RMContainerState.NEW) {
+        publishNonAMContainerEventstoATS(container);
+      }
     }
   }
 
@@ -797,7 +808,8 @@ public class RMContainerImpl implements RMContainer {
           this.getAllocatedSchedulerKey().getPriority(), this.getCreationTime(),
           this.getFinishTime(), this.getDiagnosticsInfo(), this.getLogURL(),
           this.getContainerExitStatus(), this.getContainerState(),
-          this.getNodeHttpAddress(), this.getExecutionType());
+          this.getNodeHttpAddress(),  this.getExecutionType());
+      containerReport.setExposedPorts(this.getExposedPorts());
     } finally {
       this.readLock.unlock();
     }
@@ -806,8 +818,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public String getNodeHttpAddress() {
+    readLock.lock();
     try {
-      readLock.lock();
       if (container.getNodeHttpAddress() != null) {
         StringBuilder httpAddress = new StringBuilder();
         httpAddress.append(WebAppUtils.getHttpSchemePrefix(rmContext
@@ -820,6 +832,19 @@ public class RMContainerImpl implements RMContainer {
     } finally {
       readLock.unlock();
     }
+  }
+
+  @Override
+  public Map<String, List<Map<String, String>>> getExposedPorts() {
+    if (container.getExposedPorts() == null) {
+      return null;
+    }
+    return container.getExposedPorts();
+  }
+
+  @Override
+  public void setExposedPorts(Map<String, List<Map<String, String>>> ports) {
+    container.setExposedPorts(ports);
   }
 
   @Override
@@ -877,8 +902,8 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public Resource getAllocatedOrReservedResource() {
+    readLock.lock();
     try {
-      readLock.lock();
       if (getState().equals(RMContainerState.RESERVED)) {
         return getReservedResource();
       } else {

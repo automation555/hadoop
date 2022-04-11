@@ -22,9 +22,9 @@ import java.util.List;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.base.Objects;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.util.Lists;
 
 /**
  * An AclStatus contains the ACL information of a specific file. AclStatus
@@ -69,7 +69,7 @@ public class AclStatus {
   /**
    * Returns the list of all ACL entries, ordered by their natural ordering.
    *
-   * @return List<AclEntry> unmodifiable ordered list of all ACL entries
+   * @return List&lt;AclEntry&gt; unmodifiable ordered list of all ACL entries
    */
   public List<AclEntry> getEntries() {
     return entries;

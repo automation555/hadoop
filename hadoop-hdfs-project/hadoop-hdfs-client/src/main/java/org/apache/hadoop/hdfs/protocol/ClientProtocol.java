@@ -176,6 +176,7 @@ public interface ClientProtocol {
    *                     policy. ecPolicyName and SHOULD_REPLICATE CreateFlag
    *                     are mutually exclusive. It's invalid to set both
    *                     SHOULD_REPLICATE flag and a non-null ecPolicyName.
+   *@param storagePolicy the name of the storage policy.
    *
    * @return the status of the created file, it could be null if the server
    *           doesn't support returning the file status
@@ -209,7 +210,8 @@ public interface ClientProtocol {
   HdfsFileStatus create(String src, FsPermission masked,
       String clientName, EnumSetWritable<CreateFlag> flag,
       boolean createParent, short replication, long blockSize,
-      CryptoProtocolVersion[] supportedVersions, String ecPolicyName)
+      CryptoProtocolVersion[] supportedVersions, String ecPolicyName,
+      String storagePolicy)
       throws IOException;
 
   /**
@@ -696,6 +698,27 @@ public interface ClientProtocol {
       boolean needLocation) throws IOException;
 
   /**
+<<<<<<< HEAD
+   * Get a partial listing of the input directories
+   *
+   * @param srcs the input directories
+   * @param startAfter the name to start listing after encoded in Java UTF8
+   * @param needLocation if the FileStatus should contain block locations
+   *
+   * @return a partial listing starting after startAfter. null if the input is
+   *   empty
+   * @throws IOException if an I/O error occurred
+   */
+  @Idempotent
+  @ReadOnly(isCoordinated = true)
+  BatchedDirectoryListing getBatchedListing(
+      String[] srcs,
+      byte[] startAfter,
+      boolean needLocation) throws IOException;
+
+  /**
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    * Get the list of snapshottable directories that are owned
    * by the current user. Return all the snapshottable directories if the
    * current user is a super user.
@@ -706,6 +729,18 @@ public interface ClientProtocol {
   @ReadOnly(isCoordinated = true)
   SnapshottableDirectoryStatus[] getSnapshottableDirListing()
       throws IOException;
+
+  /**
+   * Get listing of all the snapshots for a snapshottable directory.
+   *
+   * @return Information about all the snapshots for a snapshottable directory
+   * @throws IOException If an I/O error occurred
+   */
+  @Idempotent
+  @ReadOnly(isCoordinated = true)
+  SnapshotStatus[] getSnapshotListing(String snapshotRoot)
+      throws IOException;
+
 
   ///////////////////////////////////////
   // System issues and management
@@ -1143,11 +1178,11 @@ public interface ClientProtocol {
    * Sets the modification and access time of the file to the specified time.
    * @param src The string representation of the path
    * @param mtime The number of milliseconds since Jan 1, 1970.
-   *              Setting mtime to -1 means that modification time should not
+   *              Setting negative mtime means that modification time should not
    *              be set by this call.
    * @param atime The number of milliseconds since Jan 1, 1970.
-   *              Setting atime to -1 means that access time should not be set
-   *              by this call.
+   *              Setting negative atime means that access time should not be
+   *              set by this call.
    *
    * @throws org.apache.hadoop.security.AccessControlException permission denied
    * @throws java.io.FileNotFoundException file <code>src</code> is not found
@@ -1740,6 +1775,18 @@ public interface ClientProtocol {
    */
   @AtMostOnce
   void unsetErasureCodingPolicy(String src) throws IOException;
+
+  /**
+   * Verifies if the given policies are supported in the given cluster setup.
+   * If not policy is specified checks for all enabled policies.
+   * @param policyNames name of policies.
+   * @return the result if the given policies are supported in the cluster setup
+   * @throws IOException
+   */
+  @Idempotent
+  @ReadOnly
+  ECTopologyVerifierResult getECTopologyResultForPolicies(String... policyNames)
+      throws IOException;
 
   /**
    * Get {@link QuotaUsage} rooted at the specified directory.

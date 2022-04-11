@@ -25,7 +25,11 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedList;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.StringUtils;
 
@@ -334,10 +338,17 @@ class Ls extends FsCommand {
     }
 
     StringBuilder fmt = new StringBuilder();
+<<<<<<< HEAD
+    fmt.append("%s%s") // permission string
+        .append("%"  + maxRepl  + "s ")
+        .append((maxOwner > 0) ? "%-" + maxOwner + "s " : "%s")
+        .append((maxGroup > 0) ? "%-" + maxGroup + "s " : "%s");
+=======
     fmt.append("%s%s"); // permission string
     fmt.append("%"  + maxRepl  + "s ");
     fmt.append((maxOwner > 0) ? "%-" + maxOwner + "s " : "%s");
     fmt.append((maxGroup > 0) ? "%-" + maxGroup + "s " : "%s");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // Do not use '%-0s' as a formatting conversion, since it will throw a
     // a MissingFormatWidthException if it is used in String.format().
     // http://docs.oracle.com/javase/1.5.0/docs/api/java/util/Formatter.html#intFlags

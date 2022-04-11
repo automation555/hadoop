@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.yarn.api.records.impl.pb;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.protocolrecords.ResourceTypes;
@@ -32,13 +34,15 @@ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceInformationProto;
 import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 
+import java.util.HashSet;
 import java.util.Map;
 
 @Private
 @Unstable
 public class ResourcePBImpl extends Resource {
 
-  private static final Log LOG = LogFactory.getLog(ResourcePBImpl.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ResourcePBImpl.class);
 
   ResourceProto proto = ResourceProto.getDefaultInstance();
   ResourceProto.Builder builder = null;
@@ -184,6 +188,17 @@ public class ResourcePBImpl extends Resource {
       ri.setUnits(units);
       ri.setValue(value);
     }
+    if (entry.getTagsCount() > 0) {
+      ri.setTags(new HashSet<>(entry.getTagsList()));
+    } else {
+      ri.setTags(ImmutableSet.of());
+    }
+    if (entry.getAttributesCount() > 0) {
+      ri.setAttributes(ProtoUtils
+          .convertStringStringMapProtoListToMap(entry.getAttributesList()));
+    } else {
+      ri.setAttributes(ImmutableMap.of());
+    }
     return ri;
   }
 
@@ -230,6 +245,15 @@ public class ResourcePBImpl extends Resource {
         e.setUnits(resInfo.getUnits());
         e.setType(ProtoUtils.converToProtoFormat(resInfo.getResourceType()));
         e.setValue(resInfo.getValue());
+        if (resInfo.getAttributes() != null
+            && !resInfo.getAttributes().isEmpty()) {
+          e.addAllAttributes(ProtoUtils.convertToProtoFormat(
+              resInfo.getAttributes()));
+        }
+        if (resInfo.getTags() != null
+            && !resInfo.getTags().isEmpty()) {
+          e.addAllTags(resInfo.getTags());
+        }
         builder.addResourceValueMap(e);
       }
     }

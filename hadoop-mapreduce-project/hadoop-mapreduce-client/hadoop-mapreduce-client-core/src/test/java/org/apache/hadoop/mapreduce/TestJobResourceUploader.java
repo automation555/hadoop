@@ -24,9 +24,15 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+<<<<<<< HEAD
+import static org.mockito.Mockito.spy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+=======
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.spy;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import java.io.IOException;
 import java.net.URI;
@@ -399,6 +405,10 @@ public class TestJobResourceUploader {
       Path expectedRemotePath) throws IOException, URISyntaxException {
     Path dstPath = new Path("hdfs://localhost:1234/home/hadoop/");
     DistributedFileSystem fs = mock(DistributedFileSystem.class);
+<<<<<<< HEAD
+    when(fs.makeQualified(any(Path.class))).thenReturn(dstPath);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // make sure that FileUtils.copy() doesn't try to copy anything
     when(fs.mkdirs(any(Path.class))).thenReturn(false);
     when(fs.getUri()).thenReturn(dstPath.toUri());
@@ -407,6 +417,10 @@ public class TestJobResourceUploader {
     JobConf jConf = new JobConf();
     Path originalPath = spy(path);
     FileSystem localFs = mock(FileSystem.class);
+<<<<<<< HEAD
+    when(localFs.makeQualified(any(Path.class))).thenReturn(path);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     FileStatus fileStatus = mock(FileStatus.class);
     when(localFs.getFileStatus(any(Path.class))).thenReturn(fileStatus);
     when(fileStatus.isDirectory()).thenReturn(true);
@@ -420,8 +434,19 @@ public class TestJobResourceUploader {
         originalPath, jConf, (short) 1);
 
     ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
+<<<<<<< HEAD
+    verify(fs, times(2)).makeQualified(pathCaptor.capture());
+    List<Path> paths = pathCaptor.getAllValues();
+    // first call is invoked on a path which was created by the test,
+    // but the second one is created in copyRemoteFiles()
+    Assert.assertEquals("Expected remote path",
+        expectedRemotePath, paths.get(0));
+    Assert.assertEquals("Expected remote path",
+        expectedRemotePath, paths.get(1));
+=======
     verify(fs).makeQualified(pathCaptor.capture());
     Assert.assertEquals("Path", expectedRemotePath, pathCaptor.getValue());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   private void testErasureCodingSetting(boolean defaultBehavior)

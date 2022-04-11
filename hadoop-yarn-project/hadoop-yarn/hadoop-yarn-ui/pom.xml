@@ -20,11 +20,19 @@
   <parent>
     <artifactId>hadoop-yarn</artifactId>
     <groupId>org.apache.hadoop</groupId>
+<<<<<<< HEAD
+    <version>3.4.0-SNAPSHOT</version>
+  </parent>
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>hadoop-yarn-ui</artifactId>
+  <version>3.4.0-SNAPSHOT</version>
+=======
     <version>3.2.1</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-yarn-ui</artifactId>
   <version>3.2.1</version>
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <name>Apache Hadoop YARN UI</name>
   <packaging>${packagingType}</packaging>
 
@@ -65,7 +73,6 @@
 
       <plugin>
         <artifactId>maven-clean-plugin</artifactId>
-        <version>3.0.0</version>
         <configuration>
           <skip>${keepUIBuildCache}</skip>
           <followSymLinks>false</followSymLinks>
@@ -118,7 +125,48 @@
                         <exclude>bower_components/**/*</exclude>
                         <exclude>tmp/**/*</exclude>
                         <exclude>dist/**/*</exclude>
+                        <exclude>terminal/**/*</exclude>
                       </excludes>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+              <execution>
+                <id>copy-terminal</id>
+                <!-- here the phase you need -->
+                <phase>compile</phase>
+                <goals>
+                  <goal>copy-resources</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${webappDir}/dist</outputDirectory>
+                  <resources>
+                    <resource>
+                      <directory>${basedir}/src/main/webapp</directory>
+                      <filtering>true</filtering>
+                      <includes>
+                        <include>terminal/**/*</include>
+                      </includes>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+              <execution>
+                <id>copy-xterm</id>
+                <!-- here the phase you need -->
+                <phase>compile</phase>
+                <goals>
+                  <goal>copy-resources</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${webappDir}/dist/terminal/xterm</outputDirectory>
+                  <resources>
+                    <resource>
+                      <directory>${basedir}/target/webapp/node_modules/xterm</directory>
+                      <filtering>true</filtering>
+                      <includes>
+                        <include>dist/**/*</include>
+                      </includes>
                     </resource>
                   </resources>
                 </configuration>
@@ -144,8 +192,8 @@
                   <goal>install-node-and-yarn</goal>
                 </goals>
                 <configuration>
-                  <nodeVersion>v5.12.0</nodeVersion>
-                  <yarnVersion>v0.21.3</yarnVersion>
+                  <nodeVersion>v12.22.1</nodeVersion>
+                  <yarnVersion>v1.22.5</yarnVersion>
                 </configuration>
               </execution>
               <execution>
@@ -162,7 +210,7 @@
                 <phase>generate-resources</phase>
                 <id>bower install</id>
                 <configuration>
-                  <arguments>install</arguments>
+                  <arguments>install --allow-root</arguments>
                 </configuration>
                 <goals>
                   <goal>bower</goal>
@@ -202,6 +250,14 @@
             <groupId>ro.isdc.wro4j</groupId>
             <artifactId>wro4j-maven-plugin</artifactId>
             <version>1.7.9</version>
+            <dependencies>
+              <!-- TODO: Remove this dependency after upgrading wro4j-maven-plugin to 1.8.1 or later. -->
+              <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>2.18.0</version>
+              </dependency>
+            </dependencies>
             <executions>
               <execution>
                 <phase>prepare-package</phase>

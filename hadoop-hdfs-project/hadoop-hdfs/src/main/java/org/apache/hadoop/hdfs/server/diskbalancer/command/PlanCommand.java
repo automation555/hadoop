@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.diskbalancer.command;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.base.Throwables;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -176,8 +176,7 @@ public class PlanCommand extends Command {
       final String errMsg =
           "Errors while recording the output of plan command.";
       LOG.error(errMsg, e);
-      result.appendln(errMsg);
-      result.appendln(Throwables.getStackTraceAsString(e));
+      result.appendln(errMsg).appendln(Throwables.getStackTraceAsString(e));
     }
 
     getPrintStream().print(result.toString());

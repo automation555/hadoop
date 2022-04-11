@@ -26,6 +26,7 @@ export default Ember.Component.extend({
     searchType: 'manual',
   }),
   graphDrawn: false,
+  userInfo: null,
 
   actions: {
     changeViewType(param) {
@@ -376,6 +377,18 @@ export default Ember.Component.extend({
         }
       }
     }, {
+      id: 'exposedPorts',
+      headerTitle: 'Exposed Ports',
+      contentPath: 'exposedPorts',
+      getCellContent: function(row) {
+        var ports = row.get('exposedPorts');
+        if (ports) {
+          return ports;
+        } else {
+          return 'N/A';
+        }
+      }
+    }, {
       id: 'nodeHttpAddress',
       headerTitle: 'NodeManager Web UI',
       contentPath: 'nodeHttpAddress',
@@ -417,7 +430,14 @@ export default Ember.Component.extend({
       id: 'id',
       headerTitle: 'Container ID',
       contentPath: 'id',
-      minWidth: '350px'
+      cellComponentName: 'em-table-html-cell',
+      minWidth: '350px',
+      getCellContent: function(row) {
+        var termLink = self.checkHttpProtocol(row.get('nodeHttpAddress'));
+        var containerId = row.get('id');
+        var requestedUser = self.get('requestedUser');
+        return `<a href="${termLink}/terminal/terminal.template?container=${containerId}&user.name=${requestedUser}" target="_blank">${containerId}</a>`;
+      }
     }, {
       id: 'startedTime',
       headerTitle: 'Started Time',
@@ -473,6 +493,21 @@ export default Ember.Component.extend({
         var containerLogUrl = row.get('appAttemptContainerLogsURL');
         if (containerLogUrl) {
           return `<a href="${containerLogUrl}">Link</a>`;
+<<<<<<< HEAD
+        } else {
+          return 'N/A';
+        }
+      }
+    }, {
+      id: 'exposedPorts',
+      headerTitle: 'Exposed Ports',
+      contentPath: 'exposedPorts',
+      getCellContent: function(row) {
+        var ports = row.get('exposedPorts');
+        if (ports) {
+          return ports;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         } else {
           return 'N/A';
         }
@@ -503,5 +538,12 @@ export default Ember.Component.extend({
       prop = 'http://' + prop;
     }
     return prop;
-  }
+  },
+
+  requestedUser: function() {
+    if (this.get('userInfo')) {
+      return this.get('userInfo.requestedUser');
+    }
+    return '';
+  }.property('userInfo'),
 });

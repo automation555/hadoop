@@ -20,17 +20,20 @@ package org.apache.hadoop.crypto.key;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.security.Security;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -42,6 +45,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 
 import javax.crypto.KeyGenerator;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CRYPTO_JCE_PROVIDER_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CRYPTO_JCEKS_KEY_SERIALFILTER;
 
 /**
@@ -49,12 +53,12 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
  * abstraction to separate key storage from users of encryption. It
  * is intended to support getting or storing keys in a variety of ways,
  * including third party bindings.
- * <P/>
+ * <p>
  * <code>KeyProvider</code> implementations must be thread safe.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
-public abstract class KeyProvider {
+public abstract class KeyProvider implements Closeable {
   public static final String DEFAULT_CIPHER_NAME =
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_DEFAULT_CIPHER_KEY;
   public static final String DEFAULT_CIPHER =
@@ -408,9 +412,13 @@ public abstract class KeyProvider {
     // java.security.UnrecoverableKeyException in JDK 8u171.
     if(System.getProperty(JCEKS_KEY_SERIAL_FILTER) == null) {
       String serialFilter =
-          conf.get(HADOOP_SECURITY_CRYPTO_JCEKS_KEY_SERIALFILTER,
-              JCEKS_KEY_SERIALFILTER_DEFAULT);
+              conf.get(HADOOP_SECURITY_CRYPTO_JCEKS_KEY_SERIALFILTER,
+                      JCEKS_KEY_SERIALFILTER_DEFAULT);
       System.setProperty(JCEKS_KEY_SERIAL_FILTER, serialFilter);
+    }
+    String jceProvider = conf.get(HADOOP_SECURITY_CRYPTO_JCE_PROVIDER_KEY);
+    if (BouncyCastleProvider.PROVIDER_NAME.equals(jceProvider)) {
+      Security.addProvider(new BouncyCastleProvider());
     }
   }
 
@@ -549,7 +557,7 @@ public abstract class KeyProvider {
   /**
    * Create a new key generating the material for it.
    * The given key must not already exist.
-   * <p/>
+   * <p>
    * This implementation generates the key material and calls the
    * {@link #createKey(String, byte[], Options)} method.
    *
@@ -593,7 +601,7 @@ public abstract class KeyProvider {
 
   /**
    * Roll a new version of the given key generating the material for it.
-   * <p/>
+   * <p>
    * This implementation generates the key material and calls the
    * {@link #rollNewVersion(String, byte[])} method.
    *

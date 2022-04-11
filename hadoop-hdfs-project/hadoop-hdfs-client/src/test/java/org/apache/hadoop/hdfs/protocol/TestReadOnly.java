@@ -39,7 +39,13 @@ public class TestReadOnly {
           "getStoragePolicies",
           "getStoragePolicy",
           "getListing",
+<<<<<<< HEAD
+          "getBatchedListing",
           "getSnapshottableDirListing",
+          "getSnapshotListing",
+=======
+          "getSnapshottableDirListing",
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
           "getPreferredBlockSize",
           "listCorruptFileBlocks",
           "getFileInfo",
@@ -73,7 +79,12 @@ public class TestReadOnly {
           "getEditsFromTxid",
           "getQuotaUsage",
           "msync",
+<<<<<<< HEAD
+          "getHAServiceState",
+          "getECTopologyResultForPolicies"
+=======
           "getHAServiceState"
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       )
   );
 

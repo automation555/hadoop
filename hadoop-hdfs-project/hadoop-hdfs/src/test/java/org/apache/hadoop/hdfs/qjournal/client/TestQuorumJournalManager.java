@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdfs.qjournal.MiniJournalCluster;
 import org.apache.hadoop.hdfs.qjournal.QJMTestUtil;
 import org.apache.hadoop.hdfs.qjournal.protocol.QJournalProtocolProtos.SegmentStateProto;
 import org.apache.hadoop.hdfs.qjournal.server.JournalFaultInjector;
+import org.apache.hadoop.hdfs.qjournal.server.JournalNode;
 import org.apache.hadoop.hdfs.server.namenode.EditLogInputStream;
 import org.apache.hadoop.hdfs.server.namenode.EditLogOutputStream;
 import org.apache.hadoop.hdfs.server.namenode.FileJournalManager;
@@ -57,16 +59,17 @@ import org.apache.hadoop.hdfs.server.namenode.NNStorage;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeLayoutVersion;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.ProtobufRpcEngine2;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Stubber;
 
-import com.google.common.collect.Lists;
+import org.slf4j.event.Level;
 
 /**
  * Functional tests for QuorumJournalManager.
@@ -84,14 +87,25 @@ public class TestQuorumJournalManager {
   private final List<QuorumJournalManager> toClose = Lists.newLinkedList();
   
   static {
-    GenericTestUtils.setLogLevel(ProtobufRpcEngine.LOG, Level.ALL);
+    GenericTestUtils.setLogLevel(ProtobufRpcEngine2.LOG, Level.TRACE);
   }
+
+  @Rule
+  public TestName name = new TestName();
 
   @Before
   public void setup() throws Exception {
     conf = new Configuration();
+<<<<<<< HEAD
+    if (!name.getMethodName().equals("testSelectThreadCounts")) {
+      // Don't retry connections - it just slows down the tests.
+      conf.setInt(
+          CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
+    }
+=======
     // Don't retry connections - it just slows down the tests.
     conf.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // Turn off IPC client caching to handle daemon restarts.
     conf.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECTION_MAXIDLETIME_KEY, 0);
@@ -1040,6 +1054,30 @@ public class TestQuorumJournalManager {
   }
 
   @Test
+<<<<<<< HEAD
+  public void testSelectThreadCounts() throws Exception {
+    EditLogOutputStream stm =
+        qjm.startLogSegment(1, NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION);
+    writeTxns(stm, 1, 10);
+    JournalNode jn0 = cluster.getJournalNode(0);
+    String ipcAddr = cluster.getJournalNodeIpcAddress(0);
+    jn0.stopAndJoin(0);
+    for (int i = 0; i < 1000; i++) {
+      qjm.selectInputStreams(new ArrayList<>(), 1, true, false);
+    }
+    String expectedName =
+        "Logger channel (from parallel executor) to " + ipcAddr;
+    long num = Thread.getAllStackTraces().keySet().stream()
+        .filter((t) -> t.getName().contains(expectedName)).count();
+    // The number of threads for the stopped jn shouldn't be more than the
+    // configured value.
+    assertTrue("Number of threads are : " + num,
+        num <= DFSConfigKeys.DFS_QJOURNAL_PARALLEL_READ_NUM_THREADS_DEFAULT);
+  }
+
+  @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testSelectViaRpcTwoJNsError() throws Exception {
     EditLogOutputStream stm =
         qjm.startLogSegment(1, NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION);

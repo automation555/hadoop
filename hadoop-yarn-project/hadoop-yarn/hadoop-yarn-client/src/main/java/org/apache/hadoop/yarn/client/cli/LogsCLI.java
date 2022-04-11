@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.yarn.client.cli;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientHandlerException;
 import com.sun.jersey.api.client.ClientRequest;
@@ -27,17 +27,13 @@ import com.sun.jersey.api.client.UniformInterfaceException;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.WebResource.Builder;
 import com.sun.jersey.api.client.filter.ClientFilter;
-import com.sun.jersey.client.urlconnection.HttpURLConnectionFactory;
-import com.sun.jersey.client.urlconnection.URLConnectionClientHandler;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.ConnectException;
-import java.net.HttpURLConnection;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -68,9 +64,8 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptReport;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
@@ -78,6 +73,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerReport;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEntityType;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
@@ -85,7 +81,10 @@ import org.apache.hadoop.yarn.logaggregation.ContainerLogFileInfo;
 import org.apache.hadoop.yarn.logaggregation.ContainerLogsRequest;
 import org.apache.hadoop.yarn.logaggregation.LogCLIHelpers;
 import org.apache.hadoop.yarn.logaggregation.LogToolUtils;
+import org.apache.hadoop.yarn.server.metrics.AppAttemptMetricsConstants;
+import org.apache.hadoop.yarn.util.Apps;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
+import org.apache.hadoop.yarn.webapp.util.WebServiceClient;
 import org.apache.hadoop.yarn.webapp.util.YarnWebServiceUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -97,11 +96,17 @@ public class LogsCLI extends Configured implements Tool {
 
   private static final String CONTAINER_ID_OPTION = "containerId";
   private static final String APPLICATION_ID_OPTION = "applicationId";
+<<<<<<< HEAD
+  private static final String APPLICATION_ATTEMPT_ID_OPTION =
+          "applicationAttemptId";
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   private static final String CLUSTER_ID_OPTION = "clusterId";
   private static final String NODE_ADDRESS_OPTION = "nodeAddress";
   private static final String APP_OWNER_OPTION = "appOwner";
   private static final String AM_CONTAINER_OPTION = "am";
   private static final String PER_CONTAINER_LOG_FILES_OPTION = "log_files";
+  private static final String PER_CONTAINER_LOG_FILES_OLD_OPTION = "logFiles";
   private static final String PER_CONTAINER_LOG_FILES_REGEX_OPTION
       = "log_files_pattern";
   private static final String LIST_NODES_OPTION = "list_nodes";
@@ -136,6 +141,9 @@ public class LogsCLI extends Configured implements Tool {
   @Override
   public int run(String[] args) throws Exception {
     try {
+<<<<<<< HEAD
+      webServiceClient = WebServiceClient.getWebServiceClient().createClient();
+=======
       webServiceClient = new Client(new URLConnectionClientHandler(
           new HttpURLConnectionFactory() {
           @Override
@@ -151,6 +159,7 @@ public class LogsCLI extends Configured implements Tool {
             return conn;
           }
         }));
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       return runCommand(args);
     } finally {
       if (yarnClient != null) {
@@ -175,6 +184,10 @@ public class LogsCLI extends Configured implements Tool {
     }
     CommandLineParser parser = new GnuParser();
     String appIdStr = null;
+<<<<<<< HEAD
+    String appAttemptIdStr = null;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     String clusterIdStr = null;
     String containerIdStr = null;
     String nodeAddress = null;
@@ -195,6 +208,8 @@ public class LogsCLI extends Configured implements Tool {
     try {
       CommandLine commandLine = parser.parse(opts, args, false);
       appIdStr = commandLine.getOptionValue(APPLICATION_ID_OPTION);
+      appAttemptIdStr = commandLine.getOptionValue(
+              APPLICATION_ATTEMPT_ID_OPTION);
       containerIdStr = commandLine.getOptionValue(CONTAINER_ID_OPTION);
       nodeAddress = commandLine.getOptionValue(NODE_ADDRESS_OPTION);
       appOwner = commandLine.getOptionValue(APP_OWNER_OPTION);
@@ -218,6 +233,12 @@ public class LogsCLI extends Configured implements Tool {
       }
       if (commandLine.hasOption(PER_CONTAINER_LOG_FILES_OPTION)) {
         logFiles = commandLine.getOptionValues(PER_CONTAINER_LOG_FILES_OPTION);
+      } else {
+        // For backward compatibility, we need to check for the old form of this
+        // command line option as well.  New form takes precedent.
+        if (commandLine.hasOption(PER_CONTAINER_LOG_FILES_OLD_OPTION)) {
+          logFiles = commandLine.getOptionValues(PER_CONTAINER_LOG_FILES_OLD_OPTION);
+        }
       }
       if (commandLine.hasOption(PER_CONTAINER_LOG_FILES_REGEX_OPTION)) {
         logFilesRegex = commandLine.getOptionValues(
@@ -249,9 +270,9 @@ public class LogsCLI extends Configured implements Tool {
       return -1;
     }
 
-    if (appIdStr == null && containerIdStr == null) {
-      System.err.println("Both applicationId and containerId are missing, "
-          + " one of them must be specified.");
+    if (appIdStr == null && appAttemptIdStr == null && containerIdStr == null) {
+      System.err.println("None of applicationId, appAttemptId and containerId "
+          + "is available,  one of them must be specified.");
       printHelpMessage(printOpts);
       return -1;
     }
@@ -266,9 +287,32 @@ public class LogsCLI extends Configured implements Tool {
       }
     }
 
+    ApplicationAttemptId appAttemptId = null;
+    if (appAttemptIdStr != null) {
+      try {
+        appAttemptId = ApplicationAttemptId.fromString(appAttemptIdStr);
+        if (appId == null) {
+          appId = appAttemptId.getApplicationId();
+        } else if (!appId.equals(appAttemptId.getApplicationId())) {
+          System.err.println("The Application:" + appId
+                  + " does not have the AppAttempt:" + appAttemptId);
+          return -1;
+        }
+      } catch (Exception e) {
+        System.err.println("Invalid AppAttemptId specified");
+        return -1;
+      }
+    }
+
     if (containerIdStr != null) {
       try {
         ContainerId containerId = ContainerId.fromString(containerIdStr);
+        if (appAttemptId != null && !appAttemptId.equals(
+                containerId.getApplicationAttemptId())) {
+          System.err.println("The AppAttempt:" + appAttemptId
+                  + " does not have the container:" + containerId);
+          return -1;
+        }
         if (appId == null) {
           appId = containerId.getApplicationAttemptId().getApplicationId();
         } else if (!containerId.getApplicationAttemptId().getApplicationId()
@@ -353,9 +397,9 @@ public class LogsCLI extends Configured implements Tool {
     }
 
 
-    ContainerLogsRequest request = new ContainerLogsRequest(appId,
-        isApplicationFinished(appState), appOwner, nodeAddress, null,
-        containerIdStr, localDir, logs, bytes, null);
+    ContainerLogsRequest request = new ContainerLogsRequest(appId, appAttemptId,
+        Apps.isApplicationFinalState(appState), appOwner, nodeAddress,
+        null, containerIdStr, localDir, logs, bytes, null);
 
     if (showContainerLogInfo) {
       return showContainerLogInfo(request, logCliHelper);
@@ -408,7 +452,9 @@ public class LogsCLI extends Configured implements Tool {
     Configuration conf = new YarnConfiguration();
     LogsCLI logDumper = new LogsCLI();
     logDumper.setConf(conf);
+    WebServiceClient.initialize(conf);
     int exitCode = logDumper.run(args);
+    WebServiceClient.destroy();
     System.exit(exitCode);
   }
 
@@ -595,7 +641,7 @@ public class LogsCLI extends Configured implements Tool {
       for (String logFile : request.getLogTypes()) {
         InputStream is = null;
         try {
-          ClientResponse response = getResponeFromNMWebService(conf,
+          ClientResponse response = getResponseFromNMWebService(conf,
               webServiceClient, request, logFile);
           if (response != null && response.getStatusInfo().getStatusCode() ==
               ClientResponse.Status.OK.getStatusCode()) {
@@ -643,12 +689,6 @@ public class LogsCLI extends Configured implements Tool {
         ContainerId.fromString(containerIdStr));
   }
 
-  private boolean isApplicationFinished(YarnApplicationState appState) {
-    return appState == YarnApplicationState.FINISHED
-        || appState == YarnApplicationState.FAILED
-        || appState == YarnApplicationState.KILLED; 
-  }
-
   private int printAMContainerLogs(Configuration conf,
       ContainerLogsRequest request, List<String> amContainers,
       LogCLIHelpers logCliHelper, boolean useRegex, boolean ignoreSizeLimit)
@@ -686,16 +726,31 @@ public class LogsCLI extends Configured implements Tool {
               + "and make sure the timeline server is running.");
         } else {
           try {
-            amContainersList = getAMContainerInfoForAHSWebService(conf, appId);
-            if (amContainersList != null && !amContainersList.isEmpty()) {
-              getAMContainerLists = true;
-              for (JSONObject amContainer : amContainersList) {
-                ContainerLogsRequest amRequest = new ContainerLogsRequest(
-                    request);
-                amRequest.setContainerId(
-                    amContainer.getString("amContainerId"));
-                requests.add(amRequest);
+            if (YarnConfiguration.timelineServiceV2Enabled(conf)) {
+              try {
+                amContainersList =
+                    getAMContainerInfoFromTimelineReader(conf, appId);
+                getAMContainerLists =
+                    createContainerLogsRequestForMasterContainer(requests,
+                        request, amContainersList,
+                        AppAttemptMetricsConstants.MASTER_CONTAINER_INFO);
+              } catch (Exception e) {
+                System.err.println(
+                    "Unable to get AM container informations from "
+                        + "TimelineReader for the application:" + appId);
+                if (YarnConfiguration.timelineServiceV1Enabled(conf)
+                    || YarnConfiguration.timelineServiceV15Enabled(conf)) {
+                  getAMContainerLists =
+                      getAMContainerInfoForAHSWebService(conf, appId, requests,
+                          request);
+                } else {
+                  throw e;
+                }
               }
+            } else {
+              getAMContainerLists =
+                  getAMContainerInfoForAHSWebService(conf, appId, requests,
+                      request);
             }
           } catch (Exception e) {
             errorMessage.append(e.getMessage());
@@ -751,6 +806,76 @@ public class LogsCLI extends Configured implements Tool {
           useRegex, ignoreSizeLimit);
     }
     return 0;
+  }
+
+  private boolean getAMContainerInfoForAHSWebService(Configuration conf,
+      String appId, List<ContainerLogsRequest> requests,
+      ContainerLogsRequest request) throws JSONException {
+    List<JSONObject> amContainersList =
+        getAMContainerInfoForAHSWebService(conf, appId);
+    return createContainerLogsRequestForMasterContainer(requests, request,
+        amContainersList, "amContainerId");
+  }
+
+  private boolean createContainerLogsRequestForMasterContainer(
+      List<ContainerLogsRequest> requests, ContainerLogsRequest request,
+      List<JSONObject> amContainersList, String masterContainerInfo)
+      throws JSONException {
+    boolean getAMContainerLists = false;
+    if (amContainersList != null && !amContainersList.isEmpty()) {
+      getAMContainerLists = true;
+      for (JSONObject amContainer : amContainersList) {
+        ContainerLogsRequest amRequest = new ContainerLogsRequest(request);
+        amRequest.setContainerId(amContainer.getString(masterContainerInfo));
+        requests.add(amRequest);
+      }
+    }
+    return getAMContainerLists;
+  }
+
+  private List<JSONObject> getAMContainerInfoFromTimelineReader(
+      Configuration conf, String appId)
+      throws IOException, ClientHandlerException, UniformInterfaceException,
+      JSONException {
+    ClientResponse response = getClientResponseFromTimelineReader(conf, appId);
+
+    JSONArray appAttemptEntities = response.getEntity(JSONArray.class);
+    List<JSONObject> amContainersList = new ArrayList<JSONObject>();
+    for (int i = 0; i < appAttemptEntities.length(); i++) {
+      JSONObject appAttemptEntity = appAttemptEntities.getJSONObject(i);
+      JSONObject infoField = appAttemptEntity.getJSONObject("info");
+      amContainersList.add(infoField);
+    }
+    Collections.reverse(amContainersList);
+    return amContainersList;
+  }
+
+  protected ClientResponse getClientResponseFromTimelineReader(
+      Configuration conf, String appId) throws IOException {
+    String webAppAddress = WebAppUtils.getHttpSchemePrefix(conf) + WebAppUtils
+        .getTimelineReaderWebAppURLWithoutScheme(conf);
+    WebResource webResource = webServiceClient.resource(webAppAddress);
+
+    ClientResponse response =
+        webResource.path("ws").path("v2").path("timeline").path("clusters")
+            .path(conf.get(YarnConfiguration.RM_CLUSTER_ID)).path("apps")
+            .path(appId).path("entities")
+            .path(TimelineEntityType.YARN_APPLICATION_ATTEMPT.toString())
+            .queryParam("fields", "INFO").accept(MediaType.APPLICATION_JSON)
+            .get(ClientResponse.class);
+
+    if (response == null
+        || response.getStatusInfo().getStatusCode() != ClientResponse.Status.OK
+        .getStatusCode()) {
+      String msg =
+          "Response from the timeline reader server is " + ((response == null) ?
+              "null" :
+              "not successful," + " HTTP error code: " + response.getStatus()
+                  + ", Server response:\n" + response.getEntity(String.class));
+      System.out.println(msg);
+      throw new IOException(msg);
+    }
+    return response;
   }
 
   private void outputAMContainerLogs(ContainerLogsRequest request,
@@ -841,6 +966,9 @@ public class LogsCLI extends Configured implements Tool {
     Option appIdOpt =
         new Option(APPLICATION_ID_OPTION, true, "ApplicationId (required)");
     opts.addOption(appIdOpt);
+    opts.addOption(APPLICATION_ATTEMPT_ID_OPTION, true, "ApplicationAttemptId. "
+        + "Lists all logs belonging to the specified application attempt Id. "
+        + "If specified, the applicationId can be omitted");
     opts.addOption(CONTAINER_ID_OPTION, true, "ContainerId. "
         + "By default, it will print all available logs."
         + " Work with -log_files to get only specific logs. If specified, the"
@@ -872,6 +1000,12 @@ public class LogsCLI extends Configured implements Tool {
     logFileOpt.setArgs(Option.UNLIMITED_VALUES);
     logFileOpt.setArgName("Log File Name");
     opts.addOption(logFileOpt);
+    Option oldLogFileOpt = new Option(PER_CONTAINER_LOG_FILES_OLD_OPTION, true,
+        "Deprecated name for log_files, please use log_files option instead");
+    oldLogFileOpt.setValueSeparator(',');
+    oldLogFileOpt.setArgs(Option.UNLIMITED_VALUES);
+    oldLogFileOpt.setArgName("Log File Name");
+    opts.addOption(oldLogFileOpt);
     Option logFileRegexOpt = new Option(PER_CONTAINER_LOG_FILES_REGEX_OPTION,
         true, "Specify comma-separated value "
         + "to get matched log files by using java regex. Use \".*\" to "
@@ -1375,16 +1509,10 @@ public class LogsCLI extends Configured implements Tool {
   }
 
   @VisibleForTesting
-  public ClientResponse getResponeFromNMWebService(Configuration conf,
+  public ClientResponse getResponseFromNMWebService(Configuration conf,
       Client webServiceClient, ContainerLogsRequest request, String logFile) {
-    WebResource webResource =
-        webServiceClient.resource(WebAppUtils.getHttpSchemePrefix(conf)
-        + request.getNodeHttpAddress());
-    return webResource.path("ws").path("v1").path("node")
-        .path("containers").path(request.getContainerId()).path("logs")
-        .path(logFile)
-        .queryParam("size", Long.toString(request.getBytes()))
-        .accept(MediaType.TEXT_PLAIN).get(ClientResponse.class);
+    return LogToolUtils.getResponseFromNMWebService(
+        conf, webServiceClient, request, logFile);
   }
 
   @VisibleForTesting

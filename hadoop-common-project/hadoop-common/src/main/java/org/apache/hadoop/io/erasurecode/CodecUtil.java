@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.io.erasurecode;
 
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.erasurecode.codec.ErasureCodec;
@@ -36,7 +36,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
 /**
- * A codec & coder utility to help create coders conveniently.
+ * A codec &amp; coder utility to help create coders conveniently.
  *
  * {@link CodecUtil} includes erasure coder configurations key and default
  * values such as coder class name and erasure codec option values included

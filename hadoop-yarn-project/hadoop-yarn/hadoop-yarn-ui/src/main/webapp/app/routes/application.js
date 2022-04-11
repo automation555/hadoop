@@ -28,6 +28,12 @@ export default AbstractRoute.extend({
       userInfo: this.store.findAll('cluster-user-info', {reload: true}).catch(function() {
         return null;
       }),
+<<<<<<< HEAD
+      jhsHealth: this.store.queryRecord('jhs-health', {}).catch(function() {
+        return null;
+      }),
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       timelineHealth: this.store.queryRecord('timeline-health', {}).catch(function() {
         return null;
       })
@@ -60,5 +66,9 @@ export default AbstractRoute.extend({
     this.store.unloadAll('ClusterInfo');
     this.store.unloadAll('cluster-user-info');
     this.store.unloadAll('timeline-health');
+<<<<<<< HEAD
+    this.store.unloadAll('jhs-health');
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   },
 });

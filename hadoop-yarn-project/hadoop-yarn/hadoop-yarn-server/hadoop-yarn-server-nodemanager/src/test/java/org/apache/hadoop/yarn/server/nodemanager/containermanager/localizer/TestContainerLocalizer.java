@@ -20,13 +20,13 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer;
 import static junit.framework.TestCase.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Matchers.same;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -37,6 +37,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +94,7 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 
 public class TestContainerLocalizer {
 
@@ -212,13 +214,7 @@ public class TestContainerLocalizer {
 
     // verify all HB use localizerID provided
     verify(nmProxy, never()).heartbeat(argThat(
-        new ArgumentMatcher<LocalizerStatus>() {
-          @Override
-          public boolean matches(Object o) {
-            LocalizerStatus status = (LocalizerStatus) o;
-            return !containerId.equals(status.getLocalizerId());
-          }
-        }));
+        status -> !containerId.equals(status.getLocalizerId())));
   }
 
   @Test(timeout = 15000)
@@ -251,7 +247,12 @@ public class TestContainerLocalizer {
     RecordFactory recordFactory = mock(RecordFactory.class);
     ContainerLocalizer localizer = new ContainerLocalizer(lfs,
         UserGroupInformation.getCurrentUser().getUserName(), "application_01",
+<<<<<<< HEAD
+        "container_01", String.format(ContainerExecutor.TOKEN_FILE_NAME_FMT,
+        "container_01"), new ArrayList<>(), recordFactory){
+=======
         "container_01", new ArrayList<>(), recordFactory) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       @Override
       Configuration initConfiguration() {
         return conf;
@@ -428,14 +429,13 @@ public class TestContainerLocalizer {
     doReturn(cs).when(localizer).createCompletionService(syncExec);
   }
 
-  static class HBMatches extends ArgumentMatcher<LocalizerStatus> {
+  static class HBMatches implements ArgumentMatcher<LocalizerStatus> {
     final LocalResource rsrc;
     HBMatches(LocalResource rsrc) {
       this.rsrc = rsrc;
     }
     @Override
-    public boolean matches(Object o) {
-      LocalizerStatus status = (LocalizerStatus) o;
+    public boolean matches(LocalizerStatus status) {
       for (LocalResourceStatus localized : status.getResources()) {
         switch (localized.getStatus()) {
         case FETCH_SUCCESS:
@@ -475,7 +475,9 @@ public class TestContainerLocalizer {
     FakeContainerLocalizer(FileContext lfs, String user, String appId,
         String localizerId, List<Path> localDirs,
         RecordFactory recordFactory) throws IOException {
-      super(lfs, user, appId, localizerId, localDirs, recordFactory);
+      super(lfs, user, appId, localizerId,
+          String.format(ContainerExecutor.TOKEN_FILE_NAME_FMT, containerId),
+          localDirs, recordFactory);
     }
 
     FakeLongDownload getDownloader() {
@@ -551,7 +553,7 @@ public class TestContainerLocalizer {
       DataInputBuffer appTokens = createFakeCredentials(random, 10);
       tokenPath =
         lfs.makeQualified(new Path(
-              String.format(ContainerLocalizer.TOKEN_FILE_NAME_FMT,
+            String.format(ContainerExecutor.TOKEN_FILE_NAME_FMT,
                   containerId)));
       doReturn(new FSDataInputStream(new FakeFSDataInputStream(appTokens))
           ).when(spylfs).open(tokenPath);
@@ -683,7 +685,8 @@ static DataInputBuffer createFakeCredentials(Random r, int nTok)
     RecordFactory recordFactory = mock(RecordFactory.class);
     ContainerLocalizer localizer = new ContainerLocalizer(lfs,
         UserGroupInformation.getCurrentUser().getUserName(), "application_01",
-        "container_01", new ArrayList<Path>(), recordFactory);
+        "container_01", String.format(ContainerExecutor.TOKEN_FILE_NAME_FMT,
+        "container_01"), new ArrayList<>(), recordFactory);
     LocalResource rsrc = mock(LocalResource.class);
     when(rsrc.getVisibility()).thenReturn(LocalResourceVisibility.PRIVATE);
     Path destDirPath = new Path(fileCacheDir, "0/0/85");

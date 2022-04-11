@@ -18,26 +18,34 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+=======
 import com.google.common.base.Joiner;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.server.namenode.FSNamesystem.DefaultAuditLogger;
+import org.apache.hadoop.hdfs.server.namenode.FSNamesystem.FSNamesystemAuditLogger;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.log4j.Level;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.slf4j.event.Level;
 
 import java.net.Inet4Address;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+<<<<<<< HEAD
+=======
+
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -54,7 +62,7 @@ public class TestAuditLogAtDebug {
   
   private DefaultAuditLogger makeSpyLogger(
       Level level, Optional<List<String>> debugCommands) {
-    DefaultAuditLogger logger = new DefaultAuditLogger();
+    DefaultAuditLogger logger = new FSNamesystemAuditLogger();
     Configuration conf = new HdfsConfiguration();
     if (debugCommands.isPresent()) {
       conf.set(DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_DEBUG_CMDLIST,

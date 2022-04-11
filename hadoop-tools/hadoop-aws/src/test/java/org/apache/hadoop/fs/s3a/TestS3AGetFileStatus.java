@@ -19,8 +19,10 @@
 package org.apache.hadoop.fs.s3a;
 
 import static org.junit.Assert.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.FileNotFoundException;
 import java.util.Collections;
@@ -39,10 +41,8 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.hamcrest.BaseMatcher;
-import org.hamcrest.Description;
-import org.hamcrest.Matcher;
 import org.junit.Test;
+import org.mockito.ArgumentMatcher;
 
 /**
  * S3A tests for getFileStatus using mock S3 client.
@@ -76,11 +76,15 @@ public class TestS3AGetFileStatus extends AbstractS3AMockTest {
     String key = path.toUri().getPath().substring(1);
     when(s3.getObjectMetadata(argThat(correctGetMetadataRequest(BUCKET, key))))
       .thenThrow(NOT_FOUND);
-    ObjectMetadata meta = new ObjectMetadata();
-    meta.setContentLength(0L);
-    when(s3.getObjectMetadata(argThat(
-        correctGetMetadataRequest(BUCKET, key + "/"))
-    )).thenReturn(meta);
+    String keyDir = key + "/";
+    ListObjectsV2Result listResult = new ListObjectsV2Result();
+    S3ObjectSummary objectSummary = new S3ObjectSummary();
+    objectSummary.setKey(keyDir);
+    objectSummary.setSize(0L);
+    listResult.getObjectSummaries().add(objectSummary);
+    when(s3.listObjectsV2(argThat(
+        matchListV2Request(BUCKET, keyDir))
+    )).thenReturn(listResult);
     FileStatus stat = fs.getFileStatus(path);
     assertNotNull(stat);
     assertEquals(fs.makeQualified(path), stat.getPath());
@@ -155,25 +159,20 @@ public class TestS3AGetFileStatus extends AbstractS3AMockTest {
         .thenReturn(v2Result);
   }
 
-  private Matcher<GetObjectMetadataRequest> correctGetMetadataRequest(
+  private ArgumentMatcher<GetObjectMetadataRequest> correctGetMetadataRequest(
       String bucket, String key) {
-    return new BaseMatcher<GetObjectMetadataRequest>() {
+    return request -> request != null
+        && request.getBucketName().equals(bucket)
+        && request.getKey().equals(key);
+  }
 
-      @Override
-      public void describeTo(Description description) {
-        description.appendText("bucket and key match");
-      }
-
-      @Override
-      public boolean matches(Object o) {
-        if(o instanceof GetObjectMetadataRequest) {
-          GetObjectMetadataRequest getObjectMetadataRequest =
-              (GetObjectMetadataRequest)o;
-          return getObjectMetadataRequest.getBucketName().equals(bucket)
-            && getObjectMetadataRequest.getKey().equals(key);
-        }
-        return false;
-      }
+  private ArgumentMatcher<ListObjectsV2Request> matchListV2Request(
+      String bucket, String key) {
+    return (ListObjectsV2Request request) -> {
+      return request != null
+          && request.getBucketName().equals(bucket)
+          && request.getPrefix().equals(key);
     };
   }
+
 }

@@ -17,12 +17,22 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.gpu;
 
 import static org.apache.hadoop.yarn.api.records.ResourceInformation.GPU_URI;
+<<<<<<< HEAD
+import static org.apache.hadoop.yarn.util.resource.CustomResourceTypesConfigurationProvider.initResourceTypes;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+=======
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.eq;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -37,6 +47,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+<<<<<<< HEAD
+import org.apache.hadoop.util.Lists;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceInformation;
@@ -47,7 +61,10 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resource
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.gpu.GpuResourceAllocator.GpuAllocation;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu.GpuDevice;
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
+<<<<<<< HEAD
+=======
 import org.apache.hadoop.yarn.util.resource.TestResourceUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -58,15 +75,22 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+<<<<<<< HEAD
+=======
 import com.google.common.collect.Lists;
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 /**
  * Unit tests for GpuResourceAllocator.
  */
 public class TestGpuResourceAllocator {
   private static final int WAIT_PERIOD_FOR_RESOURCE = 100;
 
+<<<<<<< HEAD
+  private static class ContainerMatcher implements ArgumentMatcher<Container> {
+=======
   private static class ContainerMatcher extends ArgumentMatcher<Container> {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     private Container container;
 
@@ -75,6 +99,9 @@ public class TestGpuResourceAllocator {
     }
 
     @Override
+<<<<<<< HEAD
+    public boolean matches(Container other) {
+=======
     public boolean matches(Object o) {
       if (!(o instanceof Container)) {
         return false;
@@ -82,13 +109,17 @@ public class TestGpuResourceAllocator {
 
       Container other = (Container) o;
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       long expectedId = container.getContainerId().getContainerId();
       long otherId = other.getContainerId().getContainerId();
       return expectedId == otherId;
     }
   }
 
+<<<<<<< HEAD
+=======
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Captor
   private ArgumentCaptor<List<Serializable>> gpuCaptor;
 
@@ -105,7 +136,11 @@ public class TestGpuResourceAllocator {
 
   @Before
   public void setup() {
+<<<<<<< HEAD
+    initResourceTypes(ResourceInformation.GPU_URI);
+=======
     TestResourceUtils.addNewTypesToResources(ResourceInformation.GPU_URI);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     MockitoAnnotations.initMocks(this);
     testSubject = createTestSubject(WAIT_PERIOD_FOR_RESOURCE);
   }

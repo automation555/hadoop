@@ -50,8 +50,8 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 
 /**
  * A simple LoadBalancing KMSClientProvider that round-robins requests
@@ -148,6 +148,12 @@ public class LoadBalancingKMSClientProvider extends KeyProvider implements
       selectDelegationToken(Credentials creds) {
     Token<? extends TokenIdentifier> token =
         KMSClientProvider.selectDelegationToken(creds, canonicalService);
+<<<<<<< HEAD
+    if (token == null) {
+      token = KMSClientProvider.selectDelegationToken(creds, dtService);
+    }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // fallback to querying each sub-provider.
     if (token == null) {
       for (KMSClientProvider provider : getProviders()) {
@@ -499,6 +505,7 @@ public class LoadBalancingKMSClientProvider extends KeyProvider implements
         return null;
       }
     }, nextIdx(), false);
+    invalidateCache(name);
   }
 
   @Override

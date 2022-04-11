@@ -30,7 +30,7 @@ import org.apache.hadoop.hdfs.protocol.BlockType;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.Server;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 /**
  * Stores information about all corrupt blocks in the File System.
@@ -38,7 +38,7 @@ import com.google.common.annotations.VisibleForTesting;
  * corrupt. While reporting replicas of a Block, we hide any corrupt
  * copies. These copies are removed once Block is found to have 
  * expected number of good replicas.
- * Mapping: Block -> TreeSet<DatanodeDescriptor> 
+ * Mapping: Block {@literal -> TreeSet<DatanodeDescriptor>}
  */
 
 @InterfaceAudience.Private

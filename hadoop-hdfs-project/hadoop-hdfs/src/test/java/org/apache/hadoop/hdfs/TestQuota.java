@@ -36,7 +36,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Scanner;
 
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -57,6 +57,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
+import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ToolRunner;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -64,8 +65,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.Lists;
+import org.apache.hadoop.thirdparty.com.google.common.base.Charsets;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
@@ -150,12 +150,12 @@ public class TestQuota {
     resetStream();
   }
 
-  private void runCommand(DFSAdmin admin, boolean expectError, String... args) 
+  static void runCommand(DFSAdmin admin, boolean expectError, String... args)
                          throws Exception {
     runCommand(admin, args, expectError);
   }
-  
-  private void runCommand(DFSAdmin admin, String args[], boolean expectEror)
+
+  static void runCommand(DFSAdmin admin, String[] args, boolean expectEror)
   throws Exception {
     int val = admin.run(args);
     if (expectEror) {
@@ -413,13 +413,13 @@ public class TestQuota {
       }
     });
 
-    // 19: clrQuota on the root directory ("/") should fail
-    runCommand(admin, true, "-clrQuota", "/");
+    // 19: clrQuota on the root directory ("/") should pass.
+    runCommand(admin, false, "-clrQuota", "/");
 
     // 20: setQuota on the root directory ("/") should succeed
     runCommand(admin, false, "-setQuota", "1000000", "/");
 
-    runCommand(admin, true, "-clrQuota", "/");
+    runCommand(admin, false, "-clrQuota", "/");
     runCommand(admin, false, "-clrSpaceQuota", "/");
     runCommand(admin, new String[]{"-clrQuota", parent.toString()}, false);
     runCommand(admin, false, "-clrSpaceQuota", parent.toString());
@@ -456,7 +456,7 @@ public class TestQuota {
     final Path childFile4 = new Path(dir, "datafile2");
     final Path childFile5 = new Path(dir, "datafile3");
 
-    runCommand(admin, true, "-clrQuota", "/");
+    runCommand(admin, false, "-clrQuota", "/");
     runCommand(admin, false, "-clrSpaceQuota", "/");
     // set space quota to a real low value
     runCommand(admin, false, "-setSpaceQuota", Long.toString(spaceQuota2), "/");
@@ -1566,6 +1566,22 @@ public class TestQuota {
   }
 
   @Test
+<<<<<<< HEAD
+  public void testClrQuotaOnRoot() throws Exception {
+    long orignalQuota = dfs.getQuotaUsage(new Path("/")).getQuota();
+    DFSAdmin admin = new DFSAdmin(conf);
+    String[] args;
+    args = new String[] {"-setQuota", "3K", "/"};
+    runCommand(admin, args, false);
+    assertEquals(3 * 1024, dfs.getQuotaUsage(new Path("/")).getQuota());
+    args = new String[] {"-clrQuota", "/"};
+    runCommand(admin, args, false);
+    assertEquals(orignalQuota, dfs.getQuotaUsage(new Path("/")).getQuota());
+  }
+
+  @Test
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   public void testRename() throws Exception {
     int fileLen = 1024;
     short replication = 3;

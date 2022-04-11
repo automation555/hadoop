@@ -44,10 +44,19 @@ import org.apache.hadoop.yarn.server.metrics.ContainerMetricsConstants;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+<<<<<<< HEAD
+import java.util.List;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 
+<<<<<<< HEAD
+import static org.apache.hadoop.yarn.util.StringHelper.PATH_JOINER;
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 /**
  * Utility class to generate reports from timeline entities.
  */
@@ -56,7 +65,11 @@ public final class TimelineEntityV2Converter {
   }
 
   public static ContainerReport convertToContainerReport(
+<<<<<<< HEAD
+      TimelineEntity entity, String serverAddress, String user) {
+=======
       TimelineEntity entity) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     int allocatedMem = 0;
     int allocatedVcore = 0;
     String allocatedHost = null;
@@ -68,6 +81,11 @@ public final class TimelineEntityV2Converter {
     int exitStatus = ContainerExitStatus.INVALID;
     ContainerState state = null;
     String nodeHttpAddress = null;
+<<<<<<< HEAD
+    Map<String, List<Map<String, String>>> exposedPorts = null;
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Map<String, Object> entityInfo = entity.getInfo();
     if (entityInfo != null) {
       if (entityInfo
@@ -103,6 +121,15 @@ public final class TimelineEntityV2Converter {
             (String) entityInfo.get(
                 ContainerMetricsConstants.ALLOCATED_HOST_HTTP_ADDRESS_INFO);
       }
+<<<<<<< HEAD
+      if (entityInfo.containsKey(
+          ContainerMetricsConstants.ALLOCATED_EXPOSED_PORTS)) {
+        exposedPorts =
+            (Map<String, List<Map<String, String>>>) entityInfo
+                .get(ContainerMetricsConstants.ALLOCATED_EXPOSED_PORTS);
+      }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       if (entityInfo.containsKey(ContainerMetricsConstants.DIAGNOSTICS_INFO)) {
         diagnosticsInfo =
             entityInfo.get(
@@ -133,15 +160,33 @@ public final class TimelineEntityV2Converter {
     }
     String logUrl = null;
     NodeId allocatedNode = null;
+<<<<<<< HEAD
+    String containerId = entity.getId();
+    if (allocatedHost != null) {
+      allocatedNode = NodeId.newInstance(allocatedHost, allocatedPort);
+      if (serverAddress != null && user != null) {
+        logUrl = PATH_JOINER.join(serverAddress,
+            "logs", allocatedNode, containerId, containerId, user);
+      }
+    }
+    ContainerReport container = ContainerReport.newInstance(
+=======
     if (allocatedHost != null) {
       allocatedNode = NodeId.newInstance(allocatedHost, allocatedPort);
     }
     return ContainerReport.newInstance(
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         ContainerId.fromString(entity.getId()),
         Resource.newInstance(allocatedMem, allocatedVcore), allocatedNode,
         Priority.newInstance(allocatedPriority),
         createdTime, finishedTime, diagnosticsInfo, logUrl, exitStatus, state,
         nodeHttpAddress);
+<<<<<<< HEAD
+    container.setExposedPorts(exposedPorts);
+
+    return container;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public static ApplicationAttemptReport convertToApplicationAttemptReport(
@@ -239,6 +284,10 @@ public final class TimelineEntityV2Converter {
     String type = null;
     boolean unmanagedApplication = false;
     long createdTime = 0;
+<<<<<<< HEAD
+    long launchTime = 0;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     long finishedTime = 0;
     float progress = 0.0f;
     int applicationPriority = 0;
@@ -398,6 +447,12 @@ public final class TimelineEntityV2Converter {
             ApplicationMetricsConstants.CREATED_EVENT_TYPE)) {
           createdTime = event.getTimestamp();
         } else if (event.getId().equals(
+<<<<<<< HEAD
+            ApplicationMetricsConstants.LAUNCHED_EVENT_TYPE)) {
+          launchTime = event.getTimestamp();
+        } else if (event.getId().equals(
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
             ApplicationMetricsConstants.UPDATED_EVENT_TYPE)) {
           // This type of events are parsed in time-stamp descending order
           // which means the previous event could override the information
@@ -430,8 +485,14 @@ public final class TimelineEntityV2Converter {
     return ApplicationReport.newInstance(
         ApplicationId.fromString(entity.getId()),
         latestApplicationAttemptId, user, queue, name, null, -1, null, state,
+<<<<<<< HEAD
+        diagnosticsInfo, null, createdTime, launchTime,
+        finishedTime, finalStatus, appResources, null,
+        progress, type, null, appTags, unmanagedApplication,
+=======
         diagnosticsInfo, null, createdTime, finishedTime, finalStatus,
         appResources, null, progress, type, null, appTags, unmanagedApplication,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         Priority.newInstance(applicationPriority), appNodeLabelExpression,
         amNodeLabelExpression);
   }

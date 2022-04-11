@@ -18,16 +18,20 @@
 
 package org.apache.hadoop.hdfs.server.namenode;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+=======
 import com.google.protobuf.ByteString;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
 import java.security.PrivilegedExceptionAction;
 
 import org.slf4j.Logger;
@@ -45,9 +49,9 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.base.Throwables;
 
 /**
  * An implementation of the abstract class {@link EditLogInputStream}, which
@@ -67,7 +71,6 @@ public class EditLogFileInputStream extends EditLogInputStream {
     CLOSED
   }
   private State state = State.UNINIT;
-  private InputStream fStream = null;
   private int logVersion = 0;
   private FSEditLogOp.Reader reader = null;
   private FSEditLogLoader.PositionTrackingInputStream tracker = null;
@@ -153,6 +156,7 @@ public class EditLogFileInputStream extends EditLogInputStream {
       throws LogHeaderCorruptException, IOException {
     Preconditions.checkState(state == State.UNINIT);
     BufferedInputStream bin = null;
+    InputStream fStream = null;
     try {
       fStream = log.getInputStream();
       bin = new BufferedInputStream(fStream);
@@ -440,7 +444,7 @@ public class EditLogFileInputStream extends EditLogInputStream {
 
     @Override
     public InputStream getInputStream() throws IOException {
-      return new FileInputStream(file);
+      return Files.newInputStream(file.toPath());
     }
 
     @Override

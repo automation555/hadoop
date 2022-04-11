@@ -25,8 +25,8 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -300,11 +300,51 @@ public class TestLdapGroupsMapping extends TestLdapGroupsMappingBase {
         mapping.getPassword(conf, LdapGroupsMapping.BIND_PASSWORD_KEY, ""));
     Assert.assertEquals("storepass",
         mapping.getPassword(conf, LdapGroupsMapping.LDAP_KEYSTORE_PASSWORD_KEY,
-           ""));
+            ""));
     // let's make sure that a password that doesn't exist returns an
     // empty string as currently expected and used to trigger a call to
     // extract password
     Assert.assertEquals("", mapping.getPassword(conf,"invalid-alias", ""));
+  }
+
+  @Test
+  public void testConfGetPasswordUsingAlias() throws Exception {
+    File testDir = GenericTestUtils.getTestDir();
+    Configuration conf = getBaseConf();
+    final Path jksPath = new Path(testDir.toString(), "test.jks");
+    final String ourUrl =
+        JavaKeyStoreProvider.SCHEME_NAME + "://file" + jksPath.toUri();
+
+    File file = new File(testDir, "test.jks");
+    file.delete();
+    conf.set(CredentialProviderFactory.CREDENTIAL_PROVIDER_PATH, ourUrl);
+
+    // Set alias
+    String bindpassAlias = "bindpassAlias";
+    conf.set(LdapGroupsMapping.BIND_PASSWORD_ALIAS_KEY, bindpassAlias);
+
+    CredentialProvider provider =
+        CredentialProviderFactory.getProviders(conf).get(0);
+    char[] bindpass = "bindpass".toCharArray();
+
+    // Ensure that we get null when the key isn't there
+    assertNull(provider.getCredentialEntry(bindpassAlias));
+
+    // Create credential for the alias
+    provider.createCredentialEntry(bindpassAlias, bindpass);
+    provider.flush();
+
+    // Make sure we get back the right key
+    assertArrayEquals(bindpass, provider.getCredentialEntry(
+        bindpassAlias).getCredential());
+
+    LdapGroupsMapping mapping = new LdapGroupsMapping();
+    Assert.assertEquals("bindpass",
+        mapping.getPasswordFromCredentialProviders(conf, bindpassAlias, ""));
+
+    // Empty for an invalid alias
+    Assert.assertEquals("", mapping.getPasswordFromCredentialProviders(
+        conf, "invalid-alias", ""));
   }
 
   /**
@@ -349,8 +389,9 @@ public class TestLdapGroupsMapping extends TestLdapGroupsMappingBase {
         fail("The LDAP query should have timed out!");
       } catch (NamingException ne) {
         LOG.debug("Got the exception while LDAP querying: ", ne);
-        assertExceptionContains("LDAP response read timed out, timeout used:" +
-            connectionTimeoutMs + "ms", ne);
+        assertExceptionContains("LDAP response read timed out, timeout used",
+            ne);
+        assertExceptionContains("" + connectionTimeoutMs, ne);
         assertFalse(ne.getMessage().contains("remaining name"));
       } finally {
         finLatch.countDown();
@@ -404,8 +445,9 @@ public class TestLdapGroupsMapping extends TestLdapGroupsMappingBase {
         fail("The LDAP query should have timed out!");
       } catch (NamingException ne) {
         LOG.debug("Got the exception while LDAP querying: ", ne);
-        assertExceptionContains("LDAP response read timed out, timeout used:" +
-            readTimeoutMs + "ms", ne);
+        assertExceptionContains("LDAP response read timed out, timeout used",
+            ne);
+        assertExceptionContains(""+ readTimeoutMs, ne);
         assertExceptionContains("remaining name", ne);
       } finally {
         finLatch.countDown();

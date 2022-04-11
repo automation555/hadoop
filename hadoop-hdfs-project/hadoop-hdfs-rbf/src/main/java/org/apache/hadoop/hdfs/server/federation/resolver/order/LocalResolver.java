@@ -42,8 +42,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.net.HostAndPort;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.net.HostAndPort;
 
 
 /**
@@ -65,7 +65,7 @@ public class LocalResolver extends RouterResolver<String, String> {
    * too many calls. The cache might be updated asynchronously to reduce
    * latency.
    *
-   * @return Node IP -> Subcluster.
+   * @return Node IP to Subcluster.
    */
   @Override
   protected Map<String, String> getSubclusterInfo(

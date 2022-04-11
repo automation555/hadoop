@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.fs.azurebfs;
 
-import com.google.common.collect.Lists;
+import org.apache.hadoop.util.Lists;
 
 import java.io.FileNotFoundException;
 import java.util.List;
@@ -32,7 +32,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.azurebfs.constants.FSOperationType;
 import org.apache.hadoop.fs.azurebfs.utils.AclTestHelpers;
+import org.apache.hadoop.fs.azurebfs.utils.TracingHeaderValidator;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -88,7 +90,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntries() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.mkdirs(path, FsPermission.createImmutable((short) RWX_RX));
 
@@ -121,7 +127,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesOnlyAccess() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -145,7 +155,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesOnlyDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -168,7 +182,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesMinimal() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -186,7 +204,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesMinimalDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -206,7 +228,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesCustomMask() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -225,7 +251,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesStickyBit() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 01750));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -255,7 +285,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=FileNotFoundException.class)
   public void testModifyAclEntriesPathNotFound() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     // Path has not been created.
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -269,7 +303,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test (expected=Exception.class)
   public void testModifyAclEntriesDefaultOnFile() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -281,7 +319,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesWithDefaultMask() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -305,7 +347,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesWithAccessMask() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -326,7 +372,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=PathIOException.class)
   public void testModifyAclEntriesWithDuplicateEntries() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -342,7 +392,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclEntries() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -370,7 +424,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclEntriesOnlyAccess() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -395,7 +453,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclEntriesOnlyDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -422,7 +484,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclEntriesMinimal() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RWX_RW));
@@ -445,7 +511,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclEntriesMinimalDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -473,7 +543,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclEntriesStickyBit() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 01750));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -501,7 +575,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=FileNotFoundException.class)
   public void testRemoveAclEntriesPathNotFound() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     // Path has not been created.
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -512,7 +590,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=PathIOException.class)
   public void testRemoveAclEntriesAccessMask() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -526,7 +608,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=PathIOException.class)
   public void testRemoveAclEntriesDefaultMask() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -540,7 +626,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=PathIOException.class)
   public void testRemoveAclEntriesWithDuplicateEntries() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -556,7 +646,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveDefaultAcl() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -578,7 +672,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveDefaultAclOnlyAccess() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -600,7 +698,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveDefaultAclOnlyDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -616,7 +718,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveDefaultAclMinimal() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     fs.removeDefaultAcl(path);
@@ -629,7 +735,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveDefaultAclStickyBit() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 01750));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -651,7 +761,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=FileNotFoundException.class)
   public void testRemoveDefaultAclPathNotFound() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     // Path has not been created.
     fs.removeDefaultAcl(path);
@@ -660,7 +774,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAcl() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -682,7 +800,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclMinimalAcl() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -696,7 +818,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclStickyBit() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 01750));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -716,7 +842,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclOnlyDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -735,7 +865,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=FileNotFoundException.class)
   public void testRemoveAclPathNotFound() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     // Path has not been created.
     fs.removeAcl(path);
@@ -744,7 +878,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAcl() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -770,7 +908,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclOnlyAccess() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -791,7 +933,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclOnlyDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -811,7 +957,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclMinimal() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R_R));
@@ -835,7 +985,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclMinimalDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -855,7 +1009,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclCustomMask() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -877,7 +1035,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclStickyBit() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) 01750));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -903,7 +1065,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=FileNotFoundException.class)
   public void testSetAclPathNotFound() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     // Path has not been created.
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -917,7 +1083,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=Exception.class)
   public void testSetAclDefaultOnFile() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -929,7 +1099,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclDoesNotChangeDefaultMask() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -953,7 +1127,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test(expected=PathIOException.class)
   public void testSetAclWithDuplicateEntries() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -965,7 +1143,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetPermission() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -992,7 +1174,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetPermissionOnlyAccess() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     fs.create(path).close();
     fs.setPermission(path, FsPermission.createImmutable((short) RW_R));
@@ -1014,7 +1200,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetPermissionOnlyDefault() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1038,7 +1228,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultAclNewFile() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1058,7 +1252,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Ignore // wait umask fix to be deployed
   public void testOnlyAccessAclNewFile() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1075,7 +1273,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultMinimalAclNewFile() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1094,7 +1296,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultAclNewDir() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1120,7 +1326,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testOnlyAccessAclNewDir() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1137,7 +1347,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultMinimalAclNewDir() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1159,7 +1373,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultAclNewFileWithMode() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1181,7 +1399,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultAclNewDirWithMode() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     FileSystem.mkdirs(fs, path, FsPermission.createImmutable((short) RWX_RX_RX));
     List<AclEntry> aclSpec = Lists.newArrayList(
@@ -1205,7 +1427,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultAclRenamedFile() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     Path dirPath = new Path(path, "dir");
     FileSystem.mkdirs(fs, dirPath, FsPermission.createImmutable((short) RWX_RX));
@@ -1216,7 +1442,12 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
     fs.create(filePath).close();
     fs.setPermission(filePath, FsPermission.createImmutable((short) RW_R));
     Path renamedFilePath = new Path(dirPath, "file1");
+
+    fs.registerListener(new TracingHeaderValidator(
+        fs.getAbfsStore().getAbfsConfiguration().getClientCorrelationId(),
+        fs.getFileSystemId(), FSOperationType.RENAME, true, 0));
     fs.rename(filePath, renamedFilePath);
+    fs.registerListener(null);
     AclEntry[] expected = new AclEntry[] { };
     AclStatus s = fs.getAclStatus(renamedFilePath);
     AclEntry[] returned = s.getEntries().toArray(new AclEntry[0]);
@@ -1227,7 +1458,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testDefaultAclRenamedDir() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     path = new Path(testRoot, UUID.randomUUID().toString());
     Path dirPath = new Path(path, "dir");
     FileSystem.mkdirs(fs, dirPath, FsPermission.createImmutable((short) RWX_RX));
@@ -1248,39 +1483,80 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testEnsureAclOperationWorksForRoot() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    assumeTrue(getIsNamespaceEnabled(fs));
+=======
     assumeTrue(fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     Path rootPath = new Path("/");
 
     List<AclEntry> aclSpec1 = Lists.newArrayList(
         aclEntry(DEFAULT, GROUP, FOO, ALL),
         aclEntry(ACCESS, GROUP, BAR, ALL));
+<<<<<<< HEAD
+
+    fs.registerListener(new TracingHeaderValidator(
+        fs.getAbfsStore().getAbfsConfiguration().getClientCorrelationId(),
+        fs.getFileSystemId(), FSOperationType.SET_ACL, true, 0));
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     fs.setAcl(rootPath, aclSpec1);
+
+    fs.setListenerOperation(FSOperationType.GET_ACL_STATUS);
     fs.getAclStatus(rootPath);
 
+<<<<<<< HEAD
+    fs.setListenerOperation(FSOperationType.SET_OWNER);
     fs.setOwner(rootPath, TEST_OWNER, TEST_GROUP);
+    fs.setListenerOperation(FSOperationType.SET_PERMISSION);
+=======
+    fs.setOwner(rootPath, TEST_OWNER, TEST_GROUP);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     fs.setPermission(rootPath, new FsPermission("777"));
 
     List<AclEntry> aclSpec2 = Lists.newArrayList(
         aclEntry(DEFAULT, USER, FOO, ALL),
         aclEntry(ACCESS, USER, BAR, ALL));
+<<<<<<< HEAD
+    fs.setListenerOperation(FSOperationType.MODIFY_ACL);
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     fs.modifyAclEntries(rootPath, aclSpec2);
+    fs.setListenerOperation(FSOperationType.REMOVE_ACL_ENTRIES);
     fs.removeAclEntries(rootPath, aclSpec2);
+    fs.setListenerOperation(FSOperationType.REMOVE_DEFAULT_ACL);
     fs.removeDefaultAcl(rootPath);
+    fs.setListenerOperation(FSOperationType.REMOVE_ACL);
     fs.removeAcl(rootPath);
   }
 
   @Test
   public void testSetOwnerForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    AbfsConfiguration conf = fs.getAbfsStore().getAbfsConfiguration();
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
 
     assertTrue(fs.exists(filePath));
 
+    TracingHeaderValidator tracingHeaderValidator = new TracingHeaderValidator(
+        conf.getClientCorrelationId(), fs.getFileSystemId(),
+        FSOperationType.GET_FILESTATUS, false, 0);
+    fs.registerListener(tracingHeaderValidator);
     FileStatus oldFileStatus = fs.getFileStatus(filePath);
+<<<<<<< HEAD
+    tracingHeaderValidator.setOperation(FSOperationType.SET_OWNER);
     fs.setOwner(filePath, TEST_OWNER, TEST_GROUP);
+    fs.registerListener(null);
+=======
+    fs.setOwner(filePath, TEST_OWNER, TEST_GROUP);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     FileStatus newFileStatus = fs.getFileStatus(filePath);
 
     assertEquals(oldFileStatus.getOwner(), newFileStatus.getOwner());
@@ -1290,7 +1566,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetPermissionForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
 
@@ -1309,7 +1589,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testModifyAclEntriesForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
     try {
@@ -1326,7 +1610,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclEntriesEntriesForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
     try {
@@ -1343,7 +1631,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveDefaultAclForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
     try {
@@ -1357,7 +1649,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testRemoveAclForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
     try {
@@ -1371,7 +1667,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testSetAclForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
     try {
@@ -1388,7 +1688,11 @@ public class ITestAzureBlobFilesystemAcl extends AbstractAbfsIntegrationTest {
   @Test
   public void testGetAclStatusForNonNamespaceEnabledAccount() throws Exception {
     final AzureBlobFileSystem fs = this.getFileSystem();
+<<<<<<< HEAD
+    Assume.assumeTrue(!getIsNamespaceEnabled(fs));
+=======
     Assume.assumeTrue(!fs.getIsNamespaceEnabled());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     final Path filePath = new Path(methodName.getMethodName());
     fs.create(filePath);
     try {

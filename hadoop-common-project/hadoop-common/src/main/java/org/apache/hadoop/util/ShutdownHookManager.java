@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.util;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +46,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.SERVICE_SHUTDOW
 /**
  * The <code>ShutdownHookManager</code> enables running shutdownHook
  * in a deterministic order, higher priority first.
- * <p/>
+ * <p>
  * The JVM runs ShutdownHooks in a non-deterministic order or in parallel.
  * This class registers a single JVM shutdownHook and run all the
  * shutdownHooks registered to it (to this class) in order based on their
@@ -147,14 +147,14 @@ public final class ShutdownHookManager {
           shutdownTimeout,
           TIME_UNIT_DEFAULT)) {
         // timeout waiting for the
-        LOG.error("ShutdownHookManger shutdown forcefully after"
+        LOG.error("ShutdownHookManager shutdown forcefully after"
             + " {} seconds.", shutdownTimeout);
         EXECUTOR.shutdownNow();
       }
-      LOG.debug("ShutdownHookManger completed shutdown.");
+      LOG.debug("ShutdownHookManager completed shutdown.");
     } catch (InterruptedException ex) {
       // interrupted.
-      LOG.error("ShutdownHookManger interrupted while waiting for " +
+      LOG.error("ShutdownHookManager interrupted while waiting for " +
           "termination.", ex);
       EXECUTOR.shutdownNow();
       Thread.currentThread().interrupt();

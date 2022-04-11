@@ -32,26 +32,34 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+<<<<<<< HEAD
+
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.api.client.ClientHandlerException;
 import com.sun.jersey.api.client.UniformInterfaceException;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.JettyUtils;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.ApplicationBaseProtocol;
 import org.apache.hadoop.yarn.api.records.timeline.TimelineAbout;
+<<<<<<< HEAD
+import org.apache.hadoop.yarn.server.webapp.LogServlet;
+=======
 import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileControllerFactory;
 import org.apache.hadoop.yarn.server.webapp.LogWebServiceUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.server.webapp.WebServices;
+import org.apache.hadoop.yarn.server.webapp.WrappedLogMetaRequest;
 import org.apache.hadoop.yarn.server.webapp.YarnWebServiceParams;
 import org.apache.hadoop.yarn.server.webapp.dao.AppAttemptInfo;
 import org.apache.hadoop.yarn.server.webapp.dao.AppAttemptsInfo;
@@ -61,6 +69,10 @@ import org.apache.hadoop.yarn.server.webapp.dao.ContainerInfo;
 import org.apache.hadoop.yarn.server.webapp.dao.ContainersInfo;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.yarn.webapp.BadRequestException;
+<<<<<<< HEAD
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+=======
 import org.apache.hadoop.yarn.webapp.NotFoundException;
 import com.google.common.base.Joiner;
 import com.google.inject.Inject;
@@ -68,26 +80,19 @@ import com.google.inject.Singleton;
 import org.codehaus.jettison.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 @Singleton
 @Path("/ws/v1/applicationhistory")
 public class AHSWebServices extends WebServices {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(AHSWebServices.class);
-  private static final String NM_DOWNLOAD_URI_STR =
-      "/ws/v1/node/containers";
-  private static final Joiner JOINER = Joiner.on("");
-  private static final Joiner DOT_JOINER = Joiner.on(". ");
-  private final Configuration conf;
-  private final LogAggregationFileControllerFactory factory;
+  private LogServlet logServlet;
 
   @Inject
   public AHSWebServices(ApplicationBaseProtocol appBaseProt,
       Configuration conf) {
     super(appBaseProt);
-    this.conf = conf;
-    this.factory = new LogAggregationFileControllerFactory(conf);
+    this.logServlet = new LogServlet(conf, this);
   }
 
   @GET
@@ -107,7 +112,8 @@ public class AHSWebServices extends WebServices {
   public AppsInfo get(@Context HttpServletRequest req,
       @Context HttpServletResponse res) {
     return getApps(req, res, null, Collections.<String> emptySet(), null, null,
-      null, null, null, null, null, null, Collections.<String> emptySet());
+      null, null, null, null, null, null, null,
+        Collections.<String> emptySet());
   }
 
   @GET
@@ -126,12 +132,13 @@ public class AHSWebServices extends WebServices {
       @QueryParam("startedTimeEnd") String startedEnd,
       @QueryParam("finishedTimeBegin") String finishBegin,
       @QueryParam("finishedTimeEnd") String finishEnd,
+      @QueryParam("name") String name,
       @QueryParam("applicationTypes") Set<String> applicationTypes) {
     initForReadableEndpoints(res);
     validateStates(stateQuery, statesQuery);
     return super.getApps(req, res, stateQuery, statesQuery, finalStatusQuery,
       userQuery, queueQuery, count, startedBegin, startedEnd, finishBegin,
-      finishEnd, applicationTypes);
+      finishEnd, name, applicationTypes);
   }
 
   @GET
@@ -227,7 +234,7 @@ public class AHSWebServices extends WebServices {
    *    The container ID
    * @param nmId
    *    The Node Manager NodeId
-   * @param redirected_from_node
+   * @param redirectedFromNode
    *    Whether this is a redirected request from NM
    * @return
    *    The log file's name and current file size
@@ -241,15 +248,18 @@ public class AHSWebServices extends WebServices {
       @PathParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
       @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
       @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirected_from_node) {
-    ContainerId containerId = null;
+      @DefaultValue("false") boolean redirectedFromNode,
+      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
+      @DefaultValue("false") boolean manualRedirection) {
     initForReadableEndpoints(res);
-    try {
-      containerId = ContainerId.fromString(containerIdStr);
-    } catch (IllegalArgumentException e) {
-      throw new BadRequestException("invalid container id, " + containerIdStr);
-    }
 
+<<<<<<< HEAD
+    WrappedLogMetaRequest.Builder logMetaRequestBuilder =
+        LogServlet.createRequestFromContainerId(containerIdStr);
+
+    return logServlet.getContainerLogsInfo(req, logMetaRequestBuilder, nmId,
+        redirectedFromNode, null, manualRedirection);
+=======
     ApplicationId appId = containerId.getApplicationAttemptId()
         .getApplicationId();
     AppInfo appInfo;
@@ -325,6 +335,7 @@ public class AHSWebServices extends WebServices {
       throw new NotFoundException(
           "The application is not at Running or Finished State.");
     }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -344,7 +355,7 @@ public class AHSWebServices extends WebServices {
    *    the size of the log file
    * @param nmId
    *    The Node Manager NodeId
-   * @param redirected_from_node
+   * @param redirectedFromNode
    *    Whether this is the redirect request from NM
    * @return
    *    The contents of the container's log file
@@ -362,9 +373,11 @@ public class AHSWebServices extends WebServices {
       @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_SIZE) String size,
       @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
       @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      boolean redirected_from_node) {
+      boolean redirectedFromNode,
+      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
+      @DefaultValue("false") boolean manualRedirection) {
     return getLogs(req, res, containerIdStr, filename, format,
-        size, nmId, redirected_from_node);
+        size, nmId, redirectedFromNode, manualRedirection);
   }
 
   //TODO: YARN-4993: Refactory ContainersLogsBlock, AggregatedLogsBlock and
@@ -383,8 +396,26 @@ public class AHSWebServices extends WebServices {
       @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_SIZE) String size,
       @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
       @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirected_from_node) {
+      @DefaultValue("false") boolean redirectedFromNode,
+      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
+      @DefaultValue("false") boolean manualRedirection) {
     initForReadableEndpoints(res);
+<<<<<<< HEAD
+    return logServlet.getLogFile(req, containerIdStr, filename, format, size,
+        nmId, redirectedFromNode, null, manualRedirection);
+  }
+
+  @VisibleForTesting
+  @InterfaceAudience.Private
+  LogServlet getLogServlet() {
+    return this.logServlet;
+  }
+
+  @VisibleForTesting
+  @InterfaceAudience.Private
+  void setLogServlet(LogServlet logServlet) {
+    this.logServlet = logServlet;
+=======
     ContainerId containerId;
     try {
       containerId = ContainerId.fromString(containerIdStr);
@@ -475,5 +506,6 @@ public class AHSWebServices extends WebServices {
       String nodeId)
       throws ClientHandlerException, UniformInterfaceException, JSONException {
     return LogWebServiceUtils.getNMWebAddressFromRM(configuration, nodeId);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

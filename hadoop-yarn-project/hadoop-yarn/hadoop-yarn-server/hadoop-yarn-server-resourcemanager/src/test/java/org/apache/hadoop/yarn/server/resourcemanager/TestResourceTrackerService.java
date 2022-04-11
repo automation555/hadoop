@@ -18,13 +18,31 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.net.ServerSocketUtil;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
+import org.apache.hadoop.yarn.nodelabels.NodeAttributeStore;
+import org.apache.hadoop.yarn.nodelabels.NodeLabelUtil;
+import org.apache.hadoop.yarn.server.api.ResourceTracker;
+import org.apache.hadoop.yarn.server.api.ServerRMProxy;
+import org.apache.hadoop.yarn.server.api.protocolrecords.NodeToAttributes;
+import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager.NodeEventDispatcher;
+=======
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.yarn.nodelabels.NodeAttributeStore;
 import org.apache.hadoop.yarn.nodelabels.NodeLabelUtil;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeToAttributes;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.FileSystemNodeAttributeStore;
-import static org.mockito.Matchers.any;
+
+import static org.apache.hadoop.yarn.server.resourcemanager.MockNM.createMockNodeStatus;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -34,6 +52,7 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,6 +63,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,10 +77,13 @@ import javax.xml.transform.OutputKeys;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.yarn.LocalConfigurationProvider;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
@@ -80,9 +104,13 @@ import org.apache.hadoop.yarn.event.DrainDispatcher;
 import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.event.InlineDispatcher;
+import org.apache.hadoop.yarn.factories.RecordFactory;
+import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.nodelabels.AttributeValue;
 import org.apache.hadoop.yarn.nodelabels.NodeAttributesManager;
 import org.apache.hadoop.yarn.nodelabels.NodeLabelTestBase;
+import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.SystemCredentialsForAppsProto;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
@@ -102,6 +130,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStatusEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
@@ -109,10 +138,14 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.security.NMTokenSecretManagerInRM;
+import org.apache.hadoop.yarn.server.resourcemanager.security.RMContainerTokenSecretManager;
 import org.apache.hadoop.yarn.server.timelineservice.collector.PerNodeTimelineCollectorsAuxService;
 import org.apache.hadoop.yarn.server.timelineservice.storage.FileSystemTimelineWriterImpl;
 import org.apache.hadoop.yarn.server.timelineservice.storage.TimelineWriter;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
+import org.apache.hadoop.yarn.server.utils.YarnServerBuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import org.junit.After;
@@ -401,7 +434,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     rm.waitForState(id3, NodeState.RUNNING);
 
     // Create an app and launch two containers on host1.
-    RMApp app = rm.submitApp(2000);
+    RMApp app = MockRMAppSubmitter.submitWithMemory(2000, rm);
     MockAM am = MockRM.launchAndRegisterAM(app, rm, nm1);
     ApplicationAttemptId aaid = app.getCurrentAppAttempt().getAppAttemptId();
     nm1.nodeHeartbeat(aaid, 2, ContainerState.RUNNING);
@@ -500,12 +533,13 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     checkDecommissionedNMCount(rm, ++initialMetricCount);
     nodeHeartbeat = nm1.nodeHeartbeat(true);
     Assert.assertEquals(
-        "Node should not have been decomissioned.",
+        "Node should not have been decommissioned.",
         NodeAction.NORMAL,
         nodeHeartbeat.getNodeAction());
     nodeHeartbeat = nm2.nodeHeartbeat(true);
-    Assert.assertEquals("Node should have been decomissioned but is in state" +
-        nodeHeartbeat.getNodeAction(),
+    Assert.assertEquals(
+        "Node should have been decommissioned but is in state"
+            + nodeHeartbeat.getNodeAction(),
         NodeAction.SHUTDOWN, nodeHeartbeat.getNodeAction());
   }
 
@@ -1302,12 +1336,19 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertEquals(2, attrs.size());
     attrs.keySet().stream().forEach(e -> {
       Assert.assertEquals(NodeAttributeType.STRING, e.getAttributeType());
+<<<<<<< HEAD
+      if (e.getAttributeKey().getAttributePrefix() == NodeAttribute.PREFIX_DISTRIBUTED) {
+        Assert.assertEquals("host", e.getAttributeKey().getAttributeName());
+        Assert.assertEquals("host4", e.getAttributeValue());
+      } else if (e.getAttributeKey().getAttributePrefix() == NodeAttribute.PREFIX_CENTRALIZED) {
+=======
       if (e.getAttributeKey().getAttributePrefix()
           == NodeAttribute.PREFIX_DISTRIBUTED) {
         Assert.assertEquals("host", e.getAttributeKey().getAttributeName());
         Assert.assertEquals("host4", e.getAttributeValue());
       } else if (e.getAttributeKey().getAttributePrefix()
           == NodeAttribute.PREFIX_CENTRALIZED) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         Assert.assertEquals("centAttr", e.getAttributeKey().getAttributeName());
         Assert.assertEquals("x", e.getAttributeValue());
       }
@@ -1600,13 +1641,13 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     RMNodeImpl node2 =
         (RMNodeImpl) rm.getRMContext().getRMNodes().get(nm2.getNodeId());
 
-    RMAppImpl app1 = (RMAppImpl) rm.submitApp(1024);
+    RMAppImpl app1 = (RMAppImpl) MockRMAppSubmitter.submitWithMemory(1024, rm);
     String collectorAddr1 = "1.2.3.4:5";
     app1.setCollectorData(AppCollectorData.newInstance(
         app1.getApplicationId(), collectorAddr1));
 
     String collectorAddr2 = "5.4.3.2:1";
-    RMAppImpl app2 = (RMAppImpl) rm.submitApp(1024);
+    RMAppImpl app2 = (RMAppImpl) MockRMAppSubmitter.submitWithMemory(1024, rm);
     app2.setCollectorData(AppCollectorData.newInstance(
         app2.getApplicationId(), collectorAddr2));
 
@@ -1730,7 +1771,11 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
         spy(rm.getRMContext().getDispatcher().getEventHandler());
 
     // Case 1: Unmanaged AM
-    RMApp app = rm.submitApp(1024, true);
+    MockRMAppSubmissionData data =
+        MockRMAppSubmissionData.Builder.createWithMemory(1024, rm)
+            .withUnmanagedAM(true)
+            .build();
+    RMApp app = MockRMAppSubmitter.submit(rm, data);
 
     // Case 1.1: AppAttemptId is null
     NMContainerStatus report =
@@ -1754,7 +1799,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     verify(handler, never()).handle((Event)any());
 
     // Case 2: Managed AM
-    app = rm.submitApp(1024);
+    app = MockRMAppSubmitter.submitWithMemory(1024, rm);
 
     // Case 2.1: AppAttemptId is null
     report = NMContainerStatus.newInstance(
@@ -2184,7 +2229,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
                 DEFAULT_RM_NODEMANAGER_UNTRACKED_REMOVAL_TIMEOUT_MSEC);
     int nodeRemovalInterval =
         rmContext.getNodesListManager().getNodeRemovalCheckInterval();
-    long maxThreadSleeptime = nodeRemovalInterval + nodeRemovalTimeout;
+    long maxThreadSleeptime = nodeRemovalInterval + nodeRemovalTimeout + 100;
     latch.await(maxThreadSleeptime, TimeUnit.MILLISECONDS);
 
     rmNode = rmContext.getInactiveRMNodes().get(nm2.getNodeId());
@@ -2658,7 +2703,11 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     };
 
     rm.start();
-    RMApp app = rm.submitApp(1024, true);
+    MockRMAppSubmissionData data =
+        MockRMAppSubmissionData.Builder.createWithMemory(1024, rm)
+            .withUnmanagedAM(true)
+            .build();
+    RMApp app = MockRMAppSubmitter.submit(rm, data);
     ApplicationAttemptId appAttemptId = app.getCurrentAppAttempt()
         .getAppAttemptId();
 
@@ -2682,10 +2731,14 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
         RegisterNodeManagerRequest.class);
     NodeId nodeId = NodeId.newInstance("host2", 1234);
     Resource capability = BuilderUtils.newResource(1024, 1);
+
+    NodeStatus mockNodeStatus = createMockNodeStatus();
+
     req.setResource(capability);
     req.setNodeId(nodeId);
     req.setHttpPort(1234);
     req.setNMVersion(YarnVersionInfo.getVersion());
+    req.setNodeStatus(mockNodeStatus);
     ContainerId c1 = ContainerId.newContainerId(appAttemptId, 1);
     ContainerId c2 = ContainerId.newContainerId(appAttemptId, 2);
     ContainerId c3 = ContainerId.newContainerId(appAttemptId, 3);
@@ -2819,8 +2872,55 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     Assert.assertEquals(1, nodeHeartbeat.getResponseId());
   }
 
+<<<<<<< HEAD
+  @Test
+  public void testNMIpHostNameResolution() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
+        "localhost:" + ServerSocketUtil.getPort(10000, 10));
+    conf.setBoolean(YarnConfiguration.RM_NM_REGISTRATION_IP_HOSTNAME_CHECK_KEY,
+        true);
+    MockRM mockRM = new MockRM(conf) {
+      @Override
+      protected ResourceTrackerService createResourceTrackerService() {
+        return new ResourceTrackerService(getRMContext(), nodesListManager,
+            this.nmLivelinessMonitor,
+            rmContext.getContainerTokenSecretManager(),
+            rmContext.getNMTokenSecretManager()) {
+        };
+      }
+    };
+    mockRM.start();
+    ResourceTracker rmTracker =
+        ServerRMProxy.createRMProxy(mockRM.getConfig(), ResourceTracker.class);
+    RegisterNodeManagerResponse response = rmTracker.registerNodeManager(
+        RegisterNodeManagerRequest.newInstance(
+            NodeId.newInstance("host1" + System.currentTimeMillis(), 1234),
+            1236, Resource.newInstance(10000, 10), "2", new ArrayList<>(),
+            new ArrayList<>()));
+    Assert
+        .assertEquals("Shutdown signal should be received", NodeAction.SHUTDOWN,
+            response.getNodeAction());
+    Assert.assertTrue("Diagnostic Message", response.getDiagnosticsMessage()
+        .contains("hostname cannot be resolved "));
+    // Test success
+    rmTracker =
+        ServerRMProxy.createRMProxy(mockRM.getConfig(), ResourceTracker.class);
+    response = rmTracker.registerNodeManager(RegisterNodeManagerRequest
+        .newInstance(NodeId.newInstance("localhost", 1234), 1236,
+            Resource.newInstance(10000, 10), "2", new ArrayList<>(),
+            new ArrayList<>()));
+    Assert.assertEquals("Successfull registration", NodeAction.NORMAL,
+        response.getNodeAction());
+    mockRM.stop();
+  }
+
+  /**
+   * A no-op implementation of NodeAttributeStore for testing
+=======
   /**
    * A no-op implementation of NodeAttributeStore for testing.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
    */
   public static class NullNodeAttributeStore implements NodeAttributeStore {
 
@@ -2848,4 +2948,144 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     public void close() {
     }
   }
+<<<<<<< HEAD
+
+  @Test(timeout = 5000)
+  public void testSystemCredentialsAfterTokenSequenceNoChange()
+      throws Exception {
+
+    Configuration conf = new Configuration();
+
+    RMContext rmContext = mock(RMContextImpl.class);
+
+    Dispatcher dispatcher = new InlineDispatcher();
+    when(rmContext.getDispatcher()).thenReturn(dispatcher);
+
+    NodeId nodeId = NodeId.newInstance("localhost", 1234);
+    ConcurrentMap<NodeId, RMNode> rmNodes =
+        new ConcurrentHashMap<NodeId, RMNode>();
+    RMNode rmNode = MockNodes.newNodeInfo(1, Resource.newInstance(1024, 1), 1,
+        "localhost", 1234, rmContext);
+    rmNodes.put(nodeId, rmNode);
+    when(rmContext.getRMNodes()).thenReturn(rmNodes);
+
+    ConcurrentMap<NodeId, RMNode> inactiveNodes =
+        new ConcurrentHashMap<NodeId, RMNode>();
+    when(rmContext.getInactiveRMNodes()).thenReturn(inactiveNodes);
+    when(rmContext.getConfigurationProvider())
+        .thenReturn(new LocalConfigurationProvider());
+
+    dispatcher.register(SchedulerEventType.class,
+        new InlineDispatcher.EmptyEventHandler());
+    dispatcher.register(RMNodeEventType.class,
+        new NodeEventDispatcher(rmContext));
+
+    NMLivelinessMonitor nmLivelinessMonitor =
+        new NMLivelinessMonitor(dispatcher);
+    nmLivelinessMonitor.init(conf);
+    nmLivelinessMonitor.start();
+    NodesListManager nodesListManager = new NodesListManager(rmContext);
+    nodesListManager.init(conf);
+    RMContainerTokenSecretManager containerTokenSecretManager =
+        new RMContainerTokenSecretManager(conf);
+    containerTokenSecretManager.start();
+    NMTokenSecretManagerInRM nmTokenSecretManager =
+        new NMTokenSecretManagerInRM(conf);
+    nmTokenSecretManager.start();
+    ResourceTrackerService resourceTrackerService = new ResourceTrackerService(
+        rmContext, nodesListManager, nmLivelinessMonitor,
+        containerTokenSecretManager, nmTokenSecretManager);
+
+    resourceTrackerService.init(conf);
+    resourceTrackerService.start();
+
+    RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
+
+    RegisterNodeManagerRequest request =
+        recordFactory.newRecordInstance(RegisterNodeManagerRequest.class);
+    request.setNodeId(nodeId);
+    request.setHttpPort(1234);
+    request.setResource(BuilderUtils.newResource(1024, 1));
+    resourceTrackerService.registerNodeManager(request);
+
+    org.apache.hadoop.yarn.server.api.records.NodeStatus nodeStatus =
+        recordFactory.newRecordInstance(
+            org.apache.hadoop.yarn.server.api.records.NodeStatus.class);
+    nodeStatus.setNodeId(nodeId);
+    nodeStatus.setResponseId(0);
+    nodeStatus.setNodeHealthStatus(
+        recordFactory.newRecordInstance(NodeHealthStatus.class));
+    nodeStatus.getNodeHealthStatus().setIsNodeHealthy(true);
+
+    NodeHeartbeatRequest request1 =
+        recordFactory.newRecordInstance(NodeHeartbeatRequest.class);
+    request1.setNodeStatus(nodeStatus);
+
+    // Set NM's token sequence no as 1
+    request1.setTokenSequenceNo(1);
+
+    // Set RM's token sequence no as 1
+    when(rmContext.getTokenSequenceNo()).thenReturn((long) 1);
+
+    // Populate SystemCredentialsForApps
+    final ApplicationId appId = ApplicationId.newInstance(1234, 1);
+    Credentials app1Cred = new Credentials();
+
+    Token<DelegationTokenIdentifier> token =
+        new Token<DelegationTokenIdentifier>();
+    token.setKind(new Text("kind1"));
+    app1Cred.addToken(new Text("token1"), token);
+    Token<DelegationTokenIdentifier> token2 =
+        new Token<DelegationTokenIdentifier>();
+    token2.setKind(new Text("kind2"));
+    app1Cred.addToken(new Text("token2"), token2);
+
+    DataOutputBuffer dob = new DataOutputBuffer();
+    app1Cred.writeTokenStorageToStream(dob);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
+
+    SystemCredentialsForAppsProto systemCredentialsForAppsProto =
+        YarnServerBuilderUtils.newSystemCredentialsForAppsProto(appId,
+            byteBuffer);
+
+    ConcurrentHashMap<ApplicationId, SystemCredentialsForAppsProto> systemCredentialsForApps =
+        new ConcurrentHashMap<ApplicationId, SystemCredentialsForAppsProto>(1);
+
+    systemCredentialsForApps.put(appId, systemCredentialsForAppsProto);
+
+    when(rmContext.getSystemCredentialsForApps())
+        .thenReturn(systemCredentialsForApps);
+
+    // first ping
+    NodeHeartbeatResponse response =
+        resourceTrackerService.nodeHeartbeat(request1);
+
+    // Though SystemCredentialsForApps size is 1, it is not being sent as part
+    // of response as there is no difference between NM's and RM's token
+    // sequence no
+    assertEquals(1, rmContext.getTokenSequenceNo());
+    assertEquals(1, rmContext.getSystemCredentialsForApps().size());
+    assertEquals(1, response.getTokenSequenceNo());
+    assertEquals(0, response.getSystemCredentialsForApps().size());
+
+    // Set RM's token sequence no as 2
+    when(rmContext.getTokenSequenceNo()).thenReturn((long) 2);
+
+    // Ensure new heartbeat has been sent to avoid duplicate issues
+    nodeStatus.setResponseId(1);
+    request1.setNodeStatus(nodeStatus);
+
+    // second ping
+    NodeHeartbeatResponse response1 =
+        resourceTrackerService.nodeHeartbeat(request1);
+
+    // Since NM's and RM's token sequence no is different, response should
+    // contain SystemCredentialsForApps
+    assertEquals(2, response1.getTokenSequenceNo());
+    assertEquals(1, response1.getSystemCredentialsForApps().size());
+
+    resourceTrackerService.close();
+  }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 }

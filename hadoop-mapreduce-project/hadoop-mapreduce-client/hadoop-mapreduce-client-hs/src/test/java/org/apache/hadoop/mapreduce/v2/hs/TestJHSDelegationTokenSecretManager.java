@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.mapreduce.v2.hs;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -26,7 +27,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+<<<<<<< HEAD
+import java.util.function.Supplier;
+=======
 import com.google.common.base.Supplier;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.v2.api.MRDelegationTokenIdentifier;
@@ -181,10 +186,17 @@ public class TestJHSDelegationTokenSecretManager {
       JHSDelegationTokenSecretManagerForTest mgr) {
     mgr.stopThreads();
     mgr.reset();
+<<<<<<< HEAD
+    assertThat(mgr.getAllKeys().length)
+        .withFailMessage("Secret manager should not contain keys").isZero();
+    assertThat(mgr.getAllTokens().size())
+        .withFailMessage("Secret manager should not contain tokens").isZero();
+=======
     Assert.assertEquals("Secret manager should not contain keys",
         mgr.getAllKeys().length, 0);
     Assert.assertEquals("Secret manager should not contain tokens",
         mgr.getAllTokens().size(), 0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   private static class JHSDelegationTokenSecretManagerForTest

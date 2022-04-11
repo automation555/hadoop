@@ -85,6 +85,15 @@
 </property>
 
 <property>
+  <name>mapreduce.job.dfs.storage.capacity.kill-limit-exceed</name>
+  <value>false</value>
+  <description>Whether to fast fail the task when exceeds allocated storage
+    capacity in the cluster filesystem(ClusterStorageCapacityExceededException
+    happens), for example, exceeds the dfs quota limitation. If true, the
+    task will fast fail. If false, the task will get retried.</description>
+</property>
+
+<property>
   <name>mapreduce.job.maps</name>
   <value>2</value>
   <description>The default number of map tasks per job.
@@ -264,6 +273,16 @@
   <description>The number of milliseconds before a task will be
   terminated if it neither reads an input, writes an output, nor
   updates its status string.  A value of 0 disables the timeout.
+  </description>
+</property>
+
+<property>
+  <name>mapreduce.task.stuck.timeout-ms</name>
+  <value>600000</value>
+  <description>The max timeout before receiving remote task's first heartbeat.
+    This parameter is in order to avoid waiting for the container
+    to start indefinitely, which made task stuck in the NEW state.
+    A value of 0 disables the timeout.
   </description>
 </property>
 
@@ -1248,6 +1267,29 @@
 </property>
 
 <property>
+  <name>mapreduce.shuffle.pathcache.max-weight</name>
+  <value>10485760</value>
+  <description>The maximum total weight of entries the cache may contain.
+  </description>
+</property>
+
+<property>
+  <name>mapreduce.shuffle.pathcache.expire-after-access-minutes</name>
+  <value>5</value>
+  <description>The length of time after an entry is last accessed that it
+    should be automatically removed.
+  </description>
+</property>
+
+<property>
+  <name>mapreduce.shuffle.pathcache.concurrency-level</name>
+  <value>16</value>
+  <description>Uses the concurrency level to create a fixed number of hashtable
+    segments, each governed by its own write lock.
+  </description>
+</property>
+
+<property>
   <name>mapreduce.job.reduce.shuffle.consumer.plugin.class</name>
   <value>org.apache.hadoop.mapreduce.task.reduce.Shuffle</value>
   <description>
@@ -1295,9 +1337,9 @@
 </property>
 
 <property>
- <name>mapreduce.job.counters.limit</name>
+ <name>mapreduce.job.counters.max</name>
   <value>120</value>
-  <description>Limit on the number of user counters allowed per job.
+  <description>The max number of user counters allowed per job.
   </description>
 </property>
 
@@ -1370,6 +1412,23 @@
     end notification. Cluster administrators can set this to limit how long
     after end of a job, the Application Master waits before exiting. Must be
     marked as final to prevent users from overriding this.
+  </description>
+</property>
+
+<property>
+  <name>mapreduce.job.end-notification.custom-notifier-class</name>
+  <description>A class to be invoked in order to send a notification after the
+               job has completed (success/failure). The class must implement
+               org.apache.hadoop.mapreduce.CustomJobEndNotifier. A notification
+               url still has to be set which will be passed to the notifyOnce
+               method of your implementation along with the Job's configuration.
+               If this is set instead of using a simple HttpURLConnection we'll
+               create a new instance of this class. For now this still only works
+               with HTTP/HTTPS URLs, but by implementing this class you can choose
+               how you want to make the notification itself. For example you can
+               choose to use a custom HTTP library, or do a delegation token
+               authentication, maybe set a custom SSL context on the connection, etc.
+               The class needs to have a no-arg constructor.
   </description>
 </property>
 
@@ -1479,6 +1538,27 @@
   <description>Range of ports that the MapReduce AM can use for its webapp when binding.
     Leave blank if you want all possible ports.
     For example 50000-50050,50100-50200</description>
+</property>
+
+<property>
+  <name>yarn.app.mapreduce.am.webapp.https.enabled</name>
+  <value>false</value>
+  <description>True if the MR AM should use HTTPS for its webapp.  If
+    yarn.resourcemanager.application-https.policy is set to LENIENT or STRICT,
+    the MR AM will automatically use the keystore provided by YARN with a
+    certificate for the MR AM webapp, unless provided by the user.
+  </description>
+</property>
+
+<property>
+  <name>yarn.app.mapreduce.am.webapp.https.client.auth</name>
+  <value>false</value>
+  <description>True if the MR AM webapp should require client HTTPS
+    authentication (i.e. the proxy server (RM) should present a certificate to
+    the MR AM webapp). If yarn.resourcemanager.application-https.policy is set
+    to LENIENT or STRICT, the MR AM will automatically use the truststore
+    provided by YARN with the RMs certificate, unless provided by the user.
+  </description>
 </property>
 
 <property>

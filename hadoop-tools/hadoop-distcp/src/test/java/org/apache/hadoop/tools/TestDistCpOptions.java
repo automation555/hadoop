@@ -289,7 +289,11 @@ public class TestDistCpOptions {
         "atomicWorkPath=null, logPath=null, sourceFileListing=abc, " +
         "sourcePaths=null, targetPath=xyz, filtersFile='null', " +
         "blocksPerChunk=0, copyBufferSize=8192, verboseLog=false, " +
+<<<<<<< HEAD
+        "directWrite=false, useiterator=false}";
+=======
         "directWrite=false}";
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     String optionString = option.toString();
     Assert.assertEquals(val, optionString);
     Assert.assertNotSame(DistCpOptionSwitch.ATOMIC_COMMIT.toString(),

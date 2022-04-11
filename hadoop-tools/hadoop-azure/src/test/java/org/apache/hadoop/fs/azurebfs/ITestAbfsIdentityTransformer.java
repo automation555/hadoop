@@ -22,7 +22,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
+<<<<<<< HEAD
+import org.apache.hadoop.util.Lists;
+=======
 import com.google.common.collect.Lists;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.azurebfs.oauth2.IdentityTransformer;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.junit.Test;

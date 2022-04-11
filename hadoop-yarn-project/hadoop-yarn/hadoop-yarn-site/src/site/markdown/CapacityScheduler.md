@@ -54,7 +54,11 @@ The `CapacityScheduler` supports the following features:
 
 * **Operability**
 
+<<<<<<< HEAD
+    * Runtime Configuration - The queue definitions and properties such as capacity, ACLs can be changed, at runtime, by administrators in a secure manner to minimize disruption to users. Also, a console is provided for users and administrators to view current allocation of resources to various queues in the system. Administrators can *add additional queues* at runtime, but queues cannot be *deleted* at runtime unless the queue is STOPPED and has no pending/running apps.
+=======
     * Runtime Configuration - The queue definitions and properties such as capacity, ACLs can be changed, at runtime, by administrators in a secure manner to minimize disruption to users. Also, a console is provided for users and administrators to view current allocation of resources to various queues in the system. Administrators can *add additional queues* at runtime, but queues cannot be *deleted* at runtime unless the queue is STOPPED and nhas no pending/running apps.
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     * Drain applications - Administrators can *stop* queues at runtime to ensure that while existing applications run to completion, no new applications can be submitted. If a queue is in `STOPPED` state, new applications cannot be submitted to *itself* or *any of its child queues*. Existing applications continue to completion, thus the queue can be *drained* gracefully. Administrators can also *start* the stopped queues.
 
@@ -116,6 +120,7 @@ Configuration
 </property>
 ```
 
+
 ###Queue Properties
 
   * Resource Allocation
@@ -125,7 +130,7 @@ Configuration
 | `yarn.scheduler.capacity.<queue-path>.capacity` | Queue *capacity* in percentage (%) as a float (e.g. 12.5) OR as absolute resource queue minimum capacity. The sum of capacities for all queues, at each level, must be equal to 100. However if absolute resource is configured, sum of absolute resources of child queues could be less than it's parent absolute resource capacity. Applications in the queue may consume more resources than the queue's capacity if there are free resources, providing elasticity. |
 | `yarn.scheduler.capacity.<queue-path>.maximum-capacity` | Maximum queue capacity in percentage (%) as a float OR as absolute resource queue maximum capacity. This limits the *elasticity* for applications in the queue. 1) Value is between 0 and 100. 2) Admin needs to make sure absolute maximum capacity >= absolute capacity for each queue. Also, setting this value to -1 sets maximum capacity to 100%. |
 | `yarn.scheduler.capacity.<queue-path>.minimum-user-limit-percent` | Each queue enforces a limit on the percentage of resources allocated to a user at any given time, if there is demand for resources. The user limit can vary between a minimum and maximum value. The former (the minimum value) is set to this property value and the latter (the maximum value) depends on the number of users who have submitted applications. For e.g., suppose the value of this property is 25. If two users have submitted applications to a queue, no single user can use more than 50% of the queue resources. If a third user submits an application, no single user can use more than 33% of the queue resources. With 4 or more users, no user can use more than 25% of the queues resources. A value of 100 implies no user limits are imposed. The default is 100. Value is specified as a integer. |
-| `yarn.scheduler.capacity.<queue-path>.user-limit-factor` | The multiple of the queue capacity which can be configured to allow a single user to acquire more resources. By default this is set to 1 which ensures that a single user can never take more than the queue's configured capacity irrespective of how idle the cluster is. Value is specified as a float. |
+| `yarn.scheduler.capacity.<queue-path>.user-limit-factor` | User limit factor provides a way to control the max amount of resources that a single user can consume. It is the multiple of the queue's capacity. By default this is set to 1 which ensures that a single user can never take more than the queue's configured capacity irrespective of how idle the cluster is. Increasing it means a single user can use more than the minimum capacity of the cluster, while decreasing it results in lower maximum resources. Setting this to -1 will disable the feature. Value is specified as a float. Note: using the flexible auto queue creation (yarn.scheduler.capacity.\<queue-path\>.auto-queue-creation-v2) with weights will automatically set this property to -1, as the dynamic queues will be created with the hardcoded weight of 1 and in idle cluster scenarios they should be able to use more resources than calculated. |
 | `yarn.scheduler.capacity.<queue-path>.maximum-allocation-mb` | The per queue maximum limit of memory to allocate to each container request at the Resource Manager. This setting overrides the cluster configuration `yarn.scheduler.maximum-allocation-mb`. This value must be smaller than or equal to the cluster maximum. |
 | `yarn.scheduler.capacity.<queue-path>.maximum-allocation-vcores` | The per queue maximum limit of virtual cores to allocate to each container request at the Resource Manager. This setting overrides the cluster configuration `yarn.scheduler.maximum-allocation-vcores`. This value must be smaller than or equal to the cluster maximum. |
 | `yarn.scheduler.capacity.<queue-path>.user-settings.<user-name>.weight` | This floating point value is used when calculating the user limit resource values for users in a queue. This value will weight each user more or less than the other users in the queue. For example, if user A should receive 50% more resources in a queue than users B and C, this property will be set to 1.5 for user A.  Users B and C will default to 1.0. |
@@ -142,6 +147,23 @@ Configuration
 |:---- |:---- |
 | `yarn.scheduler.capacity.maximum-applications` / `yarn.scheduler.capacity.<queue-path>.maximum-applications` | Maximum number of applications in the system which can be concurrently active both running and pending. Limits on each queue are directly proportional to their queue capacities and user limits. This is a hard limit and any applications submitted when this limit is reached will be rejected. Default is 10000. This can be set for all queues with `yarn.scheduler.capacity.maximum-applications` and can also be overridden on a per queue basis by setting `yarn.scheduler.capacity.<queue-path>.maximum-applications`. Integer value expected. |
 | `yarn.scheduler.capacity.maximum-am-resource-percent` / `yarn.scheduler.capacity.<queue-path>.maximum-am-resource-percent` | Maximum percent of resources in the cluster which can be used to run application masters - controls number of concurrent active applications. Limits on each queue are directly proportional to their queue capacities and user limits. Specified as a float - ie 0.5 = 50%. Default is 10%. This can be set for all queues with `yarn.scheduler.capacity.maximum-am-resource-percent` and can also be overridden on a per queue basis by setting `yarn.scheduler.capacity.<queue-path>.maximum-am-resource-percent` |
+| `yarn.scheduler.capacity.max-parallel-apps` / `yarn.scheduler.capacity.<queue-path>.max-parallel-apps` | Maximum number of applications that can run at the same time. Unlike to `maximum-applications`, application submissions are *not* rejected when this limit is reached. Instead they stay in `ACCEPTED` state until they are eligible to run. This can be set for all queues with `yarn.scheduler.capacity.max-parallel-apps` and can also be overridden on a per queue basis by setting `yarn.scheduler.capacity.<queue-path>.max-parallel-apps`. Integer value is expected. By default, there is no limit. |
+
+  You can also limit the number of parallel applications on a per user basis.
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.scheduler.capacity.user.max-parallel-apps` | Maximum number of applications that can run at the same time for all users. Default value is unlimited. |
+| `yarn.scheduler.capacity.user.<username>.max-parallel-apps` | Maximum number of applications that can run at the same for a specific user. This overrides the global setting. |
+
+
+ The evaluation of these limits happens in the following order:
+
+1. `maximum-applications` check - if the limit is exceeded, the submission is rejected immediately.
+
+2. `max-parallel-apps` check - the submission is accepted, but the application will not transition to `RUNNING` state. It stays in `ACCEPTED` until the queue / user limits are satisfied.
+
+3. `maximum-am-resource-percent` check - if there are too many Application Masters running, the application stays in `ACCEPTED` state until there is enough room for it.
 
   * Queue Administration & Permissions
   
@@ -155,28 +177,77 @@ Configuration
 
 **Note:** An *ACL* is of the form *user1*,*user2* *space* *group1*,*group2*. The special value of * implies *anyone*. The special value of *space* implies *no one*. The default is * for the root queue if not specified.
 
+  * Queue lifetime for applications
+
+    The `CapacityScheduler` supports the following parameters to lifetime of an application:
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.scheduler.capacity.<queue-path>.maximum-application-lifetime` | Maximum lifetime (in seconds) of an application which is submitted to a queue. Any value less than or equal to zero will be considered as disabled. The default is -1. If positive value is configured then any application submitted to this queue will be killed after it exceeds the configured lifetime. User can also specify lifetime per application in application submission context. However, user lifetime will be overridden if it exceeds queue maximum lifetime. It is point-in-time configuration. Note: This feature can be set at any level in the queue hierarchy. Child queues will inherit their parent's value unless overridden at the child level. A value of 0 means no max lifetime and will override a parent's max lifetime. If this property is not set or is set to a negative number, then this queue's max lifetime value will be inherited from it's parent.|
+| `yarn.scheduler.capacity.root.<queue-path>.default-application-lifetime` | Default lifetime (in seconds) of an application which is submitted to a queue. Any value less than or equal to zero will be considered as disabled. If the user has not submitted application with lifetime value then this value will be taken. It is point-in-time configuration. This feature can be set at any level in the queue hierarchy. Child queues will inherit their parent's value unless overridden at the child level. If set to less than or equal to 0, the queue's max value must also be unlimited. Default lifetime can't exceed maximum lifetime. |
+
   * Queue Mapping based on User or Group, Application Name or user defined placement rules
 
   The `CapacityScheduler` supports the following parameters to configure the queue mapping based on user or group, user & group, or application name. User can also define their own placement rule:
 
 | Property | Description |
 |:---- |:---- |
-| `yarn.scheduler.capacity.queue-mappings` | This configuration specifies the mapping of user or group to a specific queue. You can map a single user or a list of users to queues. Syntax: `[u or g]:[name]:[queue_name][,next_mapping]*`. Here, *u or g* indicates whether the mapping is for a user or group. The value is *u* for user and *g* for group. *name* indicates the user name or group name. To specify the user who has submitted the application, %user can be used. *queue_name* indicates the queue name for which the application has to be mapped. To specify queue name same as user name, *%user* can be used. To specify queue name same as the name of the primary group for which the user belongs to, *%primary_group* can be used.|
+| `yarn.scheduler.capacity.queue-mappings` | This configuration specifies the mapping of user or group to a specific queue. You can map a single user or a list of users to queues. Syntax: `[u or g]:[name]:[queue_name][,next_mapping]*`. Here, *u or g* indicates whether the mapping is for a user or group. The value is *u* for user and *g* for group. *name* indicates the user name or group name. To specify the user who has submitted the application, %user can be used. *queue_name* indicates the queue name for which the application has to be mapped. To specify queue name same as user name, *%user* can be used. To specify queue name same as the name of the primary group for which the user belongs to, *%primary_group* can be used. Secondary group can be referenced as *%secondary_group* |
 | `yarn.scheduler.queue-placement-rules.app-name` | This configuration specifies the mapping of application_name to a specific queue. You can map a single application or a list of applications to queues. Syntax: `[app_name]:[queue_name][,next_mapping]*`. Here, *app_name* indicates the application name you want to do the mapping. *queue_name* indicates the queue name for which the application has to be mapped. To specify the current application's name as the app_name, %application can be used.|
 | `yarn.scheduler.capacity.queue-mappings-override.enable` | This function is used to specify whether the user specified queues can be overridden. This is a Boolean value and the default value is *false*. |
 
 Example:
 
-```
+Below example covers single mapping separately. In case of multiple mappings with comma separated values, evaluation would be from left to right, and the first valid mapping will be used. Below example order has been documented based on actual order of execution at runtime in case of multiple mappings.
+``` 
  <property>
-   <name>yarn.scheduler.capacity.queue-mappings</name>
-   <value>u:user1:queue1,g:group1:queue2,u:%user:%user,u:user2:%primary_group</value>
-   <description>
-     Here, <user1> is mapped to <queue1>, <group1> is mapped to <queue2>, 
-     maps users to queues with the same name as user, <user2> is mapped 
-     to queue name same as <primary group> respectively. The mappings will be 
-     evaluated from left to right, and the first valid mapping will be used.
-   </description>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>u:%user:%primary_group.%user</value>
+    <description>Maps users to queue with the same name as user but
+    parent queue name should be same as primary group of the user</description>
+ </property>
+ ...
+ <property>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>u:%user:%secondary_group.%user</value>
+    <description>Maps users to queue with the same name as user but
+    parent queue name should be same as any secondary group of the user</description>
+ </property>
+ ...
+ <property>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>u:%user:%user</value>
+    <description>Maps users to queues with the same name as user</description>
+ </property>
+ ...
+ <property>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>u:user2:%primary_group</value>
+    <description>user2 is mapped to queue name same as primary group</description>
+ </property>
+ ...
+ <property>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>u:user3:%secondary_group</value>
+    <description>user3 is mapped to queue name same as secondary group</description>
+ </property>
+ ...
+ <property>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>u:user1:queue1</value>
+    <description>user1 is mapped to queue1</description>
+ </property>
+ ...
+ <property>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>g:group1:queue2</value>
+    <description>group1 is mapped to queue2</description>
+ </property>
+ ...
+ <property>
+    <name>yarn.scheduler.capacity.queue-mappings</name>
+    <value>u:user1:queue1,u:user2:queue2</value>
+    <description>Here, <user1> is mapped to <queue1>, <user2> is mapped to <queue2> respectively</description>
  </property>
 
   <property>
@@ -190,14 +261,221 @@ Example:
   </property>
 ```
 
-  * Queue lifetime for applications
+###JSON-based queue mapping configuration
 
-    The `CapacityScheduler` supports the following parameters to lifetime of an application:
+  In order to make the queue mapping feature more versatile, a new format and evaluation engine has been added to Capacity Scheduler. The new engine is fully backwards compatible with the old one and adds several new features. Note that it can also parse the old format, but the new features are only available if you specify the mappings in JSON.
 
-| Property | Description |
+  * Syntax
+
+  Based on the current JSON schema, users can define mapping rules the following way:
+
+```
+{
+  "rules": [
+    {
+      "type": "...",
+      "matches": "...",
+      "policy": "...",
+      "parentQueue": "...",
+      "customPlacement": "...",
+      "fallbackResult":"...",
+      "create": true/false,
+      "value": "...",
+      "customPlacement": "..."
+    },
+    {
+       ... next rule ...
+    }
+  ]
+}
+```
+
+Rules are evaluated from top to bottom. Compared to the legacy mapping rule evaluator, it can be adjusted more flexibly what happens when the evaluation stops and a given rule does not match.
+
+  * Rules
+
+  Each mapping rule can have the following settings:
+
+| Setting | Description |
 |:---- |:---- |
-| `yarn.scheduler.capacity.<queue-path>.maximum-application-lifetime` | Maximum lifetime of an application which is submitted to a queue in seconds. Any value less than or equal to zero will be considered as disabled. This will be a hard time limit for all applications in this queue. If positive value is configured then any application submitted to this queue will be killed after exceeds the configured lifetime. User can also specify lifetime per application basis in application submission context. But user lifetime will be overridden if it exceeds queue maximum lifetime. It is point-in-time configuration. Note : Configuring too low value will result in killing application sooner. This feature is applicable only for leaf queue. |
-| `yarn.scheduler.capacity.root.<queue-path>.default-application-lifetime` | Default lifetime of an application which is submitted to a queue in seconds. Any value less than or equal to zero will be considered as disabled. If the user has not submitted application with lifetime value then this value will be taken. It is point-in-time configuration. Note : Default lifetime can't exceed maximum lifetime. This feature is applicable only for leaf queue.|
+| `type` | Possible values: `user`, `group`, `application`. It tells the engine what the current rule should be matched against. |
+| `matches` | The string to match, or an asterisk "&ast;" which means "all". For example, if the type is `user` and this string is "hadoop" then the rule will only be evaluated if the submitter user is "hadoop". The "&ast;" does not work with groups. |
+| `policy` | Selects a list of pre-defined policies which defines where the application should be placed. This will be explained later in the "Policies" section. |
+| `parentQueue` | In case of `user`, `primaryGroup`, `primaryGroupUser`, `secondaryGroup`, `secondaryGroupUser` policies, this tells the engine where the matching queue should be looked for. For example, if the policy is `primaryGroup`, parent is `root.groups` and the submitter's group is "admins", then the resulting queue will be "root.groups.admin" |
+| `fallbackResult` | If the target queue does not exist or it cannot be created (ie. it exists under a regular parent), it defines a fallback action. Valid values are `skip`, `reject` and `placeDefault`. |
+| `create` | Only applies to managed queue parents. If set to "false", then the queue will not be created if it does not exist. |
+| `value` | If the policy is `setDefaultQueue`, then the default queue will change to this setting from "root.default". Otherwise ignored. |
+| `customPlacement` | Only works with `custom` placement policy. The value of this field will be evaluated directly by the engine, which means that various placeholders such as `%application` or `%primary_group` will be replaced with their respective values. |
+
+
+  `type` is the equivalent of the first column in the old format. It is either "g" or "u" and there is a separate property for application mappings. `matches` is the second column. The only difference is that `%user` means to match all users, but it's not expressive enough. So in the new format, it's been changed to `*`.
+  The `fallbackResult` setting is checked what to do when the target queue cannot be created or does not exist. The three settings work the following way:
+* `skip`: ignore the current rule and proceed to the next. This is how Fair Scheduler evaluates placement rules.
+* `placeDefault`: place the application to the default queue `root.default` (unless it's overridden to something else). This is how Capacity Scheduler works with the old mapping rules.
+* `reject`: rejects the submission.
+
+  The `create` flag has no effect on the queue if the parent is not managed.
+
+ * Policies
+
+  There are a number of pre-defined placement policies which are similar to those in Fair Scheduler. Many of them can be expressed as a "custom" placement policy as you will see soon, but in many cases, it's safer and more straightforward to use them directly.
+
+| Policy | Description |
+|:---- |:---- |
+| `specified` | Places the application to the queue that was defined during submission. |
+| `reject` | Rejects the submission. |
+| `defaultQueue` | Places the application into the default queue `root.default` or to its overwritten value set by `setDefaultQueue`. |
+| `user` | Places the application into a queue which matches the username of the submitter. |
+| `applicationName` | Places the application into a queue which matches the name of the application. Important: it is case-sensitive, white spaces are not removed. |
+| `primaryGroup` | Places the application into a queue which matches the primary group of the submitter. |
+| `primaryGroupUser` | Places the application into the queue hierarchy `root.[parentQueue].<primaryGroup>.<userName>`. Note that `parentQueue` is optional. |
+| `secondaryGroup` | Places the application into a queue which matches the secondary group of the submitter. |
+| `secondaryGroupUser` | Places the application into the queue hierarchy `root.[parentQueue].<secondaryGroup>.<userName>`. Note that `parentQueue` is optional. |
+| `setDefaultQueue` | Changes the default queue from `root.default`. The change is permament in a sense that it is not restored in the next rule. You can change the default queue at any point and as many times as necessary. |
+| `custom` | Enables the user to use custom placement strings. See explanation below. |
+
+Notes:
+
+1. The `setDefaultQueue` rule only changes the default queue. If you want to restore the default queue back to `root.default`, then it has to be added to the rule chain again.
+
+2. The nested rules `primaryGroupUser` and `secondaryGroupUser` expects the parent queues to exist, ie. they cannot be created automatically. More specifically: when you use `primaryGroupUser`, it will result in a queue path like `root.<primaryGroup>.<userName>` and `root.<primaryGroup>` must exist. It can be a managed parent in order to have `userName` leaf created automatically, but the parent still has to be created by hand (this is in contrast to Fair Scheduler, where this scenario is more flexible).
+
+3. The `custom` placement policy can describe other policies with the appropriate variable placeholders (see below). For example, `primaryGroupUser` with the parent queue `root.groups` can be expressed as `root.groups.%primary_group.%user`. The primary reason for the rules to exist is that its easier to understand for user who have background in configuring Fair Scheduler and it is more natural to configure the mapping rules this way. It is also more robust because it's less likely that the user makes a mistake. The "Variables" section describes what variables are available if you intend to use the `custom` policy.
+
+
+  * Variables
+
+  Internally, the tool populates certain variables with appropriate values. These can be used if `custom` mapping policy is selected. Note that the engine does only minimal verification when it comes to replacing them - therefore it is your responsibility to provide the correct string.
+
+| Variable | Meaning |
+|:---- |:---- |
+| `%application` | The name of the submitted application. |
+| `%user` | The user who submitted the application. |
+| `%primary_group` | Primary group of the submitter. |
+| `%secondary_group` | Secondary (supplementary) group of the submitter. |
+| `%default` | The default queue of the scheduler. |
+| `%specified` | Contains the queue what the submitter defined. |
+
+Example: let's say we submit a MapReduce application to a queue `root.users.mrjobs`. In this case, the value of `%specified` will be set to `root.users.mrjobs`.
+
+As explained in the "Policies" section, quite a few policies can be achieved with `custom`. So, instead of using the `specified` policy, you can use `custom` with setting the `customPlacement` field to `%specified`. However, you have much greater control over it, because you can also append or prepend an extra string to these variables. So the following setting is possible: `%specified.%user.largejobs`. Keep in mind that the string must be resolved to a valid queue path in order to have a proper placement.
+
+
+  * Converting the old mapping rule format to the new one
+
+  In this table, you can see how to rewrite the old, colon-separated rules to the new format.
+
+| Old mapping rule | JSON-based mapping rule |
+|:---- |:---- |
+| `u:username:root.user.queue` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;username&quot;,<br/>&quot;policy&quot;: &quot;custom&quot;,<br/>&quot;customPlacement&quot;: &quot;root.user.queue&quot;,<br/>&quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:%user` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;user&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:root.parent.%user` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/>&quot;policy&quot;: &quot;user&quot;,<br/> &quot;parentQueue&quot;: &quot;root.parent&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:%primary_group` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;primaryGroup&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:%primary_group.%user` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;primaryGroupUser&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:root.groups.%primary_group.%user` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;primaryGroupUser&quot;, <br/>&quot;parentQueue&quot;: &quot;root.groups&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:%secondary_group` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;secondaryGroup&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:%secondary_group.%user` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;secondaryGroupUser&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `u:%user:root.groups.%secondary_group.%user` | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;secondaryGroupUser&quot;,<br/> &quot;parentQueue&quot;: &quot;root.groups&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `g:hadoop:root.groups.hadoop` | <tt>{ &quot;type&quot;: &quot;group&quot;,<br/>&quot;matches&quot;: &quot;hadoop&quot;,<br/> &quot;policy&quot;: &quot;custom&quot;,<br/> &quot;customPlacement&quot;: &quot;root.groups.hadoop&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `%application:%application` (application mapping) | <tt>{ &quot;type&quot;: &quot;user&quot;,<br/>&quot;matches&quot;: &quot;*&quot;,<br/> &quot;policy&quot;: &quot;applicationName&quot;,<br/> &quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+| `hive_query:root.query.hive` (application mapping) | <tt>{ &quot;type&quot;: &quot;application&quot;,<br/>&quot;matches&quot;: &quot;hive_query&quot;,<br/> &quot;policy&quot;: &quot;custom&quot;,<br/>&quot;customPlacement&quot;: &quot;root.query.hive&quot;,<br/>&quot;fallbackResult&quot;:&quot;placeDefault&quot; }</tt> |
+
+  It's worth noting that `%application:%application` requires a `user` type matcher. It is because internally, the "&ast;" is interpreted only for users. If you set the `type` to `application`, then the "&ast;" means to match an application which is named "&ast;".
+
+  * Example
+
+  We have a cluster which is shared among developers, QA engineers and test developers.
+
+  We'd like to achieve the following placement logic:
+
+1. If the user belongs to the `devs` primary group, it should be placed to `root.users.devs`. This is reserved for developers.
+
+2. If the user belongs to the `qa` primary group, then the application should go to `root.users.lowpriogroups.<primaryGroup>`. These queues have lower capacities and are intended for testers.
+
+3. If the user belongs to the `qa-dev` primary group, then the application should go to `root.users.highpriogroups.<primaryGroup>`. These queues have higher capacities and are intended for test developers.
+
+4. Put the application into the queue which matches the user name.
+
+5. If there is no such queue, take the queue from the application submission context, but the queue should not be created if it does not exist and the parent is managed.
+
+6. If none of the above matches, then the application should be placed to `root.default`.
+
+7. If the default placement fails for whatever reason, we change the default queue to `root.users.default`.
+
+8. Try a placement to the default queue again.
+
+9. If that fails, reject the submission altogether.
+
+  This means a chain of 9 rules:
+
+ ```json
+ {
+  "rules":[
+    {
+      "type": "group",
+      "matches": "devs",
+      "policy": "custom",
+      "customPlacement": "root.users.devs",
+      "fallbackResult":"skip"
+    },
+    {
+      "type": "group",
+      "matches": "qa",
+      "policy": "primaryGroup",
+      "parentQueue": "root.users.lowpriogroups",
+      "fallbackResult":"skip"
+    },
+    {
+      "type": "group",
+      "matches": "qa-dev",
+      "policy": "primaryGroup",
+      "parentQueue": "root.users.highpriogroups",
+      "fallbackResult":"skip"
+    },
+    {
+      "type": "user",
+      "matches": "*",
+      "policy": "user",
+      "fallbackResult":"skip"
+    },
+    {
+      "type": "user",
+      "matches": "*",
+      "policy": "specified",
+      "create": false,
+      "fallbackResult":"skip"
+    },
+    {
+      "type": "user",
+      "matches": "*",
+      "policy": "defaultQueue",
+      "fallbackResult":"skip"
+    },
+    {
+      "type": "user",
+      "matches": "*",
+      "policy": "setDefaultQueue",
+      "value": "root.users.default",
+      "fallbackResult": "skip"
+    },
+    {
+      "type": "user",
+      "matches": "*",
+      "policy": "defaultQueue",
+      "fallbackResult":"skip"
+    },
+    {
+      "type":"user",
+      "matches":"*",
+      "policy":"reject"
+    }
+  ]
+}
+```
+
+  Note: it's actually possible to set the `fallbackResult` to `reject` on the 8th rule, so you don't need the final `reject`. But using `reject` on its own has its merits: since the `type` and `matches` fields are mandatory, you can reject submissions from certain groups, applications or users.
+
+
 
 
 ###Setup for application priority.
@@ -285,7 +563,7 @@ The `ReservationSystem` is integrated with the `CapacityScheduler` queue hierach
 | `yarn.scheduler.capacity.<queue-path>.reservation-window` | *Optional* parameter representing the time in milliseconds for which the `SharingPolicy` will validate if the constraints in the Plan are satisfied. Long value expected. The default value is one day. |
 | `yarn.scheduler.capacity.<queue-path>.instantaneous-max-capacity` | *Optional* parameter: maximum capacity at any time in percentage (%) as a float that the `SharingPolicy` allows a single user to reserve. The default value is 1, i.e. 100%. |
 | `yarn.scheduler.capacity.<queue-path>.average-capacity` | *Optional* parameter: the average allowed capacity which will aggregated over the *ReservationWindow* in percentage (%) as a float that the `SharingPolicy` allows a single user to reserve. The default value is 1, i.e. 100%. |
-| `yarn.scheduler.capacity.<queue-path>.reservation-planner` | *Optional* parameter: the class name that will be used to determine the implementation of the *Planner*  which will be invoked if the `Plan` capacity fall below (due to scheduled maintenance or node failuers) the user reserved resources. The default value is *org.apache.hadoop.yarn.server.resourcemanager.reservation.planning.SimpleCapacityReplanner* which scans the `Plan` and greedily removes reservations in reversed order of acceptance (LIFO) till the reserved resources are within the `Plan` capacity |
+| `yarn.scheduler.capacity.<queue-path>.reservation-planner` | *Optional* parameter: the class name that will be used to determine the implementation of the *Planner*  which will be invoked if the `Plan` capacity fall below (due to scheduled maintenance or node failures) the user reserved resources. The default value is *org.apache.hadoop.yarn.server.resourcemanager.reservation.planning.SimpleCapacityReplanner* which scans the `Plan` and greedily removes reservations in reversed order of acceptance (LIFO) till the reserved resources are within the `Plan` capacity |
 | `yarn.scheduler.capacity.<queue-path>.reservation-enforcement-window` | *Optional* parameter representing the time in milliseconds for which the `Planner` will validate if the constraints in the Plan are satisfied. Long value expected. The default value is one hour. |
 
 ###Dynamic Auto-Creation and Management of Leaf Queues
@@ -337,10 +615,11 @@ The parent queue which has been enabled for auto leaf queue creation,supports
 
 | Property | Description |
 |:---- |:---- |
-| `yarn.scheduler.capacity.<queue-path>.leaf-queue-template.capacity` | *Mandatory* parameter: Specifies the minimum guaranteed capacity for the  auto-created leaf queues. Currently *Absolute Resource* configurations are not supported on auto-created leaf queues |
+| `yarn.scheduler.capacity.<queue-path>.leaf-queue-template.capacity` | *Mandatory* parameter: Specifies the minimum guaranteed capacity for the  auto-created leaf queues. |
+| `yarn.scheduler.capacity.<queue-path>.leaf-queue-template.maximum-capacity` | *Optional* parameter: Specifies the maximum capacity for the  auto-created leaf queues. This value must be smaller than or equal to the cluster maximum. |
 | `yarn.scheduler.capacity.<queue-path>.leaf-queue-template.<leaf-queue-property>` |  *Optional* parameter: For other queue parameters that can be configured on auto-created leaf queues like maximum-capacity, user-limit-factor, maximum-am-resource-percent ...  - Refer **Queue Properties** section |
 
-Example:
+Example 1:
 
 ```
  <property>
@@ -381,6 +660,22 @@ Example:
  </property>
 ```
 
+Example 2:
+
+```
+ <property>
+   <name>yarn.scheduler.capacity.root.parent2.auto-create-child-queue.enabled</name>
+   <value>true</value>
+ </property>
+ <property>
+    <name>yarn.scheduler.capacity.root.parent2.leaf-queue-template.capacity</name>
+    <value>[memory=1024,vcores=1]</value>
+ </property>
+ <property>
+    <name>yarn.scheduler.capacity.root.parent2.leaf-queue-template.maximum-capacity</name>
+    <value>[memory=10240,vcores=10]</value>
+ </property>
+```
 * Scheduling Edit Policy configuration for auto-created queue management
 
 Admins need to specify an additional `org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueManagementDynamicEditPolicy` scheduling edit policy to the
@@ -523,3 +818,44 @@ Updating a Container (Experimental - API may change in the future)
   The **DECREASE_RESOURCE** and **DEMOTE_EXECUTION_TYPE** container updates are automatic - the AM does not explicitly have to ask the NM to decrease the resources of the container. The other update types require the AM to explicitly ask the NM to update the container.
   
   If the **yarn.resourcemanager.auto-update.containers** configuration parameter is set to **true** (false by default), The RM will ensure that all container updates are automatic.
+
+Activities
+--------------------
+
+  Scheduling activities are activity messages used for debugging on some critical scheduling path, they can be recorded and exposed via RESTful API with minor impact on the scheduler performance.
+  Currently, there are two types of activities supported: **scheduler activities** and **application activities**.
+
+### Scheduler Activities
+
+  Scheduler activities include useful scheduling info in a scheduling cycle, which illustrate how the scheduler allocates a container.
+  Scheduler activities REST API (`http://rm-http-address:port/ws/v1/cluster/scheduler/activities`) provides a way to enable recording scheduler activities and fetch them from cache.
+  To eliminate the performance impact, scheduler automatically disables recording activities at the end of a scheduling cycle, you can query the RESTful API again to get the latest scheduler activities.
+
+  See the [YARN Resource Manager REST API](ResourceManagerRest.html#Scheduler_Activities_API) for query parameters, output structure and examples about scheduler activities.
+
+### Application Activities
+
+  Application activities include useful scheduling info for a specified application, which illustrate how the requirements are satisfied or just skipped.
+  Application activities REST API (`http://rm-http-address:port/ws/v1/cluster/scheduler/app-activities/{appid}`) provides a way to enable recording application activities for a specified application within a few seconds or fetch historical application activities from cache, available actions which include "refresh" and "get" can be specified by the "actions" parameter:
+
+  * Query with parameter "actions=refresh" will enable recording application activities for the specified application for a certain time (defaults to 3 seconds) and get a simple response like: {"appActivities":{"applicationId":"application_1562308866454_0001","diagnostic":"Successfully received action: refresh","timestamp":1562308869253,"dateTime":"Fri Jul 05 14:41:09 CST 2019"}}.
+  * Query with parameter "actions=get" will not enable recording but directly get historical application activities from cache.
+  * If no actions parameter is specified, default actions are "refresh,get", which means both "refresh" and "get" will be performed.
+
+  See the [YARN Resource Manager REST API](ResourceManagerRest.html#Application_Activities_API) for query parameters, output structure and examples about application activities.
+
+### Configuration
+
+  The CapacityScheduler supports the following parameters to control the cache size and the expiration of scheduler/application activities.
+
+| Property | Description |
+|:---- |:---- |
+| `yarn.resourcemanager.activities-manager.cleanup-interval-ms` | The cleanup interval for activities in milliseconds. Defaults to 5000. |
+| `yarn.resourcemanager.activities-manager.scheduler-activities.ttl-ms` | Time to live for scheduler activities in milliseconds. Defaults to 600000. |
+| `yarn.resourcemanager.activities-manager.app-activities.ttl-ms` | Time to live for application activities in milliseconds. Defaults to 600000. |
+| `yarn.resourcemanager.activities-manager.app-activities.max-queue-length` | Max queue length for app activities. Defaults to 100. |
+
+### Web UI
+
+   Activities info is available in the application attempt page on RM Web UI, where outstanding requests are aggregated and displayed.
+   Simply click the refresh button to get the latest activities info.

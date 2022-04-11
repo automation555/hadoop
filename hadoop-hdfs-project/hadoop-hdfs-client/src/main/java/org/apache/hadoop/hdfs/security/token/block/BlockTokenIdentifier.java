@@ -27,12 +27,13 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Optional;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.AccessModeProto;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BlockTokenSecretProto;
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -142,6 +143,10 @@ public class BlockTokenIdentifier extends TokenIdentifier {
   }
 
   public void setHandshakeMsg(byte[] bytes) {
+<<<<<<< HEAD
+    cache = null; // invalidate the cache
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     handshakeMsg = bytes;
   }
 
@@ -214,6 +219,15 @@ public class BlockTokenIdentifier extends TokenIdentifier {
     if (!dis.markSupported()) {
       throw new IOException("Could not peek first byte.");
     }
+
+    // this.cache should be assigned the raw bytes from the input data for
+    // upgrading compatibility. If we won't mutate fields and call getBytes()
+    // for something (e.g retrieve password), we should return the raw bytes
+    // instead of serializing the instance self fields to bytes, because we may
+    // lose newly added fields which we can't recognize
+    this.cache = IOUtils.readFullyToByteArray(dis);
+    dis.reset();
+
     dis.mark(1);
     final byte firstByte = dis.readByte();
     dis.reset();
@@ -237,19 +251,32 @@ public class BlockTokenIdentifier extends TokenIdentifier {
       modes.add(WritableUtils.readEnum(in, AccessMode.class));
     }
 
-    length = WritableUtils.readVInt(in);
-    StorageType[] readStorageTypes = new StorageType[length];
-    for (int i = 0; i < length; i++) {
-      readStorageTypes[i] = WritableUtils.readEnum(in, StorageType.class);
-    }
-    storageTypes = readStorageTypes;
+    try {
+      length = WritableUtils.readVInt(in);
+      StorageType[] readStorageTypes = new StorageType[length];
+      for (int i = 0; i < length; i++) {
+        readStorageTypes[i] = WritableUtils.readEnum(in, StorageType.class);
+      }
+      storageTypes = readStorageTypes;
 
-    length = WritableUtils.readVInt(in);
-    String[] readStorageIds = new String[length];
-    for (int i = 0; i < length; i++) {
-      readStorageIds[i] = WritableUtils.readString(in);
+      length = WritableUtils.readVInt(in);
+      String[] readStorageIds = new String[length];
+      for (int i = 0; i < length; i++) {
+        readStorageIds[i] = WritableUtils.readString(in);
+      }
+      storageIds = readStorageIds;
+
+      int handshakeMsgLen = WritableUtils.readVInt(in);
+      if (handshakeMsgLen != 0) {
+        handshakeMsg = new byte[handshakeMsgLen];
+        in.readFully(handshakeMsg);
+      }
+    } catch (EOFException eof) {
+      // If the NameNode is on a version before HDFS-6708 and HDFS-9807, then
+      // the block token won't have storage types or storage IDs. For backward
+      // compatibility, swallow the EOF that we get when we try to read those
+      // fields. Same for the handshake secret field from HDFS-14611.
     }
-    storageIds = readStorageIds;
 
     useProto = false;
 
@@ -321,13 +348,21 @@ public class BlockTokenIdentifier extends TokenIdentifier {
     for (AccessMode aMode : modes) {
       WritableUtils.writeEnum(out, aMode);
     }
-    WritableUtils.writeVInt(out, storageTypes.length);
-    for (StorageType type: storageTypes){
-      WritableUtils.writeEnum(out, type);
+    if (storageTypes != null) {
+      WritableUtils.writeVInt(out, storageTypes.length);
+      for (StorageType type : storageTypes) {
+        WritableUtils.writeEnum(out, type);
+      }
     }
-    WritableUtils.writeVInt(out, storageIds.length);
-    for (String id: storageIds) {
-      WritableUtils.writeString(out, id);
+    if (storageIds != null) {
+      WritableUtils.writeVInt(out, storageIds.length);
+      for (String id : storageIds) {
+        WritableUtils.writeString(out, id);
+      }
+    }
+    if (handshakeMsg != null && handshakeMsg.length > 0) {
+      WritableUtils.writeVInt(out, handshakeMsg.length);
+      out.write(handshakeMsg);
     }
     if (handshakeMsg != null && handshakeMsg.length > 0) {
       WritableUtils.writeVInt(out, handshakeMsg.length);

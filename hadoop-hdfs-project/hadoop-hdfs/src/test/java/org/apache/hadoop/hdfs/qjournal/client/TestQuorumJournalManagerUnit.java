@@ -19,11 +19,19 @@ package org.apache.hadoop.hdfs.qjournal.client;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+<<<<<<< HEAD
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+=======
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.eq;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -32,6 +40,10 @@ import java.net.URI;
 import java.util.List;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+<<<<<<< HEAD
+import org.apache.hadoop.util.Lists;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Assert;
 
 import org.apache.hadoop.conf.Configuration;
@@ -57,12 +69,20 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Stubber;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.Futures;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListenableFuture;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.SettableFuture;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+=======
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
 import static org.apache.hadoop.hdfs.qjournal.QJMTestUtil.writeOp;
 import static org.apache.hadoop.hdfs.qjournal.QJMTestUtil.createTxnData;

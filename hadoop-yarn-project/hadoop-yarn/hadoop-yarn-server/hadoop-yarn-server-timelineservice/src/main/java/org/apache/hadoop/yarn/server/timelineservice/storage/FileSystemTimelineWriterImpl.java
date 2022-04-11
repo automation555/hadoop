@@ -24,6 +24,10 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+<<<<<<< HEAD
+import org.apache.hadoop.fs.FSDataInputStream;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -40,7 +44,11 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.timelineservice.collector.TimelineCollectorContext;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,6 +86,10 @@ public class FileSystemTimelineWriterImpl extends AbstractService
   private int fsNumRetries;
   private long fsRetryInterval;
   private Path entitiesPath;
+<<<<<<< HEAD
+  private Configuration config;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   /** default value for storage location on local disk. */
   private static final String STORAGE_DIR_ROOT = "timeline_service_data";
@@ -122,6 +134,15 @@ public class FileSystemTimelineWriterImpl extends AbstractService
                                           TimelineEntity entity,
                                           TimelineWriteResponse response)
                                           throws IOException {
+<<<<<<< HEAD
+    String entityTypePathStr = clusterId + File.separator + userId +
+        File.separator + escape(flowName) + File.separator +
+        escape(flowVersion) + File.separator + flowRun + File.separator + appId
+        + File.separator + entity.getType();
+    Path entityTypePath = new Path(entitiesPath, entityTypePathStr);
+    try {
+      mkdirs(entityTypePath);
+=======
     Path clusterIdPath = new Path(entitiesPath, clusterId);
     Path userIdPath = new Path(clusterIdPath, userId);
     Path flowNamePath = new Path(userIdPath, escape(flowName));
@@ -133,6 +154,7 @@ public class FileSystemTimelineWriterImpl extends AbstractService
       mkdirs(rootPath, entitiesPath, clusterIdPath, userIdPath,
               flowNamePath, flowVersionPath, flowRunPath, appIdPath,
               entityTypePath);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       Path filePath =
               new Path(entityTypePath,
                       entity.getId() + TIMELINE_SERVICE_STORAGE_EXTENSION);
@@ -181,7 +203,12 @@ public class FileSystemTimelineWriterImpl extends AbstractService
             DEFAULT_TIMELINE_FS_WRITER_NUM_RETRIES);
     fsRetryInterval = conf.getLong(TIMELINE_FS_WRITER_RETRY_INTERVAL_MS,
             DEFAULT_TIMELINE_FS_WRITER_RETRY_INTERVAL_MS);
+<<<<<<< HEAD
+    config = conf;
+    fs = rootPath.getFileSystem(config);
+=======
     fs = rootPath.getFileSystem(getConfig());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @Override
@@ -285,12 +312,24 @@ public class FileSystemTimelineWriterImpl extends AbstractService
     // final status.
     try {
       fsOut = fs.create(tempPath, true);
+<<<<<<< HEAD
+      FSDataInputStream fsIn = fs.open(outputPath);
+      IOUtils.copyBytes(fsIn, fsOut, config, false);
+      fsIn.close();
+      fs.delete(outputPath, false);
+      fsOut.write(data);
+      fsOut.close();
+      fs.rename(tempPath, outputPath);
+    } catch (IOException ie) {
+      LOG.error("Got an exception while writing file", ie);
+=======
       fsOut.write(data);
       fsOut.close();
       fsOut = null;
       fs.rename(tempPath, outputPath);
     } finally {
       IOUtils.cleanupWithLogger(LOG, fsOut);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     }
   }
 

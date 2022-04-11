@@ -17,47 +17,30 @@
  */
 package org.apache.hadoop.hdfs.server.blockmanagement;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkArgument;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import java.util.AbstractList;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Queue;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.server.namenode.INode;
-import org.apache.hadoop.hdfs.server.namenode.INodeFile;
-import org.apache.hadoop.hdfs.server.namenode.INodeId;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.Namesystem;
-import org.apache.hadoop.hdfs.util.CyclicIteration;
-import org.apache.hadoop.hdfs.util.LightWeightHashSet;
-import org.apache.hadoop.hdfs.util.LightWeightLinkedSet;
-import org.apache.hadoop.util.ChunkedArrayList;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * Manages decommissioning and maintenance state for DataNodes. A background
  * monitor thread periodically checks the status of DataNodes that are
  * decommissioning or entering maintenance state.
- * <p/>
+ * <p>
  * A DataNode can be decommissioned in a few situations:
  * <ul>
  * <li>If a DN is dead, it is decommissioned immediately.</li>
@@ -72,11 +55,11 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  * determine if they can be DECOMMISSIONED. The monitor also prunes this list
  * as blocks become replicated, so monitor scans will become more efficient
  * over time.
- * <p/>
+ * <p>
  * DECOMMISSION_INPROGRESS nodes that become dead do not progress to
  * DECOMMISSIONED until they become live again. This prevents potential
  * durability loss for singly-replicated blocks (see HDFS-6791).
- * <p/>
+ * <p>
  * DataNodes can also be put under maintenance state for any short duration
  * maintenance operations. Unlike decommissioning, blocks are not always
  * re-replicated for the DataNodes to enter maintenance state. When the
@@ -88,7 +71,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  * of maintenance expiry time. When DataNodes don't transition or join the
  * cluster back by expiry time, blocks are re-replicated just as in
  * decommissioning case as to avoid read or write performance degradation.
- * <p/>
+ * <p>
  * This class depends on the FSNamesystem lock for synchronization.
  */
 @InterfaceAudience.Private
@@ -100,35 +83,7 @@ public class DatanodeAdminManager {
   private final HeartbeatManager hbManager;
   private final ScheduledExecutorService executor;
 
-  /**
-   * Map containing the DECOMMISSION_INPROGRESS or ENTERING_MAINTENANCE
-   * datanodes that are being tracked so they can be be marked as
-   * DECOMMISSIONED or IN_MAINTENANCE. Even after the node is marked as
-   * IN_MAINTENANCE, the node remains in the map until
-   * maintenance expires checked during a monitor tick.
-   * <p/>
-   * This holds a set of references to the under-replicated blocks on the DN at
-   * the time the DN is added to the map, i.e. the blocks that are preventing
-   * the node from being marked as decommissioned. During a monitor tick, this
-   * list is pruned as blocks becomes replicated.
-   * <p/>
-   * Note also that the reference to the list of under-replicated blocks
-   * will be null on initial add
-   * <p/>
-   * However, this map can become out-of-date since it is not updated by block
-   * reports or other events. Before being finally marking as decommissioned,
-   * another check is done with the actual block map.
-   */
-  private final TreeMap<DatanodeDescriptor, AbstractList<BlockInfo>>
-      outOfServiceNodeBlocks;
-
-  /**
-   * Tracking a node in outOfServiceNodeBlocks consumes additional memory. To
-   * limit the impact on NN memory consumption, we limit the number of nodes in
-   * outOfServiceNodeBlocks. Additional nodes wait in pendingNodes.
-   */
-  private final Queue<DatanodeDescriptor> pendingNodes;
-  private Monitor monitor = null;
+  private DatanodeAdminMonitorInterface monitor = null;
 
   DatanodeAdminManager(final Namesystem namesystem,
       final BlockManager blockManager, final HeartbeatManager hbManager) {
@@ -139,8 +94,6 @@ public class DatanodeAdminManager {
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat("DatanodeAdminMonitor-%d")
             .setDaemon(true).build());
-    outOfServiceNodeBlocks = new TreeMap<>();
-    pendingNodes = new ArrayDeque<>();
   }
 
   /**
@@ -181,8 +134,22 @@ public class DatanodeAdminManager {
         "value for "
         + DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_MAX_CONCURRENT_TRACKED_NODES);
 
-    monitor = new Monitor(blocksPerInterval, maxConcurrentTrackedNodes);
-    executor.scheduleAtFixedRate(monitor, intervalSecs, intervalSecs,
+    Class cls = null;
+    try {
+      cls = conf.getClass(
+          DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_MONITOR_CLASS,
+          Class.forName(DFSConfigKeys
+                  .DFS_NAMENODE_DECOMMISSION_MONITOR_CLASS_DEFAULT));
+      monitor =
+          (DatanodeAdminMonitorInterface)ReflectionUtils.newInstance(cls, conf);
+      monitor.setBlockManager(blockManager);
+      monitor.setNameSystem(namesystem);
+      monitor.setDatanodeAdminManager(this);
+    } catch (Exception e) {
+      throw new RuntimeException("Unable to create the Decommission monitor " +
+          "from "+cls, e);
+    }
+    executor.scheduleWithFixedDelay(monitor, intervalSecs, intervalSecs,
         TimeUnit.SECONDS);
 
     LOG.debug("Activating DatanodeAdminManager with interval {} seconds, " +
@@ -217,7 +184,7 @@ public class DatanodeAdminManager {
               node, storage, storage.numBlocks());
         }
         node.getLeavingServiceStatus().setStartTime(monotonicNow());
-        pendingNodes.add(node);
+        monitor.startTrackingNode(node);
       }
     } else {
       LOG.trace("startDecommission: Node {} in {}, nothing to do.",
@@ -240,8 +207,7 @@ public class DatanodeAdminManager {
         blockManager.processExtraRedundancyBlocksOnInService(node);
       }
       // Remove from tracking in DatanodeAdminManager
-      pendingNodes.remove(node);
-      outOfServiceNodeBlocks.remove(node);
+      monitor.stopTrackingNode(node);
     } else {
       LOG.trace("stopDecommission: Node {} in {}, nothing to do.",
           node, node.getAdminState());
@@ -271,7 +237,7 @@ public class DatanodeAdminManager {
       }
       // Track the node regardless whether it is ENTERING_MAINTENANCE or
       // IN_MAINTENANCE to support maintenance expiration.
-      pendingNodes.add(node);
+      monitor.startTrackingNode(node);
     } else {
       LOG.trace("startMaintenance: Node {} in {}, nothing to do.",
           node, node.getAdminState());
@@ -319,20 +285,19 @@ public class DatanodeAdminManager {
       }
 
       // Remove from tracking in DatanodeAdminManager
-      pendingNodes.remove(node);
-      outOfServiceNodeBlocks.remove(node);
+      monitor.stopTrackingNode(node);
     } else {
       LOG.trace("stopMaintenance: Node {} in {}, nothing to do.",
           node, node.getAdminState());
     }
   }
 
-  private void setDecommissioned(DatanodeDescriptor dn) {
+  protected void setDecommissioned(DatanodeDescriptor dn) {
     dn.setDecommissioned();
     LOG.info("Decommissioning complete for node {}", dn);
   }
 
-  private void setInMaintenance(DatanodeDescriptor dn) {
+  protected void setInMaintenance(DatanodeDescriptor dn) {
     dn.setInMaintenance();
     LOG.info("Node {} has entered maintenance mode.", dn);
   }
@@ -344,7 +309,11 @@ public class DatanodeAdminManager {
    * always necessary, hence "sufficient".
    * @return true if sufficient, else false.
    */
+<<<<<<< HEAD
+  protected boolean isSufficient(BlockInfo block, BlockCollection bc,
+=======
   private boolean isSufficient(BlockInfo block, BlockCollection bc,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
                                NumberReplicas numberReplicas,
                                boolean isDecommission,
                                boolean isMaintenance) {
@@ -388,7 +357,7 @@ public class DatanodeAdminManager {
     return false;
   }
 
-  private void logBlockReplicationInfo(BlockInfo block,
+  protected void logBlockReplicationInfo(BlockInfo block,
       BlockCollection bc,
       DatanodeDescriptor srcNode, NumberReplicas num,
       Iterable<DatanodeStorageInfo> storages) {
@@ -401,8 +370,7 @@ public class DatanodeAdminManager {
     StringBuilder nodeList = new StringBuilder();
     for (DatanodeStorageInfo storage : storages) {
       final DatanodeDescriptor node = storage.getDatanodeDescriptor();
-      nodeList.append(node);
-      nodeList.append(' ');
+      nodeList.append(node).append(' ');
     }
     NameNode.blockStateChangeLog.info(
         "Block: " + block + ", Expected Replicas: "
@@ -413,6 +381,8 @@ public class DatanodeAdminManager {
         + ", maintenance replicas: " + num.maintenanceReplicas()
         + ", live entering maintenance replicas: "
         + num.liveEnteringMaintenanceReplicas()
+        + ", replicas on stale nodes: " + num.replicasOnStaleNodes()
+        + ", readonly replicas: " + num.readOnlyReplicas()
         + ", excess replicas: " + num.excessReplicas()
         + ", Is Open File: " + bc.isUnderConstruction()
         + ", Datanodes having this block: " + nodeList + ", Current Datanode: "
@@ -424,19 +394,24 @@ public class DatanodeAdminManager {
 
   @VisibleForTesting
   public int getNumPendingNodes() {
-    return pendingNodes.size();
+    return monitor.getPendingNodeCount();
   }
 
   @VisibleForTesting
   public int getNumTrackedNodes() {
-    return outOfServiceNodeBlocks.size();
+    return monitor.getTrackedNodeCount();
   }
 
   @VisibleForTesting
   public int getNumNodesChecked() {
-    return monitor.numNodesChecked;
+    return monitor.getNumNodesChecked();
   }
 
+<<<<<<< HEAD
+  @VisibleForTesting
+  public Queue<DatanodeDescriptor> getPendingNodes() {
+    return monitor.getPendingNodes();
+=======
   /**
    * Checks to see if datanodes have finished DECOMMISSION_INPROGRESS or
    * ENTERING_MAINTENANCE state.
@@ -787,10 +762,12 @@ public class DatanodeAdminManager {
           lowRedundancyOpenFiles, lowRedundancyBlocks,
           outOfServiceOnlyReplicas);
     }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   @VisibleForTesting
   void runMonitorForTest() throws ExecutionException, InterruptedException {
     executor.submit(monitor).get();
   }
+
 }

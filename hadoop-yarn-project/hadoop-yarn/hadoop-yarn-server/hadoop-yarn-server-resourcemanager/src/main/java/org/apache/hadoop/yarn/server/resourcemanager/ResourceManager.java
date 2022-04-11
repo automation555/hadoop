@@ -18,11 +18,15 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import com.sun.jersey.spi.container.servlet.ServletContainer;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.yarn.metrics.GenericEventTypeMetrics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 import org.apache.curator.framework.AuthInfo;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -46,8 +50,9 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.VersionInfo;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.curator.ZKCuratorManager;
+import org.apache.hadoop.util.VersionInfo;
 import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -60,6 +65,7 @@ import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
+
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.nodelabels.NodeAttributesManager;
@@ -99,20 +105,28 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.conf.YarnConfigurationStore;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.conf.YarnConfigurationStoreFactory;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint.AllocationTagsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint.MemoryPlacementConstraintManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint.PlacementConstraintManagerService;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.MultiNodeSortingManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.MutableConfScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
+import org.apache.hadoop.yarn.server.resourcemanager.security.ProxyCAManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.QueueACLsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.timelineservice.RMTimelineCollectorManager;
+import org.apache.hadoop.yarn.server.resourcemanager.volume.csi.VolumeManager;
+import org.apache.hadoop.yarn.server.resourcemanager.volume.csi.VolumeManagerImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.volume.csi.processor.VolumeAMSProcessor;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebApp;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebAppUtil;
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 import org.apache.hadoop.yarn.server.service.SystemServiceManager;
 import org.apache.hadoop.yarn.server.webproxy.AppReportFetcher;
+import org.apache.hadoop.yarn.server.webproxy.ProxyCA;
 import org.apache.hadoop.yarn.server.webproxy.ProxyUriUtils;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxy;
 import org.apache.hadoop.yarn.server.webproxy.WebAppProxyServlet;
@@ -126,17 +140,21 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -158,7 +176,9 @@ public class ResourceManager extends CompositeService
    */
   public static final int EPOCH_BIT_SHIFT = 40;
 
-  private static final Log LOG = LogFactory.getLog(ResourceManager.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ResourceManager.class);
+  private static final Marker FATAL = MarkerFactory.getMarker("FATAL");
   private static long clusterTimeStamp = System.currentTimeMillis();
 
   /*
@@ -197,6 +217,7 @@ public class ResourceManager extends CompositeService
   protected ApplicationACLsManager applicationACLsManager;
   protected QueueACLsManager queueACLsManager;
   private FederationStateStoreService federationStateStoreService;
+  private ProxyCAManager proxyCAManager;
   private WebApp webApp;
   private AppReportFetcher fetcher = null;
   protected ResourceTrackerService resourceTracker;
@@ -232,6 +253,8 @@ public class ResourceManager extends CompositeService
     return rmLoginUGI.getShortUserName();
   }
 
+  private RMInfo rmStatusInfoBean;
+
   @VisibleForTesting
   protected static void setClusterTimeStamp(long timestamp) {
     clusterTimeStamp = timestamp;
@@ -255,6 +278,26 @@ public class ResourceManager extends CompositeService
     UserGroupInformation.setConfiguration(conf);
     this.rmContext = new RMContextImpl();
     rmContext.setResourceManager(this);
+    rmContext.setYarnConfiguration(conf);
+
+    rmStatusInfoBean = new RMInfo(this);
+    rmStatusInfoBean.register();
+
+    // Set HA configuration should be done before login
+    this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
+    if (this.rmContext.isHAEnabled()) {
+      HAUtil.verifyAndSetConfiguration(this.conf);
+    }
+
+    // Set UGI and do login
+    // If security is enabled, use login user
+    // If security is not enabled, use current user
+    this.rmLoginUGI = UserGroupInformation.getCurrentUser();
+    try {
+      doSecureLogin();
+    } catch(IOException ie) {
+      throw new YarnRuntimeException("Failed to login", ie);
+    }
 
     this.configurationProvider =
         ConfigurationProviderFactory.getConfigurationProvider(conf);
@@ -274,22 +317,6 @@ public class ResourceManager extends CompositeService
     loadConfigurationXml(YarnConfiguration.YARN_SITE_CONFIGURATION_FILE);
 
     validateConfigs(this.conf);
-    
-    // Set HA configuration should be done before login
-    this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
-    if (this.rmContext.isHAEnabled()) {
-      HAUtil.verifyAndSetConfiguration(this.conf);
-    }
-
-    // Set UGI and do login
-    // If security is enabled, use login user
-    // If security is not enabled, use current user
-    this.rmLoginUGI = UserGroupInformation.getCurrentUser();
-    try {
-      doSecureLogin();
-    } catch(IOException ie) {
-      throw new YarnRuntimeException("Failed to login", ie);
-    }
 
     // register the handlers for all AlwaysOn services using setupDispatcher().
     rmDispatcher = setupDispatcher();
@@ -316,8 +343,6 @@ public class ResourceManager extends CompositeService
         rmContext.setLeaderElectorService(elector);
       }
     }
-
-    rmContext.setYarnConfiguration(conf);
 
     createAndInitActiveServices(false);
 
@@ -421,7 +446,7 @@ public class ResourceManager extends CompositeService
 
   protected QueueACLsManager createQueueACLsManager(ResourceScheduler scheduler,
       Configuration conf) {
-    return new QueueACLsManager(scheduler, conf);
+    return QueueACLsManager.getQueueACLsManager(scheduler, conf);
   }
 
   @VisibleForTesting
@@ -432,11 +457,62 @@ public class ResourceManager extends CompositeService
   }
 
   protected EventHandler<SchedulerEvent> createSchedulerEventDispatcher() {
-    return new EventDispatcher(this.scheduler, "SchedulerEventDispatcher");
+    String dispatcherName = "SchedulerEventDispatcher";
+    EventDispatcher dispatcher;
+    int threadMonitorRate = conf.getInt(
+        YarnConfiguration.YARN_DISPATCHER_CPU_MONITOR_SAMPLES_PER_MIN,
+        YarnConfiguration.DEFAULT_YARN_DISPATCHER_CPU_MONITOR_SAMPLES_PER_MIN);
+
+    if (threadMonitorRate > 0) {
+      dispatcher = new SchedulerEventDispatcher(dispatcherName,
+          threadMonitorRate);
+      ClusterMetrics.getMetrics().setRmEventProcMonitorEnable(true);
+    } else {
+      dispatcher = new EventDispatcher(this.scheduler, dispatcherName);
+    }
+    dispatcher.
+        setMetrics(GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), SchedulerEventType.class));
+    return dispatcher;
   }
 
   protected Dispatcher createDispatcher() {
-    return new AsyncDispatcher("RM Event dispatcher");
+    AsyncDispatcher dispatcher = new AsyncDispatcher("RM Event dispatcher");
+
+    // Add 4 busy event types.
+    GenericEventTypeMetrics
+        nodesListManagerEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), NodesListManagerEventType.class);
+    dispatcher.addMetrics(nodesListManagerEventTypeMetrics,
+        nodesListManagerEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        rmNodeEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), RMNodeEventType.class);
+    dispatcher.addMetrics(rmNodeEventTypeMetrics,
+        rmNodeEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        rmAppEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), RMAppEventType.class);
+    dispatcher.addMetrics(rmAppEventTypeMetrics,
+        rmAppEventTypeMetrics
+            .getEnumClass());
+
+    GenericEventTypeMetrics
+        rmAppAttemptEventTypeMetrics =
+        GenericEventTypeMetricsManager.
+            create(dispatcher.getName(), RMAppAttemptEventType.class);
+    dispatcher.addMetrics(rmAppAttemptEventTypeMetrics,
+        rmAppAttemptEventTypeMetrics
+            .getEnumClass());
+
+    return dispatcher;
   }
 
   protected ResourceScheduler createScheduler() {
@@ -564,11 +640,13 @@ public class ResourceManager extends CompositeService
   protected SystemMetricsPublisher createSystemMetricsPublisher() {
     List<SystemMetricsPublisher> publishers =
         new ArrayList<SystemMetricsPublisher>();
-    if (YarnConfiguration.timelineServiceV1Enabled(conf)) {
+    if (YarnConfiguration.timelineServiceV1Enabled(conf) &&
+        YarnConfiguration.systemMetricsPublisherEnabled(conf)) {
       SystemMetricsPublisher publisherV1 = new TimelineServiceV1Publisher();
       publishers.add(publisherV1);
     }
-    if (YarnConfiguration.timelineServiceV2Enabled(conf)) {
+    if (YarnConfiguration.timelineServiceV2Enabled(conf) &&
+        YarnConfiguration.systemMetricsPublisherEnabled(conf)) {
       // we're dealing with the v.2.x publisher
       LOG.info("system metrics publisher with the timeline service V2 is "
           + "configured");
@@ -594,12 +672,20 @@ public class ResourceManager extends CompositeService
   // sanity check for configurations
   protected static void validateConfigs(Configuration conf) {
     // validate max-attempts
-    int globalMaxAppAttempts =
-        conf.getInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
+    int rmMaxAppAttempts = conf.getInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
         YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS);
+    if (rmMaxAppAttempts <= 0) {
+      throw new YarnRuntimeException("Invalid rm am max attempts configuration"
+          + ", " + YarnConfiguration.RM_AM_MAX_ATTEMPTS
+          + "=" + rmMaxAppAttempts + ", it should be a positive integer.");
+    }
+    int globalMaxAppAttempts = conf.getInt(
+        YarnConfiguration.GLOBAL_RM_AM_MAX_ATTEMPTS,
+        conf.getInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS,
+            YarnConfiguration.DEFAULT_RM_AM_MAX_ATTEMPTS));
     if (globalMaxAppAttempts <= 0) {
       throw new YarnRuntimeException("Invalid global max attempts configuration"
-          + ", " + YarnConfiguration.RM_AM_MAX_ATTEMPTS
+          + ", " + YarnConfiguration.GLOBAL_RM_AM_MAX_ATTEMPTS
           + "=" + globalMaxAppAttempts + ", it should be a positive integer.");
     }
 
@@ -632,6 +718,10 @@ public class ResourceManager extends CompositeService
     private boolean fromActive = false;
     private StandByTransitionRunnable standByTransitionRunnable;
     private RMNMInfo rmnmInfo;
+<<<<<<< HEAD
+    private ScheduledThreadPoolExecutor eventQueueMetricExecutor;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     RMActiveServices(ResourceManager rm) {
       super("RMActiveServices");
@@ -832,6 +922,13 @@ public class ResourceManager extends CompositeService
         LOG.info("Initialized Federation membership.");
       }
 
+<<<<<<< HEAD
+      proxyCAManager = new ProxyCAManager(new ProxyCA(), rmContext);
+      addService(proxyCAManager);
+      rmContext.setProxyCAManager(proxyCAManager);
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       rmnmInfo = new RMNMInfo(rmContext, scheduler);
 
       if (conf.getBoolean(YarnConfiguration.YARN_API_SERVICES_ENABLE,
@@ -839,6 +936,33 @@ public class ResourceManager extends CompositeService
         SystemServiceManager systemServiceManager = createServiceManager();
         addIfService(systemServiceManager);
       }
+
+      // Add volume manager to RM context when it is necessary
+      String[] amsProcessorList = conf.getStrings(
+          YarnConfiguration.RM_APPLICATION_MASTER_SERVICE_PROCESSORS);
+      if (amsProcessorList != null&& Arrays.stream(amsProcessorList)
+          .anyMatch(s -> VolumeAMSProcessor.class.getName().equals(s))) {
+        VolumeManager volumeManager = new VolumeManagerImpl();
+        rmContext.setVolumeManager(volumeManager);
+        addIfService(volumeManager);
+      }
+
+      eventQueueMetricExecutor = new ScheduledThreadPoolExecutor(1,
+              new ThreadFactoryBuilder().
+              setDaemon(true).setNameFormat("EventQueueSizeMetricThread").
+              build());
+      eventQueueMetricExecutor.scheduleAtFixedRate(new Runnable() {
+        @Override
+        public void run() {
+          int rmEventQueueSize = ((AsyncDispatcher)getRMContext().
+              getDispatcher()).getEventQueueSize();
+          ClusterMetrics.getMetrics().setRmEventQueueSize(rmEventQueueSize);
+          int schedulerEventQueueSize = ((EventDispatcher)schedulerDispatcher).
+              getEventQueueSize();
+          ClusterMetrics.getMetrics().
+              setSchedulerEventQueueSize(schedulerEventQueueSize);
+        }
+      }, 1, 1, TimeUnit.SECONDS);
 
       super.serviceInit(conf);
     }
@@ -915,6 +1039,9 @@ public class ResourceManager extends CompositeService
           LOG.error("Error closing store.", e);
         }
       }
+      if (eventQueueMetricExecutor != null) {
+        eventQueueMetricExecutor.shutdownNow();
+      }
 
     }
   }
@@ -935,15 +1062,16 @@ public class ResourceManager extends CompositeService
         // how depends on the event.
         switch(event.getType()) {
         case STATE_STORE_FENCED:
-          LOG.fatal("State store fenced even though the resource manager " +
-              "is not configured for high availability. Shutting down this " +
-              "resource manager to protect the integrity of the state store.");
+          LOG.error(FATAL, "State store fenced even though the resource " +
+              "manager is not configured for high availability. Shutting " +
+              "down this resource manager to protect the integrity of the " +
+              "state store.");
           ExitUtil.terminate(1, event.getExplanation());
           break;
         case STATE_STORE_OP_FAILED:
           if (YarnConfiguration.shouldRMFailFast(getConfig())) {
-            LOG.fatal("Shutting down the resource manager because a state " +
-                "store operation failed, and the resource manager is " +
+            LOG.error(FATAL, "Shutting down the resource manager because a " +
+                "state store operation failed, and the resource manager is " +
                 "configured to fail fast. See the yarn.fail-fast and " +
                 "yarn.resourcemanager.fail-fast properties.");
             ExitUtil.terminate(1, event.getExplanation());
@@ -955,14 +1083,102 @@ public class ResourceManager extends CompositeService
           }
           break;
         default:
-          LOG.fatal("Shutting down the resource manager.");
+          LOG.error(FATAL, "Shutting down the resource manager.");
           ExitUtil.terminate(1, event.getExplanation());
         }
       }
     }
   }
 
-  /**
+  @Private
+  private class SchedulerEventDispatcher extends
+      EventDispatcher<SchedulerEvent> {
+
+    private final Thread eventProcessorMonitor;
+
+    SchedulerEventDispatcher(String name, int samplesPerMin) {
+      super(scheduler, name);
+      this.eventProcessorMonitor =
+          new Thread(new EventProcessorMonitor(getEventProcessorId(),
+              samplesPerMin));
+      this.eventProcessorMonitor
+          .setName("ResourceManager Event Processor Monitor");
+    }
+    // EventProcessorMonitor keeps track of how much CPU the EventProcessor
+    // thread is using. It takes a configurable number of samples per minute,
+    // and then reports the Avg and Max of previous 60 seconds as cluster
+    // metrics. Units are usecs per second of CPU used.
+    // Avg is not accurate until one minute of samples have been received.
+    private final class EventProcessorMonitor implements Runnable {
+      private final long tid;
+      private final boolean run;
+      private final ThreadMXBean tmxb;
+      private final ClusterMetrics clusterMetrics = ClusterMetrics.getMetrics();
+      private final int samples;
+      EventProcessorMonitor(long id, int samplesPerMin) {
+        assert samplesPerMin > 0;
+        this.tid = id;
+        this.samples = samplesPerMin;
+        this.tmxb = ManagementFactory.getThreadMXBean();
+        if (clusterMetrics != null &&
+            tmxb != null && tmxb.isThreadCpuTimeSupported()) {
+          this.run = true;
+          clusterMetrics.setRmEventProcMonitorEnable(true);
+        } else {
+          this.run = false;
+        }
+      }
+      public void run() {
+        int index = 0;
+        long[] values = new long[samples];
+        int sleepMs = (60 * 1000) / samples;
+
+        while (run && !isStopped() && !Thread.currentThread().isInterrupted()) {
+          try {
+            long cpuBefore = tmxb.getThreadCpuTime(tid);
+            long wallClockBefore = Time.monotonicNow();
+            Thread.sleep(sleepMs);
+            long wallClockDelta = Time.monotonicNow() - wallClockBefore;
+            long cpuDelta = tmxb.getThreadCpuTime(tid) - cpuBefore;
+
+            // Nanoseconds / Milliseconds = usec per second
+            values[index] = cpuDelta / wallClockDelta;
+
+            index = (index + 1) % samples;
+            long max = 0;
+            long sum = 0;
+            for (int i = 0; i < samples; i++) {
+              sum += values[i];
+              max = Math.max(max, values[i]);
+            }
+            clusterMetrics.setRmEventProcCPUAvg(sum / samples);
+            clusterMetrics.setRmEventProcCPUMax(max);
+          } catch (InterruptedException e) {
+            LOG.error("Returning, interrupted : " + e);
+            return;
+          }
+        }
+      }
+    }
+    @Override
+    protected void serviceStart() throws Exception {
+      super.serviceStart();
+      this.eventProcessorMonitor.start();
+    }
+
+    @Override
+    protected void serviceStop() throws Exception {
+      super.serviceStop();
+      this.eventProcessorMonitor.interrupt();
+      try {
+        this.eventProcessorMonitor.join();
+      } catch (InterruptedException e) {
+        throw new YarnRuntimeException(e);
+      }
+    }
+  }
+
+    /**
    * Transition to standby state in a new thread. The transition operation is
    * asynchronous to avoid deadlock caused by cyclic dependency.
    */
@@ -1004,7 +1220,7 @@ public class ResourceManager extends CompositeService
             elector.rejoinElection();
           }
         } catch (Exception e) {
-          LOG.fatal("Failed to transition RM to Standby mode.", e);
+          LOG.error(FATAL, "Failed to transition RM to Standby mode.", e);
           ExitUtil.terminate(1, e);
         }
       }
@@ -1075,8 +1291,8 @@ public class ResourceManager extends CompositeService
               rmApp.getAppAttempts().values().iterator().next();
           if (previousFailedAttempt != null) {
             try {
-              LOG.debug("Event " + event.getType() + " handled by "
-                  + previousFailedAttempt);
+              LOG.debug("Event {} handled by {}", event.getType(),
+                  previousFailedAttempt);
               previousFailedAttempt.handle(event);
             } catch (Throwable t) {
               LOG.error("Error in handling event type " + event.getType()
@@ -1186,6 +1402,8 @@ public class ResourceManager extends CompositeService
       }
       builder.withServlet(ProxyUriUtils.PROXY_SERVLET_NAME,
           ProxyUriUtils.PROXY_PATH_SPEC, WebAppProxyServlet.class);
+      builder.withAttribute(WebAppProxy.PROXY_CA,
+          rmContext.getProxyCAManager().getProxyCA());
       builder.withAttribute(WebAppProxy.FETCHER_ATTRIBUTE, fetcher);
       String[] proxyParts = proxyHostAndPort.split(":");
       builder.withAttribute(WebAppProxy.PROXY_HOST_ATTRIBUTE, proxyParts[0]);
@@ -1379,6 +1597,7 @@ public class ResourceManager extends CompositeService
     }
     transitionToStandby(false);
     rmContext.setHAServiceState(HAServiceState.STOPPING);
+    rmStatusInfoBean.unregister();
   }
   
   protected ResourceTrackerService createResourceTrackerService() {
@@ -1506,6 +1725,9 @@ public class ResourceManager extends CompositeService
     // recover applications
     rmAppManager.recover(state);
 
+    // recover ProxyCA
+    rmContext.getProxyCAManager().recover(state);
+
     setSchedulerRecoveryStartAndWaitTime(state, conf);
   }
 
@@ -1520,6 +1742,8 @@ public class ResourceManager extends CompositeService
       if (argv.length >= 1) {
         if (argv[0].equals("-format-state-store")) {
           deleteRMStateStore(conf);
+        } else if (argv[0].equals("-format-conf-store")) {
+          deleteRMConfStore(conf);
         } else if (argv[0].equals("-remove-application-from-state-store")
             && argv.length == 2) {
           removeApplication(conf, argv[1]);
@@ -1535,7 +1759,7 @@ public class ResourceManager extends CompositeService
         resourceManager.start();
       }
     } catch (Throwable t) {
-      LOG.fatal("Error starting ResourceManager", t);
+      LOG.error(FATAL, "Error starting ResourceManager", t);
       System.exit(-1);
     }
   }
@@ -1612,6 +1836,45 @@ public class ResourceManager extends CompositeService
     }
   }
 
+  /**
+   * Deletes the YarnConfigurationStore
+   *
+   * @param conf
+   * @throws Exception
+   */
+  @VisibleForTesting
+  static void deleteRMConfStore(Configuration conf) throws Exception {
+    ResourceManager rm = new ResourceManager();
+    rm.conf = conf;
+    ResourceScheduler scheduler = rm.createScheduler();
+    RMContextImpl rmContext = new RMContextImpl();
+    rmContext.setResourceManager(rm);
+
+    boolean isConfigurationMutable = false;
+    String confProviderStr = conf.get(
+        YarnConfiguration.SCHEDULER_CONFIGURATION_STORE_CLASS,
+        YarnConfiguration.DEFAULT_CONFIGURATION_STORE);
+    switch (confProviderStr) {
+      case YarnConfiguration.MEMORY_CONFIGURATION_STORE:
+      case YarnConfiguration.LEVELDB_CONFIGURATION_STORE:
+      case YarnConfiguration.ZK_CONFIGURATION_STORE:
+      case YarnConfiguration.FS_CONFIGURATION_STORE:
+        isConfigurationMutable = true;
+        break;
+      default:
+    }
+
+    if (scheduler instanceof MutableConfScheduler && isConfigurationMutable) {
+      YarnConfigurationStore confStore = YarnConfigurationStoreFactory
+          .getStore(conf);
+      confStore.initialize(conf, conf, rmContext);
+      confStore.format();
+    } else {
+      System.out.println("Scheduler Configuration format only " +
+          "supported by MutableConfScheduler.");
+    }
+  }
+
   @VisibleForTesting
   static void removeApplication(Configuration conf, String applicationId)
       throws Exception {
@@ -1632,7 +1895,10 @@ public class ResourceManager extends CompositeService
   private static void printUsage(PrintStream out) {
     out.println("Usage: yarn resourcemanager [-format-state-store]");
     out.println("                            "
-        + "[-remove-application-from-state-store <appId>]" + "\n");
+        + "[-remove-application-from-state-store <appId>]");
+    out.println("                            "
+        + "[-format-conf-store]" + "\n");
+
   }
 
   protected RMAppLifetimeMonitor createRMAppLifetimeMonitor() {

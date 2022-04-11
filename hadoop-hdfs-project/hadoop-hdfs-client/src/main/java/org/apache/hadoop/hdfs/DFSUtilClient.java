@@ -17,10 +17,17 @@
  */
 package org.apache.hadoop.hdfs;
 
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
+import org.apache.hadoop.thirdparty.com.google.common.primitives.SignedBytes;
+=======
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.SignedBytes;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.net.URISyntaxException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -35,6 +42,7 @@ import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -519,10 +527,17 @@ public class DFSUtilClient {
     // localhost), then append port
     // TODO : revisit if there is a better way
     StringBuilder sb = new StringBuilder();
+<<<<<<< HEAD
+    sb.append(uri.getScheme())
+        .append("://")
+        .append(uri.getHost())
+        .append(":");
+=======
     sb.append(uri.getScheme());
     sb.append("://");
     sb.append(uri.getHost());
     sb.append(":");
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // TODO : currently, only the very first auxiliary port is being used.
     // But actually NN supports running multiple auxiliary
     sb.append(ports[0]);
@@ -1003,7 +1018,11 @@ public class DFSUtilClient {
    * @param ugi {@link UserGroupInformation} of current user.
    * @return the home directory of current user.
    */
+<<<<<<< HEAD
+  public static String getHomeDirectory(Configuration conf,
+=======
   public static Path getHomeDirectory(Configuration conf,
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       UserGroupInformation ugi) {
     String userHomePrefix = HdfsClientConfigKeys
         .DFS_USER_HOME_DIR_PREFIX_DEFAULT;
@@ -1012,6 +1031,47 @@ public class DFSUtilClient {
           HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_KEY,
           HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT);
     }
+<<<<<<< HEAD
+    return userHomePrefix + Path.SEPARATOR + ugi.getShortUserName();
+  }
+
+  /**
+   * Returns trash root in non-encryption zone.
+   * @param conf configuration.
+   * @param ugi user of trash owner.
+   * @return unqualified path of trash root.
+   */
+  public static String getTrashRoot(Configuration conf,
+      UserGroupInformation ugi) {
+    return getHomeDirectory(conf, ugi)
+        + Path.SEPARATOR + FileSystem.TRASH_PREFIX;
+  }
+
+  /**
+   * Returns trash root in encryption zone.
+   * @param ez encryption zone.
+   * @param ugi user of trash owner.
+   * @return unqualified path of trash root.
+   */
+  public static String getEZTrashRoot(EncryptionZone ez,
+      UserGroupInformation ugi) {
+    String ezpath = ez.getPath();
+    return (ezpath.equals("/") ? ezpath : ezpath + Path.SEPARATOR)
+        + FileSystem.TRASH_PREFIX + Path.SEPARATOR + ugi.getShortUserName();
+  }
+
+  /**
+   * Returns trash root in a snapshottable directory.
+   * @param ssRoot String of path to a snapshottable directory root.
+   * @param ugi user of trash owner.
+   * @return unqualified path of trash root.
+   */
+  public static String getSnapshotTrashRoot(String ssRoot,
+      UserGroupInformation ugi) {
+    return (ssRoot.equals("/") ? ssRoot : ssRoot + Path.SEPARATOR)
+        + FileSystem.TRASH_PREFIX + Path.SEPARATOR + ugi.getShortUserName();
+=======
     return new Path(userHomePrefix + "/" + ugi.getShortUserName());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 }

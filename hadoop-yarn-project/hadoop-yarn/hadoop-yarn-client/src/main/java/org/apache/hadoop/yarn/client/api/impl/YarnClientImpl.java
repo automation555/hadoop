@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.client.api.impl;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -27,10 +28,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Future;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
@@ -38,6 +43,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.FailApplicationAttemptRequest;
@@ -111,29 +117,38 @@ import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceTypeInfo;
+import org.apache.hadoop.yarn.api.records.ShellContainerCommand;
 import org.apache.hadoop.yarn.api.records.SignalContainerCommand;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.YarnClusterMetrics;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.client.api.AHSClient;
+import org.apache.hadoop.yarn.client.api.ContainerShellWebSocket;
 import org.apache.hadoop.yarn.client.api.TimelineClient;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.client.api.YarnClientApplication;
+import org.apache.hadoop.yarn.client.util.YarnClientUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.ApplicationIdNotProvidedException;
 import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException;
 import org.apache.hadoop.yarn.exceptions.ContainerNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileController;
+import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileControllerFactory;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.security.client.TimelineDelegationTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
+import org.eclipse.jetty.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.WebSocketException;
+import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
+import org.eclipse.jetty.websocket.client.WebSocketClient;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -301,8 +316,20 @@ public class YarnClientImpl extends YarnClient {
 
     // Automatically add the timeline DT into the CLC
     // Only when the security and the timeline service are both enabled
-    if (isSecurityEnabled() && timelineV1ServiceEnabled) {
+    if (isSecurityEnabled() && timelineV1ServiceEnabled &&
+            getConfig().get(YarnConfiguration.TIMELINE_HTTP_AUTH_TYPE)
+                    .equals(KerberosAuthenticationHandler.TYPE)) {
       addTimelineDelegationToken(appContext.getAMContainerSpec());
+    }
+
+    // Automatically add the DT for Log Aggregation path
+    // This is useful when a separate storage is used for log aggregation
+    try {
+      if (isSecurityEnabled()) {
+        addLogAggregationDelegationToken(appContext.getAMContainerSpec());
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to obtain delegation token for Log Aggregation Path", e);
     }
 
     //TODO: YARN-1763:Handle RM failovers during the submitApplication call.
@@ -364,6 +391,47 @@ public class YarnClientImpl extends YarnClient {
     return applicationId;
   }
 
+  private void addLogAggregationDelegationToken(
+      ContainerLaunchContext clc) throws YarnException, IOException {
+    Credentials credentials = new Credentials();
+    DataInputByteBuffer dibb = new DataInputByteBuffer();
+    ByteBuffer tokens = clc.getTokens();
+    if (tokens != null) {
+      dibb.reset(tokens);
+      credentials.readTokenStorageStream(dibb);
+      tokens.rewind();
+    }
+
+    Configuration conf = getConfig();
+    String masterPrincipal = YarnClientUtils.getRmPrincipal(conf);
+    if (StringUtils.isEmpty(masterPrincipal)) {
+      throw new IOException(
+          "Can't get Master Kerberos principal for use as renewer");
+    }
+    LOG.debug("Delegation Token Renewer: " + masterPrincipal);
+
+    LogAggregationFileControllerFactory factory =
+        new LogAggregationFileControllerFactory(conf);
+    LogAggregationFileController fileController =
+        factory.getFileControllerForWrite();
+    Path remoteRootLogDir = fileController.getRemoteRootLogDir();
+    FileSystem fs = remoteRootLogDir.getFileSystem(conf);
+
+    final org.apache.hadoop.security.token.Token<?>[] finalTokens =
+        fs.addDelegationTokens(masterPrincipal, credentials);
+    if (finalTokens != null) {
+      for (org.apache.hadoop.security.token.Token<?> token : finalTokens) {
+        LOG.info("Added delegation token for log aggregation path "
+            + remoteRootLogDir + "; "+token);
+      }
+    }
+
+    DataOutputBuffer dob = new DataOutputBuffer();
+    credentials.writeTokenStorageToStream(dob);
+    tokens = ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
+    clc.setTokens(tokens);
+  }
+
   private void addTimelineDelegationToken(
       ContainerLaunchContext clc) throws YarnException, IOException {
     Credentials credentials = new Credentials();
@@ -388,10 +456,8 @@ public class YarnClientImpl extends YarnClient {
       return;
     }
     credentials.addToken(timelineService, timelineDelegationToken);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Add timeline delegation token into credentials: "
-          + timelineDelegationToken);
-    }
+    LOG.debug("Add timeline delegation token into credentials: {}",
+        timelineDelegationToken);
     DataOutputBuffer dob = new DataOutputBuffer();
     credentials.writeTokenStorageToStream(dob);
     tokens = ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
@@ -1073,5 +1139,56 @@ public class YarnClientImpl extends YarnClient {
     GetNodesToAttributesRequest request =
         GetNodesToAttributesRequest.newInstance(hostNames);
     return rmClient.getNodesToAttributes(request).getNodeToAttributes();
+  }
+
+  @Override
+  public void shellToContainer(ContainerId containerId,
+      ShellContainerCommand command) throws IOException {
+    try {
+      GetContainerReportRequest request = Records
+          .newRecord(GetContainerReportRequest.class);
+      request.setContainerId(containerId);
+      GetContainerReportResponse response = rmClient
+          .getContainerReport(request);
+      URI nodeHttpAddress = new URI(response.getContainerReport()
+          .getNodeHttpAddress());
+      String host = nodeHttpAddress.getHost();
+      int port = nodeHttpAddress.getPort();
+      String scheme = nodeHttpAddress.getScheme();
+      String protocol = "ws://";
+      if (scheme.equals("https")) {
+        protocol = "wss://";
+      }
+      WebSocketClient client = new WebSocketClient();
+      URI uri = URI.create(protocol + host + ":" + port + "/container/" +
+          containerId + "/" + command);
+      if (!UserGroupInformation.isSecurityEnabled()) {
+        uri = URI.create(protocol + host + ":" + port + "/container/" +
+            containerId + "/" + command + "?user.name=" +
+            System.getProperty("user.name"));
+      }
+      try {
+        client.start();
+        // The socket that receives events
+        ContainerShellWebSocket socket = new ContainerShellWebSocket();
+        ClientUpgradeRequest upgradeRequest = new ClientUpgradeRequest();
+        if (UserGroupInformation.isSecurityEnabled()) {
+          String challenge = YarnClientUtils.generateToken(host);
+          upgradeRequest.setHeader("Authorization", "Negotiate " + challenge);
+        }
+        // Attempt Connect
+        Future<Session> fut = client.connect(socket, uri, upgradeRequest);
+        Session session = fut.get();
+        if (session.isOpen()) {
+          socket.run();
+        }
+      } finally {
+        client.stop();
+      }
+    } catch (WebSocketException e) {
+      LOG.debug("Websocket exception: " + e.getMessage());
+    } catch (Throwable t) {
+      LOG.error("Fail to shell to container: " + t.getMessage());
+    }
   }
 }

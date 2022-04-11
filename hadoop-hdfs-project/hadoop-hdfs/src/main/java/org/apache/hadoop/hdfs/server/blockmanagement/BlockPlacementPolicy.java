@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.AddBlockFlag;
@@ -164,7 +164,6 @@ public abstract class BlockPlacementPolicy {
 
   /**
    * Check if the move is allowed. Used by balancer and other tools.
-   * @
    *
    * @param candidates all replicas including source and target
    * @param source source replica of the move

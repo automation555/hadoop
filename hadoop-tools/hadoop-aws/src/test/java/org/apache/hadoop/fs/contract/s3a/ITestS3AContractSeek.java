@@ -24,6 +24,10 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
 
+<<<<<<< HEAD
+import org.junit.Before;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -40,15 +44,34 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3AInputPolicy;
 import org.apache.hadoop.fs.s3a.S3ATestUtils;
+<<<<<<< HEAD
+import org.apache.hadoop.security.ssl.DelegatingSSLSocketFactory;
+import org.apache.hadoop.util.NativeCodeLoader;
+
+import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkNotNull;
+=======
 
 import static com.google.common.base.Preconditions.checkNotNull;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.fs.s3a.Constants.INPUT_FADVISE;
 import static org.apache.hadoop.fs.s3a.Constants.INPUT_FADV_NORMAL;
 import static org.apache.hadoop.fs.s3a.Constants.INPUT_FADV_RANDOM;
 import static org.apache.hadoop.fs.s3a.Constants.INPUT_FADV_SEQUENTIAL;
 import static org.apache.hadoop.fs.s3a.Constants.READAHEAD_RANGE;
+<<<<<<< HEAD
+import static org.apache.hadoop.fs.s3a.Constants.SSL_CHANNEL_MODE;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import static org.apache.hadoop.fs.s3a.S3ATestConstants.FS_S3A_IMPL_DISABLE_CACHE;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.maybeEnableS3Guard;
+import static org.apache.hadoop.security.ssl.DelegatingSSLSocketFactory.
+        SSLChannelMode.Default_JSSE;
+import static org.apache.hadoop.security.ssl.DelegatingSSLSocketFactory.
+        SSLChannelMode.Default_JSSE_with_GCM;
+import static org.apache.hadoop.security.ssl.DelegatingSSLSocketFactory.
+        SSLChannelMode.OpenSSL;
+import static org.junit.Assume.assumeTrue;
+
 
 /**
  * S3A contract tests covering file seek.
@@ -62,6 +85,10 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
   protected static final int READAHEAD = 1024;
 
   private final String seekPolicy;
+<<<<<<< HEAD
+  private final DelegatingSSLSocketFactory.SSLChannelMode sslChannelMode;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
   public static final int DATASET_LEN = READAHEAD * 2;
 
@@ -75,9 +102,15 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
   @Parameterized.Parameters
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][]{
+<<<<<<< HEAD
+        {INPUT_FADV_SEQUENTIAL, Default_JSSE},
+        {INPUT_FADV_RANDOM, OpenSSL},
+        {INPUT_FADV_NORMAL, Default_JSSE_with_GCM},
+=======
         {INPUT_FADV_RANDOM},
         {INPUT_FADV_NORMAL},
         {INPUT_FADV_SEQUENTIAL},
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     });
   }
 
@@ -85,8 +118,15 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
    * Run the test with a chosen seek policy.
    * @param seekPolicy fadvise policy to use.
    */
+<<<<<<< HEAD
+  public ITestS3AContractSeek(final String seekPolicy,
+      final DelegatingSSLSocketFactory.SSLChannelMode sslChannelMode) {
+    this.seekPolicy = seekPolicy;
+    this.sslChannelMode = sslChannelMode;
+=======
   public ITestS3AContractSeek(final String seekPolicy) {
     this.seekPolicy = seekPolicy;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -106,7 +146,12 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
       URI bucketURI = new URI(checkNotNull(conf.get("fs.contract.test.fs.s3a")));
       S3ATestUtils.removeBucketOverrides(bucketURI.getHost(), conf,
           READAHEAD_RANGE,
+<<<<<<< HEAD
+          INPUT_FADVISE,
+          SSL_CHANNEL_MODE);
+=======
           INPUT_FADVISE);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
     }
@@ -114,6 +159,10 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
     S3ATestUtils.disableFilesystemCaching(conf);
     conf.setInt(READAHEAD_RANGE, READAHEAD);
     conf.set(INPUT_FADVISE, seekPolicy);
+<<<<<<< HEAD
+    conf.set(SSL_CHANNEL_MODE, sslChannelMode.name());
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return conf;
   }
 
@@ -124,11 +173,18 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
 
   @Override
   public void teardown() throws Exception {
+<<<<<<< HEAD
+    super.teardown();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     S3AFileSystem fs = getFileSystem();
     if (fs.getConf().getBoolean(FS_S3A_IMPL_DISABLE_CACHE, false)) {
       fs.close();
     }
+<<<<<<< HEAD
+=======
     super.teardown();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -188,6 +244,17 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
     return (S3AFileSystem) super.getFileSystem();
   }
 
+<<<<<<< HEAD
+  @Before
+  public void validateSSLChannelMode() {
+    if (this.sslChannelMode == OpenSSL) {
+      assumeTrue(NativeCodeLoader.isNativeCodeLoaded() &&
+          NativeCodeLoader.buildSupportsOpenssl());
+    }
+  }
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   @Test
   public void testReadPolicyInFS() throws Throwable {
     describe("Verify the read policy is being consistently set");

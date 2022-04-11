@@ -22,13 +22,15 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.protocol.datatransfer.IOStreamPair;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
+import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerExecContext;
 
 /**
  * An abstraction for various container runtime implementations. Examples
  * include Process Tree, Docker, Appc runtimes etc. These implementations
  * are meant for low-level OS container support - dependencies on
- * higher-level node mananger constructs should be avoided.
+ * higher-level node manager constructs should be avoided.
  */
 
 @InterfaceAudience.Private
@@ -86,11 +88,31 @@ public interface ContainerRuntime {
       throws ContainerExecutionException;
 
   /**
-   * Return the host and ip of the container
+   * Run a program in container.
+   *
+   * @param ctx the {@link ContainerExecContext}
+   * @return stdin and stdout of container exec
+   * @throws ContainerExecutionException
+   */
+  IOStreamPair execContainer(ContainerExecContext ctx)
+      throws ContainerExecutionException;
+
+  /**
+   * Return the host and ip of the container.
    *
    * @param container the {@link Container}
    * @throws ContainerExecutionException if an error occurs while getting the ip
    * and hostname
    */
   String[] getIpAndHost(Container container) throws ContainerExecutionException;
+
+  /**
+   * Return the exposed ports of the container.
+   * @param container the {@link Container}
+   * @return List of exposed ports
+   * @throws ContainerExecutionException if an error occurs while getting
+   * the exposed ports
+   */
+  String getExposedPorts(Container container)
+      throws ContainerExecutionException;
 }

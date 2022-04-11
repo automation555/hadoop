@@ -36,11 +36,10 @@ import org.apache.hadoop.hdfs.server.namenode.FSImageStorageInspector.FSImageFil
 import org.apache.hadoop.hdfs.server.namenode.FileJournalManager.EditLogFile;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
 import org.apache.hadoop.hdfs.util.MD5FileUtils;
+import org.apache.hadoop.util.Lists;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ComparisonChain;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ComparisonChain;
 
 /**
  * The NNStorageRetentionManager is responsible for inspecting the storage
@@ -184,27 +183,26 @@ public class NNStorageRetentionManager {
    * @return the transaction ID corresponding to the oldest checkpoint
    * that should be retained. 
    */
-  private long getImageTxIdToRetain(FSImageTransactionalStorageInspector inspector) {
-      
-    List<FSImageFile> images = inspector.getFoundImages();
-    TreeSet<Long> imageTxIds = Sets.newTreeSet();
+  private long getImageTxIdToRetain(
+      FSImageTransactionalStorageInspector inspector) {
+
+    final List<FSImageFile> images = inspector.getFoundImages();
+    if (images.isEmpty()) {
+      return 0L;
+    }
+
+    TreeSet<Long> imageTxIds = new TreeSet<>(Collections.reverseOrder());
     for (FSImageFile image : images) {
       imageTxIds.add(image.getCheckpointTxId());
     }
-    
+
     List<Long> imageTxIdsList = Lists.newArrayList(imageTxIds);
-    if (imageTxIdsList.isEmpty()) {
-      return 0;
-    }
-    
-    Collections.reverse(imageTxIdsList);
-    int toRetain = Math.min(numCheckpointsToRetain, imageTxIdsList.size());    
+    int toRetain = Math.min(numCheckpointsToRetain, imageTxIdsList.size());
     long minTxId = imageTxIdsList.get(toRetain - 1);
-    LOG.info("Going to retain " + toRetain + " images with txid >= " +
-        minTxId);
+    LOG.info("Going to retain {} images with txid >= {}", toRetain, minTxId);
     return minTxId;
   }
-  
+
   /**
    * Interface responsible for disposing of old checkpoints and edit logs.
    */

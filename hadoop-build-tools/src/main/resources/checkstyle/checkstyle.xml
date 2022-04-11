@@ -67,6 +67,10 @@
     <!--<module name="FileLength">-->
     <module name="FileTabCharacter"/>
 
+    <!-- Checks for line length violations.                                 -->
+    <!-- See https://checkstyle.sourceforge.io/config_sizes.html#LineLength -->
+    <module name="LineLength"/>
+
     <module name="TreeWalker">
 
         <module name="SuppressWarningsHolder"/>
@@ -115,14 +119,17 @@
 
         <!-- Checks for imports                              -->
         <!-- See http://checkstyle.sf.net/config_import.html -->
-        <module name="IllegalImport"/> <!-- defaults to sun.* packages -->
+        <module name="IllegalImport">
+          <property name="regexp" value="true"/>
+          <property name="illegalPkgs" value="sun, com\.google\.common"/>
+          <property name="illegalClasses" value="^org\.apache\.hadoop\.thirdparty\.com\.google\.common\.io\.BaseEncoding, ^org\.apache\.hadoop\.thirdparty\.com\.google\.common\.base\.(Optional|Function|Predicate|Supplier), ^org\.apache\.hadoop\.thirdparty\.com\.google\.common\.collect\.(ImmutableListMultimap)"/>
+        </module>
         <module name="RedundantImport"/>
         <module name="UnusedImports"/>
 
 
         <!-- Checks for Size Violations.                    -->
         <!-- See http://checkstyle.sf.net/config_sizes.html -->
-        <module name="LineLength"/>
         <module name="MethodLength"/>
         <module name="ParameterNumber">
           <property name="ignoreOverriddenMethods" value="true"/>

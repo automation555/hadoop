@@ -20,11 +20,16 @@ package org.apache.hadoop.hdfs.server.namenode;
 import static org.apache.hadoop.hdfs.server.namenode.NNStorage.getFinalizedEditsFileName;
 import static org.apache.hadoop.hdfs.server.namenode.NNStorage.getImageFileName;
 import static org.apache.hadoop.hdfs.server.namenode.NNStorage.getInProgressEditsFileName;
+import static org.mockito.ArgumentMatchers.any;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Comparator;
+<<<<<<< HEAD
+import java.util.LinkedHashSet;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,18 +46,16 @@ import org.apache.hadoop.hdfs.server.namenode.FileJournalManager.EditLogFile;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeDirType;
 import org.apache.hadoop.hdfs.server.namenode.NNStorage.NameNodeFile;
 import org.apache.hadoop.hdfs.server.namenode.NNStorageRetentionManager.StoragePurger;
+import org.apache.hadoop.util.Lists;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 
 
 public class TestNNStorageRetentionManager {
@@ -305,7 +308,11 @@ public class TestNNStorageRetentionManager {
     Mockito.verify(mockPurger, Mockito.atLeast(0))
       .markStale(staleLogsCaptor.capture());
 
+<<<<<<< HEAD
+    Set<String> capturedPaths = new LinkedHashSet<>();
+=======
     Set<String> capturedPaths = Sets.newLinkedHashSet();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     // Check images
     for (FSImageFile captured : imagesPurgedCaptor.getAllValues()) {
       capturedPaths.add(fileToPath(captured.getFile()));
@@ -335,9 +342,15 @@ public class TestNNStorageRetentionManager {
 
   private class TestCaseDescription {
     private final Map<File, FakeRoot> dirRoots = Maps.newLinkedHashMap();
+<<<<<<< HEAD
+    private final Set<File> expectedPurgedLogs = new LinkedHashSet<>();
+    private final Set<File> expectedPurgedImages = new LinkedHashSet<>();
+    private final Set<File> expectedStaleLogs = new LinkedHashSet<>();
+=======
     private final Set<File> expectedPurgedLogs = Sets.newLinkedHashSet();
     private final Set<File> expectedPurgedImages = Sets.newLinkedHashSet();
     private final Set<File> expectedStaleLogs = Sets.newLinkedHashSet();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
     private class FakeRoot {
       final NameNodeDirType type;
@@ -485,8 +498,12 @@ public class TestNNStorageRetentionManager {
         inspector.inspectDirectory(sd);
       }
       return null;
+<<<<<<< HEAD
+    }).when(mockStorage).inspectStorageDirs(any());
+=======
     }).when(mockStorage).inspectStorageDirs(
         Mockito.<FSImageStorageInspector>anyObject());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return mockStorage;
   }
 }

@@ -19,9 +19,9 @@ package org.apache.hadoop.ha;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 
 import org.apache.commons.cli.Options;
@@ -39,8 +39,7 @@ import org.apache.hadoop.ha.HAServiceProtocol.RequestSource;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,16 +51,15 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 
 public abstract class HAAdmin extends Configured implements Tool {
-  
-  private static final String FORCEFENCE  = "forcefence";
-  private static final String FORCEACTIVE = "forceactive";
-  
+
+  protected static final String FORCEACTIVE = "forceactive";
+
   /**
    * Undocumented flag which allows an administrator to use manual failover
    * state transitions even when auto-failover is enabled. This is an unsafe
    * operation, which is why it is not documented in the usage below.
    */
-  private static final String FORCEMANUAL = "forcemanual";
+  protected static final String FORCEMANUAL = "forcemanual";
   private static final Logger LOG = LoggerFactory.getLogger(HAAdmin.class);
 
   private int rpcTimeoutForChecks = -1;
@@ -72,6 +70,8 @@ public abstract class HAAdmin extends Configured implements Tool {
         new UsageInfo("[--"+FORCEACTIVE+"] <serviceId>", "Transitions the service into Active state"))
     .put("-transitionToStandby",
         new UsageInfo("<serviceId>", "Transitions the service into Standby state"))
+<<<<<<< HEAD
+=======
       .put("-transitionToObserver",
           new UsageInfo("<serviceId>",
               "Transitions the service into Observer state"))
@@ -81,6 +81,7 @@ public abstract class HAAdmin extends Configured implements Tool {
             "Unconditionally fence services if the --"+FORCEFENCE+" option is used.\n" +
             "Try to failover to the target service even if it is not ready if the " + 
             "--" + FORCEACTIVE + " option is used."))
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     .put("-getServiceState",
         new UsageInfo("<serviceId>", "Returns the state of the service"))
       .put("-getAllServiceState",
@@ -99,6 +100,14 @@ public abstract class HAAdmin extends Configured implements Tool {
   protected PrintStream out = System.out;
   private RequestSource requestSource = RequestSource.REQUEST_BY_USER;
 
+  protected RequestSource getRequestSource() {
+    return requestSource;
+  }
+
+  protected void setRequestSource(RequestSource requestSource) {
+    this.requestSource = requestSource;
+  }
+
   protected HAAdmin() {
     super();
   }
@@ -110,40 +119,49 @@ public abstract class HAAdmin extends Configured implements Tool {
   protected abstract HAServiceTarget resolveTarget(String string);
   
   protected Collection<String> getTargetIds(String targetNodeToActivate) {
-    return new ArrayList<String>(
-        Arrays.asList(new String[]{targetNodeToActivate}));
+    return Collections.singleton(targetNodeToActivate);
   }
 
   protected String getUsageString() {
     return "Usage: HAAdmin";
   }
 
-  protected void printUsage(PrintStream errOut) {
-    errOut.println(getUsageString());
-    for (Map.Entry<String, UsageInfo> e : USAGE.entrySet()) {
+  protected void printUsage(PrintStream pStr,
+      Map<String, UsageInfo> helpEntries) {
+    pStr.println(getUsageString());
+    for (Map.Entry<String, UsageInfo> e : helpEntries.entrySet()) {
       String cmd = e.getKey();
       UsageInfo usage = e.getValue();
-      
+
       if (usage.args == null) {
-        errOut.println("    [" + cmd + "]");
+        pStr.println("    [" + cmd + "]");
       } else {
-        errOut.println("    [" + cmd + " " + usage.args + "]");
+        pStr.println("    [" + cmd + " " + usage.args + "]");
       }
     }
-    errOut.println();
-    ToolRunner.printGenericCommandUsage(errOut);    
+    pStr.println();
+    ToolRunner.printGenericCommandUsage(pStr);
   }
-  
-  private void printUsage(PrintStream errOut, String cmd) {
-    UsageInfo usage = USAGE.get(cmd);
+
+  protected void printUsage(PrintStream pStr) {
+    printUsage(pStr, USAGE);
+  }
+
+  protected void printUsage(PrintStream pStr, String cmd,
+      Map<String, UsageInfo> helpEntries) {
+    UsageInfo usage = helpEntries.get(cmd);
     if (usage == null) {
       throw new RuntimeException("No usage for cmd " + cmd);
     }
     if (usage.args == null) {
-      errOut.println(getUsageString() + " [" + cmd + "]");
+      pStr.println(getUsageString() + " [" + cmd + "]");
     } else {
-      errOut.println(getUsageString() + " [" + cmd + " " + usage.args + "]");
+      pStr.println(getUsageString() + " [" + cmd + " " + usage.args + "]");
     }
+  }
+
+  protected void printUsage(PrintStream pStr, String cmd) {
+    printUsage(pStr, cmd, USAGE);
   }
 
   private int transitionToActive(final CommandLine cmd)
@@ -181,8 +199,10 @@ public abstract class HAAdmin extends Configured implements Tool {
   private boolean isOtherTargetNodeActive(String targetNodeToActivate, boolean forceActive)
       throws IOException  {
     Collection<String> targetIds = getTargetIds(targetNodeToActivate);
-    targetIds.remove(targetNodeToActivate);
-    for(String targetId : targetIds) {
+    for (String targetId : targetIds) {
+      if (targetNodeToActivate.equals(targetId)) {
+        continue;
+      }
       HAServiceTarget target = resolveTarget(targetId);
       if (!checkManualStateManagementOK(target)) {
         return true;
@@ -225,6 +245,8 @@ public abstract class HAAdmin extends Configured implements Tool {
     return 0;
   }
 
+<<<<<<< HEAD
+=======
   private int transitionToObserver(final CommandLine cmd)
       throws IOException, ServiceFailedException {
     String[] argv = cmd.getArgs();
@@ -246,6 +268,7 @@ public abstract class HAAdmin extends Configured implements Tool {
     return 0;
   }
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Ensure that we are allowed to manually manage the HA state of the target
    * service. If automatic failover is configured, then the automatic
@@ -255,7 +278,7 @@ public abstract class HAAdmin extends Configured implements Tool {
    * @param target the target to check
    * @return true if manual state management is allowed
    */
-  private boolean checkManualStateManagementOK(HAServiceTarget target) {
+  protected boolean checkManualStateManagementOK(HAServiceTarget target) {
     if (target.isAutoFailoverEnabled()) {
       if (requestSource != RequestSource.REQUEST_BY_USER_FORCED) {
         errOut.println(
@@ -274,6 +297,9 @@ public abstract class HAAdmin extends Configured implements Tool {
     return true;
   }
 
+<<<<<<< HEAD
+  protected StateChangeRequestInfo createReqInfo() {
+=======
   /**
    * Check if the target supports the Observer state.
    * @param target the target to check
@@ -290,77 +316,19 @@ public abstract class HAAdmin extends Configured implements Tool {
   }
 
   private StateChangeRequestInfo createReqInfo() {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     return new StateChangeRequestInfo(requestSource);
   }
-
-  private int failover(CommandLine cmd)
-      throws IOException, ServiceFailedException {
-    boolean forceFence = cmd.hasOption(FORCEFENCE);
-    boolean forceActive = cmd.hasOption(FORCEACTIVE);
-
-    int numOpts = cmd.getOptions() == null ? 0 : cmd.getOptions().length;
-    final String[] args = cmd.getArgs();
-
-    if (numOpts > 3 || args.length != 2) {
-      errOut.println("failover: incorrect arguments");
-      printUsage(errOut, "-failover");
-      return -1;
-    }
-
-    HAServiceTarget fromNode = resolveTarget(args[0]);
-    HAServiceTarget toNode = resolveTarget(args[1]);
-    
-    // Check that auto-failover is consistently configured for both nodes.
-    Preconditions.checkState(
-        fromNode.isAutoFailoverEnabled() ==
-          toNode.isAutoFailoverEnabled(),
-          "Inconsistent auto-failover configs between %s and %s!",
-          fromNode, toNode);
-    
-    if (fromNode.isAutoFailoverEnabled()) {
-      if (forceFence || forceActive) {
-        // -forceActive doesn't make sense with auto-HA, since, if the node
-        // is not healthy, then its ZKFC will immediately quit the election
-        // again the next time a health check runs.
-        //
-        // -forceFence doesn't seem to have any real use cases with auto-HA
-        // so it isn't implemented.
-        errOut.println(FORCEFENCE + " and " + FORCEACTIVE + " flags not " +
-            "supported with auto-failover enabled.");
-        return -1;
-      }
-      try {
-        return gracefulFailoverThroughZKFCs(toNode);
-      } catch (UnsupportedOperationException e){
-        errOut.println("Failover command is not supported with " +
-            "auto-failover enabled: " + e.getLocalizedMessage());
-        return -1;
-      }
-    }
-    
-    FailoverController fc = new FailoverController(getConf(),
-        requestSource);
-    
-    try {
-      fc.failover(fromNode, toNode, forceFence, forceActive); 
-      out.println("Failover from "+args[0]+" to "+args[1]+" successful");
-    } catch (FailoverFailedException ffe) {
-      errOut.println("Failover failed: " + ffe.getLocalizedMessage());
-      return -1;
-    }
-    return 0;
-  }
-  
 
   /**
    * Initiate a graceful failover by talking to the target node's ZKFC.
    * This sends an RPC to the ZKFC, which coordinates the failover.
-   * 
+   *
    * @param toNode the node to fail to
    * @return status code (0 for success)
    * @throws IOException if failover does not succeed
    */
-  private int gracefulFailoverThroughZKFCs(HAServiceTarget toNode)
+  protected int gracefulFailoverThroughZKFCs(HAServiceTarget toNode)
       throws IOException {
 
     int timeout = FailoverController.getRpcTimeoutToNewActive(getConf());
@@ -412,7 +380,7 @@ public abstract class HAAdmin extends Configured implements Tool {
 
   /**
    * Return the serviceId as is, we are assuming it was
-   * given as a service address of form <host:ipcport>.
+   * given as a service address of form {@literal <}host:ipcport{@literal >}.
    */
   protected String getServiceAddr(String serviceId) {
     return serviceId;
@@ -443,45 +411,58 @@ public abstract class HAAdmin extends Configured implements Tool {
       return -1;
     }
   }
-  
-  protected int runCmd(String[] argv) throws Exception {
+
+  protected boolean checkParameterValidity(String[] argv,
+      Map<String, UsageInfo> helpEntries){
+
     if (argv.length < 1) {
-      printUsage(errOut);
+      printUsage(errOut, helpEntries);
+      return false;
+    }
+
+    String cmd = argv[0];
+    if (!cmd.startsWith("-")) {
+      errOut.println("Bad command '" + cmd +
+          "': expected command starting with '-'");
+      printUsage(errOut, helpEntries);
+      return false;
+    }
+
+    if (!helpEntries.containsKey(cmd)) {
+      errOut.println(cmd.substring(1) + ": Unknown command");
+      printUsage(errOut, helpEntries);
+      return false;
+    }
+    return true;
+  }
+
+  protected boolean checkParameterValidity(String[] argv){
+    return checkParameterValidity(argv, USAGE);
+  }
+
+  protected int runCmd(String[] argv) throws Exception {
+    if (!checkParameterValidity(argv, USAGE)){
       return -1;
     }
 
     String cmd = argv[0];
-
-    if (!cmd.startsWith("-")) {
-      errOut.println("Bad command '" + cmd + "': expected command starting with '-'");
-      printUsage(errOut);
-      return -1;
-    }
-    
-    if (!USAGE.containsKey(cmd)) {
-      errOut.println(cmd.substring(1) + ": Unknown command");
-      printUsage(errOut);
-      return -1;
-    }
-    
     Options opts = new Options();
-
     // Add command-specific options
-    if ("-failover".equals(cmd)) {
-      addFailoverCliOpts(opts);
-    }
     if("-transitionToActive".equals(cmd)) {
       addTransitionToActiveCliOpts(opts);
     }
     // Mutative commands take FORCEMANUAL option
     if ("-transitionToActive".equals(cmd) ||
+<<<<<<< HEAD
+        "-transitionToStandby".equals(cmd)) {
+=======
         "-transitionToStandby".equals(cmd) ||
         "-transitionToObserver".equals(cmd) ||
         "-failover".equals(cmd)) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       opts.addOption(FORCEMANUAL, false,
           "force manual control even if auto-failover is enabled");
     }
-         
     CommandLine cmdLine = parseOpts(cmd, opts, argv);
     if (cmdLine == null) {
       // error already printed
@@ -502,10 +483,13 @@ public abstract class HAAdmin extends Configured implements Tool {
       return transitionToActive(cmdLine);
     } else if ("-transitionToStandby".equals(cmd)) {
       return transitionToStandby(cmdLine);
+<<<<<<< HEAD
+=======
     } else if ("-transitionToObserver".equals(cmd)) {
       return transitionToObserver(cmdLine);
     } else if ("-failover".equals(cmd)) {
       return failover(cmdLine);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     } else if ("-getServiceState".equals(cmd)) {
       return getServiceState(cmdLine);
     } else if ("-getAllServiceState".equals(cmd)) {
@@ -544,7 +528,7 @@ public abstract class HAAdmin extends Configured implements Tool {
     return 0;
   }
 
-  private boolean confirmForceManual() throws IOException {
+  protected boolean confirmForceManual() throws IOException {
      return ToolRunner.confirmPrompt(
         "You have specified the --" + FORCEMANUAL + " flag. This flag is " +
         "dangerous, as it can induce a split-brain scenario that WILL " +
@@ -559,16 +543,7 @@ public abstract class HAAdmin extends Configured implements Tool {
         "Are you sure you want to continue?");
   }
 
-  /**
-   * Add CLI options which are specific to the failover command and no
-   * others.
-   */
-  private void addFailoverCliOpts(Options failoverOpts) {
-    failoverOpts.addOption(FORCEFENCE, false, "force fencing");
-    failoverOpts.addOption(FORCEACTIVE, false, "force failover");
-    // Don't add FORCEMANUAL, since that's added separately for all commands
-    // that change state.
-  }
+
   
   /**
    * Add CLI options which are specific to the transitionToActive command and
@@ -577,39 +552,47 @@ public abstract class HAAdmin extends Configured implements Tool {
   private void addTransitionToActiveCliOpts(Options transitionToActiveCliOpts) {
     transitionToActiveCliOpts.addOption(FORCEACTIVE, false, "force active");
   }
-  
-  private CommandLine parseOpts(String cmdName, Options opts, String[] argv) {
+
+  protected CommandLine parseOpts(String cmdName, Options opts, String[] argv,
+      Map<String, UsageInfo> helpEntries) {
     try {
       // Strip off the first arg, since that's just the command name
-      argv = Arrays.copyOfRange(argv, 1, argv.length); 
+      argv = Arrays.copyOfRange(argv, 1, argv.length);
       return new GnuParser().parse(opts, argv);
     } catch (ParseException pe) {
       errOut.println(cmdName.substring(1) +
           ": incorrect arguments");
-      printUsage(errOut, cmdName);
+      printUsage(errOut, cmdName, helpEntries);
       return null;
     }
   }
   
-  private int help(String[] argv) {
+  protected CommandLine parseOpts(String cmdName, Options opts, String[] argv) {
+    return parseOpts(cmdName, opts, argv, USAGE);
+  }
+  protected int help(String[] argv) {
+    return help(argv, USAGE);
+  }
+
+  protected int help(String[] argv, Map<String, UsageInfo> helpEntries) {
     if (argv.length == 1) { // only -help
-      printUsage(out);
+      printUsage(out, helpEntries);
       return 0;
     } else if (argv.length != 2) {
-      printUsage(errOut, "-help");
+      printUsage(errOut, "-help", helpEntries);
       return -1;
     }
     String cmd = argv[1];
     if (!cmd.startsWith("-")) {
       cmd = "-" + cmd;
     }
-    UsageInfo usageInfo = USAGE.get(cmd);
+    UsageInfo usageInfo = helpEntries.get(cmd);
     if (usageInfo == null) {
       errOut.println(cmd + ": Unknown command");
-      printUsage(errOut);
+      printUsage(errOut, helpEntries);
       return -1;
     }
-    
+
     if (usageInfo.args == null) {
       out.println(cmd + ": " + usageInfo.help);
     } else {

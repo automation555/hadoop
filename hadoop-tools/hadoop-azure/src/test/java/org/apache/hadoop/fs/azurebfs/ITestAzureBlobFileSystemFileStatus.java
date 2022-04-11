@@ -67,7 +67,11 @@ public class ITestAzureBlobFileSystemFileStatus extends
 
     String errorInStatus = "error in " + fileStatus + " from " + fs;
 
+<<<<<<< HEAD
+    if (!getIsNamespaceEnabled(fs)) {
+=======
     if (!fs.getIsNamespaceEnabled()) {
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       assertEquals(errorInStatus + ": owner",
               fs.getOwnerUser(), fileStatus.getOwner());
       assertEquals(errorInStatus + ": group",

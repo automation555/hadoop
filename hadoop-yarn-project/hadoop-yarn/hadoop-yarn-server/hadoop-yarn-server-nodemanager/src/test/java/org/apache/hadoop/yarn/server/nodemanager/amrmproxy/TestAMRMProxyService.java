@@ -206,7 +206,6 @@ public class TestAMRMProxyService extends BaseAMRMProxyTest {
         finishApplicationMaster(testAppId, FinalApplicationStatus.FAILED);
 
     Assert.assertNotNull(finshResponse);
-    Assert.assertEquals(false, finshResponse.getIsUnregistered());
 
     try {
       // Try to finish an application master that is already finished.
@@ -661,6 +660,27 @@ public class TestAMRMProxyService extends BaseAMRMProxyTest {
     state = getNMContext().getNMStateStore().loadAMRMProxyState();
     // The app that failed to recover should have been removed from NMSS
     Assert.assertEquals(0, state.getAppContexts().size());
+  }
+
+  @Test
+  public void testCheckIfAppExistsInStateStore()
+      throws IOException, YarnException {
+    ApplicationId appId = ApplicationId.newInstance(0, 0);
+    Configuration conf = createConfiguration();
+    conf.setBoolean(YarnConfiguration.FEDERATION_ENABLED, true);
+
+    createAndStartAMRMProxyService(conf);
+
+    Assert.assertEquals(false,
+        getAMRMProxyService().checkIfAppExistsInStateStore(appId));
+
+    Configuration distConf = createConfiguration();
+    conf.setBoolean(YarnConfiguration.DIST_SCHEDULING_ENABLED, true);
+
+    createAndStartAMRMProxyService(distConf);
+
+    Assert.assertEquals(true,
+        getAMRMProxyService().checkIfAppExistsInStateStore(appId));
   }
 
   /**

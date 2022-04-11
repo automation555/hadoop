@@ -39,7 +39,7 @@ import org.apache.hadoop.hdfs.server.federation.store.records.MembershipState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 
 /**
  * Order the destinations based on available space. This resolver uses a
@@ -83,7 +83,7 @@ public class AvailableSpaceResolver
    * caching to avoid too many calls. The cache might be updated asynchronously
    * to reduce latency.
    *
-   * @return NamespaceId -> {@link SubclusterAvailableSpace}
+   * @return NamespaceId to {@link SubclusterAvailableSpace}.
    */
   @Override
   protected Map<String, SubclusterAvailableSpace> getSubclusterInfo(

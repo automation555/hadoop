@@ -23,15 +23,16 @@ import static org.junit.Assert.fail;
 
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.datanode.FinalizedReplica;
-import org.apache.hadoop.util.AutoCloseableLock;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Unit test for ReplicasMap class
  */
 public class TestReplicaMap {
-  private final ReplicaMap map = new ReplicaMap(new AutoCloseableLock());
+  private final ReplicaMap map = new ReplicaMap(new ReentrantReadWriteLock());
   private final String bpid = "BP-TEST";
   private final  Block block = new Block(1234, 1234, 1234);
   
@@ -111,7 +112,11 @@ public class TestReplicaMap {
 
   @Test
   public void testMergeAll() {
+<<<<<<< HEAD
+    ReplicaMap temReplicaMap = new ReplicaMap(new ReentrantReadWriteLock());
+=======
     ReplicaMap temReplicaMap = new ReplicaMap(new AutoCloseableLock());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Block tmpBlock = new Block(5678, 5678, 5678);
     temReplicaMap.add(bpid, new FinalizedReplica(tmpBlock, null, null));
 
@@ -122,7 +127,11 @@ public class TestReplicaMap {
 
   @Test
   public void testAddAll() {
+<<<<<<< HEAD
+    ReplicaMap temReplicaMap = new ReplicaMap(new ReentrantReadWriteLock());
+=======
     ReplicaMap temReplicaMap = new ReplicaMap(new AutoCloseableLock());
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     Block tmpBlock = new Block(5678, 5678, 5678);
     temReplicaMap.add(bpid, new FinalizedReplica(tmpBlock, null, null));
 

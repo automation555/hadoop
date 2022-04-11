@@ -42,7 +42,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resource
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
@@ -203,9 +203,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
         throws IOException {
     String path = pathForCgroup(controller, groupName);
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("createCgroup: " + path);
-    }
+    LOG.debug("createCgroup: {}", path);
 
     if (!new File(path).mkdir()) {
       throw new IOException("Failed to create cgroup at " + path);
@@ -217,9 +215,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     String path = pathForCgroup(controller, groupName);
     param = controller + "." + param;
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("updateCgroup: " + path + ": " + param + "=" + value);
-    }
+    LOG.debug("updateCgroup: {}: {}={}", path, param, value);
 
     PrintWriter pw = null;
     try {
@@ -256,7 +252,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
               + "/tasks"), "UTF-8"))) {
         str = inl.readLine();
         if (str != null) {
-          LOG.debug("First line in cgroup tasks file: " + cgf + " " + str);
+          LOG.debug("First line in cgroup tasks file: {} {}", cgf, str);
         }
       } catch (IOException e) {
         LOG.warn("Failed to read cgroup tasks file. ", e);
@@ -299,9 +295,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
   boolean deleteCgroup(String cgroupPath) {
     boolean deleted = false;
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("deleteCgroup: " + cgroupPath);
-    }
+    LOG.debug("deleteCgroup: {}", cgroupPath);
     long start = clock.getTime();
     do {
       try {

@@ -19,7 +19,11 @@
 package org.apache.hadoop.hdfs.server.datanode.checker;
 
 import java.util.Optional;
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListenableFuture;
+=======
 import com.google.common.util.concurrent.ListenableFuture;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 

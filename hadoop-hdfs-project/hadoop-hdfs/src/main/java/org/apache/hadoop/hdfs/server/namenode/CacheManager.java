@@ -37,13 +37,13 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantLock;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -86,12 +86,15 @@ import org.apache.hadoop.hdfs.util.ReadOnlyList;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.GSet;
 import org.apache.hadoop.util.LightWeightGSet;
+import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.Time;
+
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.collect.HashMultimap;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Multimap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 
 /**
  * The Cache Manager handles caching on DataNodes.
@@ -125,8 +128,7 @@ public class CacheManager {
    * listCacheDirectives relies on the ordering of elements in this map
    * to track what has already been listed by the client.
    */
-  private final TreeMap<Long, CacheDirective> directivesById =
-      new TreeMap<Long, CacheDirective>();
+  private final TreeMap<Long, CacheDirective> directivesById = new TreeMap<>();
 
   /**
    * The directive ID to use for a new directive.  IDs always increase, and are
@@ -135,10 +137,10 @@ public class CacheManager {
   private long nextDirectiveId;
 
   /**
-   * Cache directives, sorted by path
+   * Cache directives
    */
-  private final TreeMap<String, List<CacheDirective>> directivesByPath =
-      new TreeMap<String, List<CacheDirective>>();
+  private final Multimap<String, CacheDirective> directivesByPath =
+      HashMultimap.create();
 
   /**
    * Cache pools, sorted by name.
@@ -515,12 +517,7 @@ public class CacheManager {
     assert addedDirective;
     directivesById.put(directive.getId(), directive);
     String path = directive.getPath();
-    List<CacheDirective> directives = directivesByPath.get(path);
-    if (directives == null) {
-      directives = new ArrayList<CacheDirective>(1);
-      directivesByPath.put(path, directives);
-    }
-    directives.add(directive);
+    directivesByPath.put(path, directive);
     // Fix up pool stats
     CacheDirectiveStats stats =
         computeNeeded(directive.getPath(), directive.getReplication());
@@ -681,13 +678,9 @@ public class CacheManager {
     assert namesystem.hasWriteLock();
     // Remove the corresponding entry in directivesByPath.
     String path = directive.getPath();
-    List<CacheDirective> directives = directivesByPath.get(path);
-    if (directives == null || !directives.remove(directive)) {
-      throw new InvalidRequestException("Failed to locate entry " +
-          directive.getId() + " by path " + directive.getPath());
-    }
-    if (directives.size() == 0) {
-      directivesByPath.remove(path);
+    if (!directivesByPath.remove(path, directive)) {
+      throw new InvalidRequestException("Failed to locate entry "
+          + directive.getId() + " by path " + directive.getPath());
     }
     // Fix up the stats from removing the pool
     final CachePool pool = directive.getPool();
@@ -906,7 +899,7 @@ public class CacheManager {
       Iterator<CacheDirective> iter = pool.getDirectiveList().iterator();
       while (iter.hasNext()) {
         CacheDirective directive = iter.next();
-        directivesByPath.remove(directive.getPath());
+        directivesByPath.removeAll(directive.getPath());
         directivesById.remove(directive.getId());
         iter.remove();
       }
@@ -944,6 +937,11 @@ public class CacheManager {
     }
   }
 
+  @SuppressFBWarnings(
+      value="EC_UNRELATED_TYPES",
+      justification="HDFS-15255 Asked Wei-Chiu and Pifta to review this" +
+          " warning and we all agree the code is OK and the warning is not " +
+          "needed")
   private void setCachedLocations(LocatedBlock block) {
     CachedBlock cachedBlock =
         new CachedBlock(block.getBlock().getBlockId(),
@@ -1080,6 +1078,10 @@ public class CacheManager {
       if (p.getLimit() != null)
         b.setLimit(p.getLimit());
 
+      if (p.getMaxRelativeExpiryMs() != null) {
+        b.setMaxRelativeExpiry(p.getMaxRelativeExpiryMs());
+      }
+
       pools.add(b.build());
     }
 
@@ -1145,6 +1147,10 @@ public class CacheManager {
       if (p.hasLimit())
         info.setLimit(p.getLimit());
 
+      if (p.hasMaxRelativeExpiry()) {
+        info.setMaxRelativeExpiryMs(p.getMaxRelativeExpiry());
+      }
+
       addCachePool(info);
     }
 
@@ -1171,12 +1177,7 @@ public class CacheManager {
       throw new IOException("A directive with ID " + directive.getId()
           + " already exists");
     }
-    List<CacheDirective> directives = directivesByPath.get(directive.getPath());
-    if (directives == null) {
-      directives = new LinkedList<CacheDirective>();
-      directivesByPath.put(directive.getPath(), directives);
-    }
-    directives.add(directive);
+    directivesByPath.put(directive.getPath(), directive);
   }
 
   private final class SerializerCompat {

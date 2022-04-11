@@ -284,6 +284,10 @@
       <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.ProtobufRpcEngineProtos.*"/>
     </Match>
     <Match>
+        <!-- protobuf generated code -->
+        <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.ProtobufRpcEngine2Protos.*"/>
+    </Match>
+    <Match>
       <!-- protobuf generated code -->
       <Class name="~org\.apache\.hadoop\.ipc\.protobuf\.ProtocolInfoProtos.*"/>
     </Match>
@@ -409,7 +413,11 @@
     <Bug pattern="NP_NULL_PARAM_DEREF"/>
   </Match>
 
+<<<<<<< HEAD
+  <!-- Parameter is checked with Strings.isNullOrEmpty before accessing -->
+=======
   <!-- propertyName is checked with isNullOrEmpty (fix after guava 27) -->
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   <Match>
     <Class name="org.apache.hadoop.conf.Configuration"/>
     <Method name="asXmlDocument"/>
@@ -459,5 +467,11 @@
     <Class name="org.apache.hadoop.util.JsonSerialization"/>
     <Method name="save"/>
     <Bug pattern="OBL_UNSATISFIED_OBLIGATION"/>
+  </Match>
+
+  <Match>
+    <Class name="org.apache.hadoop.ipc.ProtobufHelper" />
+    <Method name="getFixedByteString" />
+    <Bug pattern="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION" />
   </Match>
 </FindBugsFilter>

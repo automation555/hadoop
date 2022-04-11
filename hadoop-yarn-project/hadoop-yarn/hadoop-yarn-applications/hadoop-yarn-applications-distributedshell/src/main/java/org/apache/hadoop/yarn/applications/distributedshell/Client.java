@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.yarn.applications.distributedshell;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -30,8 +32,10 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.base.Joiner;
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -94,7 +98,11 @@ import org.apache.hadoop.yarn.util.UnitsConversionUtil;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
+<<<<<<< HEAD
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+=======
 import com.google.common.annotations.VisibleForTesting;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,12 +148,16 @@ public class Client {
   private static final int DEFAULT_AM_VCORES = 1;
   private static final int DEFAULT_CONTAINER_MEMORY = 10;
   private static final int DEFAULT_CONTAINER_VCORES = 1;
+
+  // check the application once per second.
+  private static final int APP_MONITOR_INTERVAL = 1000;
   
   // Configuration
   private Configuration conf;
   private YarnClient yarnClient;
   // Application master specific info to register a new Application with RM/ASM
   private String appName = "";
+  private ApplicationId applicationId;
   // App master priority
   private int amPriority = 0;
   // Queue for App master
@@ -205,7 +217,7 @@ public class Client {
   private String rollingFilesPattern = "";
 
   // Start time for client
-  private final long clientStartTime = System.currentTimeMillis();
+  private long clientStartTime = System.currentTimeMillis();
   // Timeout threshold for client. Kill app after time interval expires.
   private long clientTimeout = 600000;
 
@@ -241,8 +253,14 @@ public class Client {
   // Application tags
   private Set<String> applicationTags = new HashSet<>();
 
+  private List<String> filesToLocalize = new ArrayList<>();
+
   // Command line options
   private Options opts;
+
+  private final AtomicBoolean stopSignalReceived;
+  private final AtomicBoolean isRunning;
+  private final Object objectLock = new Object();
 
   private static final String shellCommandPath = "shellCommands";
   private static final String shellArgsPath = "shellArgs";
@@ -402,6 +420,10 @@ public class Client {
             + " The \"num_containers\" option will be ignored. All requested"
             + " containers will be of type GUARANTEED" );
     opts.addOption("application_tags", true, "Application tags.");
+    opts.addOption("localize_files", true, "List of files, separated by comma"
+        + " to be localized for the command");
+    stopSignalReceived = new AtomicBoolean(false);
+    isRunning = new AtomicBoolean(false);
   }
 
   /**
@@ -638,6 +660,17 @@ public class Client {
         this.applicationTags.add(appTag.trim());
       }
     }
+
+    if (cliParser.hasOption("localize_files")) {
+      String filesStr = cliParser.getOptionValue("localize_files");
+      if (filesStr.contains(",")) {
+        String[] files = filesStr.split(",");
+        filesToLocalize = Arrays.asList(files);
+      } else {
+        filesToLocalize.add(filesStr);
+      }
+    }
+
     return true;
   }
 
@@ -648,9 +681,11 @@ public class Client {
    * @throws YarnException
    */
   public boolean run() throws IOException, YarnException {
-
     LOG.info("Running Client");
+    isRunning.set(true);
     yarnClient.start();
+    // set the client start time.
+    clientStartTime = System.currentTimeMillis();
 
     YarnClusterMetrics clusterMetrics = yarnClient.getYarnClusterMetrics();
     LOG.info("Got Cluster metric info from ASM" 
@@ -737,7 +772,7 @@ public class Client {
           + ", specified=" + amMemory
           + ", max=" + maxMem);
       amMemory = maxMem;
-    }				
+    }
 
     int maxVCores = appResponse.getMaximumResourceCapability().getVirtualCores();
     LOG.info("Max virtual cores capability of resources in this cluster " + maxVCores);
@@ -751,7 +786,7 @@ public class Client {
     
     // set the application name
     ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
-    ApplicationId appId = appContext.getApplicationId();
+    applicationId = appContext.getApplicationId();
 
     // Set up resource type requirements
     // For now, both memory and vcores are supported, so we set memory and
@@ -792,14 +827,49 @@ public class Client {
     // Copy the application master jar to the filesystem 
     // Create a local resource to point to the destination jar path 
     FileSystem fs = FileSystem.get(conf);
-    addToLocalResources(fs, appMasterJar, appMasterJarPath, appId.toString(),
-        localResources, null);
+    addToLocalResources(fs, appMasterJar, appMasterJarPath,
+        applicationId.toString(), localResources, null);
 
     // Set the log4j properties if needed 
     if (!log4jPropFile.isEmpty()) {
-      addToLocalResources(fs, log4jPropFile, log4jPath, appId.toString(),
-          localResources, null);
-    }			
+      addToLocalResources(fs, log4jPropFile, log4jPath,
+          applicationId.toString(), localResources, null);
+    }
+
+    // Process local files for localization
+    // Here we just upload the files, the AM
+    // will set up localization later.
+    StringBuilder localizableFiles = new StringBuilder();
+    filesToLocalize.stream().forEach(path -> {
+      File f = new File(path);
+
+      if (!f.exists()) {
+        throw new UncheckedIOException(
+            new IOException(path + " does not exist"));
+      }
+
+      if (!f.canRead()) {
+        throw new UncheckedIOException(
+            new IOException(path + " cannot be read"));
+      }
+
+      if (f.isDirectory()) {
+        throw new UncheckedIOException(
+          new IOException(path + " is a directory"));
+      }
+
+      try {
+        String fileName = f.getName();
+        uploadFile(fs, path, fileName, applicationId.toString());
+        if (localizableFiles.length() == 0) {
+          localizableFiles.append(fileName);
+        } else {
+          localizableFiles.append(",").append(fileName);
+        }
+      } catch (IOException e) {
+        throw new UncheckedIOException("Cannot upload file: " + path, e);
+      }
+    });
 
     // The shell script has to be made available on the final container(s)
     // where it will be executed. 
@@ -813,7 +883,9 @@ public class Client {
     if (!shellScriptPath.isEmpty()) {
       Path shellSrc = new Path(shellScriptPath);
       String shellPathSuffix =
-          appName + "/" + appId.toString() + "/" + SCRIPT_PATH;
+          ApplicationMaster.getRelativePath(appName,
+              applicationId.toString(),
+              SCRIPT_PATH);
       Path shellDst =
           new Path(fs.getHomeDirectory(), shellPathSuffix);
       fs.copyFromLocalFile(false, true, shellSrc, shellDst);
@@ -824,12 +896,12 @@ public class Client {
     }
 
     if (!shellCommand.isEmpty()) {
-      addToLocalResources(fs, null, shellCommandPath, appId.toString(),
+      addToLocalResources(fs, null, shellCommandPath, applicationId.toString(),
           localResources, shellCommand);
     }
 
     if (shellArgs.length > 0) {
-      addToLocalResources(fs, null, shellArgsPath, appId.toString(),
+      addToLocalResources(fs, null, shellArgsPath, applicationId.toString(),
           localResources, StringUtils.join(shellArgs, " "));
     }
 
@@ -861,16 +933,16 @@ public class Client {
     for (String c : conf.getStrings(
         YarnConfiguration.YARN_APPLICATION_CLASSPATH,
         YarnConfiguration.DEFAULT_YARN_CROSS_PLATFORM_APPLICATION_CLASSPATH)) {
-      classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR);
-      classPathEnv.append(c.trim());
+      classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR)
+          .append(c.trim());
     }
     classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR).append(
       "./log4j.properties");
 
     // add the runtime classpath needed for tests to work
     if (conf.getBoolean(YarnConfiguration.IS_MINI_YARN_CLUSTER, false)) {
-      classPathEnv.append(':');
-      classPathEnv.append(System.getProperty("java.class.path"));
+      classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR)
+          .append(System.getProperty("java.class.path"));
     }
 
     env.put("CLASSPATH", classPathEnv.toString());
@@ -927,13 +999,18 @@ public class Client {
     if (keepContainers) {
       vargs.add("--keep_containers_across_application_attempts");
     }
-
     for (Map.Entry<String, String> entry : shellEnv.entrySet()) {
       vargs.add("--shell_env " + entry.getKey() + "=" + entry.getValue());
     }
     if (debugFlag) {
       vargs.add("--debug");
     }
+    if (localizableFiles.length() > 0) {
+      vargs.add("--localized_files " + localizableFiles.toString());
+    }
+    vargs.add("--appname " + appName);
+
+    vargs.add("--homedir " + fs.getHomeDirectory());
 
     vargs.addAll(containerRetryOptions);
 
@@ -984,7 +1061,7 @@ public class Client {
     if (dockerClientConfig != null) {
       dockerCredentials =
           DockerClientConfigHandler.readCredentialsFromConfigFile(
-              new Path(dockerClientConfig), conf, appId.toString());
+              new Path(dockerClientConfig), conf, applicationId.toString());
     }
 
     if (rmCredentials != null || dockerCredentials != null) {
@@ -1024,8 +1101,17 @@ public class Client {
     // app submission failure?
 
     // Monitor the application
-    return monitorApplication(appId);
+    return monitorApplication(applicationId);
 
+  }
+
+  @VisibleForTesting
+  void specifyLogAggregationContext(ApplicationSubmissionContext appContext) {
+    if (!rollingFilesPattern.isEmpty()) {
+      LogAggregationContext logAggregationContext = LogAggregationContext
+          .newInstance(null, null, rollingFilesPattern, "");
+      appContext.setLogAggregationContext(logAggregationContext);
+    }
   }
 
   @VisibleForTesting
@@ -1048,13 +1134,24 @@ public class Client {
   private boolean monitorApplication(ApplicationId appId)
       throws YarnException, IOException {
 
-    while (true) {
-
+    boolean res = false;
+    boolean needForceKill = false;
+    while (isRunning.get()) {
       // Check app status every 1 second.
       try {
-        Thread.sleep(1000);
+        synchronized (objectLock) {
+          objectLock.wait(APP_MONITOR_INTERVAL);
+        }
+        needForceKill = stopSignalReceived.get();
       } catch (InterruptedException e) {
-        LOG.debug("Thread sleep in monitoring loop interrupted");
+        LOG.warn("Thread sleep in monitoring loop interrupted");
+        // if the application is to be killed when client times out;
+        // then set needForceKill to true
+        break;
+      } finally {
+        if (needForceKill) {
+          break;
+        }
       }
 
       // Get application report for the appId we are interested in 
@@ -1077,9 +1174,23 @@ public class Client {
       FinalApplicationStatus dsStatus = report.getFinalApplicationStatus();
       if (YarnApplicationState.FINISHED == state) {
         if (FinalApplicationStatus.SUCCEEDED == dsStatus) {
-          LOG.info("Application has completed successfully. Breaking monitoring loop");
-          return true;        
+          LOG.info("Application has completed successfully. "
+                  + "Breaking monitoring loop");
+          res = true;
+        } else {
+          LOG.info("Application did finished unsuccessfully. "
+                  + "YarnState={}, DSFinalStatus={}. Breaking monitoring loop",
+              state, dsStatus);
         }
+<<<<<<< HEAD
+        break;
+      } else if (YarnApplicationState.KILLED == state
+          || YarnApplicationState.FAILED == state) {
+        LOG.info("Application did not finish. YarnState={}, DSFinalStatus={}. "
+                + "Breaking monitoring loop", state, dsStatus);
+        break;
+      }
+=======
         else {
           LOG.info("Application did finished unsuccessfully."
               + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString()
@@ -1104,7 +1215,25 @@ public class Client {
         return false;
       }
     }
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
+      // The value equal or less than 0 means no timeout
+      if (clientTimeout > 0
+          && System.currentTimeMillis() > (clientStartTime + clientTimeout)) {
+        LOG.info("Reached client specified timeout for application. " +
+            "Killing application");
+        needForceKill = true;
+        break;
+      }
+    }
+
+    if (needForceKill) {
+      forceKillApplication(appId);
+    }
+
+    isRunning.set(false);
+
+    return res;
   }
 
   /**
@@ -1128,7 +1257,7 @@ public class Client {
       String fileDstPath, String appId, Map<String, LocalResource> localResources,
       String resources) throws IOException {
     String suffix =
-        appName + "/" + appId + "/" + fileDstPath;
+        ApplicationMaster.getRelativePath(appName, appId, fileDstPath);
     Path dst =
         new Path(fs.getHomeDirectory(), suffix);
     if (fileSrcPath == null) {
@@ -1150,6 +1279,21 @@ public class Client {
             LocalResourceType.FILE, LocalResourceVisibility.APPLICATION,
             scFileStatus.getLen(), scFileStatus.getModificationTime());
     localResources.put(fileDstPath, scRsrc);
+  }
+
+  private void uploadFile(FileSystem fs, String fileSrcPath,
+      String fileDstPath, String appId) throws IOException {
+    String relativePath =
+        ApplicationMaster.getRelativePath(appName, appId, fileDstPath);
+    Path dst =
+        new Path(fs.getHomeDirectory(), relativePath);
+    LOG.info("Uploading file: " + fileSrcPath + " to " + dst);
+    fs.copyFromLocalFile(new Path(fileSrcPath), dst);
+  }
+
+  @VisibleForTesting
+  ApplicationId getAppId() {
+    return applicationId;
   }
 
   private void prepareTimelineDomain() {
@@ -1299,5 +1443,30 @@ public class Client {
       resources.put(key, resourceValue);
     }
     return resources;
+  }
+
+  @VisibleForTesting
+  protected void sendStopSignal() {
+    LOG.info("Sending stop Signal to Client");
+    stopSignalReceived.set(true);
+    synchronized (objectLock) {
+      objectLock.notifyAll();
+    }
+    int waitCount = 0;
+    LOG.info("Waiting for Client to exit loop");
+    while (isRunning.get()) {
+      try {
+        Thread.sleep(50);
+      } catch (InterruptedException ie) {
+        // do nothing
+      } finally {
+        if (++waitCount > 2000) {
+          break;
+        }
+      }
+    }
+    LOG.info("Stopping yarnClient within the DS Client");
+    yarnClient.stop();
+    LOG.info("done stopping Client");
   }
 }

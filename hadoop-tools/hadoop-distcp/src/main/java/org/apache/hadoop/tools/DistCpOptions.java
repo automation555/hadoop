@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.tools;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,6 +158,11 @@ public final class DistCpOptions {
   /** Whether data should be written directly to the target paths. */
   private final boolean directWrite;
 
+<<<<<<< HEAD
+  private final boolean useIterator;
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * File attributes for preserve.
    *
@@ -172,7 +177,8 @@ public final class DistCpOptions {
     CHECKSUMTYPE,   // C
     ACL,            // A
     XATTR,          // X
-    TIMES;          // T
+    TIMES,          // T
+    ERASURECODINGPOLICY; // E
 
     public static FileAttribute getAttribute(char symbol) {
       for (FileAttribute attribute : values()) {
@@ -221,6 +227,11 @@ public final class DistCpOptions {
     this.trackPath = builder.trackPath;
 
     this.directWrite = builder.directWrite;
+<<<<<<< HEAD
+
+    this.useIterator = builder.useIterator;
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   public Path getSourceFileListing() {
@@ -352,6 +363,13 @@ public final class DistCpOptions {
     return directWrite;
   }
 
+<<<<<<< HEAD
+  public boolean shouldUseIterator() {
+    return useIterator;
+  }
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   /**
    * Add options to configuration. These will be used in the Mapper/committer
    *
@@ -402,6 +420,12 @@ public final class DistCpOptions {
     }
     DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.DIRECT_WRITE,
             String.valueOf(directWrite));
+<<<<<<< HEAD
+
+    DistCpOptionSwitch.addToConf(conf, DistCpOptionSwitch.USE_ITERATOR,
+        String.valueOf(useIterator));
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
   /**
@@ -439,6 +463,10 @@ public final class DistCpOptions {
         ", copyBufferSize=" + copyBufferSize +
         ", verboseLog=" + verboseLog +
         ", directWrite=" + directWrite +
+<<<<<<< HEAD
+        ", useiterator=" + useIterator +
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
         '}';
   }
 
@@ -490,6 +518,11 @@ public final class DistCpOptions {
 
     private boolean directWrite = false;
 
+<<<<<<< HEAD
+    private boolean useIterator = false;
+
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     public Builder(List<Path> sourcePaths, Path targetPath) {
       Preconditions.checkArgument(sourcePaths != null && !sourcePaths.isEmpty(),
           "Source paths should not be null or empty!");
@@ -747,6 +780,14 @@ public final class DistCpOptions {
       this.directWrite = newDirectWrite;
       return this;
     }
+<<<<<<< HEAD
+
+    public Builder withUseIterator(boolean useItr) {
+      this.useIterator = useItr;
+      return this;
+    }
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
   }
 
 }

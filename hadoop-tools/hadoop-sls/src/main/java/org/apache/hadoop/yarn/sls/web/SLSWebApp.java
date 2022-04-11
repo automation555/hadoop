@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.sls.web;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,10 +50,14 @@ import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Private
 @Unstable
 public class SLSWebApp extends HttpServlet {
+  private static final Logger LOG = LoggerFactory.getLogger(SLSWebApp.class);
+
   private static final long serialVersionUID = 1905162041950251407L;
   private transient Server server;
   private transient SchedulerWrapper wrapper;
@@ -94,13 +99,13 @@ public class SLSWebApp extends HttpServlet {
     ClassLoader cl = Thread.currentThread().getContextClassLoader();
     try {
       simulateInfoTemplate = IOUtils.toString(
-          cl.getResourceAsStream("html/simulate.info.html.template"));
+          cl.getResourceAsStream("html/simulate.info.html.template"), StandardCharsets.UTF_8);
       simulateTemplate = IOUtils.toString(
-          cl.getResourceAsStream("html/simulate.html.template"));
+          cl.getResourceAsStream("html/simulate.html.template"), StandardCharsets.UTF_8);
       trackTemplate = IOUtils.toString(
-          cl.getResourceAsStream("html/track.html.template"));
+          cl.getResourceAsStream("html/track.html.template"), StandardCharsets.UTF_8);
     } catch (IOException e) {
-      e.printStackTrace();
+      LOG.error("Caught exception while initializing templates", e);
     }
   }
 
@@ -165,7 +170,7 @@ public class SLSWebApp extends HttpServlet {
                 printJsonTrack(request, response);
               }
         } catch (Exception e) {
-          e.printStackTrace();
+          LOG.error("Caught exception while starting SLSWebApp", e);
         }
       }
     };

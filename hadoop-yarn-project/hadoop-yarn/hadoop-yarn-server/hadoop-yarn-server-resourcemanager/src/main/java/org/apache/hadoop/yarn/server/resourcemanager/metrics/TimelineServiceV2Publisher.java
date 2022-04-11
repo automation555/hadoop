@@ -24,8 +24,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -62,7 +62,7 @@ import org.apache.hadoop.yarn.server.timelineservice.collector.TimelineCollector
 import org.apache.hadoop.yarn.util.TimelineServiceHelper;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 /**
  * This class is responsible for posting application, appattempt &amp; Container
@@ -71,8 +71,8 @@ import com.google.common.annotations.VisibleForTesting;
 @Private
 @Unstable
 public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
-  private static final Log LOG =
-      LogFactory.getLog(TimelineServiceV2Publisher.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TimelineServiceV2Publisher.class);
   private RMTimelineCollectorManager rmTimelineCollectorManager;
   private boolean publishContainerEvents;
 
@@ -127,7 +127,7 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
         ApplicationMetricsConstants.APP_NODE_LABEL_EXPRESSION,
         app.getAppNodeLabelExpression());
     if (app.getCallerContext() != null) {
-      if (app.getCallerContext().getContext() != null) {
+      if (app.getCallerContext().isContextValid()) {
         entityInfo.put(ApplicationMetricsConstants.YARN_APP_CALLER_CONTEXT,
             app.getCallerContext().getContext());
       }
@@ -147,6 +147,20 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(ApplicationMetricsConstants.CREATED_EVENT_TYPE);
     tEvent.setTimestamp(createdTime);
+    entity.addEvent(tEvent);
+
+    getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
+        SystemMetricsEventType.PUBLISH_ENTITY, entity, app.getApplicationId()));
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  public void appLaunched(RMApp app, long launchTime) {
+    ApplicationEntity entity =
+        createApplicationEntity(app.getApplicationId());
+    TimelineEvent tEvent = new TimelineEvent();
+    tEvent.setId(ApplicationMetricsConstants.LAUNCHED_EVENT_TYPE);
+    tEvent.setTimestamp(launchTime);
     entity.addEvent(tEvent);
 
     getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
@@ -399,6 +413,9 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
       entityInfo.put(ContainerMetricsConstants.ALLOCATED_PRIORITY_INFO,
           container.getAllocatedPriority().getPriority());
       entityInfo.put(
+          ContainerMetricsConstants.ALLOCATED_EXPOSED_PORTS,
+          container.getExposedPorts());
+      entityInfo.put(
           ContainerMetricsConstants.ALLOCATED_HOST_HTTP_ADDRESS_INFO,
           container.getNodeHttpAddress());
       entity.setInfo(entityInfo);
@@ -467,9 +484,9 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
       }
     } catch (IOException e) {
       LOG.error("Error when publishing entity " + entity);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error when publishing entity " + entity, e);
-      }
+      LOG.debug("Error when publishing entity {}", entity, e);
+    } catch (Exception e) {
+      LOG.error("Unexpected error when publishing entity {}", entity, e);
     }
   }
 

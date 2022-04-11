@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
@@ -119,6 +119,7 @@ public class BlockRecoveryWorker {
       List<BlockRecord> syncList = new ArrayList<>(locs.length);
       int errorCount = 0;
       int candidateReplicaCnt = 0;
+      DataNodeFaultInjector.get().delay();
 
       // Check generation stamps, replica size and state. Replica must satisfy
       // the following criteria to be included in syncList for recovery:
@@ -338,19 +339,24 @@ public class BlockRecoveryWorker {
 
   /**
    * blk_0  blk_1  blk_2  blk_3  blk_4  blk_5  blk_6  blk_7  blk_8
-   *  64k    64k    64k    64k    64k    64k    64k    64k    64k   <-- stripe_0
+   *  64k    64k    64k    64k    64k    64k    64k    64k    64k   &lt;--
+   *  stripe_0
    *  64k    64k    64k    64k    64k    64k    64k    64k    64k
-   *  64k    64k    64k    64k    64k    64k    64k    61k    <-- startStripeIdx
+   *  64k    64k    64k    64k    64k    64k    64k    61k    &lt;--
+   *  startStripeIdx
    *  64k    64k    64k    64k    64k    64k    64k
    *  64k    64k    64k    64k    64k    64k    59k
    *  64k    64k    64k    64k    64k    64k
-   *  64k    64k    64k    64k    64k    64k                <-- last full stripe
-   *  64k    64k    13k    64k    55k     3k              <-- target last stripe
+   *  64k    64k    64k    64k    64k    64k                &lt;--
+   *  last full stripe
+   *  64k    64k    13k    64k    55k     3k              &lt;--
+   *  target last stripe
    *  64k    64k           64k     1k
    *  64k    64k           58k
    *  64k    64k
    *  64k    19k
-   *  64k                                               <-- total visible stripe
+   *  64k                                               &lt;--
+   *  total visible stripe
    *
    *  Due to different speed of streamers, the internal blocks in a block group
    *  could have different lengths when the block group isn't ended normally.
@@ -462,7 +468,7 @@ public class BlockRecoveryWorker {
       // notify Namenode the new size and locations
       final DatanodeID[] newLocs = new DatanodeID[totalBlkNum];
       final String[] newStorages = new String[totalBlkNum];
-      for (int i = 0; i < totalBlkNum; i++) {
+      for (int i = 0; i < blockIndices.length; i++) {
         newLocs[blockIndices[i]] = DatanodeID.EMPTY_DATANODE_ID;
         newStorages[blockIndices[i]] = "";
       }
@@ -595,17 +601,22 @@ public class BlockRecoveryWorker {
     Daemon d = new Daemon(datanode.threadGroup, new Runnable() {
       @Override
       public void run() {
-        for(RecoveringBlock b : blocks) {
-          try {
-            logRecoverBlock(who, b);
-            if (b.isStriped()) {
-              new RecoveryTaskStriped((RecoveringStripedBlock) b).recover();
-            } else {
-              new RecoveryTaskContiguous(b).recover();
+        datanode.metrics.incrDataNodeBlockRecoveryWorkerCount();
+        try {
+          for (RecoveringBlock b : blocks) {
+            try {
+              logRecoverBlock(who, b);
+              if (b.isStriped()) {
+                new RecoveryTaskStriped((RecoveringStripedBlock) b).recover();
+              } else {
+                new RecoveryTaskContiguous(b).recover();
+              }
+            } catch (IOException e) {
+              LOG.warn("recover Block: {} FAILED: {}", b, e);
             }
-          } catch (IOException e) {
-            LOG.warn("recoverBlocks FAILED: " + b, e);
           }
+        } finally {
+          datanode.metrics.decrDataNodeBlockRecoveryWorkerCount();
         }
       }
     });

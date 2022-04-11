@@ -34,6 +34,9 @@
 #define DOCKER_KILL_COMMAND "kill"
 #define DOCKER_VOLUME_COMMAND "volume"
 #define DOCKER_START_COMMAND "start"
+#define DOCKER_EXEC_COMMAND "exec"
+#define DOCKER_IMAGES_COMMAND "images"
+#define DOCKER_SERVICE_MODE_ENABLED_KEY "docker.service-mode.enabled"
 #define DOCKER_ARG_MAX 1024
 #define ARGS_INITIAL_VALUE { 0 };
 
@@ -42,6 +45,8 @@ typedef struct args {
     char *data[DOCKER_ARG_MAX];
 } args;
 
+<<<<<<< HEAD
+=======
 enum docker_error_codes {
     INVALID_COMMAND_FILE = 1,
     INCORRECT_COMMAND,
@@ -72,6 +77,7 @@ enum docker_error_codes {
     INVALID_DOCKER_RUNTIME
 };
 
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 /**
  * Get the full path for the docker binary.
  * @param conf Configuration for the container-executor
@@ -178,6 +184,15 @@ int get_docker_volume_command(const char *command_file, const struct configurati
 int get_docker_start_command(const char* command_file, const struct configuration* conf, args *args);
 
 /**
+ * Get the Docker exec command line string. The function will verify that the params file is meant for the exec command.
+ * @param command_file File containing the params for the Docker start command
+ * @param conf Configuration struct containing the container-executor.cfg details
+ * @param args Buffer to construct argv
+ * @return Return code with 0 indicating success and non-zero codes indicating error
+ */
+int get_docker_exec_command(const char* command_file, const struct configuration* conf, args *args);
+
+/**
  * Give an error message for the supplied error code
  * @param error_code the error code
  * @return const string containing the error message
@@ -209,4 +224,15 @@ char** extract_execv_args(args *args);
  * @return value of max retries
  */
 int get_max_retries(const struct configuration *conf);
+
+/**
+ * Get the Docker images command line string. The function will verify that the params file is meant for the images
+ * command.
+ * @param command_file File containing the params for the Docker images command
+ * @param conf Configuration struct containing the container-executor.cfg details
+ * @param args Buffer to construct argv
+ * @return Return code with 0 indicating success and non-zero codes indicating error
+ */
+int get_docker_images_command(const char* command_file, const struct configuration* conf, args *args);
+
 #endif

@@ -73,8 +73,8 @@ import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeLayoutVersion;
 import org.apache.hadoop.hdfs.server.protocol.JournalProtocol;
 
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import org.apache.hadoop.thirdparty.protobuf.RpcController;
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 /**
  * Implementation for protobuf service that forwards requests
@@ -170,7 +170,7 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
     return VOID_JOURNAL_RESPONSE;
   }
 
-  /** @see JournalProtocol#heartbeat */
+  /** @see QJournalProtocol#heartbeat */
   @Override
   public HeartbeatResponseProto heartbeat(RpcController controller,
       HeartbeatRequestProto req) throws ServiceException {

@@ -22,8 +22,11 @@ import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileControllerFactory;
+import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileController;
+import org.apache.hadoop.yarn.util.Apps;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -41,18 +44,22 @@ import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+<<<<<<< HEAD
+=======
 import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileController;
 import org.apache.hadoop.yarn.logaggregation.filecontroller.LogAggregationFileControllerFactory;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 
 /**
  * A service that periodically deletes aggregated logs.
  */
 @InterfaceAudience.LimitedPrivate({"yarn", "mapreduce"})
 public class AggregatedLogDeletionService extends AbstractService {
-  private static final Log LOG = LogFactory.getLog(AggregatedLogDeletionService.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(AggregatedLogDeletionService.class);
   
   private Timer timer = null;
   private long checkIntervalMsecs;
@@ -68,12 +75,19 @@ public class AggregatedLogDeletionService extends AbstractService {
     public LogDeletionTask(Configuration conf, long retentionSecs, ApplicationClientProtocol rmClient) {
       this.conf = conf;
       this.retentionMillis = retentionSecs * 1000;
+<<<<<<< HEAD
+      this.suffix = LogAggregationUtils.getBucketSuffix();
+=======
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       LogAggregationFileControllerFactory factory =
           new LogAggregationFileControllerFactory(conf);
       LogAggregationFileController fileController =
           factory.getFileControllerForWrite();
       this.remoteRootLogDir = fileController.getRemoteRootLogDir();
+<<<<<<< HEAD
+=======
       this.suffix = fileController.getRemoteRootLogDirSuffix();
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
       this.rmClient = rmClient;
     }
     
@@ -85,8 +99,18 @@ public class AggregatedLogDeletionService extends AbstractService {
         FileSystem fs = remoteRootLogDir.getFileSystem(conf);
         for(FileStatus userDir : fs.listStatus(remoteRootLogDir)) {
           if(userDir.isDirectory()) {
-            Path userDirPath = new Path(userDir.getPath(), suffix);
-            deleteOldLogDirsFrom(userDirPath, cutoffMillis, fs, rmClient);
+            for (FileStatus suffixDir : fs.listStatus(userDir.getPath())) {
+              Path suffixDirPath = suffixDir.getPath();
+              if (suffixDir.isDirectory() && suffixDirPath.getName().
+                  startsWith(suffix)) {
+                for (FileStatus bucketDir : fs.listStatus(suffixDirPath)) {
+                  if (bucketDir.isDirectory()) {
+                    deleteOldLogDirsFrom(bucketDir.getPath(), cutoffMillis,
+                        fs, rmClient);
+                  }
+                }
+              }
+            }
           }
         }
       } catch (Throwable t) {
@@ -184,9 +208,7 @@ public class AggregatedLogDeletionService extends AbstractService {
         throw new IOException(e);
       }
       YarnApplicationState currentState = appReport.getYarnApplicationState();
-      return currentState == YarnApplicationState.FAILED
-          || currentState == YarnApplicationState.KILLED
-          || currentState == YarnApplicationState.FINISHED;
+      return Apps.isApplicationFinalState(currentState);
     }
 
     public ApplicationClientProtocol getRMClient() {

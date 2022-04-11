@@ -90,7 +90,7 @@ public class TestFSNamesystem {
     LeaseManager leaseMan = fsn.getLeaseManager();
     leaseMan.addLease("client1", fsn.getFSDirectory().allocateNewInodeId());
     assertEquals(1, leaseMan.countLease());
-    fsn.clear();
+    clearNamesystem(fsn);
     leaseMan = fsn.getLeaseManager();
     assertEquals(0, leaseMan.countLease());
   }
@@ -185,13 +185,22 @@ public class TestFSNamesystem {
     FSNamesystem fsn = new FSNamesystem(conf, fsImage);
     fsn.imageLoadComplete();
     assertTrue(fsn.isImageLoaded());
-    fsn.clear();
-    assertFalse(fsn.isImageLoaded());
+    clearNamesystem(fsn);
     final INodeDirectory root = (INodeDirectory) fsn.getFSDirectory()
             .getINode("/");
     assertTrue(root.getChildrenList(Snapshot.CURRENT_STATE_ID).isEmpty());
     fsn.imageLoadComplete();
     assertTrue(fsn.isImageLoaded());
+  }
+
+  private void clearNamesystem(FSNamesystem fsn) {
+    fsn.writeLock();
+    try {
+      fsn.clear();
+      assertFalse(fsn.isImageLoaded());
+    } finally {
+      fsn.writeUnlock();
+    }
   }
 
   @Test
@@ -247,9 +256,16 @@ public class TestFSNamesystem {
     fsn = new FSNamesystem(conf, fsImage);
     auditLoggers = fsn.getAuditLoggers();
     assertTrue(auditLoggers.size() == 1);
+<<<<<<< HEAD
+    assertTrue(
+        auditLoggers.get(0) instanceof FSNamesystem.FSNamesystemAuditLogger);
+    FSNamesystem.FSNamesystemAuditLogger defaultAuditLogger =
+        (FSNamesystem.FSNamesystemAuditLogger) auditLoggers.get(0);
+=======
     assertTrue(auditLoggers.get(0) instanceof FSNamesystem.DefaultAuditLogger);
     FSNamesystem.DefaultAuditLogger defaultAuditLogger =
         (FSNamesystem.DefaultAuditLogger) auditLoggers.get(0);
+>>>>>>> a6df05bf5e24d04852a35b096c44e79f843f4776
     assertTrue(defaultAuditLogger.getCallerContextEnabled());
 
     // Not to specify any audit loggers in config
@@ -262,7 +278,7 @@ public class TestFSNamesystem {
     // the audit loggers order is not defined
     for (AuditLogger auditLogger : auditLoggers) {
       assertThat(auditLogger,
-          either(instanceOf(FSNamesystem.DefaultAuditLogger.class))
+          either(instanceOf(FSNamesystem.FSNamesystemAuditLogger.class))
               .or(instanceOf(TopAuditLogger.class)));
     }
 
@@ -275,7 +291,7 @@ public class TestFSNamesystem {
     assertTrue(auditLoggers.size() == 2);
     for (AuditLogger auditLogger : auditLoggers) {
       assertThat(auditLogger,
-          either(instanceOf(FSNamesystem.DefaultAuditLogger.class))
+          either(instanceOf(FSNamesystem.FSNamesystemAuditLogger.class))
               .or(instanceOf(TopAuditLogger.class)));
     }
 
@@ -289,10 +305,18 @@ public class TestFSNamesystem {
     assertTrue(auditLoggers.size() == 3);
     for (AuditLogger auditLogger : auditLoggers) {
       assertThat(auditLogger,
-          either(instanceOf(FSNamesystem.DefaultAuditLogger.class))
+          either(instanceOf(FSNamesystem.FSNamesystemAuditLogger.class))
               .or(instanceOf(TopAuditLogger.class))
               .or(instanceOf(DummyAuditLogger.class)));
     }
+
+    // Test Configuring TopAuditLogger.
+    conf.set(DFSConfigKeys.DFS_NAMENODE_AUDIT_LOGGERS_KEY,
+        "org.apache.hadoop.hdfs.server.namenode.top.TopAuditLogger");
+    fsn = new FSNamesystem(conf, fsImage);
+    auditLoggers = fsn.getAuditLoggers();
+    assertEquals(1, auditLoggers.size());
+    assertThat(auditLoggers.get(0), instanceOf(TopAuditLogger.class));
   }
 
   static class DummyAuditLogger implements AuditLogger {
