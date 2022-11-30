@@ -46,21 +46,16 @@
  */
 #define JLONG(context) ((jlong)((ptrdiff_t)(context)))
 
-/**
- * A helper macro to convert long to ENGINE.
- */
-#define LONG_TO_ENGINE(engine) ((ENGINE*)((ptrdiff_t)(engine)))
-
 #define KEY_LENGTH_128 16
+#define KEY_LENGTH_192 24
 #define KEY_LENGTH_256 32
 #define IV_LENGTH 16
 
 #define ENCRYPT_MODE 1
 #define DECRYPT_MODE 0
 
-/** Currently only support AES/CTR/NoPadding & SM4/CTR/NoPadding. */
+/** Currently only support AES/CTR/NoPadding. */
 #define AES_CTR 0
-#define SM4_CTR 1
 #define NOPADDING 0
 #define PKCSPADDING 1
 
