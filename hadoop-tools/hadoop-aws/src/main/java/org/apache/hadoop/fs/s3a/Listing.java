@@ -201,6 +201,8 @@ public class Listing extends AbstractStoreOperation {
     String delimiter = recursive ? null : "/";
     if (recursive) {
       LOG.debug("Recursive list of all entries under {}", key);
+      LOG.debug("Recursive list of all entries under {}", key);
+      LOG.debug("Recursive list of all entries under {}", key);
     } else {
       LOG.debug("Requesting all entries under {} with delimiter '{}'",
           key, delimiter);
