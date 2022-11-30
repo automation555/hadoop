@@ -20,10 +20,11 @@ package org.apache.hadoop.mapreduce.lib.db;
 
 import java.io.IOException;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.Job;
@@ -35,8 +36,6 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A OutputFormat that sends the reduce output to a SQL table.
@@ -51,10 +50,7 @@ import org.slf4j.LoggerFactory;
 public class DBOutputFormat<K  extends DBWritable, V> 
 extends OutputFormat<K,V> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DBOutputFormat.class);
-  public String dbProductName = "DEFAULT";
-
+  private static final Log LOG = LogFactory.getLog(DBOutputFormat.class);
   public void checkOutputSpecs(JobContext context) 
       throws IOException, InterruptedException {}
 
@@ -104,14 +100,14 @@ extends OutputFormat<K,V> {
         catch (SQLException ex) {
           LOG.warn(StringUtils.stringifyException(ex));
         }
-        throw new IOException(e.getMessage());
+        throw new IOException(e);
       } finally {
         try {
           statement.close();
           connection.close();
         }
         catch (SQLException ex) {
-          throw new IOException(ex.getMessage());
+          throw new IOException(ex);
         }
       }
     }
@@ -162,12 +158,7 @@ extends OutputFormat<K,V> {
         query.append(",");
       }
     }
-
-    if (dbProductName.startsWith("DB2") || dbProductName.startsWith("ORACLE")) {
-      query.append(")");
-    } else {
-      query.append(");");
-    }
+    query.append(");");
 
     return query.toString();
   }
@@ -186,15 +177,12 @@ extends OutputFormat<K,V> {
     try {
       Connection connection = dbConf.getConnection();
       PreparedStatement statement = null;
-
-      DatabaseMetaData dbMeta = connection.getMetaData();
-      this.dbProductName = dbMeta.getDatabaseProductName().toUpperCase();
-
+  
       statement = connection.prepareStatement(
                     constructQuery(tableName, fieldNames));
       return new DBRecordWriter(connection, statement);
     } catch (Exception ex) {
-      throw new IOException(ex.getMessage());
+      throw new IOException(ex);
     }
   }
 

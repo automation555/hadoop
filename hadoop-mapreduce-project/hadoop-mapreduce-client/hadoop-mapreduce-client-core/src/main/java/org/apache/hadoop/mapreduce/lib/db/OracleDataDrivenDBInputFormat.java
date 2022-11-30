@@ -22,6 +22,9 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.sql.Types;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -67,7 +70,7 @@ public class OracleDataDrivenDBInputFormat<T extends DBWritable>
           conf, createConnection(), dbConf, dbConf.getInputConditions(),
           dbConf.getInputFieldNames(), dbConf.getInputTableName());
     } catch (SQLException ex) {
-      throw new IOException(ex.getMessage());
+      throw new IOException(ex);
     }
   }
 }
