@@ -136,7 +136,7 @@ class ChRootedFs extends AbstractFileSystem {
    */
   public String stripOutRoot(final Path p) {
     try {
-     checkPath(p);
+      checkPath(p);
     } catch (IllegalArgumentException e) {
       throw new RuntimeException("Internal Error - path " + p +
           " should have been with URI" + myUri);
@@ -396,11 +396,6 @@ class ChRootedFs extends AbstractFileSystem {
   public void deleteSnapshot(Path snapshotDir, String snapshotName)
       throws IOException {
     myFs.deleteSnapshot(fullPath(snapshotDir), snapshotName);
-  }
-
-  @Override
-  public void satisfyStoragePolicy(final Path path) throws IOException {
-    myFs.satisfyStoragePolicy(path);
   }
 
   @Override
