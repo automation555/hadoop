@@ -21,7 +21,7 @@ package org.apache.hadoop.fs;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.concurrent.TimeUnit;
+import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +37,7 @@ import static org.junit.Assume.assumeTrue;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 
 /**
@@ -61,16 +62,9 @@ public abstract class FileSystemContractBaseTest {
   protected byte[] data = dataset(getBlockSize() * 2, 0, 255);
 
   @Rule
-  public Timeout globalTimeout =
-      new Timeout(getGlobalTimeout(), TimeUnit.MILLISECONDS);
-
-  /**
-   * Get the timeout in milliseconds for each test case.
-   * @return a time in milliseconds.
-   */
-  protected int getGlobalTimeout() {
-    return 30 * 1000;
-  }
+  public Timeout globalTimeout = new Timeout(30000);
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
 
   @After
   public void tearDown() throws Exception {
@@ -253,18 +247,39 @@ public abstract class FileSystemContractBaseTest {
 
   @Test
   public void testMkdirsWithUmask() throws Exception {
-    Configuration conf = fs.getConf();
-    String oldUmask = conf.get(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY);
-    try {
-      conf.set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, TEST_UMASK);
-      final Path dir = path("newDir");
-      assertTrue(fs.mkdirs(dir, new FsPermission((short) 0777)));
-      FileStatus status = fs.getFileStatus(dir);
-      assertTrue(status.isDirectory());
-      assertEquals((short) 0715, status.getPermission().toShort());
-    } finally {
-      conf.set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, oldUmask);
+    if (!isS3(fs)) {
+      Configuration conf = fs.getConf();
+      String oldUmask = conf.get(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY);
+      try {
+        conf.set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, TEST_UMASK);
+        final Path dir = path("newDir");
+        assertTrue(fs.mkdirs(dir, new FsPermission((short) 0777)));
+        FileStatus status = fs.getFileStatus(dir);
+        assertTrue(status.isDirectory());
+        assertEquals((short) 0715, status.getPermission().toShort());
+      } finally {
+        conf.set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, oldUmask);
+      }
     }
+  }
+
+  /**
+   * Skip permission tests for S3FileSystem until HDFS-1333 is fixed.
+   * Classes that do not implement {@link FileSystem#getScheme()} method
+   * (e.g {@link RawLocalFileSystem}) will throw an
+   * {@link UnsupportedOperationException}.
+   * @param fileSystem FileSystem object to determine if it is S3 or not
+   * @return true if S3 false in any other case
+   */
+  private boolean isS3(FileSystem fileSystem) {
+    try {
+      if (fileSystem.getScheme().equals("s3n")) {
+        return true;
+      }
+    } catch (UnsupportedOperationException e) {
+      LOG.warn("Unable to determine the schema of filesystem.");
+    }
+    return false;
   }
 
   @Test
@@ -319,6 +334,102 @@ public abstract class FileSystemContractBaseTest {
 
     paths = fs.listStatus(path("testListStatus/a"));
     assertEquals(0, paths.length);
+  }
+
+  @Test
+  public void testListStatusNamesWithColon() throws Exception {
+    final Path[] testDirs = {
+            path("testListStatus/a:bcd"),
+            path("testListStatus/b:abc"),
+            path("testListStatus/c:klm/10:20:30")
+    };
+    assertFalse(fs.exists(testDirs[0]));
+
+    for (Path path : testDirs) {
+      assertTrue(fs.mkdirs(path));
+    }
+
+    FileStatus[] paths = fs.listStatus(path("."));
+    assertEquals(1, paths.length);
+    assertEquals(path("testListStatus"), paths[0].getPath());
+
+    paths = fs.listStatus(path("testListStatus"));
+    assertEquals(3, paths.length);
+    ArrayList<Path> list = new ArrayList<Path>();
+    for (FileStatus fileState : paths) {
+      list.add(fileState.getPath());
+    }
+    assertTrue(list.contains(path("testListStatus/a:bcd")));
+    assertTrue(list.contains(path("testListStatus/b:abc")));
+    assertTrue(list.contains(path("testListStatus/c:klm")));
+
+    paths = fs.listStatus(path("testListStatus/a:bcd"));
+    assertEquals(0, paths.length);
+  }
+
+  @Test
+  public void testGlobStatusWithColon() throws Exception {
+    final Path[] testDirs = {
+            path("testPathGlob/a:bcd/1:15"),
+            path("testPathGlob/b:abc/2:10"),
+            path("testPathGlob/c:klm/10:20:30"),
+            path("testPathGlob/*/f"),
+            path("testPathGlob/d1/f"),
+            path("testPathGlob/d2/f")
+    };
+    Arrays.sort(testDirs);
+    assertFalse(fs.exists(testDirs[0]));
+
+    for (Path path : testDirs) {
+      assertTrue(fs.mkdirs(path));
+    }
+
+    Path testRoot = path("testPathGlob");
+    // try the non-globbed listStatus
+    FileStatus stats[] = fs.listStatus(new Path(testRoot, "*"));
+    assertEquals(1, stats.length);
+    assertEquals(new Path(testRoot, "*/f"), stats[0].getPath());
+
+    // ensure globStatus with "*" finds all dir contents
+    stats = fs.globStatus(new Path(testRoot, "*"));
+    Arrays.sort(stats);
+    Path parentPaths[] = new Path[testDirs.length];
+    for (int i = 0; i < testDirs.length; i++) {
+      parentPaths[i] = testDirs[i].getParent();
+    }
+    assertEquals(TestPath.mergeStatuses(parentPaths), TestPath.mergeStatuses(stats));
+
+    // ensure that globStatus with an escaped "\*" only finds "*"
+    stats = fs.globStatus(new Path(testRoot, "\\*"));
+    assertEquals(1, stats.length);
+    assertEquals(new Path(testRoot, "*"), stats[0].getPath());
+
+    // try to glob the inner file for all dirs
+    stats = fs.globStatus(new Path(testRoot, "*/f"));
+    Arrays.sort(stats);
+    assertEquals(3, stats.length);
+    assertEquals(TestPath.mergeStatuses(new Path[] {testDirs[0],testDirs[4],testDirs[5]}),
+            TestPath.mergeStatuses(stats));
+
+    // try to get the inner file for only the "*" dir
+    stats = fs.globStatus(new Path(testRoot, "\\*/f"));
+    assertEquals(1, stats.length);
+    assertEquals(new Path(testRoot, "*/f"), stats[0].getPath());
+
+    // try to glob all the contents of the "*" dir
+    stats = fs.globStatus(new Path(testRoot, "\\*/*"));
+    assertEquals(1, stats.length);
+    assertEquals(new Path(testRoot, "*/f"), stats[0].getPath());
+
+    // try to glob on ":"
+    stats = fs.globStatus(new Path(testRoot, "[abc]:*"));
+    Arrays.sort(stats);
+    assertEquals(3, stats.length);
+    assertEquals(TestPath.mergeStatuses(new Path[] {
+                    testDirs[1].getParent(),
+                    testDirs[2].getParent(),
+                    testDirs[3].getParent()}),
+            TestPath.mergeStatuses(stats));
   }
 
   @Test
@@ -432,6 +543,35 @@ public abstract class FileSystemContractBaseTest {
   }
 
   @Test
+  public void testDeleteRecursivelyColonInName() throws IOException {
+    Path dir = path("test:Delete:Recursively");
+    Path file = path("test:Delete:Recursively/file:abc");
+    Path subdir = path("test:Delete:Recursively/sub:dir");
+
+    createFile(file);
+    assertTrue("Created subdir", fs.mkdirs(subdir));
+
+    assertTrue("File exists", fs.exists(file));
+    assertTrue("Dir exists", fs.exists(dir));
+    assertTrue("Subdir exists", fs.exists(subdir));
+
+    try {
+      fs.delete(dir, false);
+      fail("Should throw IOException.");
+    } catch (IOException e) {
+      // expected
+    }
+    assertTrue("File still exists", fs.exists(file));
+    assertTrue("Dir still exists", fs.exists(dir));
+    assertTrue("Subdir still exists", fs.exists(subdir));
+
+    assertTrue("Deleted", fs.delete(dir, true));
+    assertFalse("File doesn't exist", fs.exists(file));
+    assertFalse("Dir doesn't exist", fs.exists(dir));
+    assertFalse("Subdir doesn't exist", fs.exists(subdir));
+  }
+
+  @Test
   public void testDeleteEmptyDirectory() throws IOException {
     Path dir = path("testDeleteEmptyDirectory");
     assertTrue(fs.mkdirs(dir));
@@ -446,6 +586,15 @@ public abstract class FileSystemContractBaseTest {
     
     Path src = path("testRenameNonExistentPath/path");
     Path dst = path("testRenameNonExistentPathNew/newpath");
+    rename(src, dst, false, false, false);
+  }
+
+  @Test
+  public void testRenameNonExistentPathWithColon() throws Exception {
+    assumeTrue(renameSupported());
+
+    Path src = path("test:Rename:Non:Existent:Path/path");
+    Path dst = path("test:Rename:Non:Existent:Path:New/new:path");
     rename(src, dst, false, false, false);
   }
 
@@ -860,8 +1009,7 @@ public abstract class FileSystemContractBaseTest {
                found);
   }
 
-  protected void assertListStatusFinds(Path dir, Path subdir)
-      throws IOException {
+  private void assertListStatusFinds(Path dir, Path subdir) throws IOException {
     FileStatus[] stats = fs.listStatus(dir);
     boolean found = false;
     StringBuilder builder = new StringBuilder();
