@@ -18,14 +18,12 @@
 package org.apache.hadoop.fs.http.server;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockStoragePolicySpi;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FilterFileSystem;
-import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.GlobFilter;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
@@ -34,21 +32,17 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.http.client.HttpFSFileSystem;
-import org.apache.hadoop.fs.http.client.HttpFSFileSystem.FILE_TYPE;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReportListing;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
-import org.apache.hadoop.hdfs.protocol.SnapshotStatus;
 import org.apache.hadoop.hdfs.web.JsonUtil;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.lib.service.FileSystemAccess;
 import org.apache.hadoop.util.StringUtils;
 import org.json.simple.JSONArray;
@@ -61,7 +55,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -74,29 +67,14 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.HTTP_BUFFER_SIZE_DEFAULT;
  * FileSystem operation executors used by {@link HttpFSServer}.
  */
 @InterfaceAudience.Private
-public final class FSOperations {
-
-  private static int bufferSize = 4096;
-
-  private FSOperations() {
-    // not called
-  }
-  /**
-   * Set the buffer size. The size is set during the initialization of
-   * HttpFSServerWebApp.
-   * @param conf the configuration to get the bufferSize
-   */
-  public static void setBufferSize(Configuration conf) {
-    bufferSize = conf.getInt(HTTPFS_BUFFER_SIZE_KEY,
-        HTTP_BUFFER_SIZE_DEFAULT);
-  }
+public class FSOperations {
 
   /**
    * @param fileStatus a FileStatus object
    * @return JSON map suitable for wire transport
    */
   private static Map<String, Object> toJson(FileStatus fileStatus) {
-    Map<String, Object> json = new LinkedHashMap<>();
+    Map<String, Object> json = new TreeMap<>();
     json.put(HttpFSFileSystem.FILE_STATUS_JSON, toJsonInner(fileStatus, true));
     return json;
   }
@@ -109,8 +87,8 @@ public final class FSOperations {
   @SuppressWarnings({"unchecked"})
   private static Map<String, Object> toJson(FileStatus[] fileStatuses,
       boolean isFile) {
-    Map<String, Object> json = new LinkedHashMap<>();
-    Map<String, Object> inner = new LinkedHashMap<>();
+    Map<String, Object> json = new TreeMap<>();
+    Map<String, Object> inner = new TreeMap<>();
     JSONArray statuses = new JSONArray();
     for (FileStatus f : fileStatuses) {
       statuses.add(toJsonInner(f, isFile));
@@ -125,20 +103,11 @@ public final class FSOperations {
    */
   private static Map<String, Object> toJsonInner(FileStatus fileStatus,
       boolean emptyPathSuffix) {
-    Map<String, Object> json = new LinkedHashMap<String, Object>();
+    Map<String, Object> json = new TreeMap<String, Object>();
     json.put(HttpFSFileSystem.PATH_SUFFIX_JSON,
         (emptyPathSuffix) ? "" : fileStatus.getPath().getName());
-    FILE_TYPE fileType = HttpFSFileSystem.FILE_TYPE.getType(fileStatus);
-    json.put(HttpFSFileSystem.TYPE_JSON, fileType.toString());
-    if (fileType.equals(FILE_TYPE.SYMLINK)) {
-      // put the symlink into Json
-      try {
-        json.put(HttpFSFileSystem.SYMLINK_JSON,
-            fileStatus.getSymlink().getName());
-      } catch (IOException e) {
-        // Can't happen.
-      }
-    }
+    json.put(HttpFSFileSystem.TYPE_JSON,
+        HttpFSFileSystem.FILE_TYPE.getType(fileStatus).toString());
     json.put(HttpFSFileSystem.LENGTH_JSON, fileStatus.getLen());
     json.put(HttpFSFileSystem.OWNER_JSON, fileStatus.getOwner());
     json.put(HttpFSFileSystem.GROUP_JSON, fileStatus.getGroup());
@@ -149,23 +118,6 @@ public final class FSOperations {
         fileStatus.getModificationTime());
     json.put(HttpFSFileSystem.BLOCK_SIZE_JSON, fileStatus.getBlockSize());
     json.put(HttpFSFileSystem.REPLICATION_JSON, fileStatus.getReplication());
-    if (fileStatus instanceof HdfsFileStatus) {
-      // Add HDFS-specific fields to response
-      HdfsFileStatus hdfsFileStatus = (HdfsFileStatus) fileStatus;
-      json.put(HttpFSFileSystem.CHILDREN_NUM_JSON,
-          hdfsFileStatus.getChildrenNum());
-      json.put(HttpFSFileSystem.FILE_ID_JSON,
-          hdfsFileStatus.getFileId());
-      json.put(HttpFSFileSystem.STORAGEPOLICY_JSON,
-          hdfsFileStatus.getStoragePolicy());
-      if (hdfsFileStatus.getErasureCodingPolicy() != null) {
-        json.put(HttpFSFileSystem.ECPOLICYNAME_JSON,
-            hdfsFileStatus.getErasureCodingPolicy().getName());
-        json.put(HttpFSFileSystem.ECPOLICY_JSON,
-            JsonUtil.getEcPolicyAsMap(
-                hdfsFileStatus.getErasureCodingPolicy()));
-      }
-    }
     if (fileStatus.getPermission().getAclBit()) {
       json.put(HttpFSFileSystem.ACL_BIT_JSON, true);
     }
@@ -193,8 +145,8 @@ public final class FSOperations {
    */
   private static Map<String, Object> toJson(FileSystem.DirectoryEntries
       entries, boolean isFile) {
-    Map<String, Object> json = new LinkedHashMap<>();
-    Map<String, Object> inner = new LinkedHashMap<>();
+    Map<String, Object> json = new TreeMap<>();
+    Map<String, Object> inner = new TreeMap<>();
     Map<String, Object> fileStatuses = toJson(entries.getEntries(), isFile);
     inner.put(HttpFSFileSystem.PARTIAL_LISTING_JSON, fileStatuses);
     inner.put(HttpFSFileSystem.REMAINING_ENTRIES_JSON, entries.hasMore() ? 1
@@ -211,13 +163,11 @@ public final class FSOperations {
    */
   @SuppressWarnings({"unchecked"})
   private static Map<String,Object> aclStatusToJSON(AclStatus aclStatus) {
-    Map<String,Object> json = new LinkedHashMap<String,Object>();
-    Map<String,Object> inner = new LinkedHashMap<String,Object>();
+    Map<String,Object> json = new TreeMap<String,Object>();
+    Map<String,Object> inner = new TreeMap<String,Object>();
     JSONArray entriesArray = new JSONArray();
     inner.put(HttpFSFileSystem.OWNER_JSON, aclStatus.getOwner());
     inner.put(HttpFSFileSystem.GROUP_JSON, aclStatus.getGroup());
-    inner.put(HttpFSFileSystem.PERMISSION_JSON,
-        HttpFSFileSystem.permissionToString(aclStatus.getPermission()));
     inner.put(HttpFSFileSystem.ACL_STICKY_BIT_JSON, aclStatus.isStickyBit());
     for ( AclEntry e : aclStatus.getEntries() ) {
       entriesArray.add(e.toString());
@@ -237,12 +187,12 @@ public final class FSOperations {
    */
   @SuppressWarnings({"unchecked"})
   private static Map fileChecksumToJSON(FileChecksum checksum) {
-    Map json = new LinkedHashMap();
+    Map json = new TreeMap();
     json.put(HttpFSFileSystem.CHECKSUM_ALGORITHM_JSON, checksum.getAlgorithmName());
     json.put(HttpFSFileSystem.CHECKSUM_BYTES_JSON,
              org.apache.hadoop.util.StringUtils.byteToHexString(checksum.getBytes()));
     json.put(HttpFSFileSystem.CHECKSUM_LENGTH_JSON, checksum.getLength());
-    Map response = new LinkedHashMap();
+    Map response = new TreeMap();
     response.put(HttpFSFileSystem.FILE_CHECKSUM_JSON, json);
     return response;
   }
@@ -259,11 +209,11 @@ public final class FSOperations {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static Map xAttrsToJSON(Map<String, byte[]> xAttrs, 
       XAttrCodec encoding) throws IOException {
-    Map jsonMap = new LinkedHashMap();
+    Map jsonMap = new TreeMap();
     JSONArray jsonArray = new JSONArray();
     if (xAttrs != null) {
       for (Entry<String, byte[]> e : xAttrs.entrySet()) {
-        Map json = new LinkedHashMap();
+        Map json = new TreeMap();
         json.put(HttpFSFileSystem.XATTR_NAME_JSON, e.getKey());
         if (e.getValue() != null) {
           json.put(HttpFSFileSystem.XATTR_VALUE_JSON, 
@@ -286,7 +236,7 @@ public final class FSOperations {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static Map xAttrNamesToJSON(List<String> names) throws IOException {
-    Map jsonMap = new LinkedHashMap();
+    Map jsonMap = new TreeMap();
     jsonMap.put(HttpFSFileSystem.XATTRNAMES_JSON, JSONArray.toJSONString(names));
     return jsonMap;
   }
@@ -301,7 +251,7 @@ public final class FSOperations {
    */
   @SuppressWarnings({"unchecked"})
   private static Map contentSummaryToJSON(ContentSummary contentSummary) {
-    Map json = new LinkedHashMap();
+    Map json = new TreeMap();
     json.put(HttpFSFileSystem.CONTENT_SUMMARY_DIRECTORY_COUNT_JSON,
         contentSummary.getDirectoryCount());
     json.put(HttpFSFileSystem.CONTENT_SUMMARY_ECPOLICY_JSON,
@@ -319,7 +269,7 @@ public final class FSOperations {
         json.put(e.getKey(), e.getValue());
       }
     }
-    Map response = new LinkedHashMap();
+    Map response = new TreeMap();
     response.put(HttpFSFileSystem.CONTENT_SUMMARY_JSON, json);
     return response;
   }
@@ -330,14 +280,14 @@ public final class FSOperations {
    */
   @SuppressWarnings({"unchecked"})
   private static Map quotaUsageToJSON(QuotaUsage quotaUsage) {
-    Map response = new LinkedHashMap();
+    Map response = new TreeMap();
     Map quotaUsageMap = quotaUsageToMap(quotaUsage);
     response.put(HttpFSFileSystem.QUOTA_USAGE_JSON, quotaUsageMap);
     return response;
   }
 
   private static Map<String, Object> quotaUsageToMap(QuotaUsage quotaUsage) {
-    Map<String, Object> result = new LinkedHashMap<>();
+    Map<String, Object> result = new TreeMap<>();
     result.put(HttpFSFileSystem.QUOTA_USAGE_FILE_AND_DIRECTORY_COUNT_JSON,
         quotaUsage.getFileAndDirectoryCount());
     result.put(HttpFSFileSystem.QUOTA_USAGE_QUOTA_JSON, quotaUsage.getQuota());
@@ -452,9 +402,10 @@ public final class FSOperations {
      */
     @Override
     public Void execute(FileSystem fs) throws IOException {
+      int bufferSize = fs.getConf().getInt("httpfs.buffer.size", 4096);
       OutputStream os = fs.append(path, bufferSize);
-      long bytes = copyBytes(is, os);
-      HttpFSServerWebApp.get().getMetrics().incrBytesWritten(bytes);
+      IOUtils.copyBytes(is, os, bufferSize, true);
+      os.close();
       return null;
     }
 
@@ -537,7 +488,6 @@ public final class FSOperations {
     @Override
     public JSONObject execute(FileSystem fs) throws IOException {
       boolean result = fs.truncate(path, newLength);
-      HttpFSServerWebApp.get().getMetrics().incrOpsTruncate();
       return toJSON(
           StringUtils.toLowerCase(HttpFSFileSystem.TRUNCATE_JSON), result);
     }
@@ -654,63 +604,14 @@ public final class FSOperations {
         fsPermission = FsCreateModes.create(fsPermission,
             new FsPermission(unmaskedPermission));
       }
+      int bufferSize = fs.getConf().getInt(HTTPFS_BUFFER_SIZE_KEY,
+          HTTP_BUFFER_SIZE_DEFAULT);
       OutputStream os = fs.create(path, fsPermission, override, bufferSize, replication, blockSize, null);
-      long bytes = copyBytes(is, os);
-      HttpFSServerWebApp.get().getMetrics().incrBytesWritten(bytes);
+      IOUtils.copyBytes(is, os, bufferSize, true);
+      os.close();
       return null;
     }
 
-  }
-
-  /**
-   * These copyBytes methods combines the two different flavors used originally.
-   * One with length and another one with buffer size.
-   * In this impl, buffer size is determined internally, which is a singleton
-   * normally set during initialization.
-   * @param in the inputStream
-   * @param out the outputStream
-   * @return the totalBytes
-   * @throws IOException the exception to be thrown.
-   */
-  public static long copyBytes(InputStream in, OutputStream out)
-      throws IOException {
-    return copyBytes(in, out, Long.MAX_VALUE);
-  }
-
-  public static long copyBytes(InputStream in, OutputStream out, long count)
-      throws IOException {
-    long totalBytes = 0;
-
-    // If bufferSize is not initialized use 4k. This will not happen
-    // if all callers check and set it.
-    byte[] buf = new byte[bufferSize];
-    long bytesRemaining = count;
-    int bytesRead;
-
-    try {
-      while (bytesRemaining > 0) {
-        int bytesToRead = (int)
-            (bytesRemaining < buf.length ? bytesRemaining : buf.length);
-
-        bytesRead = in.read(buf, 0, bytesToRead);
-        if (bytesRead == -1) {
-          break;
-        }
-
-        out.write(buf, 0, bytesRead);
-        bytesRemaining -= bytesRead;
-        totalBytes += bytesRead;
-      }
-      return totalBytes;
-    } finally {
-      // Originally IOUtils.copyBytes() were called with close=true. So we are
-      // implementing the same behavior here.
-      try {
-        in.close();
-      } finally {
-        out.close();
-      }
-    }
   }
 
   /**
@@ -745,7 +646,6 @@ public final class FSOperations {
     @Override
     public JSONObject execute(FileSystem fs) throws IOException {
       boolean deleted = fs.delete(path, recursive);
-      HttpFSServerWebApp.get().getMetrics().incrOpsDelete();
       return toJSON(
           StringUtils.toLowerCase(HttpFSFileSystem.DELETE_JSON), deleted);
     }
@@ -814,7 +714,6 @@ public final class FSOperations {
     @Override
     public Map execute(FileSystem fs) throws IOException {
       FileStatus status = fs.getFileStatus(path);
-      HttpFSServerWebApp.get().getMetrics().incrOpsStat();
       return toJson(status);
     }
 
@@ -843,6 +742,7 @@ public final class FSOperations {
       json.put(HttpFSFileSystem.HOME_DIR_JSON, homeDir.toUri().getPath());
       return json;
     }
+
   }
 
   /**
@@ -880,7 +780,6 @@ public final class FSOperations {
     @Override
     public Map execute(FileSystem fs) throws IOException {
       FileStatus[] fileStatuses = fs.listStatus(path, filter);
-      HttpFSServerWebApp.get().getMetrics().incrOpsListing();
       return toJson(fileStatuses, fs.getFileStatus(path).isFile());
     }
 
@@ -972,7 +871,6 @@ public final class FSOperations {
             new FsPermission(unmaskedPermission));
       }
       boolean mkdirs = fs.mkdirs(path, fsPermission);
-      HttpFSServerWebApp.get().getMetrics().incrOpsMkdir();
       return toJSON(HttpFSFileSystem.MKDIRS_JSON, mkdirs);
     }
 
@@ -1005,8 +903,8 @@ public final class FSOperations {
      */
     @Override
     public InputStream execute(FileSystem fs) throws IOException {
-      // Only updating ops count. bytesRead is updated in InputStreamEntity
-      HttpFSServerWebApp.get().getMetrics().incrOpsOpen();
+      int bufferSize = HttpFSServerWebApp.get().getConfig().getInt(
+          HTTPFS_BUFFER_SIZE_KEY, HTTP_BUFFER_SIZE_DEFAULT);
       return fs.open(path, bufferSize);
     }
 
@@ -1044,7 +942,6 @@ public final class FSOperations {
     @Override
     public JSONObject execute(FileSystem fs) throws IOException {
       boolean renamed = fs.rename(path, toPath);
-      HttpFSServerWebApp.get().getMetrics().incrOpsRename();
       return toJSON(HttpFSFileSystem.RENAME_JSON, renamed);
     }
 
@@ -1970,226 +1867,6 @@ public final class FSOperations {
             + ". Please check your fs.defaultFS configuration");
       }
       return JsonUtil.toJsonString(sds);
-    }
-  }
-
-  /**
-   *  Executor that performs a getSnapshotListing operation.
-   */
-  @InterfaceAudience.Private
-  public static class FSGetSnapshotListing implements
-      FileSystemAccess.FileSystemExecutor<String> {
-    private Path path;
-
-    /**
-     * Creates a getSnapshotDiff executor.
-     * @param path directory path of the snapshots to be examined.
-     */
-    public FSGetSnapshotListing(String path) {
-      this.path = new Path(path);
-    }
-
-    /**
-     * Executes the filesystem operation.
-     * @param fs filesystem instance to use.
-     * @return A JSON string of all snapshots for a snapshottable directory.
-     * @throws IOException thrown if an IO error occurred.
-     */
-    @Override
-    public String execute(FileSystem fs) throws IOException {
-      SnapshotStatus[] sds = null;
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        sds = dfs.getSnapshotListing(path);
-      } else {
-        throw new UnsupportedOperationException("getSnapshotListing is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return JsonUtil.toJsonString(sds);
-    }
-  }
-
-  /**
-   * Executor that performs a getServerDefaults operation.
-   */
-  @InterfaceAudience.Private
-  public static class FSGetServerDefaults
-      implements FileSystemAccess.FileSystemExecutor<String> {
-
-    /**
-     * Creates a getServerDefaults executor.
-     */
-    public FSGetServerDefaults() {
-    }
-
-    /**
-     * Executes the filesystem operation.
-     * @param fs filesystem instance to use.
-     * @return A JSON string.
-     * @throws IOException thrown if an IO error occurred.
-     */
-    @Override
-    public String execute(FileSystem fs) throws IOException {
-      FsServerDefaults sds = null;
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        sds = dfs.getServerDefaults();
-      } else {
-        throw new UnsupportedOperationException("getServerDefaults is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return JsonUtil.toJsonString(sds);
-    }
-  }
-
-  /**
-   * Executor that performs a check access operation.
-   */
-  @InterfaceAudience.Private
-  public static class FSAccess
-      implements FileSystemAccess.FileSystemExecutor<Void> {
-
-    private Path path;
-    private FsAction mode;
-
-    /**
-     * Creates a access executor.
-     */
-    public FSAccess(String path, FsAction mode) {
-      this.path = new Path(path);
-      this.mode = mode;
-    }
-
-    /**
-     * Executes the filesystem operation.
-     * @param fs filesystem instance to use.
-     * @throws IOException thrown if an IO error occurred.
-     */
-    @Override
-    public Void execute(FileSystem fs) throws IOException {
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        dfs.access(path, mode);
-        HttpFSServerWebApp.get().getMetrics().incrOpsCheckAccess();
-      } else {
-        throw new UnsupportedOperationException("checkaccess is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return null;
-    }
-  }
-
-  /**
-   * Executor that performs a setErasureCodingPolicy operation.
-   */
-  @InterfaceAudience.Private
-  public static class FSSetErasureCodingPolicy
-      implements FileSystemAccess.FileSystemExecutor<Void> {
-
-    private Path path;
-    private String policyName;
-
-    public FSSetErasureCodingPolicy(String path, String policyName) {
-      this.path = new Path(path);
-      this.policyName = policyName;
-    }
-
-    @Override
-    public Void execute(FileSystem fs) throws IOException {
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        dfs.setErasureCodingPolicy(path, policyName);
-      } else {
-        throw new UnsupportedOperationException("setErasureCodingPolicy is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return null;
-    }
-  }
-
-  /**
-   * Executor that performs a getErasureCodingPolicy operation.
-   */
-  @InterfaceAudience.Private
-  public static class FSGetErasureCodingPolicy
-      implements FileSystemAccess.FileSystemExecutor<String> {
-
-    private Path path;
-
-    public FSGetErasureCodingPolicy(String path) {
-      this.path = new Path(path);
-    }
-
-    @Override
-    public String execute(FileSystem fs) throws IOException {
-      ErasureCodingPolicy policy = null;
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        policy = dfs.getErasureCodingPolicy(path);
-      } else {
-        throw new UnsupportedOperationException("getErasureCodingPolicy is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return JsonUtil.toJsonString(policy);
-    }
-  }
-
-  /**
-   * Executor that performs a unsetErasureCodingPolicy operation.
-   */
-  @InterfaceAudience.Private
-  public static class FSUnSetErasureCodingPolicy
-      implements FileSystemAccess.FileSystemExecutor<Void> {
-
-    private Path path;
-
-    public FSUnSetErasureCodingPolicy(String path) {
-      this.path = new Path(path);
-    }
-
-    @Override
-    public Void execute(FileSystem fs) throws IOException {
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        dfs.unsetErasureCodingPolicy(path);
-      } else {
-        throw new UnsupportedOperationException("unsetErasureCodingPolicy is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return null;
-    }
-  }
-
-  /**
-   * Executor that performs a satisfyStoragePolicy operation.
-   */
-  @InterfaceAudience.Private
-  public static class FSSatisyStoragePolicy
-      implements FileSystemAccess.FileSystemExecutor<Void> {
-
-    private Path path;
-
-    public FSSatisyStoragePolicy(String path) {
-      this.path = new Path(path);
-    }
-
-    @Override
-    public Void execute(FileSystem fs) throws IOException {
-      if (fs instanceof DistributedFileSystem) {
-        DistributedFileSystem dfs = (DistributedFileSystem) fs;
-        dfs.satisfyStoragePolicy(path);
-      } else {
-        throw new UnsupportedOperationException("satisfyStoragePolicy is "
-            + "not supported for HttpFs on " + fs.getClass()
-            + ". Please check your fs.defaultFS configuration");
-      }
-      return null;
     }
   }
 }
