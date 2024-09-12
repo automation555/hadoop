@@ -17,7 +17,7 @@
 */
 package org.apache.hadoop.mapreduce.v2.app.launcher;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -47,8 +47,6 @@ import org.apache.hadoop.yarn.api.ContainerManagementProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.CommitResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.ContainerUpdateResponse;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesRequest;
-import org.apache.hadoop.yarn.api.protocolrecords.GetLocalizationStatusesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.IncreaseContainersResourceResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerStatusesRequest;
@@ -265,7 +263,8 @@ public class TestContainerLauncherImpl {
       ut.handle(mockCleanupEvent);
       
       ut.waitForPoolToIdle();
-      
+
+      // Verifies stopContainers is skipped for already removed container
       verify(mockCM, never()).stopContainers(any(StopContainersRequest.class));
 
       LOG.info("inserting launch event");
@@ -284,7 +283,23 @@ public class TestContainerLauncherImpl {
       
       ut.waitForPoolToIdle();
       
-      verify(mockCM, never()).startContainers(any(StartContainersRequest.class));
+      verify(mockCM).startContainers(any(StartContainersRequest.class));
+
+      LOG.info("inserting cleanup event");
+      ContainerLauncherEvent mockCleanupEvent2 =
+          mock(ContainerLauncherEvent.class);
+      when(mockCleanupEvent2.getType())
+          .thenReturn(EventType.CONTAINER_REMOTE_CLEANUP);
+      when(mockCleanupEvent2.getContainerID())
+          .thenReturn(contId);
+      when(mockCleanupEvent2.getTaskAttemptID()).thenReturn(taskAttemptId);
+      when(mockCleanupEvent2.getContainerMgrAddress()).thenReturn(cmAddress);
+      ut.handle(mockCleanupEvent2);
+
+      ut.waitForPoolToIdle();
+
+      // Verifies stopContainers is called on existing container
+      verify(mockCM).stopContainers(any(StopContainersRequest.class));
     } finally {
       ut.stop();
     }
@@ -521,13 +536,6 @@ public class TestContainerLauncherImpl {
     @Override
     public ContainerUpdateResponse updateContainer(ContainerUpdateRequest
         request) throws YarnException, IOException {
-      return null;
-    }
-
-    @Override
-    public GetLocalizationStatusesResponse getLocalizationStatuses(
-        GetLocalizationStatusesRequest request) throws YarnException,
-        IOException {
       return null;
     }
   }
