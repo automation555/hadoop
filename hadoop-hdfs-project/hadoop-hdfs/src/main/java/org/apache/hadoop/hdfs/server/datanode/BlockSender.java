@@ -434,7 +434,6 @@ class BlockSender implements java.io.Closeable {
       ris = new ReplicaInputStreams(
           blockIn, checksumIn, volumeRef, fileIoProvider);
     } catch (IOException ioe) {
-      IOUtils.cleanupWithLogger(null, volumeRef);
       IOUtils.closeStream(this);
       IOUtils.closeStream(blockIn);
       IOUtils.closeStream(checksumIn);
