@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
+import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.ExitCode;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.LocalDirsHandlerService;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManagerImpl;
@@ -42,7 +43,7 @@ import java.io.InterruptedIOException;
  */
 public class RecoverPausedContainerLaunch extends ContainerLaunch {
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  private static final Log LOG = LogFactory.getLog(
       RecoveredContainerLaunch.class);
 
   public RecoverPausedContainerLaunch(Context context,
@@ -101,6 +102,17 @@ public class RecoverPausedContainerLaunch extends ContainerLaunch {
           LOG.error("Unable to set exit code for container " + containerId);
         }
       }
+    }
+
+    if (retCode == ExitCode.FORCE_KILLED.getExitCode()
+        || retCode == ExitCode.TERMINATED.getExitCode()) {
+      // If the process was killed, Send container_cleanedup_after_kill and
+      // just break out of this method.
+      this.dispatcher.getEventHandler().handle(
+          new ContainerExitEvent(containerId,
+              ContainerEventType.CONTAINER_KILLED_ON_REQUEST, retCode,
+              "Container exited with a non-zero exit code " + retCode));
+      return retCode;
     }
 
     if (retCode != 0) {
