@@ -125,7 +125,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -258,6 +257,7 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.thirdparty.com.google.common.cache.CacheLoader;
 import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.protobuf.BlockingService;
 
 import org.slf4j.Logger;
@@ -307,7 +307,6 @@ public class DataNode extends ReconfigurableBase
   public static final String DN_CLIENTTRACE_FORMAT =
         "src: %s" +      // src IP
         ", dest: %s" +   // dst IP
-        ", volume: %s" + // volume
         ", bytes: %s" +  // byte count
         ", op: %s" +     // operation
         ", cliID: %s" +  // DFSClient id
@@ -361,8 +360,6 @@ public class DataNode extends ReconfigurableBase
   private static final String DATANODE_HTRACE_PREFIX = "datanode.htrace.";
   private final FileIoProvider fileIoProvider;
 
-  private static final String NETWORK_ERRORS = "networkErrors";
-
   /**
    * Use {@link NetUtils#createSocketAddr(String)} instead.
    */
@@ -399,7 +396,8 @@ public class DataNode extends ReconfigurableBase
   private volatile DataNodePeerMetrics peerMetrics;
   private volatile DataNodeDiskMetrics diskMetrics;
   private InetSocketAddress streamingAddr;
-
+  
+  // See the note below in incrDatanodeNetworkErrors re: concurrency.
   private LoadingCache<String, Map<String, Long>> datanodeNetworkCounts;
 
   private String hostName;
@@ -450,6 +448,8 @@ public class DataNode extends ReconfigurableBase
   private DataSetLockManager dataSetLockManager;
 
   private final ExecutorService xferService;
+  private final Set<ExtendedBlock> transferringBlock = Sets
+      .newConcurrentHashSet();
 
   @Nullable
   private final StorageLocationChecker storageLocationChecker;
@@ -578,9 +578,9 @@ public class DataNode extends ReconfigurableBase
             .maximumSize(dncCacheMaxSize)
             .build(new CacheLoader<String, Map<String, Long>>() {
               @Override
-              public Map<String, Long> load(String key) {
-                final Map<String, Long> ret = new ConcurrentHashMap<>();
-                ret.put(NETWORK_ERRORS, 0L);
+              public Map<String, Long> load(String key) throws Exception {
+                final Map<String, Long> ret = new HashMap<String, Long>();
+                ret.put("networkErrors", 0L);
                 return ret;
               }
             });
@@ -2626,11 +2626,19 @@ public class DataNode extends ReconfigurableBase
   void incrDatanodeNetworkErrors(String host) {
     metrics.incrDatanodeNetworkErrors();
 
-    try {
-      datanodeNetworkCounts.get(host).compute(NETWORK_ERRORS,
-          (key, errors) -> errors == null ? 1L : errors + 1L);
-    } catch (ExecutionException e) {
-      LOG.warn("Failed to increment network error counts for host: {}", host);
+    /*
+     * Synchronizing on the whole cache is a big hammer, but since it's only
+     * accumulating errors, it should be ok. If this is ever expanded to include
+     * non-error stats, then finer-grained concurrency should be applied.
+     */
+    synchronized (datanodeNetworkCounts) {
+      try {
+        final Map<String, Long> curCount = datanodeNetworkCounts.get(host);
+        curCount.put("networkErrors", curCount.get("networkErrors") + 1L);
+        datanodeNetworkCounts.put(host, curCount);
+      } catch (ExecutionException e) {
+        LOG.warn("failed to increment network error counts for host: {}", host);
+      }
     }
   }
 
@@ -2739,16 +2747,22 @@ public class DataNode extends ReconfigurableBase
     
     int numTargets = xferTargets.length;
     if (numTargets > 0) {
-      final String xferTargetsString =
-          StringUtils.join(" ", Arrays.asList(xferTargets));
-      LOG.info("{} Starting thread to transfer {} to {}", bpReg, block,
-          xferTargetsString);
+      if (transferringBlock.contains(block)) {
+        LOG.warn(
+            "Thread for transfer {} was already running，ignore this block.",
+            block);
+      } else {
+        final String xferTargetsString =
+            StringUtils.join(" ", Arrays.asList(xferTargets));
+        LOG.info("{} Starting thread to transfer {} to {}", bpReg, block,
+            xferTargetsString);
 
-      final DataTransfer dataTransferTask = new DataTransfer(xferTargets,
-          xferTargetStorageTypes, xferTargetStorageIDs, block,
-          BlockConstructionStage.PIPELINE_SETUP_CREATE, "");
+        final DataTransfer dataTransferTask = new DataTransfer(xferTargets,
+            xferTargetStorageTypes, xferTargetStorageIDs, block,
+            BlockConstructionStage.PIPELINE_SETUP_CREATE, "");
 
-      this.xferService.execute(dataTransferTask);
+        this.xferService.execute(dataTransferTask);
+      }
     }
   }
 
@@ -2916,6 +2930,7 @@ public class DataNode extends ReconfigurableBase
       final boolean isClient = clientname.length() > 0;
       
       try {
+        transferringBlock.add(b);
         final String dnAddr = targets[0].getXferAddr(connectToDnViaHostname);
         InetSocketAddress curTarget = NetUtils.createSocketAddr(dnAddr);
         LOG.debug("Connecting to datanode {}", dnAddr);
@@ -2991,6 +3006,7 @@ public class DataNode extends ReconfigurableBase
       } catch (Throwable t) {
         LOG.error("Failed to transfer block {}", b, t);
       } finally {
+        transferringBlock.remove(b);
         decrementXmitsInProgress();
         IOUtils.closeStream(blockSender);
         IOUtils.closeStream(out);
