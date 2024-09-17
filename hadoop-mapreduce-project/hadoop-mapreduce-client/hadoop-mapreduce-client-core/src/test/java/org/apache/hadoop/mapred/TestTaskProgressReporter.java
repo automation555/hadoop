@@ -330,5 +330,6 @@ public class TestTaskProgressReporter {
     reporter.resetDoneFlag();
     t.join();
     Assert.assertEquals(failFast, threadExited);
+    FileSystem.clearStatistics();
   }
 }
