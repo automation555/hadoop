@@ -24,12 +24,13 @@ export default DS.Model.extend({
   user: DS.attr("string"),
   queue: DS.attr("string"),
   state: DS.attr("string"),
-  startTime: DS.attr("number"),
+  startTime: DS.attr("string"),
   elapsedTime: DS.attr("string"),
   finalStatus: DS.attr("string"),
-  finishedTime: DS.attr("number"),
+  finishedTime: DS.attr("finishedTime"),
   progress: DS.attr("number"),
   diagnostics: DS.attr("string"),
+  amContainerLogs: DS.attr("string"),
   amHostHttpAddress: DS.attr("string"),
   masterNodeId: DS.attr("string"),
   logAggregationStatus: DS.attr("string"),
@@ -53,8 +54,6 @@ export default DS.Model.extend({
   remainingTimeoutInSeconds: DS.attr("number"),
   applicationExpiryTime: DS.attr("string"),
   resourceRequests: DS.attr("array"),
-  trackingUI: DS.attr("string"),
-  trackingUrl: DS.attr("string"),
 
   isFailed: function() {
     return this.get("finalStatus") === "FAILED";
@@ -70,17 +69,6 @@ export default DS.Model.extend({
   hasFinishedTime: function() {
     return this.get("finishedTime") >= this.get("startTime");
   }.property("hasFinishedTime"),
-
-  formattedStartTime: function() {
-    return Converter.timeStampToDate(this.get('startTime'));
-  }.property('startTime'),
-
-  formattedFinishedTime: function() {
-    if (this.get("finishedTime") < this.get("startTime")) {
-      return "N/A";
-    }
-    return Converter.timeStampToDate(this.get("finishedTime"));
-  }.property('finishedTime'),
 
   formattedElapsedTime: function() {
     return Converter.msToElapsedTimeUnit(this.get("elapsedTime"));
@@ -109,6 +97,10 @@ export default DS.Model.extend({
     );
   }.property("memorySeconds", "vcoreSeconds"),
 
+  masterNodeURL: function() {
+    return `#/yarn-node/${this.get("masterNodeId")}/${this.get("amHostHttpAddress")}/info/`;
+  }.property("masterNodeId", "amHostHttpAddress"),
+
   progressStyle: function() {
     return "width: " + this.get("progress") + "%";
   }.property("progress"),
@@ -135,21 +127,5 @@ export default DS.Model.extend({
     }
 
     return "label label-" + style;
-  }.property("finalStatus"),
-
-  logAggregationStatusStyle: function() {
-    const logAggregationStatus = this.get("logAggregationStatus");
-    var style = "";
-    if (logAggregationStatus === "FAILED" ||
-        logAggregationStatus === "TIME_OUT") {
-      style = "danger";
-    } else if (logAggregationStatus === "RUNNING_WITH_FAILURE") {
-      style = "warning";
-    } else if (logAggregationStatus === "SUCCEEDED") {
-      style = "success";
-    } else {
-      style = "default";
-    }
-    return "label label-" + style;
-  }.property("logAggregationStatus")
+  }.property("finalStatus")
 });
