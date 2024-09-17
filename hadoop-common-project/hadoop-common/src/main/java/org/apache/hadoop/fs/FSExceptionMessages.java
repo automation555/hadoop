@@ -25,6 +25,11 @@ package org.apache.hadoop.fs;
 public class FSExceptionMessages {
 
   /**
+   * The operation failed because the file system is closed: {@value}
+   */
+  public static final String FILESYSTEM_IS_CLOSED = "Filesystem is closed!";
+
+  /**
    * The operation failed because the stream is closed: {@value}
    */
   public static final String STREAM_IS_CLOSED = "Stream is closed!";
@@ -51,10 +56,4 @@ public class FSExceptionMessages {
 
   public static final String PERMISSION_DENIED_BY_STICKY_BIT =
       "Permission denied by sticky bit";
-
-  /**
-   * A call was made to abort(), but it is not supported.
-   */
-  public static final String ABORTABLE_UNSUPPORTED =
-      "Abortable.abort() is not supported";
 }
