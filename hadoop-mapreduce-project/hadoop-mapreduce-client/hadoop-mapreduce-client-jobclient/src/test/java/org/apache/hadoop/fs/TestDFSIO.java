@@ -31,15 +31,16 @@ import java.io.PrintStream;
 import java.text.DecimalFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Random;
 import java.util.StringTokenizer;
-import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
@@ -60,8 +61,6 @@ import org.apache.hadoop.util.ToolRunner;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Distributed i/o benchmark.
@@ -92,7 +91,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TestDFSIO implements Tool {
   // Constants
-  private static final Logger LOG = LoggerFactory.getLogger(TestDFSIO.class);
+  private static final Log LOG = LogFactory.getLog(TestDFSIO.class);
   private static final int DEFAULT_BUFFER_SIZE = 1000000;
   private static final String BASE_FILE_NAME = "test_io_";
   private static final String DEFAULT_RES_FILE_NAME = "TestDFSIO_results.log";
@@ -109,7 +108,8 @@ public class TestDFSIO implements Tool {
                     " [-size Size[B|KB|MB|GB|TB]]" +
                     " [-resFile resultFileName] [-bufferSize Bytes]" +
                     " [-storagePolicy storagePolicyName]" +
-                    " [-erasureCodePolicy erasureCodePolicyName]";
+                    " [-erasureCodePolicy erasureCodePolicyName]" +
+                    " [-sequential]";
 
   private Configuration config;
   private static final String STORAGE_POLICY_NAME_KEY =
@@ -289,23 +289,70 @@ public class TestDFSIO implements Tool {
     bench.analyzeResult(fs, TestType.TEST_TYPE_TRUNCATE, execTime);
   }
 
+  @Test (timeout = 10000)
+  public void testSequentialWrite() throws Exception {
+    FileSystem fs = cluster.getFileSystem();
+    bench.sequentialTest(fs, TestType.TEST_TYPE_WRITE,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+  }
+
+  @Test (timeout = 10000)
+  public void testSequentialRead() throws Exception {
+    FileSystem fs = cluster.getFileSystem();
+    bench.sequentialTest(fs, TestType.TEST_TYPE_READ,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+  }
+
+  @Test (timeout = 10000)
+  public void testSequentialReadRandom() throws Exception {
+    FileSystem fs = cluster.getFileSystem();
+    bench.getConf().setLong("test.io.skip.size", 0);
+    bench.sequentialTest(fs, TestType.TEST_TYPE_READ_RANDOM,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+  }
+
+  @Test (timeout = 10000)
+  public void testSequentialAppend() throws Exception {
+    FileSystem fs = cluster.getFileSystem();
+    bench.getConf().setLong("test.io.skip.size", 0);
+    bench.sequentialTest(fs, TestType.TEST_TYPE_READ_RANDOM,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+  }
+
+  @Test (timeout = 10000)
+  public void testSequentialReadBackward() throws Exception {
+    FileSystem fs = cluster.getFileSystem();
+    bench.getConf().setLong("test.io.skip.size", -DEFAULT_BUFFER_SIZE);
+    bench.sequentialTest(fs, TestType.TEST_TYPE_READ_RANDOM,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+  }
+
+  @Test (timeout = 10000)
+  public void testSequentialReadSkip() throws Exception {
+    FileSystem fs = cluster.getFileSystem();
+    bench.sequentialTest(fs, TestType.TEST_TYPE_APPEND,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+  }
+
+  @Test(timeout = 60000)
+  public void testSequentialTruncate() throws Exception {
+    FileSystem fs = cluster.getFileSystem();
+    // given DEFAULT_NR_BYTES files to be truncated
+    bench.sequentialTest(fs, TestType.TEST_TYPE_WRITE,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+    // test truncate
+    bench.sequentialTest(fs, TestType.TEST_TYPE_TRUNCATE,
+            DEFAULT_NR_BYTES, DEFAULT_NR_FILES);
+  }
+
   @SuppressWarnings("deprecation")
   private void createControlFile(FileSystem fs,
                                   long nrBytes, // in bytes
                                   int nrFiles
                                 ) throws IOException {
     LOG.info("creating control file: "+nrBytes+" bytes, "+nrFiles+" files");
-    final int maxDirItems = config.getInt(
-        DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_KEY,
-        DFSConfigKeys.DFS_NAMENODE_MAX_DIRECTORY_ITEMS_DEFAULT);
+
     Path controlDir = getControlDir(config);
-
-    if (nrFiles > maxDirItems) {
-      final String message = "The directory item limit of " + controlDir +
-          " is exceeded: limit=" + maxDirItems + " items=" + nrFiles;
-      throw new IOException(message);
-    }
-
     fs.delete(controlDir, true);
 
     for(int i=0; i < nrFiles; i++) {
@@ -320,9 +367,8 @@ public class TestDFSIO implements Tool {
       } catch(Exception e) {
         throw new IOException(e.getLocalizedMessage());
       } finally {
-        if (writer != null) {
+        if (writer != null)
           writer.close();
-        }
         writer = null;
       }
     }
@@ -472,7 +518,6 @@ public class TestDFSIO implements Tool {
     job.setOutputKeyClass(Text.class);
     job.setOutputValueClass(Text.class);
     job.setNumReduceTasks(1);
-    job.setSpeculativeExecution(false);
     JobClient.runJob(job);
   }
 
@@ -583,7 +628,7 @@ public class TestDFSIO implements Tool {
    * 3) Skip-read skips skipSize bytes after every read          : skipSize > 0
    */
   public static class RandomReadMapper extends IOStatMapper {
-    private ThreadLocalRandom rnd;
+    private Random rnd;
     private long fileSize;
     private long skipSize;
 
@@ -594,7 +639,7 @@ public class TestDFSIO implements Tool {
     }
 
     public RandomReadMapper() { 
-      rnd = ThreadLocalRandom.current();
+      rnd = new Random();
     }
 
     @Override // IOMapperBase
@@ -636,8 +681,8 @@ public class TestDFSIO implements Tool {
      * @return
      */
     private long nextOffset(long current) {
-      if (skipSize == 0)
-        return rnd.nextLong(fileSize);
+      if(skipSize == 0)
+        return rnd.nextInt((int)(fileSize));
       if(skipSize > 0)
         return (current < 0) ? 0 : (current + bufferSize + skipSize);
       // skipSize < 0
@@ -730,10 +775,18 @@ public class TestDFSIO implements Tool {
     default:
       return;
     }
-    for(int i=0; i < nrFiles; i++)
-      ioer.doIO(Reporter.NULL,
-                BASE_FILE_NAME+Integer.toString(i), 
-                fileSize);
+    for (int i = 0; i < nrFiles; i++) {
+      ioer.configure(new JobConf(config, TestDFSIO.class));
+      String fileName = getFileName(i);
+      ioer.stream = ioer.getIOStream(fileName);
+      try {
+        ioer.doIO(Reporter.NULL, fileName, fileSize);
+      } finally {
+        if (ioer.stream != null) {
+          ioer.stream.close();
+        }
+      }
+    }
   }
 
   public static void main(String[] args) {
@@ -857,7 +910,7 @@ public class TestDFSIO implements Tool {
       long tStart = System.currentTimeMillis();
       sequentialTest(fs, testType, nrBytes, nrFiles);
       long execTime = System.currentTimeMillis() - tStart;
-      String resultLine = "Seq Test exec time sec: " + msToSecs(execTime);
+      String resultLine = "Seq Test exec time sec: " + (float)execTime / 1000;
       LOG.info(resultLine);
       return 0;
     }
@@ -921,17 +974,13 @@ public class TestDFSIO implements Tool {
     return ((float)bytes)/MEGA;
   }
 
-  static float msToSecs(long timeMillis) {
-    return timeMillis / 1000.0f;
-  }
-
   private boolean checkErasureCodePolicy(String erasureCodePolicyName,
       FileSystem fs, TestType testType) throws IOException {
-    Collection<ErasureCodingPolicyInfo> list =
+    Collection<ErasureCodingPolicy> list =
         ((DistributedFileSystem) fs).getAllErasureCodingPolicies();
     boolean isValid = false;
-    for (ErasureCodingPolicyInfo ec : list) {
-      if (erasureCodePolicyName.equals(ec.getPolicy().getName())) {
+    for (ErasureCodingPolicy ec : list) {
+      if (erasureCodePolicyName.equals(ec.getName())) {
         isValid = true;
         break;
       }
@@ -941,8 +990,8 @@ public class TestDFSIO implements Tool {
       System.out.println("Invalid erasure code policy: " +
           erasureCodePolicyName);
       System.out.println("Current supported erasure code policy list: ");
-      for (ErasureCodingPolicyInfo ec : list) {
-        System.out.println(ec.getPolicy().getName());
+      for (ErasureCodingPolicy ec : list) {
+        System.out.println(ec.getName());
       }
       return false;
     }
@@ -1001,10 +1050,9 @@ public class TestDFSIO implements Tool {
         getConf().get(ERASURE_CODE_POLICY_NAME_KEY, null);
 
     fs.mkdirs(path);
-    Collection<ErasureCodingPolicyInfo> list =
+    Collection<ErasureCodingPolicy> list =
         ((DistributedFileSystem) fs).getAllErasureCodingPolicies();
-    for (ErasureCodingPolicyInfo info : list) {
-      final ErasureCodingPolicy ec = info.getPolicy();
+    for (ErasureCodingPolicy ec : list) {
       if (erasureCodePolicyName.equals(ec.getName())) {
         ((DistributedFileSystem) fs).setErasureCodingPolicy(path, ec.getName());
         LOG.info("enable erasureCodePolicy = " + erasureCodePolicyName  +
@@ -1058,10 +1106,11 @@ public class TestDFSIO implements Tool {
         "            Date & time: " + new Date(System.currentTimeMillis()),
         "        Number of files: " + tasks,
         " Total MBytes processed: " + df.format(toMB(size)),
-        "      Throughput mb/sec: " + df.format(toMB(size) / msToSecs(time)),
+        "      Throughput mb/sec: " + df.format(size * 1000.0 / (time * MEGA)),
+        "Total Throughput mb/sec: " + df.format(toMB(size) / ((float)execTime)),
         " Average IO rate mb/sec: " + df.format(med),
         "  IO rate std deviation: " + df.format(stdDev),
-        "     Test exec time sec: " + df.format(msToSecs(execTime)),
+        "     Test exec time sec: " + df.format((float)execTime / 1000),
         "" };
 
     PrintStream res = null;
