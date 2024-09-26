@@ -35,6 +35,8 @@ function personality_globals
   JIRA_ISSUE_RE='^(HADOOP|YARN|MAPREDUCE|HDFS)-[0-9]+$'
   #shellcheck disable=SC2034
   GITHUB_REPO_DEFAULT="apache/hadoop"
+  # mount urandom to increase entropy
+  DOCKER_EXTRAARGS=("-v" "/dev/urandom:/dev/random")
 
   HADOOP_HOMEBREW_DIR=${HADOOP_HOMEBREW_DIR:-$(brew --prefix 2>/dev/null)}
   if [[ -z "${HADOOP_HOMEBREW_DIR}" ]]; then
@@ -355,7 +357,6 @@ function personality_modules
       fi
     ;;
     unit)
-      extra="-Dsurefire.rerunFailingTestsCount=2"
       if [[ "${BUILDMODE}" = full ]]; then
         ordering=mvnsrc
       elif [[ "${CHANGED_MODULES[*]}" =~ \. ]]; then
@@ -364,7 +365,7 @@ function personality_modules
 
       if [[ ${TEST_PARALLEL} = "true" ]] ; then
         if hadoop_test_parallel; then
-          extra="${extra} -Pparallel-tests"
+          extra="-Pparallel-tests"
           if [[ -n ${TEST_THREADS:-} ]]; then
             extra="${extra} -DtestsThreadCount=${TEST_THREADS}"
           fi
@@ -483,7 +484,7 @@ function personality_file_tests
   fi
 
   if [[ ${filename} =~ \.java$ ]]; then
-    add_test spotbugs
+    add_test findbugs
   fi
 }
 
@@ -551,7 +552,7 @@ function shadedclient_rebuild
   echo_and_redirect "${logfile}" \
     "${MAVEN}" "${MAVEN_ARGS[@]}" verify -fae --batch-mode -am \
       "${modules[@]}" \
-      -Dtest=NoUnitTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true -Dspotbugs.skip=true
+      -Dtest=NoUnitTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true -Dfindbugs.skip=true
 
   big_console_header "Checking client artifacts on ${repostatus} with non-shaded clients"
 
