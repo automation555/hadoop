@@ -125,7 +125,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -133,6 +132,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.annotation.Nullable;
 import javax.management.ObjectName;
@@ -307,7 +307,6 @@ public class DataNode extends ReconfigurableBase
   public static final String DN_CLIENTTRACE_FORMAT =
         "src: %s" +      // src IP
         ", dest: %s" +   // dst IP
-        ", volume: %s" + // volume
         ", bytes: %s" +  // byte count
         ", op: %s" +     // operation
         ", cliID: %s" +  // DFSClient id
@@ -361,8 +360,6 @@ public class DataNode extends ReconfigurableBase
   private static final String DATANODE_HTRACE_PREFIX = "datanode.htrace.";
   private final FileIoProvider fileIoProvider;
 
-  private static final String NETWORK_ERRORS = "networkErrors";
-
   /**
    * Use {@link NetUtils#createSocketAddr(String)} instead.
    */
@@ -399,7 +396,8 @@ public class DataNode extends ReconfigurableBase
   private volatile DataNodePeerMetrics peerMetrics;
   private volatile DataNodeDiskMetrics diskMetrics;
   private InetSocketAddress streamingAddr;
-
+  
+  // See the note below in incrDatanodeNetworkErrors re: concurrency.
   private LoadingCache<String, Map<String, Long>> datanodeNetworkCounts;
 
   private String hostName;
@@ -435,6 +433,7 @@ public class DataNode extends ReconfigurableBase
   SaslDataTransferClient saslClient;
   SaslDataTransferServer saslServer;
   private ObjectName dataNodeInfoBeanName;
+  private ReentrantReadWriteLock dataNodeInfoBeanLock;
   // Test verification only
   private volatile long lastDiskErrorCheck;
   private String supergroup;
@@ -578,9 +577,9 @@ public class DataNode extends ReconfigurableBase
             .maximumSize(dncCacheMaxSize)
             .build(new CacheLoader<String, Map<String, Long>>() {
               @Override
-              public Map<String, Long> load(String key) {
-                final Map<String, Long> ret = new ConcurrentHashMap<>();
-                ret.put(NETWORK_ERRORS, 0L);
+              public Map<String, Long> load(String key) throws Exception {
+                final Map<String, Long> ret = new HashMap<String, Long>();
+                ret.put("networkErrors", 0L);
                 return ret;
               }
             });
@@ -1299,14 +1298,19 @@ public class DataNode extends ReconfigurableBase
     }
   }
 
-  private synchronized void setClusterId(final String nsCid, final String bpid
+  private void setClusterId(final String nsCid, final String bpid
       ) throws IOException {
-    if(clusterId != null && !clusterId.equals(nsCid)) {
-      throw new IOException ("Cluster IDs not matched: dn cid=" + clusterId 
-          + " but ns cid="+ nsCid + "; bpid=" + bpid);
+    dataNodeInfoBeanLock.writeLock().lock();
+    try {
+      if(clusterId != null && !clusterId.equals(nsCid)) {
+        throw new IOException ("Cluster IDs not matched: dn cid=" + clusterId
+                + " but ns cid="+ nsCid + "; bpid=" + bpid);
+      }
+      // else
+      clusterId = nsCid;
+    } finally {
+      dataNodeInfoBeanLock.writeLock().unlock();
     }
-    // else
-    clusterId = nsCid;
   }
 
   /**
@@ -2626,11 +2630,19 @@ public class DataNode extends ReconfigurableBase
   void incrDatanodeNetworkErrors(String host) {
     metrics.incrDatanodeNetworkErrors();
 
-    try {
-      datanodeNetworkCounts.get(host).compute(NETWORK_ERRORS,
-          (key, errors) -> errors == null ? 1L : errors + 1L);
-    } catch (ExecutionException e) {
-      LOG.warn("Failed to increment network error counts for host: {}", host);
+    /*
+     * Synchronizing on the whole cache is a big hammer, but since it's only
+     * accumulating errors, it should be ok. If this is ever expanded to include
+     * non-error stats, then finer-grained concurrency should be applied.
+     */
+    synchronized (datanodeNetworkCounts) {
+      try {
+        final Map<String, Long> curCount = datanodeNetworkCounts.get(host);
+        curCount.put("networkErrors", curCount.get("networkErrors") + 1L);
+        datanodeNetworkCounts.put(host, curCount);
+      } catch (ExecutionException e) {
+        LOG.warn("failed to increment network error counts for host: {}", host);
+      }
     }
   }
 
@@ -3633,8 +3645,13 @@ public class DataNode extends ReconfigurableBase
   }
   
   @Override // DataNodeMXBean
-  public synchronized String getClusterId() {
-    return clusterId;
+  public String getClusterId() {
+    dataNodeInfoBeanLock.readLock().lock();
+    try {
+      return clusterId;
+    } finally {
+      dataNodeInfoBeanLock.readLock().unlock();
+    }
   }
 
   @Override // DataNodeMXBean
