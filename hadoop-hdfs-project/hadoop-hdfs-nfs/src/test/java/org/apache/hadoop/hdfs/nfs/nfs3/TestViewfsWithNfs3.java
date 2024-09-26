@@ -328,5 +328,7 @@ public class TestViewfsWithNfs3 {
     statusAfterRename =
         nn1.getRpcServer().getFileInfo("/user1/renameSingleNN");
     Assert.assertEquals(statusAfterRename, null);
+    testNfsRename(fromHandle, "renameSingleNNSucess",
+        fromHandle, "renameSingleNN", Nfs3Status.NFS3_OK);
   }
 }
