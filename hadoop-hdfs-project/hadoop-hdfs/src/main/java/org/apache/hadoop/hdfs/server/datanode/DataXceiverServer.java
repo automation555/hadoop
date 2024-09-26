@@ -240,6 +240,13 @@ class DataXceiverServer implements Runnable {
             .start();
       } catch (SocketTimeoutException ignored) {
         // wake up to see if should continue to run
+        if (peer != null) {
+          LOG.warn("A timeout occurred between DataXceiverServer: {} " +
+            "and remote: {}.", datanode.getDisplayName(), peer, ignored);
+        } else {
+          LOG.warn("{}:DataXceiverServer: Timeout.",
+            datanode.getDisplayName(), ignored);
+        }
       } catch (AsynchronousCloseException ace) {
         // another thread closed our listener socket - that's expected during shutdown,
         // but not in other circumstances
