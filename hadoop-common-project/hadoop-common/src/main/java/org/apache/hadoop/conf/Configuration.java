@@ -37,6 +37,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
+import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.net.JarURLConnection;
@@ -319,8 +320,28 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   /**
    * Configuration objects
    */
-  private static final WeakHashMap<Configuration,Object> REGISTRY = 
-    new WeakHashMap<Configuration,Object>();
+  private static final ConcurrentHashMap<ConfWeakRef, Object> REGISTRY =
+      new ConcurrentHashMap<>();
+
+  private static final class ConfWeakRef extends WeakReference<Object> {
+    private static final ReferenceQueue<Object> queue = new ReferenceQueue<>();
+    private static final AtomicBoolean expungeQueue = new AtomicBoolean(false);
+    private static final Object VALUE = new Object();
+
+    private ConfWeakRef(Object ref) {
+      super(ref, queue);
+      expungeStaleQueue();
+    }
+
+    private static void expungeStaleQueue() {
+      if (expungeQueue.compareAndSet(false, true)) {
+        for (Object x; (x = queue.poll()) != null; ) {
+          REGISTRY.remove((ConfWeakRef) x);
+        }
+        expungeQueue.set(false);
+      }
+    }
+  }
 
   /**
    * Map to hold properties by there tag groupings.
@@ -827,9 +848,8 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   public Configuration(boolean loadDefaults) {
     this.loadDefaults = loadDefaults;
 
-    synchronized(Configuration.class) {
-      REGISTRY.put(this, null);
-    }
+    ConfWeakRef confRef = new ConfWeakRef(this);
+    REGISTRY.put(confRef, ConfWeakRef.VALUE);
   }
   
   /** 
@@ -863,9 +883,9 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       this.propertyTagsMap.putAll(other.propertyTagsMap);
     }
 
-    synchronized(Configuration.class) {
-      REGISTRY.put(this, null);
-    }
+    ConfWeakRef confRef = new ConfWeakRef(this);
+    REGISTRY.put(confRef, ConfWeakRef.VALUE);
+
     this.classLoader = other.classLoader;
     this.loadDefaults = other.loadDefaults;
     setQuietMode(other.getQuietMode());
@@ -874,13 +894,23 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
   /**
    * Reload existing configuration instances.
    */
-  public static synchronized void reloadExistingConfigurations() {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Reloading " + REGISTRY.keySet().size()
-          + " existing configurations");
+  public static void reloadExistingConfigurations() {
+    LOG.debug("Reloading configurations");
+
+    int reloadCnt = 0;
+    Iterator<ConfWeakRef> it = REGISTRY.keySet().iterator();
+    while (it.hasNext()) {
+      Configuration conf = (Configuration) it.next().get();
+      if (conf != null) {
+        conf.reloadConfiguration();
+        reloadCnt ++;
+      } else {
+        it.remove();
+      }
     }
-    for (Configuration conf : REGISTRY.keySet()) {
-      conf.reloadConfiguration();
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Reloaded " + reloadCnt + " existing configurations");
     }
   }
 
@@ -889,15 +919,39 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
    * added.
    * @param name file name. File should be present in the classpath.
    */
-  public static synchronized void addDefaultResource(String name) {
+  public static void addDefaultResource(String name) {
     if(!defaultResources.contains(name)) {
       defaultResources.add(name);
-      for(Configuration conf : REGISTRY.keySet()) {
-        if(conf.loadDefaults) {
-          conf.reloadConfiguration();
+      Iterator<ConfWeakRef> it = REGISTRY.keySet().iterator();
+      while (it.hasNext()) {
+        Configuration conf = (Configuration) it.next().get();
+        if (conf != null) {
+          if (conf.loadDefaults) {
+            conf.reloadConfiguration();
+          }
+        } else {
+          it.remove();
         }
       }
     }
+  }
+
+  /**
+   * Get existing configuration instances count.
+   */
+  public static int getInstanceCount() {
+    int cnt = 0;
+    Iterator<ConfWeakRef> it = REGISTRY.keySet().iterator();
+    while (it.hasNext()) {
+      Configuration conf = (Configuration) it.next().get();
+      if (conf != null) {
+        cnt ++;
+      } else {
+        it.remove();
+      }
+    }
+    ConfWeakRef.expungeStaleQueue();
+    return cnt;
   }
 
   public static void setRestrictSystemPropertiesDefault(boolean val) {
@@ -1157,37 +1211,36 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
       final String var = eval.substring(varBounds[SUB_START_IDX],
           varBounds[SUB_END_IDX]);
       String val = null;
-      try {
-        // evaluate system properties or environment variables even when
-        // the configuration is restricted -the restrictions are enforced
-        // in the getenv/getProperty calls
-        if (var.startsWith("env.") && 4 < var.length()) {
-          String v = var.substring(4);
-          int i = 0;
-          for (; i < v.length(); i++) {
-            char c = v.charAt(i);
-            if (c == ':' && i < v.length() - 1 && v.charAt(i + 1) == '-') {
-              val = getenv(v.substring(0, i));
-              if (val == null || val.length() == 0) {
-                val = v.substring(i + 2);
+      if (!restrictSystemProps) {
+        try {
+          if (var.startsWith("env.") && 4 < var.length()) {
+            String v = var.substring(4);
+            int i = 0;
+            for (; i < v.length(); i++) {
+              char c = v.charAt(i);
+              if (c == ':' && i < v.length() - 1 && v.charAt(i + 1) == '-') {
+                val = getenv(v.substring(0, i));
+                if (val == null || val.length() == 0) {
+                  val = v.substring(i + 2);
+                }
+                break;
+              } else if (c == '-') {
+                val = getenv(v.substring(0, i));
+                if (val == null) {
+                  val = v.substring(i + 1);
+                }
+                break;
               }
-              break;
-            } else if (c == '-') {
-              val = getenv(v.substring(0, i));
-              if (val == null) {
-                val = v.substring(i + 1);
-              }
-              break;
             }
+            if (i == v.length()) {
+              val = getenv(v);
+            }
+          } else {
+            val = getProperty(var);
           }
-          if (i == v.length()) {
-            val = getenv(v);
-          }
-        } else {
-          val = getProperty(var);
+        } catch (SecurityException se) {
+          LOG.warn("Unexpected SecurityException in Configuration", se);
         }
-      } catch (SecurityException se) {
-        LOG.warn("Unexpected SecurityException in Configuration", se);
       }
       if (val == null) {
         val = getRaw(var);
@@ -1213,33 +1266,13 @@ public class Configuration implements Iterable<Map.Entry<String,String>>,
     throw new IllegalStateException("Variable substitution depth too large: " 
                                     + MAX_SUBST + " " + expr);
   }
-
-  /**
-   * Get the environment variable value if
-   * {@link #restrictSystemProps} does not block this.
-   * @param name environment variable name.
-   * @return the value or null if either it is unset or access forbidden.
-   */
+  
   String getenv(String name) {
-    if (!restrictSystemProps) {
-      return System.getenv(name);
-    } else {
-      return null;
-    }
+    return System.getenv(name);
   }
 
-  /**
-   * Get a system property value if
-   * {@link #restrictSystemProps} does not block this.
-   * @param key property key
-   * @return the value or null if either it is unset or access forbidden.
-   */
   String getProperty(String key) {
-    if (!restrictSystemProps) {
-      return System.getProperty(key);
-    } else {
-      return null;
-    }
+    return System.getProperty(key);
   }
 
   /**
