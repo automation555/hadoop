@@ -24,8 +24,6 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.Schedulable;
 
-import static java.lang.Math.addExact;
-
 /**
  * Contains logic for computing the fair shares. A {@link Schedulable}'s fair
  * share is {@link Resource} it is entitled to, independent of the current
@@ -33,12 +31,9 @@ import static java.lang.Math.addExact;
  * consumption lies at or below its fair share will never have its containers
  * preempted.
  */
-public final class ComputeFairShares {
+public class ComputeFairShares {
   
   private static final int COMPUTE_FAIR_SHARES_ITERATIONS = 25;
-
-  private ComputeFairShares() {
-  }
 
   /**
    * Compute fair share of the given schedulables.Fair share is an allocation of
@@ -105,20 +100,19 @@ public final class ComputeFairShares {
    * all Schedulables are only given their minShare) and an upper bound computed
    * to be large enough that too many slots are given (by doubling R until we
    * use more than totalResources resources). The helper method
-   * resourceUsedWithWeightToResourceRatio computes the total resources used
-   * with a given value of R.
+   * resourceUsedWithWeightToResourceRatio computes the total resources used with a
+   * given value of R.
    * <p>
    * The running time of this algorithm is linear in the number of Schedulables,
-   * because resourceUsedWithWeightToResourceRatio is linear-time and the
-   * number of iterations of binary search is a constant (dependent on desired
-   * precision).
+   * because resourceUsedWithWeightToResourceRatio is linear-time and the number of
+   * iterations of binary search is a constant (dependent on desired precision).
    */
   private static void computeSharesInternal(
       Collection<? extends Schedulable> allSchedulables,
       Resource totalResources, String type, boolean isSteadyShare) {
 
     Collection<Schedulable> schedulables = new ArrayList<>();
-    long takenResources = handleFixedFairShares(
+    int takenResources = handleFixedFairShares(
         allSchedulables, schedulables, isSteadyShare, type);
 
     if (schedulables.isEmpty()) {
@@ -127,11 +121,12 @@ public final class ComputeFairShares {
     // Find an upper bound on R that we can use in our binary search. We start
     // at R = 1 and double it until we have either used all the resources or we
     // have met all Schedulables' max shares.
-    long totalMaxShare = 0;
+    int totalMaxShare = 0;
     for (Schedulable sched : schedulables) {
       long maxShare = sched.getMaxShare().getResourceValue(type);
-      totalMaxShare = safeAdd(maxShare, totalMaxShare);
-      if (totalMaxShare == Long.MAX_VALUE) {
+      totalMaxShare = (int) Math.min(maxShare + (long)totalMaxShare,
+          Integer.MAX_VALUE);
+      if (totalMaxShare == Integer.MAX_VALUE) {
         break;
       }
     }
@@ -171,24 +166,23 @@ public final class ComputeFairShares {
         target = sched.getFairShare();
       }
 
-      target.setResourceValue(type, computeShare(sched, right, type));
+      target.setResourceValue(type, (long)computeShare(sched, right, type));
     }
   }
 
   /**
    * Compute the resources that would be used given a weight-to-resource ratio
-   * w2rRatio, for use in the computeFairShares algorithm as described in
-   * {@link #computeSharesInternal}.
+   * w2rRatio, for use in the computeFairShares algorithm as described in #
    */
   private static long resourceUsedWithWeightToResourceRatio(double w2rRatio,
       Collection<? extends Schedulable> schedulables, String type) {
     long resourcesTaken = 0;
     for (Schedulable sched : schedulables) {
       long share = computeShare(sched, w2rRatio, type);
-      resourcesTaken = safeAdd(resourcesTaken, share);
-      if (resourcesTaken == Long.MAX_VALUE) {
-        break;
+      if (Long.MAX_VALUE - resourcesTaken < share) {
+        return Long.MAX_VALUE;
       }
+      resourcesTaken += share;
     }
     return resourcesTaken;
   }
@@ -210,11 +204,11 @@ public final class ComputeFairShares {
    * Returns the resources taken by fixed fairshare schedulables,
    * and adds the remaining to the passed nonFixedSchedulables.
    */
-  private static long handleFixedFairShares(
+  private static int handleFixedFairShares(
       Collection<? extends Schedulable> schedulables,
       Collection<Schedulable> nonFixedSchedulables,
       boolean isSteadyShare, String type) {
-    long totalResource = 0;
+    int totalResource = 0;
 
     for (Schedulable sched : schedulables) {
       long fixedShare = getFairShareIfFixed(sched, isSteadyShare, type);
@@ -230,15 +224,15 @@ public final class ComputeFairShares {
         }
 
         target.setResourceValue(type, fixedShare);
-        totalResource = safeAdd(totalResource, fixedShare);
+        totalResource = (int) Math.min((long)totalResource + (long)fixedShare,
+            Integer.MAX_VALUE);
       }
     }
     return totalResource;
   }
 
   /**
-   * Get the fairshare for the {@link Schedulable} if it is fixed,
-   * -1 otherwise.
+   * Get the fairshare for the {@link Schedulable} if it is fixed, -1 otherwise.
    *
    * The fairshare is fixed if either the maxShare is 0, weight is 0,
    * or the Schedulable is not active for instantaneous fairshare.
@@ -264,21 +258,5 @@ public final class ComputeFairShares {
     }
 
     return -1;
-  }
-
-  /**
-   * Safely add two long values. The result will always be a valid long value.
-   * If the addition caused an overflow the return value will be set to
-   * <code>Long.MAX_VALUE</code>.
-   * @param a first long to add
-   * @param b second long to add
-   * @return result of the addition
-   */
-  private static long safeAdd(long a, long b) {
-    try {
-      return addExact(a, b);
-    } catch (ArithmeticException ae) {
-      return Long.MAX_VALUE;
-    }
   }
 }
